@@ -1,0 +1,55 @@
+{
+  "ok": true,
+  "status": "DRY_RUN_PASSED",
+  "mode": "snapshot_read_only_account_dry_run",
+  "generatedAt": "2026-07-20T11:26:25.069Z",
+  "snapshotSha256": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
+  "accountCount": 127,
+  "accountBootstrapEndpoint": true,
+  "frontendCanaryClient": true,
+  "expectedInserts": 432,
+  "expectedUpdates": 0,
+  "expectedUnchanged": 0,
+  "expectedSkips": 1,
+  "expectedTables": {
+    "apg_account_profiles": 126,
+    "apg_account_roles": 126,
+    "apg_account_cabinets": 4,
+    "apg_account_telegram_links": 10,
+    "apg_account_sessions": 166
+  },
+  "transformations": {
+    "legacyMerges": 1,
+    "resolutionManifestApplied": true
+  },
+  "batching": {
+    "batchSize": 100,
+    "batches": {
+      "apg_account_profiles": 2,
+      "apg_account_roles": 2,
+      "apg_account_cabinets": 1,
+      "apg_account_telegram_links": 1,
+      "apg_account_sessions": 2
+    }
+  },
+  "resume": {
+    "checkpointEveryBatch": true,
+    "idempotencyKeys": [
+      "user_id",
+      "cabinet_id",
+      "telegram_id",
+      "session_id"
+    ]
+  },
+  "storage": {
+    "rawSnapshotBytes": 472384
+  },
+  "importStarted": false,
+  "verifyStarted": false,
+  "canaryStarted": false,
+  "cutoverStarted": false,
+  "productionChanged": false,
+  "firestoreWrites": 0,
+  "postgresWrites": 0,
+  "missing": []
+}

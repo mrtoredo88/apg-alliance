@@ -159,7 +159,8 @@
     "readiness:account": "node scripts/account-readiness.mjs",
     "readiness:event": "node scripts/event-readiness.mjs",
     "readiness:production": "node scripts/production-readiness.mjs",
-    "test:migration-env-loader": "node scripts/migration-env-loader-test.mjs"
+    "test:migration-env-loader": "node scripts/migration-env-loader-test.mjs",
+    "account:resolve-p0": "node scripts/account-p0-resolution.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

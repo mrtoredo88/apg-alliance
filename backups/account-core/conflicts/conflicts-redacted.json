@@ -1,10 +1,16 @@
 {
-  "status": "CONFLICT_ANALYSIS_BLOCKED_P0",
-  "generatedAt": "2026-07-20T11:09:34.237Z",
+  "status": "CONFLICT_ANALYSIS_PASSED",
+  "generatedAt": "2026-07-20T11:26:24.926Z",
   "snapshotSha256": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
   "accountCount": 127,
   "conflictCount": 14,
-  "p0Conflicts": 1,
+  "p0Conflicts": 0,
+  "resolvedP0Conflicts": 1,
+  "resolutionManifest": {
+    "present": true,
+    "actions": 1,
+    "reason": ""
+  },
   "analysis": {
     "duplicateUsers": {
       "duplicateEmails": [
@@ -83,6 +89,8 @@
       "p0": [
         {
           "type": "duplicate_admin_or_owner_email",
+          "conflictId": "duplicate_admin_or_owner_email_d1c56991cfb3f8bb",
+          "resolved": true,
           "group": {
             "keyHash": "key_d1c56991cfb3f8bb",
             "count": 2,
@@ -92,11 +100,14 @@
             ]
           }
         }
-      ]
+      ],
+      "unresolvedP0": []
     },
-    "p0": [
+    "resolvedP0": [
       {
         "type": "duplicate_admin_or_owner_email",
+        "conflictId": "duplicate_admin_or_owner_email_d1c56991cfb3f8bb",
+        "resolved": true,
         "group": {
           "keyHash": "key_d1c56991cfb3f8bb",
           "count": 2,
@@ -106,7 +117,8 @@
           ]
         }
       }
-    ]
+    ],
+    "p0": []
   },
   "productionChanged": false,
   "firestoreWrites": 0,

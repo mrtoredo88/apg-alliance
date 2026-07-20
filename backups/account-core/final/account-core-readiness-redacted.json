@@ -1,0 +1,21 @@
+{
+  "status": "BLOCKED",
+  "ready": false,
+  "blockedGate": "Production Import",
+  "passed": [
+    "REMOTE_PREFLIGHT_PASSED",
+    "SNAPSHOT_CREATED",
+    "AUTO_RESOLUTION_PASSED",
+    "CONFLICT_ANALYSIS_PASSED",
+    "DRY_RUN_PASSED"
+  ],
+  "locked": [
+    "VERIFY",
+    "CANARY",
+    "OBSERVATION",
+    "CUTOVER"
+  ],
+  "productionChanged": false,
+  "firestoreWrites": 0,
+  "postgresWrites": 0
+}

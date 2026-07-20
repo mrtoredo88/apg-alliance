@@ -6,6 +6,7 @@ loadMigrationEnv();
 
 const SNAPSHOT_LATEST = 'backups/account-core/snapshot/latest-snapshot-redacted.json';
 const CONFLICTS_REPORT = 'backups/account-core/conflicts/conflicts-redacted.json';
+const RESOLUTION_MANIFEST = 'backups/account-core/conflicts/resolution-manifest-redacted.json';
 const OUT_DIR = 'backups/account-core/dryrun';
 
 const required = [
@@ -47,9 +48,12 @@ function dryRunPlan(snapshot) {
   const tgLinks = snapshot.collections.tgLinks || [];
   const sessions = snapshot.collections.telegramAuthSessions || [];
   const cabinets = plannedCabinets(snapshot);
+  const manifest = fs.existsSync(RESOLUTION_MANIFEST) ? readJson(RESOLUTION_MANIFEST) : { actions: [] };
+  const mergeActions = (manifest.actions || []).filter(action => action.type === 'mergeLegacyIntoCanonical');
+  const canonicalProfileCount = Math.max(0, users.length - mergeActions.length);
   const inserts = {
-    apg_account_profiles: users.length,
-    apg_account_roles: users.length,
+    apg_account_profiles: canonicalProfileCount,
+    apg_account_roles: canonicalProfileCount,
     apg_account_cabinets: cabinets.length,
     apg_account_telegram_links: tgLinks.length,
     apg_account_sessions: sessions.length,
@@ -57,7 +61,13 @@ function dryRunPlan(snapshot) {
   return {
     expectedInserts: Object.values(inserts).reduce((sum, count) => sum + count, 0),
     expectedUpdates: 0,
+    expectedUnchanged: 0,
+    expectedSkips: mergeActions.length,
     expectedTables: inserts,
+    transformations: {
+      legacyMerges: mergeActions.length,
+      resolutionManifestApplied: mergeActions.length > 0,
+    },
     batching: {
       batchSize: 100,
       batches: Object.fromEntries(Object.entries(inserts).map(([name, count]) => [name, Math.ceil(count / 100)])),
@@ -134,6 +144,9 @@ fs.writeFileSync(path.join(OUT_DIR, 'dry-run-summary.md'), [
   `Account count: ${report.accountCount}`,
   `Expected inserts: ${report.expectedInserts}`,
   `Expected updates: ${report.expectedUpdates}`,
+  `Expected unchanged: ${report.expectedUnchanged}`,
+  `Expected skips: ${report.expectedSkips}`,
+  `Legacy merges: ${report.transformations.legacyMerges}`,
   '',
   '## Guardrails',
   '',

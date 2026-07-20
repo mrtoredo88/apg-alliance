@@ -1,26 +1,42 @@
 {
-  "migrationId": "account_core_2026-07-20T08-41-55-206Z",
-  "sourceSnapshotHash": "not-created",
+  "version": 1,
+  "migrationId": "account_core_completion_blocked_import",
+  "status": "IMPORT_BLOCKED",
+  "sourceSnapshotHash": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
   "schemaVersion": "account-core-v1-2026-07-20",
   "recordCounts": {
-    "profiles": 0,
-    "roles": 0,
+    "profiles": 126,
+    "roles": 126,
     "permissions": 0,
-    "cabinets": 0,
-    "sessions": 0,
-    "telegramLinks": 0
+    "cabinets": 4,
+    "sessions": 166,
+    "telegramLinks": 10
   },
-  "startedAt": "2026-07-20T08:41:55.207Z",
-  "finishedAt": "2026-07-20T08:41:55.207Z",
-  "importerVersion": 1,
-  "dryRun": true,
-  "limit": 0,
-  "resume": false,
-  "conflictCount": 0,
+  "conflictResolution": {
+    "status": "AUTO_RESOLUTION_PASSED",
+    "resolutionManifest": "backups/account-core/conflicts/resolution-manifest-redacted.json",
+    "legacyMerges": 1,
+    "unresolvedP0": 0
+  },
+  "dryRun": {
+    "status": "DRY_RUN_PASSED",
+    "expectedInserts": 432,
+    "expectedUpdates": 0,
+    "expectedSkips": 1
+  },
+  "import": {
+    "status": "BLOCKED",
+    "executed": false,
+    "reason": "account-core-import execute path requires production safety implementation"
+  },
   "verifyStatus": "NOT_RUN",
   "canaryStatus": "LOCKED",
+  "observationStatus": "LOCKED",
   "cutoverStatus": "LOCKED",
   "rollbackStatus": "READY_BY_FLAGS",
   "destructiveDeletes": false,
-  "rawSnapshotCommitted": false
+  "rawSnapshotCommitted": false,
+  "productionChanged": false,
+  "firestoreWrites": 0,
+  "postgresWrites": 0
 }

@@ -1,10 +1,10 @@
 {
   "ok": true,
-  "dryRun": true,
+  "dryRun": false,
   "snapshotRequested": false,
   "redactedReport": true,
   "productionChanged": false,
   "firestoreChanged": false,
-  "postgresWrites": 0,
+  "postgresWrites": "LOCKED_WITHOUT_EXPLICIT_IMPLEMENTATION",
   "manifest": "backups/account-core/manifest.json"
 }

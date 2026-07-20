@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "generatedAt": "2026-07-20T11:26:24.785Z",
+  "status": "AUTO_RESOLUTION_PASSED",
+  "sourceSnapshotHash": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
+  "p0ConflictCount": 1,
+  "approvedCount": 1,
+  "blockedCount": 0,
+  "resolutions": [
+    {
+      "conflictId": "duplicate_admin_or_owner_email_d1c56991cfb3f8bb",
+      "type": "duplicate_admin_or_owner_email",
+      "sourceSnapshotHash": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
+      "emailHash": "email_d1c56991cfb3f8bb",
+      "deterministic": true,
+      "status": "AUTO_RESOLUTION_APPROVED",
+      "canonicalAccountHash": "account_49cfeb6df78f46b4",
+      "legacyAccountHash": "account_61a135a57aaeafc3",
+      "appliedRule": "canonical_self_owner_admin_with_legacy_linked_duplicate_pointing_to_winner",
+      "accounts": [
+        {
+          "evidence": {
+            "accountHash": "account_49cfeb6df78f46b4",
+            "emailHash": "email_d1c56991cfb3f8bb",
+            "canonicalUserHash": "account_49cfeb6df78f46b4",
+            "mergedIntoHash": "",
+            "identityStatus": "canonical",
+            "identityVersion": "identity-core-v1",
+            "primaryRole": "owner",
+            "roles": [
+              "owner",
+              "partner"
+            ],
+            "ownerFlag": true,
+            "superAdminFlag": false,
+            "adminFlag": true,
+            "ownerProtected": true,
+            "firebaseUidPresent": true,
+            "telegramIdentityPresent": true,
+            "cabinetBindingCount": 5,
+            "directBusinessReferenceCount": 13,
+            "profileCompleteness": 8,
+            "createdAtPresent": true,
+            "updatedAtPresent": true,
+            "lastLoginPresent": true,
+            "lastSeenPresent": true,
+            "legacyLinked": false,
+            "canonicalSelf": true
+          },
+          "score": 3123,
+          "scoreReasons": [
+            {
+              "points": 1000,
+              "reason": "already_canonical_self"
+            },
+            {
+              "points": 800,
+              "reason": "confirmed_owner_role"
+            },
+            {
+              "points": 600,
+              "reason": "confirmed_admin_path"
+            },
+            {
+              "points": 500,
+              "reason": "owner_protected"
+            },
+            {
+              "points": 105,
+              "reason": "cabinet_bindings"
+            },
+            {
+              "points": 80,
+              "reason": "firebase_uid_present"
+            },
+            {
+              "points": 30,
+              "reason": "telegram_identity_present"
+            },
+            {
+              "points": 8,
+              "reason": "profile_completeness"
+            }
+          ]
+        },
+        {
+          "evidence": {
+            "accountHash": "account_61a135a57aaeafc3",
+            "emailHash": "email_d1c56991cfb3f8bb",
+            "canonicalUserHash": "account_49cfeb6df78f46b4",
+            "mergedIntoHash": "account_49cfeb6df78f46b4",
+            "identityStatus": "legacy_linked",
+            "identityVersion": "identity-core-v1",
+            "primaryRole": "partner",
+            "roles": [
+              "partner"
+            ],
+            "ownerFlag": false,
+            "superAdminFlag": false,
+            "adminFlag": false,
+            "ownerProtected": false,
+            "firebaseUidPresent": false,
+            "telegramIdentityPresent": true,
+            "cabinetBindingCount": 2,
+            "directBusinessReferenceCount": 0,
+            "profileCompleteness": 6,
+            "createdAtPresent": true,
+            "updatedAtPresent": true,
+            "lastLoginPresent": false,
+            "lastSeenPresent": true,
+            "legacyLinked": true,
+            "canonicalSelf": false
+          },
+          "score": -1062,
+          "scoreReasons": [
+            {
+              "points": 102,
+              "reason": "cabinet_bindings"
+            },
+            {
+              "points": 30,
+              "reason": "telegram_identity_present"
+            },
+            {
+              "points": -900,
+              "reason": "legacy_linked"
+            },
+            {
+              "points": -300,
+              "reason": "already_merged_into_canonical"
+            },
+            {
+              "points": 6,
+              "reason": "profile_completeness"
+            }
+          ]
+        }
+      ],
+      "preservation": {
+        "legacyIdAlias": true,
+        "providerLinks": true,
+        "historicalLinks": true,
+        "rolesUnion": [
+          "owner",
+          "partner"
+        ],
+        "permissionsUnion": true,
+        "cabinetBindingsPreserved": true,
+        "profileFieldsMergedByCompleteness": true,
+        "ownerAdminPrivilegesNotDowngraded": true,
+        "sessionTokensNotMoved": true,
+        "noFirestoreWrites": true,
+        "noDeletion": true
+      },
+      "resolutionId": "account_resolution_c3afabaad18bbf1d"
+    }
+  ],
+  "productionChanged": false,
+  "firestoreWrites": 0,
+  "postgresWrites": 0,
+  "importStarted": false,
+  "verifyStarted": false,
+  "canaryStarted": false,
+  "cutoverStarted": false
+}

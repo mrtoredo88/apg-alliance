@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 
 const OUT_DIR = 'backups/account-core/conflicts';
 const SNAPSHOT_DIR = 'backups/account-core/snapshot';
+const RESOLUTION_MANIFEST = path.join(OUT_DIR, 'resolution-manifest-redacted.json');
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
 function readJson(file) {
@@ -48,6 +49,20 @@ function groupBy(items, getKey) {
     }));
 }
 
+function conflictIdFor(type, key) {
+  return `${type}_${stableHash(key)}`;
+}
+
+function readResolutionManifest(snapshotSha256) {
+  if (!fs.existsSync(RESOLUTION_MANIFEST)) return { actions: [], matched: false };
+  const manifest = readJson(RESOLUTION_MANIFEST);
+  if (manifest.sourceSnapshotHash !== snapshotSha256) return { actions: [], matched: false, reason: 'SNAPSHOT_HASH_MISMATCH' };
+  return {
+    actions: Array.isArray(manifest.actions) ? manifest.actions : [],
+    matched: true,
+  };
+}
+
 function roleOf(user) {
   const data = user.data || {};
   const roles = Array.isArray(data.roles) ? data.roles : [data.role].filter(Boolean);
@@ -74,7 +89,7 @@ function buildCabinets(snapshot) {
   ];
 }
 
-function analyze(snapshot) {
+function analyze(snapshot, resolutionManifest = { actions: [] }) {
   const users = snapshot.collections.users || [];
   const tgLinks = snapshot.collections.tgLinks || [];
   const sessions = snapshot.collections.telegramAuthSessions || [];
@@ -98,8 +113,19 @@ function analyze(snapshot) {
   const ownerUsers = users.filter(item => roleOf(item).includes('owner')).map(item => item.id);
   const sessionConflicts = groupBy(sessions, item => item.data?.userId || item.data?.uid || item.data?.telegramId);
 
+  const resolvedConflictIds = new Set((resolutionManifest.actions || []).map(action => action.conflictId).filter(Boolean));
+  const ownerAdminDuplicateP0 = duplicateEmails
+    .filter(group => group.ids.some(id => adminUsers.includes(id) || ownerUsers.includes(id)))
+    .map(group => ({
+      type: 'duplicate_admin_or_owner_email',
+      conflictId: conflictIdFor('duplicate_admin_or_owner_email', group.key),
+      group,
+      resolved: resolvedConflictIds.has(conflictIdFor('duplicate_admin_or_owner_email', group.key)),
+    }));
+  const unresolvedOwnerAdminDuplicateP0 = ownerAdminDuplicateP0.filter(item => !item.resolved);
+
   const p0 = [
-    ...duplicateEmails.filter(group => group.ids.some(id => adminUsers.includes(id) || ownerUsers.includes(id))).map(group => ({ type: 'duplicate_admin_or_owner_email', group })),
+    ...unresolvedOwnerAdminDuplicateP0,
     ...duplicateFirebase.map(group => ({ type: 'duplicate_firebase_uid', group })),
     ...duplicateTelegramIds.map(group => ({ type: 'duplicate_user_telegram_id', group })),
     ...duplicateCabinets.map(group => ({ type: 'duplicate_cabinet_owner', group })),
@@ -125,8 +151,10 @@ function analyze(snapshot) {
     ownerAdminConflicts: {
       adminUsers,
       ownerUsers,
-      p0,
+      p0: ownerAdminDuplicateP0,
+      unresolvedP0: unresolvedOwnerAdminDuplicateP0,
     },
+    resolvedP0: ownerAdminDuplicateP0.filter(item => item.resolved),
     p0,
   };
 }
@@ -146,6 +174,8 @@ function redactReference(item) {
 function redactP0(item) {
   return {
     type: item.type,
+    conflictId: item.conflictId || '',
+    resolved: Boolean(item.resolved),
     group: item.group ? redactGroup(item.group) : undefined,
     item: item.item ? redactReference(item.item) : undefined,
   };
@@ -172,7 +202,9 @@ function redactAnalysis(analysis) {
       adminUsers: analysis.ownerAdminConflicts.adminUsers.map(id => redactValue(id, 'account')),
       ownerUsers: analysis.ownerAdminConflicts.ownerUsers.map(id => redactValue(id, 'account')),
       p0: analysis.ownerAdminConflicts.p0.map(redactP0),
+      unresolvedP0: analysis.ownerAdminConflicts.unresolvedP0.map(redactP0),
     },
+    resolvedP0: analysis.resolvedP0.map(redactP0),
     p0: analysis.p0.map(redactP0),
   };
 }
@@ -194,7 +226,8 @@ if (!latest) {
   process.exit(1);
 }
 
-const analysis = analyze(latest.snapshot);
+const resolutionManifest = readResolutionManifest(latest.meta.sha256);
+const analysis = analyze(latest.snapshot, resolutionManifest);
 const conflictCount = Object.values(analysis).reduce((sum, value) => {
   if (Array.isArray(value)) return sum + value.length;
   if (value && typeof value === 'object') {
@@ -210,6 +243,12 @@ const report = {
   accountCount: latest.meta.accountCount,
   conflictCount,
   p0Conflicts: analysis.p0.length,
+  resolvedP0Conflicts: analysis.resolvedP0.length,
+  resolutionManifest: {
+    present: resolutionManifest.matched,
+    actions: resolutionManifest.actions?.length || 0,
+    reason: resolutionManifest.reason || '',
+  },
   analysis: redactAnalysis(analysis),
   productionChanged: false,
   firestoreWrites: 0,
@@ -229,6 +268,8 @@ fs.writeFileSync(path.join(OUT_DIR, 'conflicts-summary.md'), [
   `Account count: ${report.accountCount}`,
   `Conflict count: ${report.conflictCount}`,
   `P0 conflicts: ${report.p0Conflicts}`,
+  `Resolved P0 conflicts: ${report.resolvedP0Conflicts}`,
+  `Resolution manifest: ${report.resolutionManifest.present ? 'APPLIED' : 'NOT APPLIED'}`,
   '',
   '## Guardrails',
   '',
