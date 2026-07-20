@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "dryRun": true,
+  "snapshotRequested": false,
+  "redactedReport": true,
+  "productionChanged": false,
+  "firestoreChanged": false,
+  "postgresWrites": 0,
+  "manifest": "backups/account-core/manifest.json"
+}

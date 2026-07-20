@@ -144,6 +144,48 @@ export class AccountCoreService {
     };
   }
 
+  async bootstrapAccount({ userId, sessionId = '', firebaseUid = '', telegramId = '' } = {}) {
+    const [session, home, workspace, telegramLink] = await Promise.all([
+      this.restoreSession({ sessionId, userId, firebaseUid }).catch(error => {
+        this.metrics.recordError(error);
+        return null;
+      }),
+      this.bootstrapHome(userId),
+      this.bootstrapWorkspace(userId),
+      telegramId ? this.telegram.get(telegramId).catch(error => {
+        this.metrics.recordError(error);
+        return null;
+      }) : Promise.resolve(null),
+    ]);
+    const roles = workspace.roles || home.roles || ['user'];
+    const primaryRole = workspace.primaryRole || home.primaryRole || roles[0] || 'user';
+    const cabinets = Array.isArray(workspace.cabinets) ? workspace.cabinets : [];
+    return {
+      ok: true,
+      canonicalUserId: workspace.profile?.canonicalUserId || home.profile?.canonicalUserId || userId,
+      profile: workspace.profile || home.profile || null,
+      roles,
+      permissions: workspace.permissions || [],
+      cabinets,
+      access: {
+        owner: roles.includes('owner'),
+        admin: roles.some(role => ['owner', 'super_admin', 'admin'].includes(role)),
+        partner: roles.includes('partner') || cabinets.some(item => item.type === 'partner'),
+        expert: roles.includes('expert') || cabinets.some(item => item.type === 'expert'),
+        workspace: Boolean(workspace.workspaceReady),
+      },
+      session,
+      telegram: telegramLink ? { linked: true, userId: telegramLink.userId } : { linked: false },
+      diagnostics: {
+        storage: this.postgresPrimary ? 'postgres' : 'firestore',
+        fallbackEnabled: isAccountFallbackEnabled(this.flags),
+        dualRead: isAccountDualReadEnabled(this.flags),
+        dualWrite: isAccountDualWriteEnabled(this.flags),
+        source: this.postgresPrimary ? 'account-core-postgres' : 'account-core-dual-read',
+      },
+    };
+  }
+
   async bootstrapHome(userId) {
     this.metrics.increment('homeBootstrap');
     const profile = await this.getProfile(userId);

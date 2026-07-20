@@ -15,6 +15,8 @@ const missing = required.filter(file => !fs.existsSync(file));
 const report = {
   ok: missing.length === 0,
   mode: 'local_read_only_account_dry_run',
+  accountBootstrapEndpoint: fs.existsSync('server/src/routes/account.js'),
+  frontendCanaryClient: fs.existsSync('src/accountApi.js'),
   importStarted: false,
   canaryStarted: false,
   cutoverStarted: false,

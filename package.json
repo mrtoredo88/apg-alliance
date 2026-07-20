@@ -138,12 +138,16 @@
     "audit:full-postgres-migration": "node scripts/full-postgres-migration-audit.mjs",
     "test:account-core": "node scripts/account-core-test.mjs",
     "test:account-core-guard": "node scripts/account-core-architecture-guard.mjs",
+    "test:account-integration": "node scripts/account-integration-test.mjs",
+    "test:account-firestore-outage": "node scripts/account-firestore-outage-test.mjs",
+    "account:import": "node scripts/account-core-import.mjs",
     "account:dry-run": "node scripts/account-dry-run.mjs",
     "account:verify": "node scripts/account-verify.mjs",
     "account:canary": "node scripts/account-canary.mjs",
     "account:cutover": "node scripts/account-cutover.mjs",
     "account:rollback": "node scripts/account-rollback.mjs",
-    "readiness:account": "node scripts/account-readiness.mjs"
+    "readiness:account": "node scripts/account-readiness.mjs",
+    "readiness:event": "node scripts/event-readiness.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] feat: Account Core Integration v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server/src/routes/account.js`, `src/accountApi.js`, `src/UserApp.jsx`, `server/src/routes/user-actions.js`, `server/src/apg/account/*`, `scripts/account-*.mjs`, `docs/migration/account-core-integration-map.md`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен backend endpoint `POST /api/account/bootstrap` и frontend `fetchAccountBootstrap`, чтобы canary-mode UserApp получал профиль, роли, permissions, cabinets и session state через AccountCoreService.
+- `profile:sync` и `profile:update` получили gated Account Core write-through path через `serverFoundation.account.upsertProfile`, без изменения legacy Firestore rollback path и без включения production flags.
+- Добавлены account import dry-run/manifest, verify redacted reports, Firestore outage simulation, event readiness integration и integration map оставшихся legacy вызовов.
+**Почему:** Account Core scaffold должен начать обслуживать реальные критические пути через PostgreSQL/service layer, прежде чем можно будет говорить о canary и production cutover.
+
 ## [2026-07-20] feat: Account Core Migration v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server/src/apg/account/*`, `server/src/apg/index.js`, `server/src/routes/system-status.js`, `src/apg/core/FeatureFlags.js`, `scripts/account-*.mjs`, `scripts/architecture-guard.mjs`, `docs/architecture-guard-report.json`, `package.json`, `.ai/17_CHANGELOG_AI.md`

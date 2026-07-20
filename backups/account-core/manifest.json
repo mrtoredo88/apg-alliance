@@ -1,0 +1,26 @@
+{
+  "migrationId": "account_core_2026-07-20T08-41-55-206Z",
+  "sourceSnapshotHash": "not-created",
+  "schemaVersion": "account-core-v1-2026-07-20",
+  "recordCounts": {
+    "profiles": 0,
+    "roles": 0,
+    "permissions": 0,
+    "cabinets": 0,
+    "sessions": 0,
+    "telegramLinks": 0
+  },
+  "startedAt": "2026-07-20T08:41:55.207Z",
+  "finishedAt": "2026-07-20T08:41:55.207Z",
+  "importerVersion": 1,
+  "dryRun": true,
+  "limit": 0,
+  "resume": false,
+  "conflictCount": 0,
+  "verifyStatus": "NOT_RUN",
+  "canaryStatus": "LOCKED",
+  "cutoverStatus": "LOCKED",
+  "rollbackStatus": "READY_BY_FLAGS",
+  "destructiveDeletes": false,
+  "rawSnapshotCommitted": false
+}

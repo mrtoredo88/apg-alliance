@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "mode": "local_read_only_account_verify",
+  "verifyStartedAgainstProduction": false,
+  "firestoreChanged": false,
+  "productionChanged": false,
+  "parity": {
+    "recordCounts": "NOT_RUN_NO_SNAPSHOT",
+    "canonicalUserMapping": "NOT_RUN_NO_SNAPSHOT",
+    "roleParity": "NOT_RUN_NO_SNAPSHOT",
+    "permissionParity": "NOT_RUN_NO_SNAPSHOT",
+    "cabinetParity": "NOT_RUN_NO_SNAPSHOT",
+    "ownerAdminParity": "NOT_RUN_NO_SNAPSHOT",
+    "telegramLinkParity": "NOT_RUN_NO_SNAPSHOT"
+  },
+  "staticEvidence": {
+    "schema": 3601,
+    "service": 7223,
+    "endpoint": 3704
+  },
+  "canaryReadiness": "LOCKED_UNTIL_IMPORT_AND_PARITY_VERIFY"
+}

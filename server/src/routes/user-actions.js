@@ -1,5 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb, getDbAuth } from '../lib/firebase.js';
+import { serverFoundation } from '../apg/index.js';
 import { APP_URL } from '../lib/config.js';
 import { getDbMessaging } from '../lib/firebase.js';
 import webpush from 'web-push';
@@ -107,6 +108,25 @@ import {
 
 const MAX_TEXT = 4000;
 const MAX_DIALOG_TEXT = 1800;
+
+function accountCoreWriteEnabled() {
+  return ['1', 'true', 'on'].includes(String(process.env.ACCOUNT_DUAL_WRITE || process.env.ACCOUNT_CANARY || '').toLowerCase())
+    || String(process.env.ACCOUNT_STORAGE || '').toLowerCase() === 'postgres';
+}
+
+async function writeAccountProfileBestEffort(userId, profile = {}, extra = {}) {
+  if (!accountCoreWriteEnabled()) return null;
+  return serverFoundation.account.upsertProfile({
+    ...profile,
+    ...extra,
+    id: userId,
+    userId,
+    canonicalUserId: profile.canonicalUserId || userId,
+  }).catch(error => {
+    serverFoundation.account.metrics.recordError(error);
+    return null;
+  });
+}
 
 function safeString(value, max = 300) {
   return String(value ?? '').trim().slice(0, max);
@@ -658,6 +678,7 @@ async function actionProfileSync(db, req, actor) {
 
   consentStatus = getConsentStatus(userDoc);
   await audit(db, req, actor, created ? 'profile:create' : 'profile:sync', 'users', userId, 'success', { dailyBonusAwarded, referralBonusAwarded, referralRecoveryStatus, referralRecoveryReason, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion });
+  await writeAccountProfileBestEffort(userId, userDoc, { bootstrap: { profileSync: true, created } });
   if (hasReferralObservability) {
     const effectiveReferrerId = userDoc?.referredBy || userDoc?.referralBonusGrantedTo || refId || referralContext.referralCode;
     recordReferralEventAsync(db, {
@@ -793,6 +814,7 @@ async function actionProfilePatch(db, req, actor) {
   if (!Object.keys(patch).length) throw Object.assign(new Error('Нет данных для сохранения.'), { statusCode: 400 });
   patch.updatedAt = FieldValue.serverTimestamp();
   await db.collection('users').doc(userId).set(patch, { merge: true });
+  await writeAccountProfileBestEffort(userId, patch, { bootstrap: { profileUpdate: true } });
   await audit(db, req, actor, 'profile:update', 'users', userId, 'success', { fields: Object.keys(patch) });
   return { ok: true, userId, patch: req.body?.patch || {} };
 }

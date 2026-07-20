@@ -11,6 +11,7 @@ import { registerCurrentPushDevice } from './pushDiagnostics.js';
 import { confirmQrScan } from './rewardApi.js';
 import { getReputationStatus } from './economyEngine.js';
 import { userAction } from './userApi.js';
+import { fetchAccountBootstrap, shouldUseAccountCoreCanary } from './accountApi.js';
 import { db, auth } from './firebase';
 import {
   doc, getDoc,
@@ -1595,6 +1596,35 @@ export function UserApp() {
           }
         } catch (error) {
           traceAuthStage('identity_core_deferred', { userId: userData.id, error: error?.code ?? error?.message ?? String(error) });
+        }
+      }
+
+      let accountBootstrap = null;
+      if (!isGuest && shouldUseAccountCoreCanary()) {
+        try {
+          accountBootstrap = await fetchAccountBootstrap({
+            userId: String(userData.id),
+            telegramId: userData.telegramId || userData.tgId || '',
+          });
+          if (accountBootstrap?.profile && isMounted.current) {
+            const accountProfile = accountBootstrap.profile;
+            userData = {
+              ...userData,
+              ...accountProfile,
+              id: accountBootstrap.canonicalUserId || accountProfile.userId || userData.id,
+              canonicalUserId: accountBootstrap.canonicalUserId || accountProfile.canonicalUserId || userData.canonicalUserId,
+              role: accountBootstrap.roles?.[0] || accountProfile.role || userData.role,
+              roles: accountBootstrap.roles || accountProfile.roles || userData.roles,
+              partnerId: accountProfile.partnerId ?? userData.partnerId,
+              partnerCabinetIds: accountProfile.partnerCabinetIds ?? userData.partnerCabinetIds,
+              expertId: accountProfile.expertId ?? userData.expertId,
+              expertCabinetIds: accountProfile.expertCabinetIds ?? userData.expertCabinetIds,
+            };
+            setUser(userData);
+            setErrorLoggerUser(String(userData.id));
+          }
+        } catch (error) {
+          traceAuthStage('account_core_bootstrap_deferred', { userId: userData.id, error: error?.code ?? error?.message ?? String(error) });
         }
       }
 
