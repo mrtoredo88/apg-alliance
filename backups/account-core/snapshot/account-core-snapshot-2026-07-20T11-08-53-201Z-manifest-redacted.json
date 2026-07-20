@@ -1,0 +1,27 @@
+{
+  "status": "SNAPSHOT_CREATED",
+  "immutable": true,
+  "generatedAt": "2026-07-20T11:08:57.571Z",
+  "source": "production-firestore-read-only",
+  "scope": "account-core",
+  "rawSnapshotPath": "backups/account-core/snapshot/raw/account-core-snapshot-2026-07-20T11-08-53-201Z.json",
+  "sha256": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
+  "accountCount": 127,
+  "collectionCounts": {
+    "users": 127,
+    "tgLinks": 10,
+    "telegramAuthSessions": 166,
+    "partners": 18,
+    "experts": 8
+  },
+  "collectionGroupCounts": {
+    "bookings": 12
+  },
+  "productionChanged": false,
+  "firestoreWrites": 0,
+  "postgresWrites": 0,
+  "importStarted": false,
+  "verifyStarted": false,
+  "canaryStarted": false,
+  "cutoverStarted": false
+}

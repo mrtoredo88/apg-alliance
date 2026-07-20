@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 const OUT_DIR = 'backups/account-core/conflicts';
 const SNAPSHOT_DIR = 'backups/account-core/snapshot';
@@ -21,6 +22,15 @@ function normalized(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function stableHash(value) {
+  return createHash('sha256').update(String(value || '')).digest('hex').slice(0, 16);
+}
+
+function redactValue(value, prefix = 'value') {
+  if (!value) return '';
+  return `${prefix}_${stableHash(value)}`;
+}
+
 function groupBy(items, getKey) {
   const groups = new Map();
   for (const item of items) {
@@ -29,7 +39,13 @@ function groupBy(items, getKey) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(item);
   }
-  return [...groups.entries()].filter(([, items]) => items.length > 1).map(([key, items]) => ({ key, count: items.length, ids: items.map(item => item.id || item.path) }));
+  return [...groups.entries()]
+    .filter(([, items]) => items.length > 1)
+    .map(([key, items]) => ({
+      key,
+      count: items.length,
+      ids: items.map(item => item.id || item.path),
+    }));
 }
 
 function roleOf(user) {
@@ -115,6 +131,52 @@ function analyze(snapshot) {
   };
 }
 
+function redactGroup(group) {
+  return {
+    keyHash: redactValue(group.key, 'key'),
+    count: group.count,
+    ids: (group.ids || []).map(id => redactValue(id, 'account')),
+  };
+}
+
+function redactReference(item) {
+  return Object.fromEntries(Object.entries(item || {}).map(([key, value]) => [key, redactValue(value, key)]));
+}
+
+function redactP0(item) {
+  return {
+    type: item.type,
+    group: item.group ? redactGroup(item.group) : undefined,
+    item: item.item ? redactReference(item.item) : undefined,
+  };
+}
+
+function redactAnalysis(analysis) {
+  return {
+    duplicateUsers: {
+      duplicateEmails: analysis.duplicateUsers.duplicateEmails.map(redactGroup),
+      duplicateFirebase: analysis.duplicateUsers.duplicateFirebase.map(redactGroup),
+      duplicateTelegramIds: analysis.duplicateUsers.duplicateTelegramIds.map(redactGroup),
+    },
+    duplicateRoles: analysis.duplicateRoles,
+    duplicateCabinets: analysis.duplicateCabinets.map(redactGroup),
+    missingProfile: analysis.missingProfile.map(redactReference),
+    danglingReferences: {
+      orphanTgLinks: analysis.danglingReferences.orphanTgLinks.map(redactReference),
+      missingBookingUsers: analysis.danglingReferences.missingBookingUsers.map(redactReference),
+      danglingCabinets: analysis.danglingReferences.danglingCabinets.map(redactReference),
+    },
+    telegramCollisions: analysis.telegramCollisions.map(redactGroup),
+    sessionConflicts: analysis.sessionConflicts.map(redactGroup),
+    ownerAdminConflicts: {
+      adminUsers: analysis.ownerAdminConflicts.adminUsers.map(id => redactValue(id, 'account')),
+      ownerUsers: analysis.ownerAdminConflicts.ownerUsers.map(id => redactValue(id, 'account')),
+      p0: analysis.ownerAdminConflicts.p0.map(redactP0),
+    },
+    p0: analysis.p0.map(redactP0),
+  };
+}
+
 const latest = latestSnapshot();
 if (!latest) {
   const report = {
@@ -148,7 +210,7 @@ const report = {
   accountCount: latest.meta.accountCount,
   conflictCount,
   p0Conflicts: analysis.p0.length,
-  analysis,
+  analysis: redactAnalysis(analysis),
   productionChanged: false,
   firestoreWrites: 0,
   postgresWrites: 0,

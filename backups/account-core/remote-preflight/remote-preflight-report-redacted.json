@@ -3,26 +3,26 @@
   "runtime": {
     "containerId": "bbatdc5luq828rcn1tav",
     "containerName": "apg-migration-operator",
-    "revisionId": "bbavierknh9n40hoco0r",
-    "imageDigest": "sha256:e3072e32ff65dddea604ba649d887afd17cb3ad092a786c40f97a9057c8d9188",
-    "imageUrl": "cr.yandex/crpvv13u8vr3qjftdvvg/apg-migration-operator:fa432f0c",
+    "revisionId": "bbaqatlcq7101bk9q7c8",
+    "imageDigest": "sha256:adec1e8b094f0cc9ac77f50f2afcc224ea151d16b87c3e02eb2af59c9ea51c4c",
+    "imageUrl": "cr.yandex/crpvv13u8vr3qjftdvvg/apg-migration-operator:4f56a07e",
     "vpc": "enpa19j9jpki1f67p6kq",
     "serviceAccount": "ajegfv96md2tqri8gjdp",
-    "executionTimestamp": "2026-07-20T10:44:46.551Z",
-    "sourceCommit": "fa432f0c"
+    "executionTimestamp": "2026-07-20T11:08:47.837Z",
+    "sourceCommit": "4f56a07e"
   },
-  "httpStatus": 500,
-  "ok": false,
-  "status": "REMOTE_PREFLIGHT_BLOCKED",
+  "httpStatus": 200,
+  "ok": true,
+  "status": "REMOTE_PREFLIGHT_PASSED",
   "response": {
-    "ok": false,
-    "exitCode": 1,
-    "status": "REMOTE_PREFLIGHT_BLOCKED",
+    "ok": true,
+    "exitCode": 0,
+    "status": "REMOTE_PREFLIGHT_PASSED",
     "report": {
       "version": 2,
-      "generatedAt": "2026-07-20T10:44:42.218Z",
+      "generatedAt": "2026-07-20T11:08:43.188Z",
       "mode": "remote_execution_no_data",
-      "status": "REMOTE_PREFLIGHT_BLOCKED",
+      "status": "REMOTE_PREFLIGHT_PASSED",
       "productionChanged": false,
       "deployStarted": false,
       "snapshotStarted": false,
@@ -33,6 +33,7 @@
       "rollbackStarted": false,
       "postgresWrites": 0,
       "firestoreReads": 0,
+      "postgresBusinessTableReads": 0,
       "productionDataReads": 0,
       "secretsPrinted": false,
       "dsnPrinted": false,
@@ -53,10 +54,22 @@
       "env": {
         "loadedKeys": [],
         "sourceCount": 0,
+        "required": [
+          {
+            "key": "APG_IDENTITY_DATABASE_URL",
+            "source": "runtime",
+            "configured": true
+          },
+          {
+            "key": "GOOGLE_APPLICATION_CREDENTIALS",
+            "source": "runtime",
+            "configured": true
+          }
+        ],
         "redacted": true
       },
       "validation": {
-        "ok": false,
+        "ok": true,
         "checks": [
           {
             "name": "runtime_assertion",
@@ -70,11 +83,26 @@
           },
           {
             "name": "environment_loader",
-            "status": "BLOCKED",
+            "status": "PASS",
             "durationMs": 0,
             "details": {
-              "ok": false,
-              "loadedKeyCount": 0,
+              "ok": true,
+              "loadedFromFileCount": 0,
+              "alreadyPresentInRuntimeCount": 0,
+              "requiredConfiguredCount": 2,
+              "requiredMissingCount": 0,
+              "required": [
+                {
+                  "key": "APG_IDENTITY_DATABASE_URL",
+                  "source": "runtime",
+                  "configured": true
+                },
+                {
+                  "key": "GOOGLE_APPLICATION_CREDENTIALS",
+                  "source": "runtime",
+                  "configured": true
+                }
+              ],
               "dsnConfigured": true,
               "firebaseAdminConfigured": true
             }
@@ -97,7 +125,7 @@
           {
             "name": "dns",
             "status": "PASS",
-            "durationMs": 8,
+            "durationMs": 9,
             "details": {
               "ok": true,
               "addressCount": 1,
@@ -109,36 +137,44 @@
           {
             "name": "tcp",
             "status": "PASS",
-            "durationMs": 10,
+            "durationMs": 9,
             "details": {
               "ok": true,
               "port": 6432
             }
           },
           {
-            "name": "tls",
-            "status": "BLOCKED",
-            "durationMs": 6046,
-            "error": {
-              "code": "TIMEOUT",
-              "name": "Error",
-              "message": "TLS handshake timed out"
+            "name": "yandex_ca_certificate",
+            "status": "PASS",
+            "durationMs": 3,
+            "details": {
+              "ok": true,
+              "file": "/app/certs/YandexInternalRootCA.crt",
+              "nonEmpty": true,
+              "containsPrivateKey": false,
+              "sha256": "6d148f85b5213445b23ad22ff45e47e1aa2be968f183f9bd6ff39de54d47a8ef",
+              "source": "https://storage.yandexcloud.net/cloud-certs/CA.pem"
             }
           },
           {
             "name": "postgres_auth",
-            "status": "BLOCKED",
-            "durationMs": 28,
-            "error": {
-              "code": "SELF_SIGNED_CERT_IN_CHAIN",
-              "name": "Error",
-              "message": "self-signed certificate in certificate chain"
+            "status": "PASS",
+            "durationMs": 100,
+            "details": {
+              "ok": true,
+              "query": "SELECT 1",
+              "tlsVerified": true,
+              "rejectUnauthorized": true,
+              "certificateAuthority": "Yandex Cloud CA",
+              "hostnameVerification": true,
+              "productionDataRead": false,
+              "businessTableRead": false
             }
           },
           {
             "name": "firebase_admin_initialization",
             "status": "PASS",
-            "durationMs": 480,
+            "durationMs": 539,
             "details": {
               "ok": true,
               "initializedApps": 1,
@@ -149,7 +185,7 @@
           {
             "name": "migration_manifests",
             "status": "PASS",
-            "durationMs": 1,
+            "durationMs": 0,
             "details": {
               "ok": true,
               "files": [
@@ -213,28 +249,16 @@
             }
           }
         ],
-        "blocked": [
-          {
-            "name": "environment_loader",
-            "error": "BLOCKED"
-          },
-          {
-            "name": "tls",
-            "error": "TIMEOUT"
-          },
-          {
-            "name": "postgres_auth",
-            "error": "SELF_SIGNED_CERT_IN_CHAIN"
-          }
-        ],
+        "blocked": [],
         "productionDataReads": 0,
         "firestoreReads": 0,
+        "postgresBusinessTableReads": 0,
         "postgresWrites": 0
       },
-      "nextSafeStep": "Run this no-data remote preflight from the production VPC runtime. Do not snapshot/import/verify/canary/cutover."
+      "nextSafeStep": "After explicit owner approval, create the first immutable Account Core production snapshot."
     },
-    "stdoutTail": "\n> apg-app@0.0.0 account:remote-preflight\n> node scripts/account-remote-preflight.mjs --execute\n\n{\n  \"status\": \"REMOTE_PREFLIGHT_BLOCKED\",\n  \"mode\": \"remote_execution_no_data\",\n  \"report\": \"backups/account-core/preflight/remote-preflight-redacted.json\",\n  \"productionNetwork\": {\n    \"backendRuntime\": \"Yandex Serverless Container\",\n    \"containerName\": \"apg-api\",\n    \"containerId\": \"bbangqkf2d4pa9855lu0\",\n    \"networkId\": \"enpa19j9jpki1f67p6kq\"\n  },\n  \"command\": \"APG_REMOTE_OPERATOR_RUNTIME=production-vpc APG_REMOTE_PREFLIGHT_EXECUTION=1 npm run account:remote-preflight -- --execute\",\n  \"blocked\": [\n    {\n      \"name\": \"environment_loader\",\n      \"error\": \"BLOCKED\"\n    },\n    {\n      \"name\": \"tls\",\n      \"error\": \"TIMEOUT\"\n    },\n    {\n      \"name\": \"postgres_auth\",\n      \"error\": \"SELF_SIGNED_CERT_IN_CHAIN\"\n    }\n  ],\n  \"productionDataReads\": 0,\n  \"firestoreReads\": 0,\n  \"productionChanged\": false,\n  \"deployStarted\": false,\n  \"postgresWrites\": 0,\n  \"secretsPrinted\": false\n}\n",
-    "stderrTail": "(node:127) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.\nIn the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.\n\nTo prepare for this change:\n- If you want the current behavior, explicitly use 'sslmode=verify-full'\n- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'\n\nSee https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
+    "stdoutTail": "\n> apg-app@0.0.0 account:remote-preflight\n> node scripts/account-remote-preflight.mjs --execute\n\n{\n  \"status\": \"REMOTE_PREFLIGHT_PASSED\",\n  \"mode\": \"remote_execution_no_data\",\n  \"report\": \"backups/account-core/preflight/remote-preflight-redacted.json\",\n  \"productionNetwork\": {\n    \"backendRuntime\": \"Yandex Serverless Container\",\n    \"containerName\": \"apg-api\",\n    \"containerId\": \"bbangqkf2d4pa9855lu0\",\n    \"networkId\": \"enpa19j9jpki1f67p6kq\"\n  },\n  \"command\": \"APG_REMOTE_OPERATOR_RUNTIME=production-vpc APG_REMOTE_PREFLIGHT_EXECUTION=1 npm run account:remote-preflight -- --execute\",\n  \"blocked\": [],\n  \"productionDataReads\": 0,\n  \"firestoreReads\": 0,\n  \"productionChanged\": false,\n  \"deployStarted\": false,\n  \"postgresWrites\": 0,\n  \"secretsPrinted\": false\n}\n",
+    "stderrTail": "",
     "productionChanged": false,
     "snapshotStarted": false,
     "importStarted": false,
