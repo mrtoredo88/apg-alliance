@@ -10,6 +10,8 @@ const userApp = read('src/UserApp.jsx');
 const profile = read('src/ProfilePanel.jsx');
 const telegramCheck = read('server/src/routes/telegram-auth-check.js');
 const serverEmailAuth = read('server/src/routes/email-auth.js');
+const telegramAuthStart = read('server/src/routes/telegram-auth-start.js');
+const telegramUpdates = read('server/src/lib/telegramUpdates.js');
 
 function assertOrder(source, tokens, label) {
   let cursor = -1;
@@ -73,6 +75,17 @@ assertContains(telegramCheck, 'createCustomToken', 'backend telegram check: fire
 assertContains(telegramCheck, 'resolveTelegramIdentity', 'backend telegram check: identity resolver');
 assertContains(serverEmailAuth, "error: 'identity_conflict'", 'email link flow: explicit conflict code is returned');
 assertContains(serverEmailAuth, "code: 'IDENTITY_CONFLICT'", 'email link flow: backend exports conflict classification');
+assertContains(serverEmailAuth, 'async function resolveActorFromIdentity', 'email link flow: actor resolved through identity-aware helper');
+assertContains(serverEmailAuth, 'identity_v2_user', 'email link flow: actor source includes identity_v2_user');
+assertContains(serverEmailAuth, "if (action === 'link-email')", 'email link flow: link-email action exists');
+assertContains(serverEmailAuth, "if (action === 'link-telegram')", 'email link flow: link-telegram action exists');
+assertContains(profile, "action: 'link-telegram', userId: String(user.id)", 'profile: link telegram uses current user id');
+assertContains(profile, "action: 'link-email', email: linkEmailValue, userId: String(user.id)", 'profile: link email uses current user id');
+
+assertContains(telegramAuthStart, "const ownerUserId = safeString(body.ownerUserId", 'telegram auth start: ownerUserId from client is passed');
+assertContains(telegramUpdates, 'resolveTelegramLinkOwner', 'telegram updates: owner resolver exists');
+assertContains(telegramUpdates, "await serverFoundation.identityV2.getUser(rawOwnerUserId)", 'telegram updates: owner checks identity store first');
+assertContains(telegramUpdates, "linkError = \'owner_not_found\'", 'telegram updates: owner missing handled as owner_not_found');
 
 console.log('AUTH_REGRESSION_CONTRACT_OK');
 console.log(JSON.stringify({

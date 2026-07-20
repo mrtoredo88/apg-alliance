@@ -9,6 +9,58 @@ import { recordReferralClientEventsAsync, recordReferralEventAsync, referralCont
 import { resolveReferralSessionReferrer } from '../lib/referralSessions.js';
 import { serverFoundation } from '../apg/index.js';
 
+function isIdentityUserId(value) {
+  return String(value ?? '').trim().length > 0;
+}
+
+async function resolveActorFromIdentity(request) {
+  const token = getBearerToken(request);
+  if (!token) {
+    const error = new Error('Требуется авторизация.');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const decoded = await serverFoundation.identity.verifySession({ token });
+  const uid = String(decoded.uid || '');
+  const fallback = () => ({ uid, userId: uid, user: {}, source: 'token' });
+
+  const byPgUserId = isIdentityUserId(uid) ? await serverFoundation.identityV2.getUser(uid).catch(() => null) : null;
+  if (byPgUserId?.id) {
+    return {
+      uid,
+      userId: byPgUserId.id,
+      user: byPgUserId,
+      source: 'identity_v2_user',
+    };
+  }
+
+  const identity = await resolveFirebaseIdentity(getDb(), uid).catch(() => null);
+  if (identity?.userId) {
+    const canonical = await serverFoundation.identityV2.getUser(identity.userId).catch(() => null);
+    if (canonical?.id) {
+      return {
+        uid,
+        userId: canonical.id,
+        user: canonical,
+        source: `${identity.source || 'identity_core'}_resolved_to_identity_v2`,
+      };
+    }
+  }
+
+  const direct = await getDb().collection('users').doc(uid).get().catch(() => null);
+  if (direct?.exists) return { uid, userId: uid, user: direct.data() || {}, source: 'users.uid' };
+
+  const map = await getDb().collection('auth_map').doc(uid).get().catch(() => null);
+  const mappedUserId = map?.exists ? safeString(map.data()?.userId || map.data()?.vkId, 180) : '';
+  if (mappedUserId) {
+    const mapped = await getDb().collection('users').doc(mappedUserId).get().catch(() => null);
+    return { uid, userId: mappedUserId, user: mapped?.data?.() || {}, source: 'auth_map' };
+  }
+
+  return fallback();
+}
+
 const FROM = 'noreply@myapg.ru';
 const EMAIL_AUDIT_COLLECTION = 'emailAuthAttempts';
 const EMAIL_AUTH_AUDIT_TTL_DAYS = 30;
@@ -428,25 +480,7 @@ async function attachPendingPartnerInvites(db, email, userId) {
 }
 
 async function getActor(request, db) {
-  const token = getBearerToken(request);
-  if (!token) {
-    const error = new Error('Требуется авторизация.');
-    error.statusCode = 401;
-    throw error;
-  }
-  const decoded = await serverFoundation.identity.verifySession({ token });
-  const uid = decoded.uid;
-  const identity = await resolveFirebaseIdentity(db, uid).catch(() => null);
-  if (identity?.userId) return identity;
-  const direct = await db.collection('users').doc(uid).get().catch(() => null);
-  if (direct?.exists) return { uid, userId: uid, user: direct.data() || {}, source: 'users.uid' };
-  const map = await db.collection('auth_map').doc(uid).get().catch(() => null);
-  const mappedUserId = map?.exists ? safeString(map.data()?.userId || map.data()?.vkId, 180) : '';
-  if (mappedUserId) {
-    const mapped = await db.collection('users').doc(mappedUserId).get().catch(() => null);
-    return { uid, userId: mappedUserId, user: mapped?.data?.() || {}, source: 'auth_map' };
-  }
-  return { uid, userId: uid, user: {}, source: 'token' };
+  return resolveActorFromIdentity(request);
 }
 
 async function auditAccountLink(db, request, payload) {

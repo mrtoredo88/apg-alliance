@@ -1,8 +1,10 @@
 import { APP_URL } from './config.js';
 import { FieldValue } from 'firebase-admin/firestore';
+import { resolveFirebaseIdentity } from './identityCore.js';
 import { telegramUrl } from '../../../server-shared/telegram.js';
 import { ECONOMY_VERSION, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
 import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
+import { serverFoundation } from '../apg/index.js';
 import { completeReferralSessionAsync, resolveReferralSessionReferrer } from './referralSessions.js';
 import { recordReferralEventAsync } from './referralEvents.js';
 
@@ -91,6 +93,22 @@ async function tgGetPhotoUrl(userId) {
   } catch {
     return null;
   }
+}
+
+async function resolveTelegramLinkOwner(db, ownerUserId) {
+  const rawOwnerUserId = String(ownerUserId || '').trim();
+  if (!rawOwnerUserId) return '';
+
+  const asIdentity = await serverFoundation.identityV2.getUser(rawOwnerUserId).catch(() => null);
+  if (asIdentity?.id) return asIdentity.id;
+
+  const legacyIdentity = await resolveFirebaseIdentity(db, rawOwnerUserId).catch(() => null);
+  if (legacyIdentity?.userId) {
+    const fallback = await serverFoundation.identityV2.getUser(legacyIdentity.userId).catch(() => null);
+    if (fallback?.id) return fallback.id;
+  }
+
+  return '';
 }
 
 function canAttachReferral(referrerId, userId) {
@@ -273,14 +291,14 @@ export async function processTelegramUpdate(db, update, log = console) {
     if (session.linking === true) {
       const ownerUserId = String(session.ownerUserId || '').trim();
       let linkError = '';
-      let linkedOwnerId = ownerUserId || null;
+      const resolvedOwnerUserId = await resolveTelegramLinkOwner(db, ownerUserId);
+      let linkedOwnerId = resolvedOwnerUserId || ownerUserId || null;
       if (!ownerUserId) {
         linkError = 'owner_not_found';
+      } else if (!resolvedOwnerUserId) {
+        linkError = 'owner_not_found';
       } else {
-        const ownerSnap = await db.collection('users').doc(ownerUserId).get();
-        if (!ownerSnap.exists) {
-          linkError = 'owner_not_found';
-        }
+        linkedOwnerId = resolvedOwnerUserId;
       }
       await appendTelegramTimeline(ref, {
         stage: 'telegram_auth_link_validation',
