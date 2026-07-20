@@ -23,6 +23,10 @@ ok(emailAuth.includes("recordEmailLoginStage('ui_start'"), 'EmailAuth records UI
 ok(emailAuth.includes("recordEmailLoginStage('http_start'"), 'EmailAuth records HTTP start');
 ok(emailAuth.includes("recordEmailLoginStage('http_end'"), 'EmailAuth records HTTP response');
 ok(emailAuth.includes("recordEmailLoginStage('network_error'"), 'EmailAuth records network errors');
+ok(emailAuth.includes("action: 'send'"), 'EmailAuth requests email OTP before auth');
+ok(emailAuth.includes("action: 'verify'"), 'EmailAuth verifies email OTP before session creation');
+ok(!emailAuth.includes("action: 'login',"), 'EmailAuth no longer creates sessions through plain login');
+ok(emailAuth.includes('autoComplete="one-time-code"'), 'EmailAuth supports one-time-code entry');
 ok(emailAuth.includes('requestIdBackend'), 'EmailAuth stores backend request id');
 ok(emailAuth.includes('failedStage'), 'EmailAuth stores backend failed stage');
 
@@ -38,6 +42,13 @@ ok(serverRoute.includes('withEmailLoginStage'), 'backend wraps email login stage
 ok(serverRoute.includes('resolve_email_user'), 'backend traces identity resolution');
 ok(serverRoute.includes('load_user_profile'), 'backend traces user profile load');
 ok(serverRoute.includes('create_custom_token'), 'backend traces custom token creation');
+ok(serverRoute.includes("resolveEmailUser(db, email, ref ?? null, { createIfMissing: false })"), 'plain backend login cannot create missing identity');
+ok(serverRoute.includes("resolveEmailUser(db, email, ref ?? null, { createIfMissing: true })"), 'verified email code can create missing identity');
+ok(serverRoute.includes('EMAIL_ACCOUNT_NOT_FOUND'), 'backend exposes public missing-account code');
+ok(serverRoute.includes('EMAIL_IDENTITY_CREATE_FAILED'), 'backend exposes public identity-create-failed code');
+ok(serverRoute.includes('EMAIL_CODE_INVALID'), 'backend exposes public invalid-code code');
+ok(serverRoute.includes('EMAIL_CODE_EXPIRED'), 'backend exposes public expired-code code');
+ok(serverRoute.includes('emailHash'), 'backend logs email hash instead of raw email in auth diagnostics');
 ok(serverRoute.includes('EMAIL_STAGE_TIMEOUT'), 'backend returns deterministic stage timeout code');
 ok(serverRoute.includes('EMAIL_FIRESTORE_QUOTA'), 'backend classifies Firestore quota failures');
 ok(serverRoute.includes('CUSTOM_TOKEN_FAILED'), 'backend classifies custom token failures');
@@ -62,4 +73,3 @@ const scenarios = [
 scenarios.forEach(label => ok(true, `scenario covered: ${label}`));
 
 ok(pkg.scripts['test:email-login-forensic'] === 'node scripts/email-login-forensic-test.mjs', 'package script registered');
-

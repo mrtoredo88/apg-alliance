@@ -1,4 +1,5 @@
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import crypto from 'node:crypto';
 import { APP_URL } from '../lib/config.js';
 import { getDb } from '../lib/firebase.js';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
@@ -27,7 +28,7 @@ function getSes() {
 async function sendEmail(to, subject, text) {
   const source = `АПГ <${FROM}>`;
   const endpoint = 'https://postbox.cloud.yandex.net';
-  console.log('[EMAIL] Отправка:', { to, from: source, endpoint });
+  console.log('[EMAIL] Отправка:', { emailHash: emailHash(to), from: source, endpoint });
   await getSes().send(new SendEmailCommand({
     FromEmailAddress: FROM,
     Destination: { ToAddresses: [to] },
@@ -46,6 +47,18 @@ function generateCode() {
 
 function safeString(value, max = 300) {
   return String(value ?? '').trim().slice(0, max);
+}
+
+function emailHash(value) {
+  const normalized = safeString(value, 220).toLowerCase();
+  return normalized ? crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 16) : '';
+}
+
+function emailPublicMeta(email) {
+  return {
+    emailHash: emailHash(email),
+    emailDomain: String(email || '').split('@')[1] || '',
+  };
 }
 
 function getBearerToken(req) {
@@ -172,6 +185,13 @@ function classifyEmailLoginError(error) {
   const message = String(error?.message || error || '');
   const code = String(error?.code || error?.error || '');
   if (code === 'EMAIL_STAGE_TIMEOUT') return { code, statusCode: 504 };
+  if (code === 'USER_NOT_FOUND') return { code: 'EMAIL_ACCOUNT_NOT_FOUND', statusCode: 404 };
+  if (code === 'EMAIL_ACCOUNT_NOT_FOUND') return { code, statusCode: 404 };
+  if (code === 'EMAIL_REGISTRATION_REQUIRED') return { code, statusCode: 409 };
+  if (code === 'EMAIL_IDENTITY_CREATE_FAILED') return { code, statusCode: 503 };
+  if (code === 'EMAIL_CODE_INVALID') return { code, statusCode: 400 };
+  if (code === 'EMAIL_CODE_EXPIRED') return { code, statusCode: 400 };
+  if (code === 'EMAIL_AUTH_TEMPORARILY_UNAVAILABLE') return { code, statusCode: 503 };
   if (code.includes('RESOURCE_EXHAUSTED') || message.includes('RESOURCE_EXHAUSTED') || message.includes('Quota exceeded')) {
     return { code: 'EMAIL_FIRESTORE_QUOTA', statusCode: 503 };
   }
@@ -180,6 +200,20 @@ function classifyEmailLoginError(error) {
   }
   if (code === 'INVALID_EMAIL') return { code: 'INVALID_EMAIL', statusCode: 400 };
   return { code: code || 'EMAIL_LOGIN_FAILED', statusCode: Number(error?.statusCode || 500) };
+}
+
+function publicEmailAuthMessage(code) {
+  return {
+    EMAIL_ACCOUNT_NOT_FOUND: 'Аккаунт с таким email пока не создан. Зарегистрируйтесь или запросите новый код.',
+    EMAIL_REGISTRATION_REQUIRED: 'Аккаунт с таким email пока не создан. Зарегистрируйтесь или запросите новый код.',
+    EMAIL_IDENTITY_CREATE_FAILED: 'Не удалось завершить регистрацию. Попробуйте ещё раз.',
+    EMAIL_CODE_INVALID: 'Неверный код. Проверьте письмо и попробуйте ещё раз.',
+    EMAIL_CODE_EXPIRED: 'Код истёк. Запросите новый.',
+    EMAIL_AUTH_TEMPORARILY_UNAVAILABLE: 'Сервис авторизации временно недоступен.',
+    EMAIL_STAGE_TIMEOUT: 'Сервис авторизации временно недоступен.',
+    EMAIL_FIRESTORE_QUOTA: 'Сервис авторизации временно недоступен.',
+    CUSTOM_TOKEN_FAILED: 'Сервис авторизации временно недоступен.',
+  }[code] || 'Ошибка входа. Попробуйте снова.';
 }
 
 async function withEmailLoginStage(trace, stage, fn, timeoutMs = 8000) {
@@ -249,8 +283,8 @@ function shouldWriteLegacyIdentitySideEffects() {
   return !serverFoundation.identityV2.isPostgresPrimary?.() || serverFoundation.identityV2.isLegacyDualWriteEnabled?.();
 }
 
-async function resolveEmailUser(db, email, ref) {
-  const identity = await serverFoundation.identityV2.resolveEmailIdentity({ email, ref, createIfMissing: true });
+async function resolveEmailUser(db, email, ref, { createIfMissing = false } = {}) {
+  const identity = await serverFoundation.identityV2.resolveEmailIdentity({ email, ref, createIfMissing });
   const userId = identity.userId;
   if (shouldWriteLegacyIdentitySideEffects()) {
     db.collection('users').doc(userId).update({ lastSeen: FieldValue.serverTimestamp() }).catch(() => {});
@@ -353,7 +387,7 @@ export default async function emailAuthRoutes(fastify) {
         ...referralContext,
         referralCode: ref || referralContext.referralCode,
         source: 'email-auth:client',
-        metadata: { action, email },
+        metadata: { action, ...emailPublicMeta(email) },
       });
       if (ref || referralContext.referralFlowId) {
         recordReferralEventAsync(db, {
@@ -363,7 +397,7 @@ export default async function emailAuthRoutes(fastify) {
           type: REFERRAL_EVENT_TYPES.AUTH_STARTED,
           status: 'started',
           source: 'email-auth',
-          metadata: { action, email },
+          metadata: { action, ...emailPublicMeta(email) },
         });
         if (request.body?.referralSessionId || request.body?.sessionId) {
           recordReferralEventAsync(db, {
@@ -373,7 +407,7 @@ export default async function emailAuthRoutes(fastify) {
             type: REFERRAL_EVENT_TYPES.SESSION_EMAIL_LINKED,
             status: 'started',
             source: 'email-auth',
-            metadata: { action, email },
+            metadata: { action, ...emailPublicMeta(email) },
           });
         }
       }
@@ -420,66 +454,121 @@ export default async function emailAuthRoutes(fastify) {
 
     // ── VERIFY ──────────────────────────────────────────────────────────────────
     if (action === 'verify') {
-      if (!code || !/^\d{6}$/.test(String(code))) {
-        return reply.code(400).send({ ok: false, error: 'invalid_code', message: 'Введите 6-значный код' });
-      }
+      const trace = createEmailLoginTrace(request);
+      trace.mark('email_auth_request', 'START', { action, createIfMissing: true, ...emailPublicMeta(email) });
+      try {
+        if (!code || !/^\d{6}$/.test(String(code))) {
+          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', stage: 'email_code_verified' });
+          return reply.code(400).send({ ok: false, error: 'EMAIL_CODE_INVALID', message: publicEmailAuthMessage('EMAIL_CODE_INVALID'), diagnostics: { requestId: trace.requestId, failedStage: 'email_code_verified', error: 'EMAIL_CODE_INVALID' } });
+        }
 
-      const otp = await getEmailOtp(codeRef, email);
-      if (!otp.data) {
-        return reply.code(400).send({ ok: false, error: 'code_not_found', message: 'Код не найден. Запросите новый' });
-      }
+        const otp = await withEmailLoginStage(trace, 'email_code_verified', () => getEmailOtp(codeRef, email), 5000);
+        if (!otp.data) {
+          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', stage: 'email_code_verified' });
+          return reply.code(400).send({ ok: false, error: 'EMAIL_CODE_INVALID', message: publicEmailAuthMessage('EMAIL_CODE_INVALID'), diagnostics: { requestId: trace.requestId, failedStage: 'email_code_verified', error: 'EMAIL_CODE_INVALID' } });
+        }
 
-      const data = otp.data;
+        const data = otp.data;
 
-      if (otpExpiresMs(data) < Date.now()) {
-        await deleteEmailOtp(codeRef, email).catch(() => {});
-        return reply.code(400).send({ ok: false, error: 'code_expired', message: 'Код истёк. Запросите новый' });
-      }
+        if (otpExpiresMs(data) < Date.now()) {
+          await deleteEmailOtp(codeRef, email).catch(() => {});
+          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_EXPIRED', stage: 'email_code_verified' });
+          return reply.code(400).send({ ok: false, error: 'EMAIL_CODE_EXPIRED', message: publicEmailAuthMessage('EMAIL_CODE_EXPIRED'), diagnostics: { requestId: trace.requestId, failedStage: 'email_code_verified', error: 'EMAIL_CODE_EXPIRED' } });
+        }
 
-      if ((data.attempts ?? 0) >= 5) {
-        return reply.code(429).send({ ok: false, error: 'too_many_attempts', message: 'Слишком много попыток. Запросите новый код' });
-      }
+        if ((data.attempts ?? 0) >= 5) {
+          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', stage: 'email_code_verified' });
+          return reply.code(429).send({ ok: false, error: 'EMAIL_CODE_INVALID', message: 'Слишком много попыток. Запросите новый код', diagnostics: { requestId: trace.requestId, failedStage: 'email_code_verified', error: 'EMAIL_CODE_INVALID' } });
+        }
 
-      if (data.code !== String(code)) {
-        await incrementEmailOtpAttempts(codeRef, email);
-        const left = 4 - (data.attempts ?? 0);
-        return reply.code(400).send({ ok: false, error: 'wrong_code', message: `Неверный код. Осталось попыток: ${left}` });
-      }
+        if (data.code !== String(code)) {
+          await incrementEmailOtpAttempts(codeRef, email);
+          const left = 4 - (data.attempts ?? 0);
+          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', stage: 'email_code_verified' });
+          return reply.code(400).send({ ok: false, error: 'EMAIL_CODE_INVALID', message: `Неверный код. Осталось попыток: ${left}`, diagnostics: { requestId: trace.requestId, failedStage: 'email_code_verified', error: 'EMAIL_CODE_INVALID' } });
+        }
 
-      await deleteEmailOtp(codeRef, email);
+        trace.mark('resolve_email_identity_started', 'START', { createIfMissing: true, ...emailPublicMeta(email) });
+        const identity = await withEmailLoginStage(trace, 'resolve_email_user', () => resolveEmailUser(db, email, ref ?? null, { createIfMissing: true }), 9000).catch(error => {
+          error.code = error?.code === 'USER_NOT_FOUND' ? 'EMAIL_IDENTITY_CREATE_FAILED' : error?.code;
+          throw error;
+        });
+        trace.mark(identity.source === 'identity_v2_created' ? 'email_identity_created' : 'email_identity_found', 'END', { source: identity.source || null });
+        const userId = identity.userId;
+        const ud = identity.user ?? {};
+        if (ref || referralContext.referralFlowId) {
+          recordReferralEventAsync(db, {
+            ...referralContext,
+            referralCode: ref || referralContext.referralCode,
+            referrerId: ref || referralContext.referralCode,
+            referredUserId: userId,
+            type: REFERRAL_EVENT_TYPES.AUTH_COMPLETED,
+            status: 'completed',
+            source: 'email-auth:verify',
+            metadata: emailPublicMeta(email),
+          });
+        }
 
-      const identity = await resolveEmailUser(db, email, ref ?? null);
-      const userId = identity.userId;
-      const ud = identity.user ?? {};
-      if (ref || referralContext.referralFlowId) {
-        recordReferralEventAsync(db, {
-          ...referralContext,
-          referralCode: ref || referralContext.referralCode,
-          referrerId: ref || referralContext.referralCode,
-          referredUserId: userId,
-          type: REFERRAL_EVENT_TYPES.AUTH_COMPLETED,
-          status: 'completed',
-          source: 'email-auth:verify',
-          metadata: { email },
+        const token = await withEmailLoginStage(trace, 'create_custom_token', () => createFirebaseToken(userId, ud), 5000);
+        trace.mark('custom_token_created', 'END', { userId });
+        deleteEmailOtp(codeRef, email).catch(() => {});
+        trace.mark('email_code_consumed', 'END');
+        trace.mark('email_auth_completed', 'END', { userId, totalMs: Date.now() - trace.startedAt });
+        return {
+          ok: true,
+          token,
+          canonicalUserId: userId,
+          diagnostics: {
+            requestId: trace.requestId,
+            identity: serverFoundation.identityV2.snapshot(),
+            timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
+          },
+          user: {
+            id: userId,
+            canonicalUserId: userId,
+            first_name: ud.firstName ?? email.split('@')[0],
+            last_name: ud.lastName ?? '',
+            photo_200: ud.photo ?? null,
+            email,
+            role: ud.role ?? null,
+            roles: Array.isArray(ud.roles) ? ud.roles : null,
+          },
+        };
+      } catch (error) {
+        const classified = classifyEmailLoginError(error);
+        const failedStage = error?.failedStage || trace.timeline.findLast?.(item => item.status === 'FAILED')?.stage || 'unknown';
+        trace.mark('email_auth_failed', 'FAILED', {
+          failedStage,
+          publicCode: classified.code,
+          internalCode: error?.code || error?.error || null,
+          totalMs: Date.now() - trace.startedAt,
+        });
+        request.log.error({
+          requestId: trace.requestId,
+          failedStage,
+          publicCode: classified.code,
+          internalCode: error?.code || error?.error || null,
+          message: String(error?.message || String(error)).slice(0, 300),
+          action,
+          createIfMissing: true,
+          ...emailPublicMeta(email),
+          identity: serverFoundation.identityV2.snapshot(),
+          timeline: trace.timeline,
+        }, 'email-auth verify failed');
+        return reply.code(classified.statusCode).send({
+          ok: false,
+          error: classified.code,
+          message: publicEmailAuthMessage(classified.code),
+          diagnostics: {
+            requestId: trace.requestId,
+            failedStage,
+            statusCode: classified.statusCode,
+            error: classified.code,
+            identity: serverFoundation.identityV2.snapshot(),
+            timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
+          },
         });
       }
-
-      const token = await createFirebaseToken(userId, ud);
-      return {
-        ok: true,
-        token,
-        canonicalUserId: userId,
-        user: {
-          id: userId,
-          canonicalUserId: userId,
-          first_name: ud.firstName ?? email.split('@')[0],
-          last_name: ud.lastName ?? '',
-          photo_200: ud.photo ?? null,
-          email,
-          role: ud.role ?? null,
-          roles: Array.isArray(ud.roles) ? ud.roles : null,
-        },
-      };
     }
 
     // ── LINK TELEGRAM ────────────────────────────────────────────────────────────
@@ -553,9 +642,11 @@ export default async function emailAuthRoutes(fastify) {
     if (action === 'login') {
       const trace = createEmailLoginTrace(request);
       try {
-        trace.mark('request', 'START', { action, emailDomain: email.split('@')[1] || '' });
+        trace.mark('email_auth_request', 'START', { action, createIfMissing: false, ...emailPublicMeta(email) });
         const { ref } = request.body ?? {};
-        const identity = await withEmailLoginStage(trace, 'resolve_email_user', () => resolveEmailUser(db, email, ref ?? null), 9000);
+        trace.mark('resolve_email_identity_started', 'START', { createIfMissing: false, ...emailPublicMeta(email) });
+        const identity = await withEmailLoginStage(trace, 'resolve_email_user', () => resolveEmailUser(db, email, ref ?? null, { createIfMissing: false }), 9000);
+        trace.mark('email_identity_found', 'END', { source: identity.source || null });
         const userId = identity.userId;
         const ud = await withEmailLoginStage(trace, 'load_user_profile', async () => identity.user || await serverFoundation.identityV2.getUser(userId), 7000) || {};
         if (ref || referralContext.referralFlowId) {
@@ -567,7 +658,7 @@ export default async function emailAuthRoutes(fastify) {
             type: REFERRAL_EVENT_TYPES.AUTH_COMPLETED,
             status: 'completed',
             source: 'email-auth:login',
-            metadata: { email },
+            metadata: emailPublicMeta(email),
           });
         }
         if (ud.emailVerified === false) {
@@ -576,7 +667,8 @@ export default async function emailAuthRoutes(fastify) {
           });
         }
         const token = await withEmailLoginStage(trace, 'create_custom_token', () => createFirebaseToken(userId, ud), 5000);
-        trace.mark('request', 'END', { userId, totalMs: Date.now() - trace.startedAt });
+        trace.mark('custom_token_created', 'END', { userId });
+        trace.mark('email_auth_completed', 'END', { userId, totalMs: Date.now() - trace.startedAt });
         return {
           ok: true,
           token,
@@ -601,24 +693,30 @@ export default async function emailAuthRoutes(fastify) {
       } catch (error) {
         const classified = classifyEmailLoginError(error);
         const failedStage = error?.failedStage || trace.timeline.findLast?.(item => item.status === 'FAILED')?.stage || 'unknown';
-        trace.mark('request', 'FAILED', {
+        trace.mark('email_auth_failed', 'FAILED', {
           failedStage,
           code: classified.code,
+          publicCode: classified.code,
           message: String(error?.message || error).slice(0, 300),
           totalMs: Date.now() - trace.startedAt,
         });
         request.log.error({
           requestId: trace.requestId,
           failedStage,
-          code: classified.code,
-          message: error?.message || String(error),
+          publicCode: classified.code,
+          internalCode: error?.code || error?.error || null,
+          message: String(error?.message || String(error)).slice(0, 300),
           stack: String(error?.stack || '').slice(0, 1800),
+          action,
+          createIfMissing: false,
+          ...emailPublicMeta(email),
+          identity: serverFoundation.identityV2.snapshot(),
           timeline: trace.timeline,
         }, 'email-login failed');
         return reply.code(classified.statusCode).send({
           ok: false,
           error: classified.code,
-          message: 'Ошибка входа. Попробуйте снова.',
+          message: publicEmailAuthMessage(classified.code),
           diagnostics: {
             requestId: trace.requestId,
             failedStage,

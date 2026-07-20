@@ -4313,6 +4313,14 @@
 - Финальные отчёты сохранены в `backups/account-core/final/`: cutover report, summary и health report; rollback readiness подтверждён.
 - Firestore Account Core writes после canary/cutover остались `0`; PostgreSQL session writes отражены как консервативная upper-bound метрика, а не скрыты как `0`.
 
+# 2026-07-20 — Email Auth OTP Contract
+
+- EmailAuth переведён с прямого `action: login` на безопасный двухшаговый flow `send` → `verify`: новый email больше не пытается создать Identity через обычный login без подтверждения владения почтой.
+- Backend `/api/email-auth` разделяет контракты: plain `login` резолвит только существующую Identity с `createIfMissing:false`, а `verify` после валидного OTP создаёт PostgreSQL Identity через `createIfMissing:true`.
+- Добавлены публичные коды ошибок `EMAIL_ACCOUNT_NOT_FOUND`, `EMAIL_IDENTITY_CREATE_FAILED`, `EMAIL_CODE_INVALID`, `EMAIL_CODE_EXPIRED`, а production diagnostics пишет `emailHash` вместо открытого email.
+- Email referral metadata больше не пишет raw email в referral events; сохраняются action, emailHash и домен.
+- `scripts/email-login-forensic-test.mjs` расширен проверками OTP flow, запрета plain-login creation и публичных email-auth кодов.
+
 # 2026-07-19 — APG Migration Center + Architecture Guard v1
 
 - Добавлен управляемый Identity Migration Center в админке: статус PostgreSQL/Firestore, сравнение counts/checksums, protected actions, progress, history, dependency monitor и runtime rollback через Identity flags.
