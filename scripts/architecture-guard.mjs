@@ -7,6 +7,8 @@ const SCAN_ROOTS = ['src/apg', 'server/src/apg'];
 const ALLOWED_SEGMENTS = [
   '/infrastructure/adapters/',
   '/identity/providers/',
+  '/account/adapters/',
+  '/account/schema/',
   '/data/FirestoreAdminAdapter.js',
   '/schema/identity-v2.sql',
 ];

@@ -135,7 +135,15 @@
     "test:identity-verify-drift": "node scripts/identity-verify-drift-test.mjs",
     "identity:verify-lock": "node scripts/identity-verify-lock.mjs",
     "test:identity-verify-lock": "node scripts/identity-verify-lock-test.mjs",
-    "audit:full-postgres-migration": "node scripts/full-postgres-migration-audit.mjs"
+    "audit:full-postgres-migration": "node scripts/full-postgres-migration-audit.mjs",
+    "test:account-core": "node scripts/account-core-test.mjs",
+    "test:account-core-guard": "node scripts/account-core-architecture-guard.mjs",
+    "account:dry-run": "node scripts/account-dry-run.mjs",
+    "account:verify": "node scripts/account-verify.mjs",
+    "account:canary": "node scripts/account-canary.mjs",
+    "account:cutover": "node scripts/account-cutover.mjs",
+    "account:rollback": "node scripts/account-rollback.mjs",
+    "readiness:account": "node scripts/account-readiness.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

@@ -48,6 +48,7 @@ export default async function systemStatusRoutes(fastify) {
       const lastBackup = backups?.docs?.[0]?.data?.() || null;
       const vkData = vkSync?.exists ? vkSync.data() : null;
       const identitySnapshot = serverFoundation.identityV2.snapshot();
+      const accountSnapshot = serverFoundation.account.snapshot();
       const guard = architectureGuardReport();
       return {
         ok: true,
@@ -58,6 +59,10 @@ export default async function systemStatusRoutes(fastify) {
         identity: {
           ok: true,
           ...identitySnapshot,
+        },
+        account: {
+          ok: true,
+          ...accountSnapshot,
         },
         migration: {
           ok: true,
@@ -75,6 +80,7 @@ export default async function systemStatusRoutes(fastify) {
           ok: guard.ok !== false,
           identityProvider: identitySnapshot.provider,
           dataProvider: identitySnapshot.storage,
+          accountStorage: accountSnapshot.storage,
           repositoryCoverage: 'Foundation guarded',
           firestoreDependency: guard.ok === false ? `${guard.violations?.length || 0} violations` : '0 guarded violations',
           migrationStatus: identitySnapshot.storage === 'postgres' ? 'Identity PostgreSQL ready' : 'Identity fallback mode',

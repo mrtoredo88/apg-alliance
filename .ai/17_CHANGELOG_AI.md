@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] feat: Account Core Migration v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server/src/apg/account/*`, `server/src/apg/index.js`, `server/src/routes/system-status.js`, `src/apg/core/FeatureFlags.js`, `scripts/account-*.mjs`, `scripts/architecture-guard.mjs`, `docs/architecture-guard-report.json`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Создан домен `server/src/apg/account/` с PostgreSQL schema, repositories, services, bootstrap, roles/profiles/sessions/permissions/cabinets и fallback adapter для миграционного dual-read.
+- Добавлены feature flags `ACCOUNT_STORAGE`, `ACCOUNT_DUAL_READ`, `ACCOUNT_DUAL_WRITE`, `ACCOUNT_FALLBACK`, `ACCOUNT_CANARY`, Account metrics в APG Health и локальные команды dry-run/verify/canary/cutover/rollback/readiness.
+- Добавлен Account Core architecture guard и tests/readiness, подтверждающие session restore, role resolution, profile/Home/Workspace bootstrap через repository layer.
+**Почему:** после Identity следующим P0 слоем является Account Core; он должен уйти в PostgreSQL так, чтобы профиль, роли, сессии, Workspace/Home bootstrap и кабинеты перестали зависеть от Firestore в критическом пути.
+
 ## [2026-07-20] chore: Full Firebase/Firestore migration audit
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `scripts/full-postgres-migration-audit.mjs`, `docs/migration/*`, `backups/migration/audit-summary-redacted.json`, `package.json`, `.ai/17_CHANGELOG_AI.md`
