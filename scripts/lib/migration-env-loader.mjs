@@ -7,6 +7,10 @@ const DEFAULT_ENV_FILES = [
   '.env',
 ];
 
+function isConfigured(value) {
+  return typeof value === 'string' && value.length > 0;
+}
+
 function parseEnvLine(line) {
   const trimmed = String(line || '').trim();
   if (!trimmed || trimmed.startsWith('#')) return null;
@@ -26,6 +30,7 @@ export function loadMigrationEnv({ files = DEFAULT_ENV_FILES, override = false }
   const loaded = [];
   const skipped = [];
   const missing = [];
+  const fileKeys = {};
   const sources = {};
 
   for (const file of files) {
@@ -40,8 +45,10 @@ export function loadMigrationEnv({ files = DEFAULT_ENV_FILES, override = false }
       const parsed = parseEnvLine(line);
       if (!parsed) continue;
       keyCount += 1;
+      fileKeys[parsed.key] = file;
       if (!override && process.env[parsed.key]) {
         skipped.push({ key: parsed.key, source: file, reason: 'already_configured' });
+        if (!sources[parsed.key]) sources[parsed.key] = 'runtime';
         continue;
       }
       process.env[parsed.key] = parsed.value;
@@ -58,6 +65,9 @@ export function loadMigrationEnv({ files = DEFAULT_ENV_FILES, override = false }
     skipped,
     missing,
     sources,
+    fileKeys,
+    loadedFromFileCount: loaded.length,
+    alreadyPresentInRuntimeCount: skipped.filter(item => item.reason === 'already_configured').length,
     redacted: true,
   };
 }
@@ -68,4 +78,18 @@ export function secretStatus(keys, sources = {}) {
     status: process.env[key] ? 'FOUND' : 'MISSING',
     source: sources[key] || (process.env[key] ? 'process.env' : 'unknown'),
   }));
+}
+
+export function runtimeSecretStatus(keys, envLoad = {}) {
+  const fileKeys = envLoad.fileKeys || {};
+  const sources = envLoad.sources || {};
+  return keys.map(key => {
+    const configured = isConfigured(process.env[key]);
+    let source = 'missing';
+    if (configured && sources[key] && sources[key] !== 'runtime') source = 'file';
+    else if (configured && sources[key] === 'runtime') source = 'runtime';
+    else if (configured && fileKeys[key]) source = 'file';
+    else if (configured) source = 'runtime';
+    return { key, source, configured };
+  });
 }

@@ -2,6 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+RUN apk add --no-cache ca-certificates wget \
+  && mkdir -p /app/certs /root/.postgresql \
+  && wget -q -O /app/certs/YandexInternalRootCA.crt https://storage.yandexcloud.net/cloud-certs/CA.pem \
+  && test -s /app/certs/YandexInternalRootCA.crt \
+  && ! grep -q "PRIVATE KEY" /app/certs/YandexInternalRootCA.crt \
+  && cp /app/certs/YandexInternalRootCA.crt /root/.postgresql/root.crt \
+  && sha256sum /app/certs/YandexInternalRootCA.crt
+
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
@@ -22,6 +30,7 @@ COPY ops/migration-operator/server.mjs ./ops/migration-operator/server.mjs
 
 ENV NODE_ENV=production
 ENV GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
+ENV APG_YANDEX_CA_PATH=/app/certs/YandexInternalRootCA.crt
 EXPOSE 8080
 
 CMD ["node", "ops/migration-operator/server.mjs"]

@@ -2,10 +2,9 @@ import dns from 'node:dns/promises';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import tls from 'node:tls';
 import { Pool } from 'pg';
 import { getApps } from 'firebase-admin/app';
-import { loadMigrationEnv } from './lib/migration-env-loader.mjs';
+import { loadMigrationEnv, runtimeSecretStatus } from './lib/migration-env-loader.mjs';
 
 const REPORT_PATH = 'backups/account-core/preflight/remote-preflight-redacted.json';
 const PRODUCTION_CONTAINER = 'apg-api';
@@ -14,6 +13,16 @@ const PRODUCTION_NETWORK_ID = 'enpa19j9jpki1f67p6kq';
 const PRODUCTION_IMAGE = 'cr.yandex/crpvv13u8vr3qjftdvvg/apg-api:latest';
 const EXECUTE = process.argv.includes('--execute') || process.env.APG_REMOTE_PREFLIGHT_EXECUTION === '1';
 const RUNTIME_ASSERTED = process.env.APG_REMOTE_OPERATOR_RUNTIME === 'production-vpc';
+const REQUIRED_ENV_KEYS = [
+  'APG_IDENTITY_DATABASE_URL',
+  'GOOGLE_APPLICATION_CREDENTIALS',
+];
+const CA_CANDIDATES = [
+  process.env.APG_YANDEX_CA_PATH,
+  '/app/certs/YandexInternalRootCA.crt',
+  '/root/.postgresql/root.crt',
+  'certs/YandexInternalRootCA.crt',
+].filter(Boolean);
 
 function ensureDir(filePath) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -64,6 +73,39 @@ function parseDsn(dsn) {
   }
 }
 
+function normalizeDsnForPg(dsn) {
+  const url = new URL(dsn);
+  for (const key of ['ssl', 'sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'uselibpqcompat']) {
+    url.searchParams.delete(key);
+  }
+  return url.toString();
+}
+
+function findCaPath() {
+  return CA_CANDIDATES.find(file => fs.existsSync(file) && fs.statSync(file).size > 0) || '';
+}
+
+function readYandexCa() {
+  const file = findCaPath();
+  if (!file) {
+    const error = new Error('Yandex Cloud CA certificate is not installed in the operator image.');
+    error.code = 'YANDEX_CA_NOT_FOUND';
+    throw error;
+  }
+  const ca = fs.readFileSync(file, 'utf8');
+  if (!ca.includes('BEGIN CERTIFICATE') || ca.includes('PRIVATE KEY')) {
+    const error = new Error('Yandex Cloud CA certificate failed validation.');
+    error.code = 'YANDEX_CA_INVALID';
+    throw error;
+  }
+  return { file, ca };
+}
+
+async function sha256(text) {
+  const { createHash } = await import('node:crypto');
+  return createHash('sha256').update(text).digest('hex');
+}
+
 async function withTimeout(label, timeoutMs, fn) {
   let timeout = null;
   try {
@@ -110,36 +152,46 @@ async function tcpCheck(hostname, port) {
   }));
 }
 
-async function tlsCheck(hostname, port) {
-  return withTimeout('TLS handshake', 6_000, () => new Promise((resolve, reject) => {
-    const socket = tls.connect({ host: hostname, port, servername: hostname, rejectUnauthorized: false });
-    socket.once('secureConnect', () => {
-      const cert = socket.getPeerCertificate();
-      socket.end();
-      resolve({
-        ok: true,
-        authorized: socket.authorized,
-        authorizationError: socket.authorizationError || '',
-        certificatePresent: Boolean(cert && Object.keys(cert).length),
-        validTo: cert?.valid_to || '',
-      });
-    });
-    socket.once('error', reject);
-  }));
+async function caCertificateCheck() {
+  const { file, ca } = readYandexCa();
+  return {
+    ok: true,
+    file,
+    nonEmpty: ca.length > 0,
+    containsPrivateKey: false,
+    sha256: await sha256(ca),
+    source: 'https://storage.yandexcloud.net/cloud-certs/CA.pem',
+  };
 }
 
 async function postgresAuthCheck(dsn) {
-  return withTimeout('PostgreSQL authentication', 8_000, async () => {
+  return withTimeout('PostgreSQL verified connection', 10_000, async () => {
+    const parsed = parseDsn(dsn);
+    if (!parsed.ok) return parsed;
+    const { ca } = readYandexCa();
     const pool = new Pool({
-      connectionString: dsn,
+      connectionString: normalizeDsnForPg(dsn),
       max: 1,
       connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 1_000,
-      ssl: process.env.APG_IDENTITY_PG_SSL === '0' ? false : { rejectUnauthorized: false },
+      ssl: {
+        ca,
+        rejectUnauthorized: true,
+        servername: parsed.hostname,
+      },
     });
     try {
       const result = await pool.query('SELECT 1 AS ok');
-      return { ok: result.rows?.[0]?.ok === 1, query: 'SELECT 1', productionDataRead: false };
+      return {
+        ok: result.rows?.[0]?.ok === 1,
+        query: 'SELECT 1',
+        tlsVerified: true,
+        rejectUnauthorized: true,
+        certificateAuthority: 'Yandex Cloud CA',
+        hostnameVerification: true,
+        productionDataRead: false,
+        businessTableRead: false,
+      };
     } finally {
       await pool.end().catch(() => {});
     }
@@ -169,11 +221,18 @@ function fileCheck(files) {
 async function validateNoDataPreflight(envLoad) {
   const dsn = getDsn();
   const parsed = parseDsn(dsn);
+  const envStatuses = runtimeSecretStatus(REQUIRED_ENV_KEYS, envLoad);
+  const requiredConfiguredCount = envStatuses.filter(item => item.configured).length;
+  const requiredMissingCount = envStatuses.filter(item => !item.configured).length;
   const checks = [
     await step('runtime_assertion', async () => ({ ok: RUNTIME_ASSERTED, expected: 'production-vpc', asserted: RUNTIME_ASSERTED ? 'production-vpc' : 'missing' })),
     await step('environment_loader', async () => ({
-      ok: envLoad.loaded.length > 0,
-      loadedKeyCount: envLoad.loaded.length,
+      ok: requiredMissingCount === 0,
+      loadedFromFileCount: envLoad.loadedFromFileCount || 0,
+      alreadyPresentInRuntimeCount: envLoad.alreadyPresentInRuntimeCount || 0,
+      requiredConfiguredCount,
+      requiredMissingCount,
+      required: envStatuses,
       dsnConfigured: Boolean(dsn),
       firebaseAdminConfigured: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT || process.env.GOOGLE_APPLICATION_CREDENTIALS),
     })),
@@ -194,11 +253,11 @@ async function validateNoDataPreflight(envLoad) {
     checks.push(dnsResult);
     if (dnsResult.status === 'PASS') {
       checks.push(await step('tcp', () => tcpCheck(parsed.hostname, parsed.port)));
-      checks.push(await step('tls', () => tlsCheck(parsed.hostname, parsed.port)));
+      checks.push(await step('yandex_ca_certificate', caCertificateCheck));
       checks.push(await step('postgres_auth', () => postgresAuthCheck(dsn)));
     } else {
       checks.push(skippedStep('tcp', 'SKIPPED_AFTER_DNS_FAILURE'));
-      checks.push(skippedStep('tls', 'SKIPPED_AFTER_DNS_FAILURE'));
+      checks.push(skippedStep('yandex_ca_certificate', 'SKIPPED_AFTER_DNS_FAILURE'));
       checks.push(skippedStep('postgres_auth', 'SKIPPED_AFTER_DNS_FAILURE'));
     }
   }
@@ -227,6 +286,7 @@ async function validateNoDataPreflight(envLoad) {
     blocked: blocked.map(item => ({ name: item.name, error: item.error?.code || item.details?.reason || 'BLOCKED' })),
     productionDataReads: 0,
     firestoreReads: 0,
+    postgresBusinessTableReads: 0,
     postgresWrites: 0,
   };
 }
@@ -248,6 +308,7 @@ function buildReport({ executed, envLoad, validation = null }) {
     rollbackStarted: false,
     postgresWrites: 0,
     firestoreReads: validation?.firestoreReads || 0,
+    postgresBusinessTableReads: validation?.postgresBusinessTableReads || 0,
     productionDataReads: validation?.productionDataReads || 0,
     secretsPrinted: false,
     dsnPrinted: false,
@@ -268,6 +329,7 @@ function buildReport({ executed, envLoad, validation = null }) {
     env: {
       loadedKeys: envLoad.loaded.map(item => item.key).sort(),
       sourceCount: Object.keys(envLoad.sources).length,
+      required: runtimeSecretStatus(REQUIRED_ENV_KEYS, envLoad),
       redacted: true,
     },
     validation,
