@@ -327,7 +327,11 @@ async function importItems({ pool, label, items, fn, checkpoint }) {
     telegramLinks: 'SELECT 1 FROM apg_account_telegram_links WHERE telegram_id = $1 LIMIT 1',
     sessions: 'SELECT 1 FROM apg_account_sessions WHERE id = $1 LIMIT 1',
   }[label];
-  const idOf = item => item.id || item.userId || item.telegramId;
+  const idOf = item => {
+    if (label === 'profiles' || label === 'roles') return item.userId;
+    if (label === 'telegramLinks') return item.telegramId;
+    return item.id;
+  };
   for (const batch of batches(items)) {
     batchIndex += 1;
     const client = await pool.connect();

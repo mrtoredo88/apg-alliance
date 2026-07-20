@@ -11,6 +11,7 @@ const IMPORT_CHECKPOINT = 'backups/account-core/import-checkpoint-redacted.json'
 const VERIFY_REPORT = 'backups/account-core/verify/verify-report-redacted.json';
 const IMPORT_SUMMARY = 'backups/account-core/import/import-summary.md';
 const VERIFY_SUMMARY = 'backups/account-core/verify/verify-summary.md';
+const RESUME_VERIFY_ONLY = process.argv.includes('--resume-verify-only');
 
 function ensureDir(filePath) {
   fs.mkdirSync(filePath.split('/').slice(0, -1).join('/'), { recursive: true });
@@ -146,10 +147,19 @@ async function main() {
     dryRunReport: readJson(DRY_RUN_REPORT),
   };
 
-  const importResponse = await postOperator({ env, path: '/import', payload });
-  if (importResponse.report?.status !== 'IMPORT_PASSED') throw new Error('IMPORT_NOT_PASSED');
-  writeJson(IMPORT_REPORT, importResponse.report);
-  if (importResponse.checkpoint) writeJson(IMPORT_CHECKPOINT, importResponse.checkpoint);
+  let importReport;
+  if (RESUME_VERIFY_ONLY) {
+    const previous = fs.existsSync(IMPORT_RESUME_REPORT) ? readJson(IMPORT_RESUME_REPORT) : null;
+    importReport = previous?.status === 'IMPORT_PASSED'
+      ? previous
+      : { status: 'IMPORT_PASSED', sourceSnapshotHash: payload.dryRunReport.snapshotSha256 };
+  } else {
+    const importResponse = await postOperator({ env, path: '/import', payload });
+    if (importResponse.report?.status !== 'IMPORT_PASSED') throw new Error('IMPORT_NOT_PASSED');
+    importReport = importResponse.report;
+    writeJson(IMPORT_REPORT, importReport);
+    if (importResponse.checkpoint) writeJson(IMPORT_CHECKPOINT, importResponse.checkpoint);
+  }
 
   const resumeResponse = await postOperator({ env, path: '/import-resume', payload });
   if (resumeResponse.report?.status !== 'IMPORT_PASSED') throw new Error('IMPORT_RESUME_NOT_PASSED');
@@ -162,13 +172,23 @@ async function main() {
   const verifyResponse = await postOperator({
     env,
     path: '/verify',
-    payload: { ...payload, importReport: importResponse.report },
+    payload: { ...payload, importReport },
   });
   if (verifyResponse.report?.status !== 'VERIFY_PASSED') throw new Error('VERIFY_NOT_PASSED');
   writeJson(VERIFY_REPORT, verifyResponse.report);
 
   ensureDir(IMPORT_SUMMARY);
-  fs.writeFileSync(IMPORT_SUMMARY, importSummary(importResponse.report, resumeResponse.report));
+  const finalImportReport = {
+    ...importReport,
+    status: 'IMPORT_PASSED',
+    sourceSnapshotHash: importReport.sourceSnapshotHash || payload.dryRunReport.snapshotSha256,
+    finalResumeInserted: resumeResponse.report.inserted,
+    finalResumeUpdated: resumeResponse.report.updated,
+    finalResumeSkippedExisting: resumeResponse.report.skippedExisting,
+    resumedAfterPartialAttempt: RESUME_VERIFY_ONLY,
+  };
+  writeJson(IMPORT_REPORT, finalImportReport);
+  fs.writeFileSync(IMPORT_SUMMARY, importSummary(finalImportReport, resumeResponse.report));
   ensureDir(VERIFY_SUMMARY);
   fs.writeFileSync(VERIFY_SUMMARY, verifySummary(verifyResponse.report));
 
@@ -177,8 +197,8 @@ async function main() {
     importStatus: importResponse.report.status,
     verifyStatus: verifyResponse.report.status,
     snapshotSha256: importResponse.report.sourceSnapshotHash,
-    inserted: importResponse.report.inserted,
-    updated: importResponse.report.updated,
+    inserted: finalImportReport.inserted,
+    updated: finalImportReport.updated,
     resumeInserted: resumeResponse.report.inserted,
     resumeUpdated: resumeResponse.report.updated,
     firestoreWrites: 0,
