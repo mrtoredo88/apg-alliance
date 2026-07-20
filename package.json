@@ -154,6 +154,7 @@
     "account:remote-preflight": "node scripts/account-remote-preflight.mjs",
     "account:operator:deploy": "node scripts/account-operator-deploy.mjs",
     "account:operator:invoke": "node scripts/account-operator-invoke.mjs",
+    "account:operator:import": "node scripts/account-operator-import.mjs",
     "audit:migration-env": "node scripts/migration-environment-audit.mjs",
     "postgres:diagnostics": "node scripts/postgres-connectivity-diagnostics.mjs",
     "readiness:account": "node scripts/account-readiness.mjs",

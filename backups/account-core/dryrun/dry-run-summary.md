@@ -3,10 +3,10 @@
 Status: DRY_RUN_PASSED
 Snapshot SHA256: 3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7
 Account count: 127
-Expected inserts: 432
+Expected inserts: 263
 Expected updates: 0
 Expected unchanged: 0
-Expected skips: 1
+Expected skips: 170
 Legacy merges: 1
 
 ## Guardrails

@@ -43,14 +43,43 @@ function plannedCabinets(snapshot) {
   ];
 }
 
+function duplicateOwnerP0(users) {
+  const groups = new Map();
+  for (const user of users) {
+    const email = normalized(user.data?.email || user.data?.linkedEmail);
+    if (!email) continue;
+    if (!groups.has(email)) groups.set(email, []);
+    groups.get(email).push(user);
+  }
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    const isP0 = group.some(user => {
+      const data = user.data || {};
+      const roles = (Array.isArray(data.roles) ? data.roles : [data.role].filter(Boolean)).map(normalized);
+      return roles.some(role => ['owner', 'super_admin', 'admin'].includes(role));
+    });
+    if (!isP0) continue;
+    const canonical = group.find(user => normalized(user.data?.canonicalUserId) === normalized(user.id) && user.data?.identityStatus === 'canonical');
+    const legacy = group.find(user => canonical && normalized(user.data?.mergedInto) === normalized(canonical.id) && user.data?.identityStatus === 'legacy_linked');
+    if (canonical && legacy) return { canonicalId: canonical.id, legacyId: legacy.id };
+  }
+  return null;
+}
+
 function dryRunPlan(snapshot) {
   const users = snapshot.collections.users || [];
-  const tgLinks = snapshot.collections.tgLinks || [];
-  const sessions = snapshot.collections.telegramAuthSessions || [];
-  const cabinets = plannedCabinets(snapshot);
+  const p0 = duplicateOwnerP0(users);
+  const canonicalByLegacy = new Map(p0 ? [[normalized(p0.legacyId), p0.canonicalId]] : []);
+  const remapUser = userId => canonicalByLegacy.get(normalized(userId)) || userId;
+  const profileIds = new Set(users.filter(user => normalized(user.id) !== normalized(p0?.legacyId)).map(user => normalized(user.id)));
+  const tgLinks = (snapshot.collections.tgLinks || []).filter(item => profileIds.has(normalized(remapUser(item.data?.userId || item.data?.uid || item.data?.canonicalUserId || ''))));
+  const sessions = (snapshot.collections.telegramAuthSessions || []).filter(item => profileIds.has(normalized(remapUser(item.data?.userId || item.data?.uid || ''))));
+  const cabinets = plannedCabinets(snapshot).map(item => ({ ...item, userId: remapUser(item.userId) })).filter(item => profileIds.has(normalized(item.userId)));
   const manifest = fs.existsSync(RESOLUTION_MANIFEST) ? readJson(RESOLUTION_MANIFEST) : { actions: [] };
   const mergeActions = (manifest.actions || []).filter(action => action.type === 'mergeLegacyIntoCanonical');
   const canonicalProfileCount = Math.max(0, users.length - mergeActions.length);
+  const orphanTelegramLinks = (snapshot.collections.tgLinks || []).length - tgLinks.length;
+  const orphanSessions = (snapshot.collections.telegramAuthSessions || []).length - sessions.length;
   const inserts = {
     apg_account_profiles: canonicalProfileCount,
     apg_account_roles: canonicalProfileCount,
@@ -62,10 +91,12 @@ function dryRunPlan(snapshot) {
     expectedInserts: Object.values(inserts).reduce((sum, count) => sum + count, 0),
     expectedUpdates: 0,
     expectedUnchanged: 0,
-    expectedSkips: mergeActions.length,
+    expectedSkips: mergeActions.length + orphanTelegramLinks + orphanSessions,
     expectedTables: inserts,
     transformations: {
       legacyMerges: mergeActions.length,
+      orphanTelegramLinks,
+      orphanSessions,
       resolutionManifestApplied: mergeActions.length > 0,
     },
     batching: {
