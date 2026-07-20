@@ -82,8 +82,12 @@ assertContains(serverEmailAuth, 'linkedTelegram: telegramId', 'email response in
 assertContains(serverEmailAuth, 'linkedEmail: ud.linkedEmail || identityEmail', 'email response includes linked email marker');
 assertContains(serverEmailAuth, "if (action === 'link-email')", 'email link flow: link-email action exists');
 assertContains(serverEmailAuth, "if (action === 'link-telegram')", 'email link flow: link-telegram action exists');
+assertContains(serverEmailAuth, "error: 'link_data_missing'", 'email link flow: link-telegram verifies persisted link before success');
+assertContains(serverEmailAuth, 'TELEGRAM_LINK_PERSISTENCE_FAILED', 'email link flow: persistence failure is explicit');
 assertContains(userApp, "localStorage.setItem('apg_email_user', JSON.stringify(emailUser));", 'complete email auth persists full user payload');
 assertContains(profile, "action: 'link-telegram', userId: String(user.id)", 'profile: link telegram uses current user id');
+assertContains(profile, 'const returnedLink = linkData?.link || {}', 'profile link telegram validates returned persisted-link payload');
+assertContains(profile, '!returnedLink?.userId || String(returnedLink.userId) !== String(user.id) || !returnedLink?.telegramId', 'profile link telegram does not treat non-persisted responses as success');
 assertContains(profile, "action: 'link-email', email: linkEmailValue, userId: String(user.id)", 'profile: link email uses current user id');
 
 assertContains(telegramAuthStart, "const ownerUserId = safeString(body.ownerUserId", 'telegram auth start: ownerUserId from client is passed');

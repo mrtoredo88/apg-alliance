@@ -942,7 +942,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               body: JSON.stringify({ action: 'link-telegram', userId: String(user.id), ...tgPayload }),
             });
             const linkData = await linkRes.json().catch(() => ({}));
-            if (!linkRes.ok || linkData.ok === false) {
+            const returnedLink = linkData?.link || {};
+            if (
+              !linkRes.ok || linkData.ok === false
+              || !returnedLink?.userId || String(returnedLink.userId) !== String(user.id)
+              || !returnedLink?.telegramId
+            ) {
               throw new Error(linkData.message || 'telegram_link_failed');
             }
             const userPatch = {

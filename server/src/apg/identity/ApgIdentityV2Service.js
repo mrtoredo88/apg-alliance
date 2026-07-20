@@ -201,7 +201,32 @@ export class ApgIdentityV2Service {
   }
 
   async linkTelegram({ telegramId, userId, telegram = {}, firebaseUid = '' }) {
-    const result = await this.repository.linkTelegram({ telegramId, userId, telegram });
+    const normalizedTelegramId = normalizeTelegramId(telegramId);
+    const normalizedUserId = safeString(userId, 260);
+    const result = await this.repository.linkTelegram({ telegramId: normalizedTelegramId, userId: normalizedUserId, telegram });
+    const persistedLink = await this.repository.links.get('telegram', normalizedTelegramId).catch(() => null);
+    const persistedUser = await this.repository.users.get(normalizedUserId).catch(() => null);
+    const persistedTelegram = persistedUser?.linkedTelegram && typeof persistedUser.linkedTelegram === 'object'
+      ? persistedUser.linkedTelegram
+      : null;
+    const persistedTelegramId = normalizeTelegramId(persistedTelegram?.tgId || persistedTelegram?.telegramId || '');
+    const requestedTelegramId = normalizeTelegramId(
+      telegram?.tgId || telegram?.telegramId || normalizedTelegramId,
+    );
+    if (
+      !persistedLink
+      || String(persistedLink.userId || '') !== normalizedUserId
+      || !persistedTelegramId
+      || persistedTelegramId !== requestedTelegramId
+    ) {
+      const error = Object.assign(
+        new Error('Не удалось надежно сохранить привязку Telegram.'),
+        { statusCode: 500, code: 'TELEGRAM_LINK_PERSISTENCE_FAILED' },
+      );
+      this.metrics.lastError = classify(error);
+      throw error;
+    }
+
     this.metrics.yandexWrites += 2;
     if (this.legacySource && enabled(this.flags.identityDualWrite)) {
       this.legacySource.linkTelegram({ telegramId, userId, telegram, firebaseUid }).catch(() => {});

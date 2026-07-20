@@ -1179,18 +1179,20 @@ export default async function emailAuthRoutes(fastify) {
       }
 
       try {
-        await serverFoundation.identityV2.linkTelegram({
+        const linkResult = await serverFoundation.identityV2.linkTelegram({
           telegramId: normalizedTgId,
           userId: String(userId),
           firebaseUid: actor.uid,
           telegram: { firstName: firstName ?? null, lastName: lastName ?? null, username: username ?? null, photo: photo ?? null },
         });
+        if (!linkResult?.link?.userId || String(linkResult.link.userId) !== String(userId)) {
+          return reply.code(500).send({ ok: false, error: 'link_data_missing', message: 'Привязка не завершена. Попробуйте ещё раз.' });
+        }
+        await auditAccountLink(db, request, { action: 'link-telegram', result: 'success', firebaseUid: actor.uid, actorUserId: actor.userId, requestedUserId: String(userId), telegramId: normalizedTgId });
+        return { ok: true, link: { userId: String(linkResult.link.userId), telegramId: linkResult.link.providerUserId || normalizedTgId } };
       } catch (e) {
         return reply.code(e.statusCode || 500).send({ ok: false, error: e.statusCode === 409 ? 'already_linked' : 'link_failed', message: e.message || 'Не удалось привязать Telegram.' });
       }
-      await auditAccountLink(db, request, { action: 'link-telegram', result: 'success', firebaseUid: actor.uid, actorUserId: actor.userId, requestedUserId: String(userId), telegramId: normalizedTgId });
-
-      return { ok: true };
     }
 
     // ── LINK EMAIL ───────────────────────────────────────────────────────────────
