@@ -2,7 +2,7 @@
   "version": 1,
   "migration": "account-core-production-v1",
   "status": "PREFLIGHT_BLOCKED",
-  "generatedAt": "2026-07-20T08:57:46.874Z",
+  "generatedAt": "2026-07-20T09:04:58.594Z",
   "productionChanged": false,
   "firestoreChanged": false,
   "postgresWrites": 0,
@@ -11,7 +11,7 @@
   "canaryStarted": false,
   "cutoverStarted": false,
   "branch": "migration/account-core-production-v1",
-  "currentCommit": "fedb2135",
+  "currentCommit": "52c7e62a",
   "sourceCommit": "fedb2135",
   "expectedCommit": "fedb2135",
   "checks": [
@@ -24,8 +24,8 @@
         "statusLines": [
           "M .DS_Store",
           " M .ai/17_CHANGELOG_AI.md",
-          " M .gitignore",
-          " M package.json",
+          " M backups/account-core/preflight-report.json",
+          " M scripts/account-production-preflight.mjs",
           "?? .ai/00_START_HERE.md",
           "?? .ai/01_PROJECT_OVERVIEW.md",
           "?? .ai/02_ARCHITECTURE.md",
@@ -60,10 +60,10 @@
           "?? apg-theme-partners-light-682ed807.png",
           "?? apg-theme-workspace-dark-682ed807.png",
           "?? apg-theme-workspace-light-682ed807.png",
-          "?? backups/account-core/preflight-report.json",
+          "?? backups/account-core/preflight/",
           "?? backups/identity/"
         ],
-        "omittedStatusLines": 98
+        "omittedStatusLines": 99
       }
     },
     {
@@ -71,7 +71,7 @@
       "ok": true,
       "durationMs": 0,
       "details": {
-        "currentCommit": "fedb2135",
+        "currentCommit": "52c7e62a",
         "sourceCommit": "fedb2135",
         "expected": "fedb2135",
         "sourceIsAncestor": true
@@ -80,7 +80,7 @@
     {
       "name": "production_frontend_version",
       "ok": true,
-      "durationMs": 19,
+      "durationMs": 18,
       "details": {
         "ok": true,
         "status": 200,
@@ -92,13 +92,13 @@
     {
       "name": "production_backend_health",
       "ok": true,
-      "durationMs": 0,
+      "durationMs": 1,
       "details": {
         "ok": true,
         "status": 200,
         "body": {
           "ok": true,
-          "ts": 1784537867113
+          "ts": 1784538298844
         }
       }
     },
@@ -128,7 +128,7 @@
       "ok": true,
       "durationMs": 0,
       "details": {
-        "df": "/dev/disk3s1   239331776 153917264  52011216    75%    /System/Volumes/Data"
+        "df": "/dev/disk3s1   239331776 153942792  51985688    75%    /System/Volumes/Data"
       }
     },
     {
@@ -142,7 +142,7 @@
     {
       "name": "monitoring_surface",
       "ok": true,
-      "durationMs": 1,
+      "durationMs": 0,
       "details": {
         "systemStatusRoute": true,
         "accountSnapshot": true
@@ -151,7 +151,7 @@
     {
       "name": "test:account-core",
       "ok": true,
-      "durationMs": 137,
+      "durationMs": 139,
       "details": {
         "script": "test:account-core",
         "ok": true,
@@ -163,7 +163,7 @@
     {
       "name": "test:account-core-guard",
       "ok": true,
-      "durationMs": 132,
+      "durationMs": 130,
       "details": {
         "script": "test:account-core-guard",
         "ok": true,
@@ -175,7 +175,7 @@
     {
       "name": "test:account-integration",
       "ok": true,
-      "durationMs": 130,
+      "durationMs": 137,
       "details": {
         "script": "test:account-integration",
         "ok": true,
@@ -187,7 +187,7 @@
     {
       "name": "test:account-firestore-outage",
       "ok": true,
-      "durationMs": 136,
+      "durationMs": 138,
       "details": {
         "script": "test:account-firestore-outage",
         "ok": true,
@@ -199,7 +199,7 @@
     {
       "name": "readiness:account",
       "ok": true,
-      "durationMs": 200,
+      "durationMs": 206,
       "details": {
         "script": "readiness:account",
         "ok": true,
@@ -211,7 +211,7 @@
     {
       "name": "readiness:event",
       "ok": true,
-      "durationMs": 304,
+      "durationMs": 307,
       "details": {
         "script": "readiness:event",
         "ok": true,

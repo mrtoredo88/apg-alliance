@@ -35,6 +35,16 @@
 - Raw snapshot path исключён из Git, чтобы production data не могло случайно попасть в commit.
 **Почему:** Production Account Core migration должна останавливаться на первом доказанном блокере и не переходить к snapshot/import/canary/cutover без подтверждённой инфраструктурной готовности.
 
+## [2026-07-20] docs: APG Production Infrastructure Readiness v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `docs/migration/production-readiness-checklist.md`, `docs/migration/postgres-readiness.md`, `docs/migration/firebase-admin-readiness.md`, `docs/migration/rollback-readiness.md`, `docs/migration/backup-readiness.md`, `docs/migration/monitoring-readiness.md`, `docs/migration/preflight-blockers.md`, `backups/account-core/preflight/final-readiness-redacted.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** docs
+**Что изменено:**
+- Проведён read-only аудит production infrastructure readiness для Account Core без snapshot/import/verify/canary/cutover/deploy.
+- Зафиксированы блокеры `PREFLIGHT_BLOCKED`: отсутствующие PostgreSQL/Firebase Admin/encryption/backup/monitoring secrets, нечистое рабочее дерево, неполные rollback и monitoring доказательства.
+- Создан единый redacted readiness report и чек-листы по PostgreSQL, Firebase Admin, rollback, backup, monitoring и preflight blockers.
+**Почему:** перед реальной миграцией Account Core нужно доказать готовность production-инфраструктуры, а не продолжать pipeline на предположениях.
+
 ## [2026-07-20] feat: Account Core Migration v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server/src/apg/account/*`, `server/src/apg/index.js`, `server/src/routes/system-status.js`, `src/apg/core/FeatureFlags.js`, `scripts/account-*.mjs`, `scripts/architecture-guard.mjs`, `docs/architecture-guard-report.json`, `package.json`, `.ai/17_CHANGELOG_AI.md`

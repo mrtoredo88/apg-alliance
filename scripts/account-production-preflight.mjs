@@ -41,7 +41,7 @@ function runCheck(name, fn, options = {}) {
   }
 }
 
-async function fetchJson(url, timeoutMs = 5000) {
+async function fetchJson(url, timeoutMs = 10000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
