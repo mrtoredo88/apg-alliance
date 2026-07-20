@@ -40,6 +40,8 @@ const fatalMarkers = [
   'React error #300',
   'What happened',
   'Что-то пошло не так',
+  'Cannot access',
+  'before initialization',
 ];
 
 const userAppSource = fs.readFileSync('src/UserApp.jsx', 'utf8');
@@ -123,9 +125,18 @@ async function getScenarioRunner(page) {
     if (hasMarkers.length) {
       throw new Error(`Найден фатальный текст в интерфейсе: ${hasMarkers.join(', ')}`);
     }
+    const hasReferenceError = runnerErrorsContainsReferenceError();
+    if (hasReferenceError) {
+      throw new Error(`Найден ReferenceError в runtime: ${hasReferenceError}`);
+    }
     if (errors.some((entry) => /Minified React error|APG-MRLR2SYM|React error #310|Error #310|React error #300/.test(entry.message))) {
       throw new Error(`Fatal runtime errors: ${errors.map((entry) => entry.message).join(' | ')}`);
     }
+  };
+
+  const runnerErrorsContainsReferenceError = () => {
+    const refError = errors.find((entry) => /ReferenceError|Cannot access .*before initialization/i.test(entry.message));
+    return refError ? refError.message : '';
   };
 
   const simulateManualLogout = async () => {
@@ -191,6 +202,7 @@ async function runForTarget(baseUrl) {
     // Базовая загрузка после входа по обычной сессии (или гость).
     await page.goto(target, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
     await runner.run();
+    autoScenarios.push('Сценарий bootstrap приложения без авторизации: экран рендерится без ErrorBoundary и ReferenceError');
 
     autoScenarios.push('Базовая проверка загрузки root после загрузки приложения');
 

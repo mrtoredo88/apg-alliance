@@ -2323,6 +2323,33 @@ export function UserApp() {
     return () => window.removeEventListener('apg:auth_session_ready', onAuthSessionReady);
   }, [loadData, loggedOut]);
 
+  const emitEmailAuthAuditEvent = useCallback(async (stage, status = 'OK', payload = {}) => {
+    const attempt = emailAuthAttemptRef.current;
+    if (!attempt?.authAttemptId) return;
+    const expectedUid = payload?.expectedUid || attempt?.expectedUid || '';
+    const actualUid = payload?.actualUid || auth.currentUser?.uid || '';
+    sendEmailAuthAudit({
+      ...buildEmailAuthAttemptContextPayload(attempt),
+      stage,
+      status,
+      identityPath: attempt.identityPath || 'identity_v2',
+      identityResolved: attempt.identityResolved === true,
+      customTokenIssued: attempt.customTokenIssued === true,
+      backendRevision: attempt.backendRevision,
+      payload: {
+        ...payload,
+        authProvider: 'email',
+        expectedUidHash: payload.expectedUidHash || (expectedUid ? await hashTextSha256(expectedUid) : ''),
+        actualUidHash: payload.actualUidHash || (actualUid ? await hashTextSha256(actualUid) : ''),
+        apgUserIdHash: attempt.apgUserIdHash || attempt.apgUserIdHashFallback || '',
+      },
+    });
+  }, []);
+
+  const clearEmailAuthAttemptTracking = useCallback(() => {
+    emailAuthAttemptRef.current = null;
+  }, []);
+
   useEffect(() => {
     if (loading || loggedOut || networkError || !user?.id) return;
     const userId = String(user.id);
@@ -3336,29 +3363,6 @@ export function UserApp() {
 
   // ─── Профиль ────────────────────────────────────────────────────────────────
 
-  const emitEmailAuthAuditEvent = useCallback(async (stage, status = 'OK', payload = {}) => {
-    const attempt = emailAuthAttemptRef.current;
-    if (!attempt?.authAttemptId) return;
-    const expectedUid = payload?.expectedUid || attempt?.expectedUid || '';
-    const actualUid = payload?.actualUid || auth.currentUser?.uid || '';
-    sendEmailAuthAudit({
-      ...buildEmailAuthAttemptContextPayload(attempt),
-      stage,
-      status,
-      identityPath: attempt.identityPath || 'identity_v2',
-      identityResolved: attempt.identityResolved === true,
-      customTokenIssued: attempt.customTokenIssued === true,
-      backendRevision: attempt.backendRevision,
-      payload: {
-        ...payload,
-        authProvider: 'email',
-        expectedUidHash: payload.expectedUidHash || (expectedUid ? await hashTextSha256(expectedUid) : ''),
-        actualUidHash: payload.actualUidHash || (actualUid ? await hashTextSha256(actualUid) : ''),
-        apgUserIdHash: attempt.apgUserIdHash || attempt.apgUserIdHashFallback || '',
-      },
-    });
-  }, []);
-
   const startEmailAuthAttemptTracking = useCallback((emailUser, authPayload = {}) => {
     const attempt = {
       ...buildEmailAuthAttemptContextPayload(authPayload),
@@ -3378,10 +3382,6 @@ export function UserApp() {
     };
     emailAuthAttemptRef.current = attempt;
     return attempt;
-  }, []);
-
-  const clearEmailAuthAttemptTracking = useCallback(() => {
-    emailAuthAttemptRef.current = null;
   }, []);
 
   const completeEmailLogin = useCallback((emailUser) => {
