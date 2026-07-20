@@ -1,5 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { loadMigrationEnv } from './lib/migration-env-loader.mjs';
+
+loadMigrationEnv();
 
 const REPORT_PATH = 'backups/account-core/preflight-report.json';
 const OUT_DIR = 'backups/account-core/snapshot';

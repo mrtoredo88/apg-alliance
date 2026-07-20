@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] chore: Account Core Security & Infrastructure Completion
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/AdminPanel.jsx`, `server/src/routes/raffle-draw.js`, `server/src/routes/activity-index.js`, `scripts/postgres-connectivity-diagnostics.mjs`, `scripts/account-snapshot.mjs`, `scripts/migration-environment-audit.mjs`, `.gitignore`, `docs/security/security-findings-resolution.md`, `docs/migration/postgres-connectivity.md`, `docs/migration/working-tree-cleanup.md`, `docs/migration/final-preflight-status.md`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Убраны client-side shared secrets для ручного запуска розыгрыша и индекса активности; админские действия теперь используют Firebase ID token и существующий backend role guard.
+- Добавлен read-only `postgres:diagnostics`, который локализует PostgreSQL blocker на DNS `ENOTFOUND` без вывода DSN и без PostgreSQL writes.
+- Working-tree gate подготовлен к clean state через ignore generated/local artifacts и удаление `.DS_Store` из Git index.
+**Почему:** перед production Account Core snapshot нужно закрыть security findings и доказать, какие blockers являются кодовыми, а какие относятся к production infrastructure.
+
 ## [2026-07-20] feat: Account Core Integration v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server/src/routes/account.js`, `src/accountApi.js`, `src/UserApp.jsx`, `server/src/routes/user-actions.js`, `server/src/apg/account/*`, `scripts/account-*.mjs`, `docs/migration/account-core-integration-map.md`, `package.json`, `.ai/17_CHANGELOG_AI.md`

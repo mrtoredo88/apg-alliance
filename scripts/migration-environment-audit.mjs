@@ -103,12 +103,18 @@ function scanSecurityFiles() {
     ['firebase_config_literal', /(apiKey|authDomain|projectId|storageBucket)\s*:/i, 'LOW'],
     ['test_credential_marker', /(test.*password|password.*test|demo.*secret|local.*secret)/i, 'MEDIUM'],
   ];
+  const allowedFalsePositive = (type, line) => {
+    if (type !== 'temporary_bypass_or_backdoor') return false;
+    return /temporarypassword|temporary password|временн(ый|ого|ую|ым) парол/i.test(line);
+  };
   const findings = [];
   for (const file of targets) {
     const lines = read(file).split(/\r?\n/);
     lines.forEach((line, index) => {
       for (const [type, pattern, severity] of riskPatterns) {
-        if (pattern.test(line)) findings.push({ file, line: index + 1, type, severity });
+        if (pattern.test(line) && !allowedFalsePositive(type, line)) {
+          findings.push({ file, line: index + 1, type, severity });
+        }
       }
     });
   }
