@@ -77,8 +77,12 @@ assertContains(serverEmailAuth, "error: 'identity_conflict'", 'email link flow: 
 assertContains(serverEmailAuth, "code: 'IDENTITY_CONFLICT'", 'email link flow: backend exports conflict classification');
 assertContains(serverEmailAuth, 'async function resolveActorFromIdentity', 'email link flow: actor resolved through identity-aware helper');
 assertContains(serverEmailAuth, 'identity_v2_user', 'email link flow: actor source includes identity_v2_user');
+assertContains(serverEmailAuth, 'function buildEmailAuthUserPayload', 'email response now preserves identity links');
+assertContains(serverEmailAuth, 'linkedTelegram: telegramId', 'email response includes linked Telegram payload');
+assertContains(serverEmailAuth, 'linkedEmail: ud.linkedEmail || identityEmail', 'email response includes linked email marker');
 assertContains(serverEmailAuth, "if (action === 'link-email')", 'email link flow: link-email action exists');
 assertContains(serverEmailAuth, "if (action === 'link-telegram')", 'email link flow: link-telegram action exists');
+assertContains(userApp, "localStorage.setItem('apg_email_user', JSON.stringify(emailUser));", 'complete email auth persists full user payload');
 assertContains(profile, "action: 'link-telegram', userId: String(user.id)", 'profile: link telegram uses current user id');
 assertContains(profile, "action: 'link-email', email: linkEmailValue, userId: String(user.id)", 'profile: link email uses current user id');
 
@@ -98,5 +102,6 @@ console.log(JSON.stringify({
     'guest_after_logout_without_reload',
     'auth_restore_after_logout',
     'auth_restore_after_telegram',
+    'email_login_retains_telegram_link_after_logout',
   ],
 }, null, 2));

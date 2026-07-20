@@ -496,6 +496,35 @@ async function createFirebaseToken(userId, user = {}) {
   return serverFoundation.identityV2.createCustomToken(userId, user);
 }
 
+function buildEmailAuthUserPayload(userId, ud, email) {
+  const identityEmail = String(email || '').trim().toLowerCase();
+  const linkedTelegram = ud?.linkedTelegram && typeof ud.linkedTelegram === 'object' ? ud.linkedTelegram : null;
+  const telegramId = String(linkedTelegram?.tgId || linkedTelegram?.telegramId || '').trim();
+  return {
+    id: userId,
+    canonicalUserId: userId,
+    first_name: ud.firstName ?? identityEmail.split('@')[0],
+    last_name: ud.lastName ?? '',
+    photo_200: ud.photo ?? null,
+    email: identityEmail,
+    emailVerified: ud.emailVerified ?? null,
+    linkedEmail: ud.linkedEmail || identityEmail,
+    linkedTelegram: telegramId
+      ? {
+        tgId: telegramId,
+        telegramId,
+        username: linkedTelegram?.username || null,
+        firstName: linkedTelegram?.firstName || null,
+        lastName: linkedTelegram?.lastName || null,
+        photo: linkedTelegram?.photo || linkedTelegram?.photoUrl || null,
+        linkedAt: linkedTelegram?.linkedAt || null,
+      }
+      : null,
+    role: ud.role ?? null,
+    roles: Array.isArray(ud.roles) ? ud.roles : null,
+  };
+}
+
 function createEmailLoginTrace(request) {
   const attemptContext = getEmailAuthAttemptContext(request);
   return {
@@ -1077,16 +1106,7 @@ export default async function emailAuthRoutes(fastify) {
             expectedUidHash: trace.expectedUidHash,
             timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
           },
-          user: {
-            id: userId,
-            canonicalUserId: userId,
-            first_name: ud.firstName ?? email.split('@')[0],
-            last_name: ud.lastName ?? '',
-            photo_200: ud.photo ?? null,
-            email,
-            role: ud.role ?? null,
-            roles: Array.isArray(ud.roles) ? ud.roles : null,
-          },
+          user: buildEmailAuthUserPayload(userId, ud, email),
         };
       } catch (error) {
         const classified = classifyEmailLoginError(error);
@@ -1281,17 +1301,7 @@ export default async function emailAuthRoutes(fastify) {
             expectedUidHash: trace.expectedUidHash,
             timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
           },
-          user: {
-            id: userId,
-            canonicalUserId: userId,
-            first_name: ud.firstName ?? email.split('@')[0],
-            last_name:  ud.lastName  ?? '',
-            photo_200:  ud.photo     ?? null,
-            email,
-            emailVerified: ud.emailVerified ?? null,
-            role: ud.role ?? null,
-            roles: Array.isArray(ud.roles) ? ud.roles : null,
-          },
+          user: buildEmailAuthUserPayload(userId, ud, email),
         };
       } catch (error) {
         const classified = classifyEmailLoginError(error);
