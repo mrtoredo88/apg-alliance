@@ -1,0 +1,12 @@
+{
+  "status": "ACCOUNT_CORE_HEALTH_PASSED",
+  "generatedAt": "2026-07-20T12:14:02.230Z",
+  "accountCore": "PASS",
+  "identity": "PASS",
+  "postgres": "PASS",
+  "runtime": "postgres",
+  "migration": "PASS",
+  "backendRevision": "bbavu0f0clhb5g3o25r1",
+  "productionFrontendVersion": "5f02f785",
+  "firebaseAuthUnchanged": true
+}

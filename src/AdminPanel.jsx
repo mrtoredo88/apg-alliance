@@ -7080,8 +7080,8 @@ export const AdminPanel = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/raffle-draw`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: 'apg2026raffle', prizeId: prize.id }),
+        headers: await adminRequestHeaders(`raffle_draw_${prize.id}_${Date.now()}`),
+        body: JSON.stringify({ prizeId: prize.id }),
       });
       const data = await res.json();
       if (data.winner) {
@@ -10596,8 +10596,8 @@ export const AdminPanel = () => {
           try {
             const res = await fetch(`${API_BASE_URL}/api/activity-index`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ secret: 'apg2026activity' }),
+              headers: await adminRequestHeaders(`activity_index_${Date.now()}`),
+              body: JSON.stringify({}),
             });
             const data = await res.json();
             if (data.error) throw new Error(data.error);

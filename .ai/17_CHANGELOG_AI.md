@@ -15,6 +15,106 @@
 
 ---
 
+## [2026-07-20] feat: Account Core Production Migration Phase 1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/account-operator-deploy.mjs`, `scripts/account-snapshot.mjs`, `scripts/account-conflicts.mjs`, `scripts/account-dry-run.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Operator deploy helper теперь собирает image строго под `linux/amd64` и проверяет manifest перед Yandex Serverless revision deploy.
+- `account:snapshot` создаёт immutable read-only Account Core snapshot с raw JSON вне Git, SHA256 и redacted manifest после успешного remote preflight.
+- `account:conflicts` и `account:dry-run` работают от immutable snapshot, считают P0 conflicts и read-only import plan без PostgreSQL writes/import/verify/canary/cutover.
+**Почему:** Phase 1 должна завершить snapshot readiness: remote preflight → immutable snapshot → conflict analysis → dry run, не переходя к production mutation stages.
+
+## [2026-07-20] chore: One-Off Account Core Migration Operator
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `ops/migration-operator/Dockerfile`, `ops/migration-operator/server.mjs`, `scripts/account-operator-deploy.mjs`, `scripts/account-operator-invoke.mjs`, `docs/migration/one-off-migration-operator.md`, `package.json`, `.gitignore`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен отдельный no-data migration operator image/entrypoint для запуска только `account:remote-preflight -- --execute` в production VPC.
+- Добавлены deploy/invoke helpers, которые используют отдельный `apg-migration-operator`, не меняют `apg-api`, не печатают env values и сохраняют только redacted отчёты.
+- Зафиксирован runbook с guardrails: запрет snapshot/import/verify/canary/cutover/rollback, Firestore reads и PostgreSQL writes.
+**Почему:** remote preflight нужно доказать из production network path через временный operator container, не трогая production backend и не открывая PostgreSQL наружу.
+
+## [2026-07-20] chore: PostgreSQL Production Network Integration
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/account-remote-preflight.mjs`, `docs/migration/postgres-network-topology.md`, `docs/migration/migration-operator-runtime.md`, `docs/migration/postgres-connectivity-runbook.md`, `docs/migration/remote-preflight-checklist.md`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Зафиксирован production network path: Yandex Serverless Container `apg-api` использует VPC network `enpa19j9jpki1f67p6kq` и тот же PostgreSQL DSN group.
+- Добавлен no-data `account:remote-preflight`, который проверяет runtime assertion, env loader, DNS/TCP/TLS, PostgreSQL auth через `SELECT 1`, Firebase Admin init и manifests без Firestore reads, PostgreSQL writes, snapshot/import/verify/canary/cutover/deploy.
+- Добавлены topology/runbook/checklist документы для запуска migration operator в том же сетевом контуре, без открытия PostgreSQL наружу.
+**Почему:** локальный `ENOTFOUND` является различием сетевого окружения; migration operator должен использовать уже работающий production VPC path, а не новый публичный доступ к базе.
+
+## [2026-07-20] chore: Account Core Security & Infrastructure Completion
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/AdminPanel.jsx`, `server/src/routes/raffle-draw.js`, `server/src/routes/activity-index.js`, `scripts/postgres-connectivity-diagnostics.mjs`, `scripts/account-snapshot.mjs`, `scripts/migration-environment-audit.mjs`, `.gitignore`, `docs/security/security-findings-resolution.md`, `docs/migration/postgres-connectivity.md`, `docs/migration/working-tree-cleanup.md`, `docs/migration/final-preflight-status.md`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Убраны client-side shared secrets для ручного запуска розыгрыша и индекса активности; админские действия теперь используют Firebase ID token и существующий backend role guard.
+- Добавлен read-only `postgres:diagnostics`, который локализует PostgreSQL blocker на DNS `ENOTFOUND` без вывода DSN и без PostgreSQL writes.
+- Working-tree gate подготовлен к clean state через ignore generated/local artifacts и удаление `.DS_Store` из Git index.
+**Почему:** перед production Account Core snapshot нужно закрыть security findings и доказать, какие blockers являются кодовыми, а какие относятся к production infrastructure.
+
+## [2026-07-20] feat: Account Core Integration v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server/src/routes/account.js`, `src/accountApi.js`, `src/UserApp.jsx`, `server/src/routes/user-actions.js`, `server/src/apg/account/*`, `scripts/account-*.mjs`, `docs/migration/account-core-integration-map.md`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен backend endpoint `POST /api/account/bootstrap` и frontend `fetchAccountBootstrap`, чтобы canary-mode UserApp получал профиль, роли, permissions, cabinets и session state через AccountCoreService.
+- `profile:sync` и `profile:update` получили gated Account Core write-through path через `serverFoundation.account.upsertProfile`, без изменения legacy Firestore rollback path и без включения production flags.
+- Добавлены account import dry-run/manifest, verify redacted reports, Firestore outage simulation, event readiness integration и integration map оставшихся legacy вызовов.
+**Почему:** Account Core scaffold должен начать обслуживать реальные критические пути через PostgreSQL/service layer, прежде чем можно будет говорить о canary и production cutover.
+
+## [2026-07-20] chore: Account Core Production Migration Preflight
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/account-production-preflight.mjs`, `scripts/account-snapshot.mjs`, `scripts/account-conflicts.mjs`, `scripts/account-drift.mjs`, `scripts/account-observe.mjs`, `scripts/production-readiness.mjs`, `package.json`, `.gitignore`, `backups/account-core/preflight-report.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен gate-based Preflight для production Account Core migration: он проверяет ветку/commit, версии, backend health, PostgreSQL DSN/schema, Firebase Admin read access, rollback/monitoring и обязательные account tests.
+- Добавлены заблокированные команды snapshot/conflicts/drift/observe и общий `readiness:production`, которые не продолжают pipeline без выполненных gate.
+- Raw snapshot path исключён из Git, чтобы production data не могло случайно попасть в commit.
+**Почему:** Production Account Core migration должна останавливаться на первом доказанном блокере и не переходить к snapshot/import/canary/cutover без подтверждённой инфраструктурной готовности.
+
+## [2026-07-20] docs: APG Production Infrastructure Readiness v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `docs/migration/production-readiness-checklist.md`, `docs/migration/postgres-readiness.md`, `docs/migration/firebase-admin-readiness.md`, `docs/migration/rollback-readiness.md`, `docs/migration/backup-readiness.md`, `docs/migration/monitoring-readiness.md`, `docs/migration/preflight-blockers.md`, `backups/account-core/preflight/final-readiness-redacted.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** docs
+**Что изменено:**
+- Проведён read-only аудит production infrastructure readiness для Account Core без snapshot/import/verify/canary/cutover/deploy.
+- Зафиксированы блокеры `PREFLIGHT_BLOCKED`: отсутствующие PostgreSQL/Firebase Admin/encryption/backup/monitoring secrets, нечистое рабочее дерево, неполные rollback и monitoring доказательства.
+- Создан единый redacted readiness report и чек-листы по PostgreSQL, Firebase Admin, rollback, backup, monitoring и preflight blockers.
+**Почему:** перед реальной миграцией Account Core нужно доказать готовность production-инфраструктуры, а не продолжать pipeline на предположениях.
+
+## [2026-07-20] feat: Migration Environment Loader
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/lib/migration-env-loader.mjs`, `scripts/migration-environment-audit.mjs`, `scripts/account-production-preflight.mjs`, `scripts/account-readiness.mjs`, `scripts/account-dry-run.mjs`, `scripts/account-verify.mjs`, `scripts/account-core-import.mjs`, `docs/migration/environment-loading.md`, `docs/migration/migration-operator-environment.md`, `docs/migration/security-redacted-review.md`, `docs/migration/preflight-resolution-plan.md`, `backups/account-core/preflight/environment-audit-redacted.json`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен единый redacted environment loader для migration operator scripts, который читает `server/.env` без вывода значений и не требует ручного `export` десятков переменных.
+- `account:preflight`, `account:dry-run`, `account:import`, `account:verify` и `readiness:account` теперь используют единый env-loading path.
+- Добавлен read-only аудит окружения и security-redacted review по ранее отмеченным файлам; отчёты фиксируют только имена ключей, источники, статусы и типы риска.
+**Почему:** production secrets существовали в deploy source, но migration scripts их не получали; нужно устранить этот инфраструктурный разрыв без изменения production и без раскрытия секретов.
+
+## [2026-07-20] feat: Account Core Migration v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server/src/apg/account/*`, `server/src/apg/index.js`, `server/src/routes/system-status.js`, `src/apg/core/FeatureFlags.js`, `scripts/account-*.mjs`, `scripts/architecture-guard.mjs`, `docs/architecture-guard-report.json`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Создан домен `server/src/apg/account/` с PostgreSQL schema, repositories, services, bootstrap, roles/profiles/sessions/permissions/cabinets и fallback adapter для миграционного dual-read.
+- Добавлены feature flags `ACCOUNT_STORAGE`, `ACCOUNT_DUAL_READ`, `ACCOUNT_DUAL_WRITE`, `ACCOUNT_FALLBACK`, `ACCOUNT_CANARY`, Account metrics в APG Health и локальные команды dry-run/verify/canary/cutover/rollback/readiness.
+- Добавлен Account Core architecture guard и tests/readiness, подтверждающие session restore, role resolution, profile/Home/Workspace bootstrap через repository layer.
+**Почему:** после Identity следующим P0 слоем является Account Core; он должен уйти в PostgreSQL так, чтобы профиль, роли, сессии, Workspace/Home bootstrap и кабинеты перестали зависеть от Firestore в критическом пути.
+
+## [2026-07-20] chore: Full Firebase/Firestore migration audit
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/full-postgres-migration-audit.mjs`, `docs/migration/*`, `backups/migration/audit-summary-redacted.json`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен read-only аудит Firebase/Firestore зависимостей с redacted JSON-отчётом по доменам, операциям, hotspot-файлам и P0/P1 рискам.
+- Создан полный набор документов для PostgreSQL migration program: dependency audit, domain register, critical paths, failure matrix, target architecture, sequence, Firebase Auth decision и event readiness plan.
+- Добавлен npm-скрипт `audit:full-postgres-migration`; production, Firestore, feature flags, import/verify/canary/cutover и deploy не изменялись.
+**Почему:** после завершения Identity Migration нужно понять полный масштаб оставшейся Firebase/Firestore зависимости и спланировать безопасный перенос остальных доменов без новой инфраструктурной слепой зоны.
+
 ## [2026-07-20] chore: Immutable Verify Package v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `scripts/identity-verify-lock.mjs`, `scripts/identity-verify-lock-test.mjs`, `scripts/identity-verify.mjs`, `scripts/identity-canary.mjs`, `scripts/identity-controlled-cutover.mjs`, `scripts/identity-verify-drift.mjs`, `scripts/identity-canary-test.mjs`, `scripts/identity-controlled-cutover-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
@@ -4205,6 +4305,14 @@
 - Старое действие `event:propose` оставлено совместимым с новым workspace-layer, чтобы кабинет партнёра/эксперта продолжал отправлять предложения на модерацию.
 - `scripts/workspace-core-test.mjs` расширен проверками партнёр/эксперт ownership, статусов, архивов, прошедших событий, конфликтов и безопасного дублирования.
 
+# 2026-07-20 — Account Core Production Cutover
+
+- Выполнен финальный Canary → Controlled Cutover для Account Core runtime: canary allowlist прошёл через PostgreSQL Account Core, затем production runtime переключён на PostgreSQL.
+- Backend `apg-api` получил canary gate для `/api/account/bootstrap`: при `ACCOUNT_CANARY=1` endpoint доступен только утверждённому allowlist; после cutover canary отключён.
+- Frontend production собран и задеплоен с `VITE_ACCOUNT_STORAGE=postgres`, Firebase Authentication остался без изменений.
+- Финальные отчёты сохранены в `backups/account-core/final/`: cutover report, summary и health report; rollback readiness подтверждён.
+- Firestore Account Core writes после canary/cutover остались `0`; PostgreSQL session writes отражены как консервативная upper-bound метрика, а не скрыты как `0`.
+
 # 2026-07-19 — APG Migration Center + Architecture Guard v1
 
 - Добавлен управляемый Identity Migration Center в админке: статус PostgreSQL/Firestore, сравнение counts/checksums, protected actions, progress, history, dependency monitor и runtime rollback через Identity flags.
@@ -4238,6 +4346,15 @@
 - Добавлена controlled-процедура `npm run identity:cutover`: перед production `cutover-postgres` сверяет Canary/Manifest/Verify/Dry Run хэши, backend revision, PostgreSQL/Identity health, rollback readiness и создаёт checkpoint в `backups/identity/cutover/`.
 - `/api/identity-v2-admin` получил lightweight action `cutover-status`, который для pre/post cutover проверяет PostgreSQL counts, Identity flags и dependency monitor без полного Firestore snapshot, чтобы не ловить 30s timeout на операционном переключении.
 - Добавлен `npm run test:identity-controlled-cutover`: проверяет gate-based precheck, checkpoint-before-cutover, rollback readiness, monitoring report, запрет автоматического rollback/disable fallback/deploy и честную маркировку live-login checks.
+
+# 2026-07-20 — Account Core Production Import
+
+- Выполнен Account Core Import → Verify через `apg-migration-operator` в production VPC без изменения `apg-api`, feature flags, Canary или Cutover.
+- Импорт использует immutable snapshot `3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7`, resolution manifest и dry run gate.
+- Добавлен remote runner `account:operator:import` для управляемого import/resume/verify через operator endpoint.
+- Исправлено сохранение exact identity IDs для cabinet ownership, чтобы dry run и PostgreSQL FK использовали одну модель данных.
+- Исправлен idempotency key для `telegramLinks`; финальный resume прошёл с `0` inserts и `0` updates.
+- Verify подтвердил parity: profiles `126`, roles `126`, cabinets `4`, telegram links `7`, sessions `0`, orphan records `0`, duplicate canonical accounts `0`.
 
 # 2026-07-14 — Workspace Meetings CRM
 

@@ -1,0 +1,162 @@
+{
+  "status": "CUTOVER_PASSED",
+  "generatedAt": "2026-07-20T12:14:02.232Z",
+  "snapshotSha256": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
+  "backendRevision": "bbavu0f0clhb5g3o25r1",
+  "productionFrontendVersion": "5f02f785",
+  "runtimeSwitchedToPostgres": true,
+  "firebaseAuthUnchanged": true,
+  "firestoreAccountCoreReads": 0,
+  "firestoreAccountCoreWrites": 0,
+  "postgresAccountCoreReads": 7,
+  "postgresAccountCoreWritesUpperBound": 7,
+  "firestoreOutageSimulation": "PASSED",
+  "apgHealth": "PASS",
+  "rollbackReadiness": "READY",
+  "canary": "CANARY_PASSED",
+  "cutover": "PASSED",
+  "postCutoverChecks": [
+    {
+      "category": "owner",
+      "userHash": "account_49cfeb6df78f46b4",
+      "ok": true,
+      "latencyMs": 3240,
+      "roleCount": 2,
+      "cabinetCount": 1,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": false,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    },
+    {
+      "category": "admin",
+      "userHash": "account_96866ef26c2fd473",
+      "ok": true,
+      "latencyMs": 181,
+      "roleCount": 1,
+      "cabinetCount": 0,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": false,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    },
+    {
+      "category": "partner",
+      "userHash": "account_49cfeb6df78f46b4",
+      "ok": true,
+      "latencyMs": 172,
+      "roleCount": 2,
+      "cabinetCount": 1,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": false,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    },
+    {
+      "category": "expert",
+      "userHash": "account_29dbc480578427be",
+      "ok": true,
+      "latencyMs": 168,
+      "roleCount": 2,
+      "cabinetCount": 1,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": false,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    },
+    {
+      "category": "telegramUser",
+      "userHash": "account_39c7c8f0452d0b79",
+      "ok": true,
+      "latencyMs": 167,
+      "roleCount": 1,
+      "cabinetCount": 0,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": false,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    },
+    {
+      "category": "regularUser",
+      "userHash": "account_f9c704d12853d447",
+      "ok": true,
+      "latencyMs": 165,
+      "roleCount": 1,
+      "cabinetCount": 0,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": false,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    },
+    {
+      "category": "multiRoleUser",
+      "userHash": "account_49cfeb6df78f46b4",
+      "ok": true,
+      "latencyMs": 173,
+      "roleCount": 2,
+      "cabinetCount": 1,
+      "sessionObserved": true,
+      "source": {
+        "storage": "postgres",
+        "fallbackEnabled": true,
+        "dualRead": false,
+        "dualWrite": false,
+        "source": "account-core-postgres"
+      }
+    }
+  ],
+  "commands": {
+    "backendDeploy": {
+      "ok": true
+    },
+    "frontendDeploy": {
+      "ok": true
+    },
+    "readinessAccount": {
+      "ok": true
+    },
+    "build": {
+      "ok": true
+    },
+    "productionSmoke": {
+      "ok": true
+    },
+    "firestoreOutage": {
+      "ok": true
+    }
+  },
+  "productionDataChanged": {
+    "firestore": 0,
+    "postgresTables": {
+      "apg_account_profiles": 126,
+      "apg_account_roles": 126,
+      "apg_account_cabinets": 4,
+      "apg_account_telegram_links": 7,
+      "apg_account_sessions": 0
+    }
+  }
+}

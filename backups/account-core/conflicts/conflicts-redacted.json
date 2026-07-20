@@ -1,0 +1,130 @@
+{
+  "status": "CONFLICT_ANALYSIS_PASSED",
+  "generatedAt": "2026-07-20T11:38:55.812Z",
+  "snapshotSha256": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
+  "accountCount": 127,
+  "conflictCount": 14,
+  "p0Conflicts": 0,
+  "resolvedP0Conflicts": 1,
+  "resolutionManifest": {
+    "present": true,
+    "actions": 1,
+    "reason": ""
+  },
+  "analysis": {
+    "duplicateUsers": {
+      "duplicateEmails": [
+        {
+          "keyHash": "key_d1c56991cfb3f8bb",
+          "count": 2,
+          "ids": [
+            "account_49cfeb6df78f46b4",
+            "account_61a135a57aaeafc3"
+          ]
+        },
+        {
+          "keyHash": "key_eb6f040a3b32bacb",
+          "count": 2,
+          "ids": [
+            "account_e6edcc4773d0b3cc",
+            "account_146d64a2b5edda16"
+          ]
+        },
+        {
+          "keyHash": "key_f22d08b99bfcad8f",
+          "count": 2,
+          "ids": [
+            "account_e3577f123dce0a21",
+            "account_0626c2c525510e12"
+          ]
+        }
+      ],
+      "duplicateFirebase": [],
+      "duplicateTelegramIds": []
+    },
+    "duplicateRoles": [],
+    "duplicateCabinets": [],
+    "missingProfile": [
+      {
+        "id": "id_25f7fdaf954f27a5",
+        "target": "target_1e3a864ad81a8849"
+      },
+      {
+        "id": "id_01af2a8ca8b67964",
+        "target": "target_6889ec23c6ce6289"
+      },
+      {
+        "id": "id_b27afa1eddb5a6ab",
+        "target": "target_0abecd09175ea7a7"
+      }
+    ],
+    "danglingReferences": {
+      "orphanTgLinks": [
+        {
+          "id": "id_25f7fdaf954f27a5",
+          "target": "target_1e3a864ad81a8849"
+        },
+        {
+          "id": "id_01af2a8ca8b67964",
+          "target": "target_6889ec23c6ce6289"
+        },
+        {
+          "id": "id_b27afa1eddb5a6ab",
+          "target": "target_0abecd09175ea7a7"
+        }
+      ],
+      "missingBookingUsers": [],
+      "danglingCabinets": []
+    },
+    "telegramCollisions": [],
+    "sessionConflicts": [],
+    "ownerAdminConflicts": {
+      "adminUsers": [
+        "account_49cfeb6df78f46b4",
+        "account_96866ef26c2fd473"
+      ],
+      "ownerUsers": [
+        "account_49cfeb6df78f46b4"
+      ],
+      "p0": [
+        {
+          "type": "duplicate_admin_or_owner_email",
+          "conflictId": "duplicate_admin_or_owner_email_d1c56991cfb3f8bb",
+          "resolved": true,
+          "group": {
+            "keyHash": "key_d1c56991cfb3f8bb",
+            "count": 2,
+            "ids": [
+              "account_49cfeb6df78f46b4",
+              "account_61a135a57aaeafc3"
+            ]
+          }
+        }
+      ],
+      "unresolvedP0": []
+    },
+    "resolvedP0": [
+      {
+        "type": "duplicate_admin_or_owner_email",
+        "conflictId": "duplicate_admin_or_owner_email_d1c56991cfb3f8bb",
+        "resolved": true,
+        "group": {
+          "keyHash": "key_d1c56991cfb3f8bb",
+          "count": 2,
+          "ids": [
+            "account_49cfeb6df78f46b4",
+            "account_61a135a57aaeafc3"
+          ]
+        }
+      }
+    ],
+    "p0": []
+  },
+  "productionChanged": false,
+  "firestoreWrites": 0,
+  "postgresWrites": 0,
+  "importStarted": false,
+  "verifyStarted": false,
+  "canaryStarted": false,
+  "cutoverStarted": false
+}

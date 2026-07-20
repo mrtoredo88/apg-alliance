@@ -1,5 +1,6 @@
 import { getDb } from '../lib/firebase.js';
 import { FieldValue } from 'firebase-admin/firestore';
+import { requireAdminPermission } from '../lib/adminSecurity.js';
 
 function currentMonthKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -174,8 +175,8 @@ export default async function activityIndexRoutes(fastify) {
   fastify.post('/api/activity-index', async (request, reply) => {
     try {
       const cronAuth  = request.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;
-      const adminAuth = request.body?.secret === process.env.ACTIVITY_SECRET;
-      if (!cronAuth && !adminAuth) return reply.code(403).send({ error: 'Forbidden' });
+      const secretAuth = request.body?.secret === process.env.ACTIVITY_SECRET;
+      if (!cronAuth && !secretAuth) await requireAdminPermission(request, 'partners:update');
 
       const db = getDb();
 

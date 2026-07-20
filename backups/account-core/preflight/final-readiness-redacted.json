@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "name": "APG Production Infrastructure Readiness v1",
+  "status": "PREFLIGHT_BLOCKED",
+  "branch": "migration/account-core-production-v1",
+  "commit": "52c7e62a",
+  "productionChanged": false,
+  "firestoreChanged": false,
+  "postgresWrites": 0,
+  "snapshotStarted": false,
+  "importStarted": false,
+  "verifyStarted": false,
+  "canaryStarted": false,
+  "cutoverStarted": false,
+  "rollbackStarted": false,
+  "deployStarted": false,
+  "frontend": {
+    "versionEndpoint": "https://myapg.ru/version.json",
+    "reachable": true,
+    "version": "b526041e"
+  },
+  "backend": {
+    "healthEndpoint": "https://bbangqkf2d4pa9855lu0.containers.yandexcloud.net/health",
+    "reachable": true
+  },
+  "components": {
+    "postgresql": {
+      "status": "BLOCKED",
+      "blocker": "POSTGRES_DSN_NOT_CONFIGURED"
+    },
+    "firebaseAdmin": {
+      "status": "BLOCKED",
+      "blocker": "FIREBASE_ADMIN_CREDENTIALS_NOT_CONFIGURED"
+    },
+    "secrets": {
+      "status": "BLOCKED",
+      "missing": [
+        "POSTGRES_DSN",
+        "Firebase Admin credentials",
+        "migration encryption key",
+        "backup path",
+        "monitoring credentials"
+      ]
+    },
+    "rollback": {
+      "status": "BLOCKED",
+      "blocker": "Rollback flags/script exist; production manifests/checkpoints/reports are not proven."
+    },
+    "monitoring": {
+      "status": "BLOCKED",
+      "blocker": "Full production Account Core cutover metrics are not proven."
+    },
+    "backup": {
+      "status": "BLOCKED",
+      "blocker": "Encrypted immutable snapshot cannot be proven without production read credentials and encryption key."
+    },
+    "apgHealth": {
+      "status": "BLOCKED",
+      "blocker": "Production authenticated APG Health Account Core metrics were not verified."
+    },
+    "build": {
+      "status": "PASS"
+    },
+    "readiness": {
+      "status": "BLOCKED",
+      "blocker": "readiness:production stops on account:preflight blockers."
+    }
+  },
+  "nextSafeStep": "Resolve infrastructure blockers and rerun npm run account:preflight. Do not run snapshot/import/canary/cutover before PREFLIGHT_PASSED."
+}

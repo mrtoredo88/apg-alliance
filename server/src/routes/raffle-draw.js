@@ -1,6 +1,7 @@
 import { APP_URL } from '../lib/config.js';
 import { getDb, getDbMessaging } from '../lib/firebase.js';
 import { FieldValue } from 'firebase-admin/firestore';
+import { requireAdminPermission } from '../lib/adminSecurity.js';
 
 function weightedRandom(entries) {
   const total = entries.reduce((s, e) => s + (e.ticketsCount ?? 0), 0);
@@ -82,8 +83,8 @@ export default async function raffleDrawRoutes(fastify) {
   fastify.post('/api/raffle-draw', async (request, reply) => {
     try {
       const cronAuth  = request.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;
-      const adminAuth = request.body?.secret === process.env.RAFFLE_SECRET;
-      if (!cronAuth && !adminAuth) return reply.code(403).send({ error: 'Forbidden' });
+      const secretAuth = request.body?.secret === process.env.RAFFLE_SECRET;
+      if (!cronAuth && !secretAuth) await requireAdminPermission(request, 'prizes:update');
 
       const db = getDb();
 

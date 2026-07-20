@@ -4,6 +4,7 @@ import { createIdentityV2 } from './createIdentityV2.js';
 import { FirebaseAdminIdentityProvider } from './identity/providers/FirebaseAdminIdentityProvider.js';
 import { NativeApgServerIdentityProvider } from './identity/providers/NativeApgServerIdentityProvider.js';
 import { YandexServerIdentityProvider } from './identity/providers/YandexServerIdentityProvider.js';
+import { createAccountCore } from './account/index.js';
 
 export const SERVER_REPOSITORY_DEFINITIONS = {
   UserRepository: 'users',
@@ -23,9 +24,11 @@ export const SERVER_REPOSITORY_DEFINITIONS = {
 
 export function createServerFoundation({ dataAdapter = new FirestoreAdminAdapter(), identityProvider = new FirebaseAdminIdentityProvider() } = {}) {
   const identityV2 = createIdentityV2({ tokenProvider: identityProvider });
+  const account = createAccountCore();
   return {
     identity: identityProvider,
     identityV2,
+    account,
     data: {
       adapter: dataAdapter,
       repositories: Object.fromEntries(
@@ -57,3 +60,4 @@ export { FirestoreAdminAdapter } from './data/FirestoreAdminAdapter.js';
 export { ServerRepository } from './data/ServerRepository.js';
 export { PostgresIdentityAdapter } from './infrastructure/adapters/PostgresIdentityAdapter.js';
 export { FirestoreIdentityFallbackAdapter } from './infrastructure/adapters/FirestoreIdentityFallbackAdapter.js';
+export * from './account/index.js';

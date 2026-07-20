@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "status": "IMPORT_PASSED",
+  "sourceSnapshotHash": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
+  "inserted": 0,
+  "updated": 0,
+  "loadedRecordsVerified": 263,
+  "skipped": 433,
+  "skippedExisting": 263,
+  "retryCount": 0,
+  "checkpointsCreated": 6,
+  "expectedDryRunInserts": 263,
+  "tableCountsBefore": {
+    "apg_account_profiles": 126,
+    "apg_account_roles": 126,
+    "apg_account_cabinets": 4,
+    "apg_account_telegram_links": 7,
+    "apg_account_sessions": 0
+  },
+  "tableCountsAfter": {
+    "apg_account_profiles": 126,
+    "apg_account_roles": 126,
+    "apg_account_cabinets": 4,
+    "apg_account_telegram_links": 7,
+    "apg_account_sessions": 0
+  },
+  "p0Resolution": 1,
+  "legacyMerges": 1,
+  "firestoreWrites": 0,
+  "postgresWrites": 0,
+  "verifyStarted": false,
+  "canaryStarted": false,
+  "cutoverStarted": false,
+  "finalResumeInserted": 0,
+  "finalResumeUpdated": 0,
+  "finalResumeSkippedExisting": 263,
+  "resumedAfterPartialAttempt": true,
+  "attemptNotes": [
+    "Initial execute attempt stopped on apg_account_cabinets FK coverage before canary/cutover.",
+    "Second execute attempt completed table parity but resume gate found non-zero telegram link updates.",
+    "Final resume gate passed with 0 inserts and 0 updates."
+  ]
+}

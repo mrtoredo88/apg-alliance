@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "generatedAt": "2026-07-20T11:27:18.817Z",
+  "status": "ACCOUNT_CORE_MIGRATION_BLOCKED",
+  "blockedGate": "Production Import",
+  "reason": "account-core-import execute path is locked and did not execute production import",
+  "snapshotSha256": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
+  "remotePreflight": "PASSED",
+  "automaticP0Resolution": "AUTO_RESOLUTION_PASSED",
+  "conflictAnalysis": "CONFLICT_ANALYSIS_PASSED",
+  "dryRun": "DRY_RUN_PASSED",
+  "import": {
+    "status": "BLOCKED",
+    "executed": false,
+    "checkpoint": "backups/account-core/import-checkpoint-redacted.json",
+    "reason": "LOCKED_WITHOUT_EXPLICIT_IMPLEMENTATION"
+  },
+  "verify": "NOT_RUN",
+  "canary": "NOT_RUN",
+  "observation": "NOT_RUN",
+  "cutover": "NOT_RUN",
+  "productionReady": "BLOCKED",
+  "counts": {
+    "accountRecords": 127,
+    "conflicts": 14,
+    "p0After": 0,
+    "expectedInserts": 432,
+    "expectedUpdates": 0,
+    "expectedUnchanged": 0,
+    "expectedSkips": 1
+  },
+  "writes": {
+    "firestore": 0,
+    "postgresMigration": 0
+  },
+  "productionChanged": false,
+  "tagCreated": false
+}

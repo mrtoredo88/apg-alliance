@@ -1,0 +1,8 @@
+{
+  "status": "OBSERVATION_LOCKED",
+  "reason": "Canary observation requires CANARY_PASSED and explicit owner command.",
+  "productionChanged": false,
+  "firestoreChanged": false,
+  "canaryStarted": false,
+  "cutoverStarted": false
+}

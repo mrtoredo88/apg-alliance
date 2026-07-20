@@ -1,0 +1,94 @@
+{
+  "ok": true,
+  "status": "IMPORT_PASSED",
+  "dryRun": false,
+  "resume": true,
+  "sourceSnapshotHash": "3e470904ebcdbd54aebd363ec8f65e9367cea28d87fd04d73f0ef2a38e2ce8d7",
+  "startedAt": "2026-07-20T11:51:52.607Z",
+  "batches": [
+    {
+      "label": "profiles",
+      "batch": 1,
+      "size": 100,
+      "inserted": 0,
+      "updated": 0,
+      "skippedExisting": 100,
+      "committed": true,
+      "retryCount": 0
+    },
+    {
+      "label": "profiles",
+      "batch": 2,
+      "size": 26,
+      "inserted": 0,
+      "updated": 0,
+      "skippedExisting": 126,
+      "committed": true,
+      "retryCount": 0
+    },
+    {
+      "label": "roles",
+      "batch": 1,
+      "size": 100,
+      "inserted": 0,
+      "updated": 0,
+      "skippedExisting": 100,
+      "committed": true,
+      "retryCount": 0
+    },
+    {
+      "label": "roles",
+      "batch": 2,
+      "size": 26,
+      "inserted": 0,
+      "updated": 0,
+      "skippedExisting": 126,
+      "committed": true,
+      "retryCount": 0
+    },
+    {
+      "label": "cabinets",
+      "batch": 1,
+      "size": 4,
+      "inserted": 0,
+      "updated": 0,
+      "skippedExisting": 4,
+      "committed": true,
+      "retryCount": 0
+    },
+    {
+      "label": "telegramLinks",
+      "batch": 1,
+      "size": 7,
+      "inserted": 0,
+      "updated": 0,
+      "skippedExisting": 7,
+      "committed": true,
+      "retryCount": 0
+    }
+  ],
+  "productionChanged": true,
+  "firestoreChanged": false,
+  "firestoreWrites": 0,
+  "postgresWrites": 0,
+  "finishedAt": "2026-07-20T11:51:54.440Z",
+  "inserted": 0,
+  "updated": 0,
+  "skipped": 433,
+  "skippedExisting": 263,
+  "tableCountsBefore": {
+    "apg_account_profiles": 126,
+    "apg_account_roles": 126,
+    "apg_account_cabinets": 4,
+    "apg_account_telegram_links": 7,
+    "apg_account_sessions": 0
+  },
+  "tableCountsAfter": {
+    "apg_account_profiles": 126,
+    "apg_account_roles": 126,
+    "apg_account_cabinets": 4,
+    "apg_account_telegram_links": 7,
+    "apg_account_sessions": 0
+  },
+  "rollbackReady": true
+}

@@ -8,6 +8,11 @@ const DEFAULT_FLAGS = {
   MESSAGE_PROVIDER: 'firestore',
   SEARCH_PROVIDER: 'firestore',
   STORAGE_PROVIDER: 'yandex-s3',
+  ACCOUNT_STORAGE: 'firestore',
+  ACCOUNT_DUAL_READ: '0',
+  ACCOUNT_DUAL_WRITE: '0',
+  ACCOUNT_FALLBACK: '1',
+  ACCOUNT_CANARY: '0',
 };
 
 function readEnvFlag(name) {
