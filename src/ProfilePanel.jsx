@@ -4,6 +4,7 @@ import { EmailAuth } from './EmailAuth.jsx';
 import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin, openUrl } from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
+import { onAuthStateChanged } from 'firebase/auth';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 import { collection, onSnapshot } from 'firebase/firestore';
 
@@ -42,6 +43,14 @@ function traceAuthStage(stage, details = {}) {
     const current = JSON.parse(localStorage.getItem(AUTH_TRACE_KEY) || '[]');
     localStorage.setItem(AUTH_TRACE_KEY, JSON.stringify([...current.slice(-29), entry]));
   } catch {}
+}
+
+function safeTraceString(value, max = 220) {
+  return String(value ?? '').trim().slice(0, max);
+}
+
+function createTraceId(prefix = 'tg') {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 10)}`;
 }
 
 function EmailVerifyBanner({ userId }) {
@@ -646,6 +655,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const tgStateRef = useRef(null);
   const tgLinkingRef = useRef(false);
   const tgActionRef = useRef(0);
+  const tgAuthTraceRef = useRef({
+    requestId: '',
+    loginSessionId: '',
+    telegramSessionId: '',
+  });
   const isGuest = !isVK() && (!user || String(user.id).startsWith('guest_'));
   const roleValue = String(user?.role || user?.userRole || user?.status || '').toLowerCase();
   const socialStorageKey = `apg_social_messaging_${String(user?.id || 'guest')}`;
@@ -815,21 +829,94 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     tgPollRef.current = null;
   }, []);
 
+  const waitForAuthStateChanged = useCallback(async (expectedUid, timeoutMs = 5000) => {
+    const expected = String(expectedUid || '').trim();
+    if (!expected) {
+      const current = auth.currentUser;
+      if (current) return current;
+      return new Promise((resolve) => {
+        let done = false;
+        let timer = null;
+        const fallbackUnsub = onAuthStateChanged(
+          auth,
+          (user) => {
+            if (done) return;
+            if (!user) return;
+            done = true;
+            if (timer) clearTimeout(timer);
+            fallbackUnsub();
+            resolve(user || auth.currentUser || null);
+          },
+          () => {
+            if (done) return;
+            done = true;
+            if (timer) clearTimeout(timer);
+            fallbackUnsub();
+            resolve(auth.currentUser || null);
+          },
+        );
+        timer = setTimeout(() => {
+          if (done) return;
+          done = true;
+          fallbackUnsub();
+          resolve(auth.currentUser || null);
+        }, timeoutMs);
+      });
+    }
+
+    const current = auth.currentUser;
+    if (current?.uid === expected) return current;
+    traceAuthStage('auth_state_wait_start', {
+      stateUid: expected,
+      currentUid: current?.uid ?? null,
+    });
+    return apgIdentity.waitForIdentity(expected, timeoutMs);
+  }, []);
+
   // Long-poll: одним fetch ждём до 25 с на сервере, при timeout — сразу повторяем
-  const startWaiting = useCallback((state) => {
+  const startWaiting = useCallback((state, diagnostics = {}) => {
     stopPolling();
     tgStateRef.current = state;
+    tgAuthTraceRef.current = {
+      requestId: safeTraceString(diagnostics.requestId || createTraceId('tg_req'), 180),
+      loginSessionId: safeTraceString(diagnostics.loginSessionId || createTraceId('tg_sess'), 220),
+      telegramSessionId: safeTraceString(diagnostics.telegramSessionId || state, 220),
+      state,
+    };
 
     const poll = async () => {
       if (tgStateRef.current !== state) return;
       try {
-        traceAuthStage('telegram_poll_start', { state });
-        const r    = await fetch(`${API_BASE_URL}/api/telegram-auth-check?state=${state}`);
+        traceAuthStage('telegram_poll_start', { state, ...tgAuthTraceRef.current });
+        const checkUrl = new URL(`${API_BASE_URL}/api/telegram-auth-check`);
+        checkUrl.searchParams.set('state', state);
+        if (tgAuthTraceRef.current.requestId) checkUrl.searchParams.set('requestId', tgAuthTraceRef.current.requestId);
+        if (tgAuthTraceRef.current.loginSessionId) checkUrl.searchParams.set('loginSessionId', tgAuthTraceRef.current.loginSessionId);
+        if (tgAuthTraceRef.current.telegramSessionId) checkUrl.searchParams.set('telegramSessionId', tgAuthTraceRef.current.telegramSessionId);
+        const r    = await fetch(checkUrl.toString(), {
+          headers: { 'X-APG-Version': 'telegram-auth-diagnose' },
+        });
         const data = await r.json();
         if (tgStateRef.current !== state) return;
         if (data.status === 'done') {
           const responseIsLinking = data.linking === true || tgLinkingRef.current;
-          traceAuthStage('telegram_auth_done', { state, userId: data.user?.id ?? null, linking: responseIsLinking, linkError: data.linkError || null });
+          const checkDiagnostics = data.diagnostics || {};
+          traceAuthStage('telegram_done', {
+            state,
+            userId: data.user?.id ?? null,
+            linking: responseIsLinking,
+            linkError: data.linkError || null,
+            ...tgAuthTraceRef.current,
+            ...checkDiagnostics,
+          });
+          traceAuthStage('telegram_auth_done', {
+            state,
+            userId: data.user?.id ?? null,
+            linking: responseIsLinking,
+            linkError: data.linkError || null,
+            ...tgAuthTraceRef.current,
+            ...checkDiagnostics,
+          });
           tgStateRef.current = null;
           localStorage.removeItem('apg_tg_pending');
           if (responseIsLinking && user?.id) {
@@ -872,25 +959,111 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             setTgStep('linked');
           } else {
             if (data.token) {
+              const identityResolved = checkDiagnostics.identityResolved === true || Boolean(checkDiagnostics.identitySource);
+              const customTokenIssued = checkDiagnostics.customTokenIssued === true;
+              const identityPath = safeTraceString(checkDiagnostics.identityPath || null, 220);
+              const identitySource = safeTraceString(checkDiagnostics.identitySource || null, 220);
+              traceAuthStage('telegram_start', {
+                state,
+                userId: data.user?.id ?? null,
+                ...tgAuthTraceRef.current,
+                identitySource,
+              });
+              traceAuthStage('identity_resolved', {
+                state,
+                userId: data.user?.id ?? null,
+                identityResolved,
+                identitySource,
+                identityPath,
+                ...tgAuthTraceRef.current,
+              });
+              traceAuthStage('custom_token_created', {
+                state,
+                userId: data.user?.id ?? null,
+                customTokenIssued,
+                identitySource,
+                identityPath,
+                ...tgAuthTraceRef.current,
+              });
+              traceAuthStage('firebase_signin_start', { state, ...tgAuthTraceRef.current, identityResolved });
               await apgIdentity.authenticate({ provider: 'firebaseCustomToken', token: data.token });
-              traceAuthStage('telegram_firebase_token_ready', { state, userId: data.user?.id ?? null, uid: auth.currentUser?.uid ?? null });
+              const expectedUid = safeTraceString(data.user?.id || data.tgId || '', 220);
+              const authUser = await waitForAuthStateChanged(expectedUid, 8000);
+              if (expectedUid && authUser?.uid !== expectedUid) {
+                throw new Error(`telegram_auth_signin_mismatch: expected ${expectedUid} got ${authUser?.uid || 'null'}`);
+              }
+              traceAuthStage('auth_state_changed', {
+                state,
+                userId: data.user?.id ?? null,
+                uid: authUser?.uid ?? auth.currentUser?.uid ?? null,
+                isAnonymous: authUser?.isAnonymous ?? null,
+                ...tgAuthTraceRef.current,
+              });
+              traceAuthStage('user_loaded', {
+                userId: data.user?.id ?? null,
+                hasToken: !!data.token,
+                source: 'after_auth_state_changed',
+                uid: authUser?.uid ?? auth.currentUser?.uid ?? null,
+                ...tgAuthTraceRef.current,
+              });
+              traceAuthStage('firebase_signin_done', {
+                state,
+                userId: data.user?.id ?? null,
+                uid: authUser?.uid ?? auth.currentUser?.uid ?? null,
+                isAnonymous: authUser?.isAnonymous ?? null,
+                ...tgAuthTraceRef.current,
+              });
             }
             localStorage.setItem('apg_tg_user', JSON.stringify(data.user));
-            traceAuthStage('telegram_user_saved', { userId: data.user?.id ?? null });
-            window.location.reload();
+            traceAuthStage('user_loaded', {
+              userId: data.user?.id ?? null,
+              hasToken: !!data.token,
+              ...tgAuthTraceRef.current,
+            });
+            traceAuthStage('telegram_user_saved', { userId: data.user?.id ?? null, ...tgAuthTraceRef.current });
+            try {
+              traceAuthStage('telegram_restore', { state, uid: auth.currentUser?.uid ?? null, ...tgAuthTraceRef.current });
+            } catch {}
+            traceAuthStage('home_render', {
+              state,
+              userId: data.user?.id ?? null,
+              source: 'telegram_session_ready_dispatched',
+            });
+            window.dispatchEvent(new CustomEvent('apg:auth_session_ready', {
+              detail: {
+                source: 'telegram',
+                userId: data.user?.id ?? null,
+                state,
+                loginSessionId: tgAuthTraceRef.current.loginSessionId,
+                requestId: tgAuthTraceRef.current.requestId,
+              },
+            }));
+            setTgStep('idle');
           }
+        } else if (data.status === 'failed') {
+          traceAuthStage('telegram_auth_unavailable', {
+            state,
+            status: data.status,
+            note: data?.diagnostics?.note || null,
+            ...tgAuthTraceRef.current,
+          });
+          tgStateRef.current = null;
+          localStorage.removeItem('apg_tg_pending');
+          setTgError('Не удалось завершить Telegram-авторизацию. Проверьте логи и попробуйте позже.');
+          setTgStep('idle');
         } else if (data.status === 'expired' || data.status === 'not_found' || data.status === 'cancelled') {
-          traceAuthStage('telegram_auth_unavailable', { state, status: data.status });
+          traceAuthStage('telegram_auth_unavailable', { state, status: data.status, ...tgAuthTraceRef.current });
           tgStateRef.current = null;
           localStorage.removeItem('apg_tg_pending');
           setTgError(data.status === 'cancelled' ? 'Сессия отменена. Создайте новую ссылку.' : 'Ссылка устарела, создайте новую.');
           setTgStep('idle');
         } else {
+          traceAuthStage('telegram_poll_status', { state, status: data.status, ...tgAuthTraceRef.current, serverDiagnostics: data.diagnostics || null });
           tgPollRef.current = setTimeout(poll, 900);
         }
       } catch (e) {
         logError(e, 'ProfilePanel.telegram.poll');
-        traceAuthStage('telegram_poll_error', { state, error: e?.message ?? String(e) });
+        traceAuthStage('telegram_poll_error', { state, error: e?.message ?? String(e), ...tgAuthTraceRef.current });
         if (tgStateRef.current !== state) return;
         if (tgLinkingRef.current) {
           tgStateRef.current = null;
@@ -899,6 +1072,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           setTgStep('idle');
           return;
         }
+        traceAuthStage('telegram_poll_retry', { state, ...tgAuthTraceRef.current });
         await new Promise(r => setTimeout(r, 2000));
         poll();
       }
@@ -915,9 +1089,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     stopPolling();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const requestId = createTraceId('tg_req');
+    const loginSessionId = createTraceId('tg_sess');
     try {
       traceAuthStage('telegram_auth_click', { linking });
-      traceAuthStage('telegram_auth_start', { linking, api: API_BASE_URL });
+      traceAuthStage('telegram_auth_start', { linking, api: API_BASE_URL, requestId, loginSessionId });
+      traceAuthStage('telegram_start', { linking, api: API_BASE_URL, requestId, loginSessionId });
       const pendingRef = readPendingReferral({ source: 'ProfilePanel.telegramAuth' }) || '';
       const serverSession = await (globalThis.__APG_REFERRAL_SESSION_PROMISE__ || ensureServerReferralSession({ apiBaseUrl: API_BASE_URL, ref: pendingRef, source: 'telegram_auth_start' })).catch(() => null);
       const referralContext = getReferralContext({ ref: pendingRef, source: 'telegram_auth_start' });
@@ -929,6 +1106,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           linking,
           ownerUserId: linking ? String(user?.id || '') : '',
           ownerEmail: linking ? String(user?.email || user?.linkedEmail || '') : '',
+          requestId,
+          loginSessionId,
           ref: pendingRef || undefined,
           referralSessionId: serverSession?.referralSessionId || referralContext.referralSessionId || referralContext.sessionId,
           referralFlowId: referralContext.referralFlowId,
@@ -937,21 +1116,38 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         }),
         signal: controller.signal,
       });
-      const { state, url, message } = await res.json().catch(() => ({}));
+      const { state, url, message, requestId: responseRequestId, loginSessionId: responseLoginSessionId, telegramSessionId } = await res.json().catch(() => ({}));
       if (!res.ok || !state || !url) throw new Error(message || 'telegram_start_failed');
-      localStorage.setItem('apg_tg_pending', JSON.stringify({ state, url, linking, at: Date.now() }));
-      traceAuthStage('telegram_session_created', { state, linking });
+      const telegramSessionIdResolved = telegramSessionId || state;
+      const trace = {
+        requestId: safeTraceString(responseRequestId || requestId),
+        loginSessionId: safeTraceString(responseLoginSessionId || loginSessionId),
+        telegramSessionId: safeTraceString(telegramSessionIdResolved || state),
+      };
+      localStorage.setItem('apg_tg_pending', JSON.stringify({
+        state,
+        url,
+        linking,
+        at: Date.now(),
+        ...trace,
+      }));
+      tgAuthTraceRef.current = {
+        ...tgAuthTraceRef.current,
+        ...trace,
+        state,
+      };
+      traceAuthStage('telegram_session_created', { state, linking, ...trace });
       setTgBotUrl(url);
       setTgLoading(false);
       setTgStep('waiting');
-      startWaiting(state);
+      startWaiting(state, trace);
       setTimeout(() => {
-        traceAuthStage('telegram_open_bot', { state });
+        traceAuthStage('telegram_open_bot', { state, ...trace });
         openUrl(url);
       }, 80);
     } catch (e) {
       logError(e, 'ProfilePanel.telegram.start');
-      traceAuthStage('telegram_start_error', { error: e?.message ?? String(e) });
+      traceAuthStage('telegram_start_error', { error: e?.message ?? String(e), requestId, loginSessionId });
       const aborted = e?.name === 'AbortError';
       setTgError(aborted ? 'Telegram не ответил вовремя. Проверьте интернет и попробуйте снова.' : 'Ошибка сети. Попробуйте снова.');
       setTgLoading(false);
@@ -985,12 +1181,18 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     const saved = localStorage.getItem('apg_tg_pending');
     if (!saved) return;
     try {
-      const { state, url, linking, at } = JSON.parse(saved);
+      const { state, url, linking, at, requestId, loginSessionId, telegramSessionId } = JSON.parse(saved);
       if (Date.now() - at > 5 * 60 * 1000) { localStorage.removeItem('apg_tg_pending'); return; }
       tgLinkingRef.current = linking === true;
       setTgBotUrl(url);
       setTgStep('waiting');
-      startWaiting(state);
+      tgAuthTraceRef.current = {
+        requestId: safeTraceString(requestId, 180),
+        loginSessionId: safeTraceString(loginSessionId, 220),
+        telegramSessionId: safeTraceString(telegramSessionId || state, 220),
+        state,
+      };
+      startWaiting(state, tgAuthTraceRef.current);
     } catch { localStorage.removeItem('apg_tg_pending'); }
   }, []);
 

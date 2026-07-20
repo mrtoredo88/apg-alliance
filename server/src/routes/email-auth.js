@@ -10,6 +10,95 @@ import { resolveReferralSessionReferrer } from '../lib/referralSessions.js';
 import { serverFoundation } from '../apg/index.js';
 
 const FROM = 'noreply@myapg.ru';
+const EMAIL_AUDIT_COLLECTION = 'emailAuthAttempts';
+const EMAIL_AUTH_AUDIT_TTL_DAYS = 30;
+const EMAIL_AUTH_AUDIT_WINDOW_MS = 60_000;
+const EMAIL_AUTH_AUDIT_RATE_LIMIT = 240;
+const EMAIL_AUTH_AUDIT_ALLOWED_STAGES = new Set([
+  'email_auth_started',
+  'otp_send_started',
+  'otp_send_succeeded',
+  'otp_send_failed',
+  'otp_verify_started',
+  'otp_verify_succeeded',
+  'otp_verify_failed',
+  'identity_resolve_started',
+  'identity_resolve_succeeded',
+  'identity_resolve_failed',
+  'identity_resolve_completed',
+  'email_identity_found',
+  'email_identity_created',
+  'custom_token_started',
+  'custom_token_issued',
+  'custom_token_created',
+  'custom_token_failed',
+  'email_code_verified',
+  'email_code_consumed',
+  'attempt_completed',
+  'email_auth_completed',
+  'email_auth_failed',
+  'frontend_token_received',
+  'firebase_signin_started',
+  'firebase_signin_succeeded',
+  'firebase_signin_failed',
+  'auth_state_changed',
+  'profile_load_started',
+  'profile_load_succeeded',
+  'profile_load_failed',
+  'home_render',
+  'guest_rollback',
+  'client_closed',
+  'network_interrupted',
+]);
+const EMAIL_AUTH_AUDIT_ALLOWED_FIELDS = new Set([
+  'authAttemptId',
+  'requestId',
+  'loginSessionId',
+  'stage',
+  'status',
+  'timestamp',
+  'durationMs',
+  'publicErrorCode',
+  'internalErrorCode',
+  'frontendVersion',
+  'backendRevision',
+  'identityPath',
+  'identityResolved',
+  'customTokenIssued',
+  'expectedUidHash',
+  'actualUidHash',
+  'apgUserIdHash',
+  'emailHash',
+  'deviceIdHash',
+  'platform',
+  'appMode',
+  'finalResult',
+  'failureCategory',
+  'failedStage',
+]);
+const EMAIL_AUTH_AUDIT_FORBIDDEN_KEYS = new Set([
+  'otp',
+  'token',
+  'customtoken',
+  'custom_token',
+  'tokenHash',
+  'email',
+  'password',
+  'authorization',
+  'cookie',
+  'set-cookie',
+  'providerpayload',
+  'rawproviderpayload',
+]);
+const AUDIT_RATE_LIMIT_STORE = new Map();
+const EMAIL_AUTH_BACKEND_REVISION = safeString(
+  process.env.VERCEL_GIT_COMMIT_SHA
+  || process.env.APP_VERSION
+  || process.env.GIT_COMMIT_SHA
+  || process.env.BUILD_REVISION
+  || '',
+  80,
+) || 'local';
 
 let _ses = null;
 function getSes() {
@@ -49,9 +138,223 @@ function safeString(value, max = 300) {
   return String(value ?? '').trim().slice(0, max);
 }
 
+function normalizeAuditField(value, max = 260) {
+  if (value == null) return null;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value).slice(0, max);
+  }
+  if (value instanceof Date) return value.toISOString();
+  try {
+    return JSON.stringify(value).slice(0, max);
+  } catch {
+    return String(value).slice(0, max);
+  }
+}
+
+function sanitizeEmailAuthAuditPayload(payload = {}) {
+  if (!payload || typeof payload !== 'object') return {};
+  const normalized = Object.fromEntries(
+    Object.entries(payload).filter(([rawKey]) => {
+      const key = String(rawKey ?? '').trim();
+      if (!key) return false;
+      if (EMAIL_AUTH_AUDIT_FORBIDDEN_KEYS.has(key.toLowerCase())) return false;
+      return EMAIL_AUTH_AUDIT_ALLOWED_FIELDS.has(key);
+    }).map(([key, value]) => [
+      key,
+      key === 'durationMs'
+        ? (Number.isFinite(Number(value)) ? Number(value) : null)
+        : normalizeAuditField(value),
+    ]),
+  );
+  if (normalized.identityResolved != null) normalized.identityResolved = String(normalized.identityResolved) === 'true';
+  if (normalized.customTokenIssued != null) normalized.customTokenIssued = String(normalized.customTokenIssued) === 'true';
+  return normalized;
+}
+
+function isEmailAuthAuditRateLimited(key, now = Date.now()) {
+  const bucketKey = safeString(key, 220) || 'global';
+  const bucket = AUDIT_RATE_LIMIT_STORE.get(bucketKey) || [];
+  const active = bucket.filter(ts => now - Number(ts || 0) < EMAIL_AUTH_AUDIT_WINDOW_MS);
+  if (active.length >= EMAIL_AUTH_AUDIT_RATE_LIMIT) {
+    AUDIT_RATE_LIMIT_STORE.set(bucketKey, active);
+    return true;
+  }
+  active.push(now);
+  AUDIT_RATE_LIMIT_STORE.set(bucketKey, active);
+  return false;
+}
+
+function buildAuditTimelineDocId(stage) {
+  return `st_${safeString(String(stage || 'unknown'), 120).toLowerCase().replace(/[^a-z0-9._-]+/g, '_').slice(0, 80)}`;
+}
+
+function buildEmailAuthAuditExpiresAt() {
+  return Timestamp.fromDate(new Date(Date.now() + EMAIL_AUTH_AUDIT_TTL_DAYS * 24 * 60 * 60 * 1000));
+}
+
+function buildTraceId(prefix, fallback = 'trace') {
+  return `${prefix || fallback}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function hashValue(value, max = 32) {
+  const normalized = safeString(value, 200);
+  return normalized ? crypto.createHash('sha256').update(normalized).digest('hex').slice(0, max) : '';
+}
+
 function emailHash(value) {
   const normalized = safeString(value, 220).toLowerCase();
   return normalized ? crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 16) : '';
+}
+
+function getEmailAuthAttemptContext(request) {
+  const body = request?.body || {};
+  const fallbackRequestId = safeString(body?.requestId || request.headers['x-request-id'] || '', 120)
+    || `email_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    requestId: fallbackRequestId,
+    loginSessionId: safeString(
+      body?.loginSessionId
+      || request.headers['x-login-session-id']
+      || `ls_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+      120,
+    ),
+    authAttemptId: safeString(
+      body?.authAttemptId
+      || request.headers['x-auth-attempt-id']
+      || buildTraceId('attempt', `attempt_${fallbackRequestId}`),
+      120,
+    ),
+    appMode: safeString(body?.appMode || request.headers['x-app-mode'] || 'browser', 40),
+    platform: safeString(body?.platform || body?.platformHint || request.headers['x-platform'] || '', 120),
+    frontendVersion: safeString(body?.frontendVersion || request.headers['x-apg-version'] || request.headers['x-apg-build'] || '', 80),
+    deviceIdHash: hashValue(safeString(body?.deviceId || request.headers['x-device-id'] || request.ip, 200), 32),
+  };
+}
+
+function buildEmailAuthAttemptSummary(context, options = {}) {
+  return {
+    provider: 'email',
+    authAttemptId: context.authAttemptId || '',
+    requestId: context.requestId || '',
+    loginSessionId: context.loginSessionId || '',
+    appMode: context.appMode || 'browser',
+    platform: context.platform || '',
+    frontendVersion: context.frontendVersion || '',
+    backendRevision: EMAIL_AUTH_BACKEND_REVISION,
+    identityPath: options.identityPath || 'identity_v2',
+    identityResolved: Boolean(options.identityResolved),
+    customTokenIssued: Boolean(options.customTokenIssued),
+    expectedUidHash: safeString(options.expectedUidHash, 64),
+    actualUidHash: safeString(options.actualUidHash, 64),
+    apgUserIdHash: safeString(options.apgUserIdHash, 64),
+    deviceIdHash: context.deviceIdHash || '',
+    emailHash: safeString(options.emailHash, 16),
+    finalResult: safeString(options.finalResult, 30) || 'unknown',
+    failureCategory: safeString(options.failureCategory, 80) || null,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+    expiresAt: buildEmailAuthAuditExpiresAt(),
+  };
+}
+
+function classifyFailureCategory(stage, code, internalCode) {
+  if (code === 'EMAIL_CODE_INVALID') return 'OTP_INVALID';
+  if (code === 'EMAIL_CODE_EXPIRED') return 'OTP_EXPIRED';
+  if (code === 'IDENTITY_RESOLVE_FAILED') return 'IDENTITY_RESOLVE_FAILED';
+  if (String(stage || '').includes('identity') && String(code || '').includes('IDENTITY')) return 'IDENTITY_RESOLVE_FAILED';
+  if (code === 'CUSTOM_TOKEN_FAILED' || String(internalCode || '').includes('CUSTOM_TOKEN') || String(stage || '').includes('custom_token')) return 'CUSTOM_TOKEN_FAILED';
+  if (String(stage || '').includes('verify_timeout') || String(code || '').includes('TIMEOUT')) return 'OTP_VERIFY_TIMEOUT';
+  if (String(code || '').includes('OTP') && String(stage || '').includes('send')) return 'NETWORK_INTERRUPTED';
+  if (String(stage || '').includes('network') || String(internalCode || '').includes('NETWORK')) return 'NETWORK_INTERRUPTED';
+  if (String(code || '').includes('EXPIRED')) return 'OTP_EXPIRED';
+  if (String(code || '').includes('INVALID')) return 'OTP_INVALID';
+  return 'UNKNOWN_INCOMPLETE';
+}
+
+async function appendEmailAuthAuditEvent(request, attemptContext, event) {
+  if (!attemptContext?.authAttemptId || !event?.stage) return;
+  const db = getDb();
+  const stage = safeString(event.stage, 120);
+  const normalizedStage = stage.toLowerCase();
+  if (!EMAIL_AUTH_AUDIT_ALLOWED_STAGES.has(normalizedStage)) return;
+  const status = safeString(event.status, 30) || 'OK';
+  const rawDetail = sanitizeEmailAuthAuditPayload({
+    ...event.payload,
+    stage,
+    status,
+    requestId: event.requestId,
+    loginSessionId: event.loginSessionId,
+    authAttemptId: event.authAttemptId,
+    timestamp: safeString(event.timestamp, 60) || new Date().toISOString(),
+    durationMs: Number.isFinite(Number(event.durationMs)) ? Number(event.durationMs) : null,
+    frontendVersion: safeString(event.frontendVersion, 80),
+    backendRevision: safeString(event.backendRevision, 80),
+    identityPath: safeString(event.identityPath, 80),
+    identityResolved: safeString(event.identityResolved, 5),
+    customTokenIssued: safeString(event.customTokenIssued, 5),
+    expectedUidHash: safeString(event.expectedUidHash, 64),
+    actualUidHash: safeString(event.actualUidHash, 64),
+    apgUserIdHash: safeString(event.apgUserIdHash, 64),
+    emailHash: safeString(event.emailHash, 16),
+    deviceIdHash: safeString(event.deviceIdHash, 32),
+    platform: safeString(event.platform, 120),
+    appMode: safeString(event.appMode, 40),
+    publicErrorCode: safeString(event.publicErrorCode, 80),
+    internalErrorCode: safeString(event.internalErrorCode, 80),
+    finalResult: safeString(event.finalResult, 30),
+    failureCategory: safeString(event.failureCategory, 80),
+    failedStage: safeString(event.failedStage, 120),
+  });
+  const detail = Object.fromEntries(
+    Object.entries(rawDetail).filter(([key]) => EMAIL_AUTH_AUDIT_ALLOWED_FIELDS.has(key)),
+  );
+  const row = {
+    stage,
+    status,
+    timestamp: safeString(detail.timestamp, 60) || new Date().toISOString(),
+    durationMs: Number.isFinite(Number(event.durationMs)) ? Number(event.durationMs) : null,
+    publicErrorCode: safeString(detail.publicErrorCode, 80) || null,
+    internalErrorCode: safeString(detail.internalErrorCode, 80) || null,
+    identityResolved: detail.identityResolved === true || detail.identityResolved === 'true',
+    customTokenIssued: detail.customTokenIssued === true || detail.customTokenIssued === 'true',
+    expectedUidHash: safeString(detail.expectedUidHash, 64),
+    actualUidHash: safeString(detail.actualUidHash, 64),
+    apgUserIdHash: safeString(detail.apgUserIdHash, 64),
+    ...detail,
+  };
+  try {
+    const attemptRef = db.collection(EMAIL_AUDIT_COLLECTION).doc(attemptContext.authAttemptId);
+    await attemptRef.set({
+      ...buildEmailAuthAttemptSummary(attemptContext, {
+        identityPath: detail.identityPath || 'identity_v2',
+        identityResolved: row.identityResolved,
+        customTokenIssued: row.customTokenIssued,
+        expectedUidHash: row.expectedUidHash,
+        actualUidHash: row.actualUidHash,
+        apgUserIdHash: row.apgUserIdHash,
+        emailHash: safeString(detail.emailHash || detail.email || '', 16),
+      }),
+      updatedAt: FieldValue.serverTimestamp(),
+      requestIp: safeString(request.ip || '', 120),
+      lastStage: stage,
+      lastStatus: status,
+      lastStageAt: new Date().toISOString(),
+      lastDurationMs: Number.isFinite(Number(event.durationMs)) ? Number(event.durationMs) : null,
+      emailHash: safeString(detail.emailHash || detail.email || '', 16),
+      }, { merge: true });
+    await attemptRef.collection('timeline').doc(buildAuditTimelineDocId(normalizedStage)).set({
+      ...row,
+      requestId: attemptContext.requestId || '',
+      loginSessionId: attemptContext.loginSessionId || '',
+      authAttemptId: attemptContext.authAttemptId,
+      backendRevision: EMAIL_AUTH_BACKEND_REVISION,
+      appMode: safeString(attemptContext.appMode || 'browser', 40),
+      platform: safeString(attemptContext.platform || '', 120),
+      userAgent: safeString(request.headers['user-agent'], 240),
+      requestIp: safeString(request.ip || '', 120),
+      expiresAt: buildEmailAuthAuditExpiresAt(),
+    }, { merge: true });
+  } catch {}
 }
 
 function emailPublicMeta(email) {
@@ -160,9 +463,16 @@ async function createFirebaseToken(userId, user = {}) {
 }
 
 function createEmailLoginTrace(request) {
-  const requestId = String(request.headers['x-request-id'] || '').trim() || `email_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const attemptContext = getEmailAuthAttemptContext(request);
   return {
-    requestId,
+    ...attemptContext,
+    requestId: attemptContext.requestId,
+    identityPath: 'identity_v2',
+    identityResolved: false,
+    customTokenIssued: false,
+    expectedUidHash: '',
+    actualUidHash: '',
+    apgUserIdHash: '',
     startedAt: Date.now(),
     timeline: [],
     mark(stage, status = 'START', detail = {}) {
@@ -175,7 +485,33 @@ function createEmailLoginTrace(request) {
         detail,
       };
       this.timeline.push(row);
-      request.log.info({ requestId, stage, status, durationMs: row.durationMs, ...detail }, 'email-login-forensic');
+      request.log.info({
+        requestId: this.requestId,
+        authAttemptId: this.authAttemptId || '',
+        loginSessionId: this.loginSessionId || '',
+        stage,
+        status,
+        durationMs: row.durationMs,
+        ...detail,
+      }, 'email-login-forensic');
+      void appendEmailAuthAuditEvent(
+        request,
+        {
+          ...attemptContext,
+          requestId: this.requestId,
+          authAttemptId: this.authAttemptId || attemptContext.authAttemptId,
+          loginSessionId: this.loginSessionId || attemptContext.loginSessionId,
+          appMode: this.appMode || attemptContext.appMode,
+          platform: this.platform || attemptContext.platform,
+          frontendVersion: this.frontendVersion || attemptContext.frontendVersion,
+        },
+        {
+          stage,
+          status,
+          durationMs: row.durationMs,
+          payload: detail,
+        },
+      );
       return row;
     },
   };
@@ -366,6 +702,60 @@ function otpExpiresMs(data) {
 }
 
 export default async function emailAuthRoutes(fastify) {
+  fastify.post('/api/email-auth-audit', async (request, reply) => {
+    const body = request.body || {};
+    const requestContext = getEmailAuthAttemptContext(request);
+    const rawStage = safeString(body.stage, 120);
+    const normalizedStage = rawStage.toLowerCase();
+    if (!rawStage || !EMAIL_AUTH_AUDIT_ALLOWED_STAGES.has(normalizedStage)) {
+      return reply.code(400).send({ ok: false, error: 'invalid_stage' });
+    }
+    const key = `${safeString(request.ip, 120)}_${normalizedStage}`;
+    if (isEmailAuthAuditRateLimited(key)) {
+      return reply.code(429).send({ ok: false, error: 'rate_limited', retryAfterMs: EMAIL_AUTH_AUDIT_WINDOW_MS });
+    }
+    const context = {
+      ...requestContext,
+      requestId: safeString(body.requestId || requestContext.requestId, 120),
+      loginSessionId: safeString(body.loginSessionId || requestContext.loginSessionId, 120),
+      authAttemptId: safeString(body.authAttemptId || requestContext.authAttemptId, 120),
+      stage: rawStage,
+      status: safeString(body.status, 30) || 'OK',
+      appMode: safeString(body.appMode || requestContext.appMode, 40),
+      platform: safeString(body.platform || requestContext.platform, 120),
+      frontendVersion: safeString(body.frontendVersion || requestContext.frontendVersion, 80),
+    };
+    const payload = sanitizeEmailAuthAuditPayload({
+      ...body,
+      stage: rawStage,
+      status: context.status,
+      requestId: context.requestId,
+      loginSessionId: context.loginSessionId,
+      authAttemptId: context.authAttemptId,
+      appMode: context.appMode,
+      platform: context.platform,
+      frontendVersion: context.frontendVersion,
+    });
+    await appendEmailAuthAuditEvent(request, context, {
+      ...payload,
+      stage: context.stage,
+      status: context.status,
+      durationMs: body.durationMs,
+      payload: {
+        ...payload,
+        requestId: context.requestId,
+        loginSessionId: context.loginSessionId,
+        authAttemptId: context.authAttemptId,
+      },
+    });
+    return {
+      ok: true,
+      requestId: context.requestId,
+      authAttemptId: context.authAttemptId,
+      stage: context.stage,
+    };
+  });
+
   fastify.post('/api/email-auth', async (request, reply) => {
     const { action, email: rawEmail, code } = request.body ?? {};
 
@@ -416,10 +806,15 @@ export default async function emailAuthRoutes(fastify) {
 
     // ── SEND ────────────────────────────────────────────────────────────────────
     if (action === 'send') {
+      const trace = createEmailLoginTrace(request);
+      trace.mark('email_auth_started', 'START', { action, ...emailPublicMeta(email) });
+      trace.mark('otp_send_started', 'START', { action, ...emailPublicMeta(email) });
       const existing = await getEmailOtp(codeRef, email);
       if (existing.data) {
         const created = otpCreatedMs(existing.data);
         if (Date.now() - created < 60_000) {
+          trace.mark('otp_send_failed', 'FAILED', { publicCode: 'EMAIL_RATE_LIMITED' });
+          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_RATE_LIMITED', failedStage: 'otp_send_started' });
           return reply.code(429).send({ ok: false, error: 'rate_limited', message: 'Подождите минуту перед повторным запросом' });
         }
       }
@@ -446,54 +841,167 @@ export default async function emailAuthRoutes(fastify) {
       } catch (e) {
         await deleteEmailOtp(codeRef, email).catch(() => {});
         request.log.warn({ name: e.name, message: e.message, metadata: e.$metadata || {}, responseBody: e.$response?.body || '' }, 'Postbox send failed');
+        trace.mark('otp_send_failed', 'FAILED', { publicCode: 'EMAIL_SEND_FAILED', internalErrorCode: e.code || e?.name || 'EMAIL_SEND_FAILED', message: e.message || null });
+        trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_SEND_FAILED', failedStage: 'otp_send_started', internalErrorCode: e.code || e?.name || 'EMAIL_SEND_FAILED' });
         return reply.code(500).send({ ok: false, error: 'email_error', message: 'Не удалось отправить письмо. Проверьте адрес или попробуйте позже.' });
       }
 
-      return { ok: true };
+      trace.mark('otp_send_succeeded', 'OK', { stageDurationMs: Date.now() - trace.startedAt });
+      trace.mark('email_auth_completed', 'END', { email: emailPublicMeta(email).emailHash, totalMs: Date.now() - trace.startedAt });
+      return {
+        ok: true,
+        diagnostics: {
+          requestId: trace.requestId,
+          authAttemptId: trace.authAttemptId,
+          loginSessionId: trace.loginSessionId,
+          timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
+          identityPath: trace.identityPath,
+          identityResolved: false,
+          customTokenIssued: false,
+          backendRevision: EMAIL_AUTH_BACKEND_REVISION,
+          frontendVersion: trace.frontendVersion,
+        },
+      };
     }
 
     // ── VERIFY ──────────────────────────────────────────────────────────────────
     if (action === 'verify') {
       const trace = createEmailLoginTrace(request);
-      trace.mark('email_auth_request', 'START', { action, createIfMissing: true, ...emailPublicMeta(email) });
+      trace.identityPath = 'identity_v2';
+      trace.mark('email_auth_started', 'START', { action, createIfMissing: true, ...emailPublicMeta(email), authAttemptId: trace.authAttemptId || '' });
+      trace.mark('otp_verify_started', 'START', { action, createIfMissing: true, ...emailPublicMeta(email) });
       try {
         if (!code || !/^\d{6}$/.test(String(code))) {
-          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', stage: 'email_code_verified' });
-          return reply.code(400).send({ ok: false, error: 'EMAIL_CODE_INVALID', message: publicEmailAuthMessage('EMAIL_CODE_INVALID'), diagnostics: { requestId: trace.requestId, failedStage: 'email_code_verified', error: 'EMAIL_CODE_INVALID' } });
+          trace.mark('otp_verify_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', stage: 'otp_verify_started', publicErrorCode: 'EMAIL_CODE_INVALID' });
+          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', failedStage: 'otp_verify_started', internalErrorCode: 'EMAIL_CODE_INVALID' });
+          return reply.code(400).send({
+            ok: false,
+            error: 'EMAIL_CODE_INVALID',
+            message: publicEmailAuthMessage('EMAIL_CODE_INVALID'),
+            diagnostics: {
+              requestId: trace.requestId,
+              authAttemptId: trace.authAttemptId,
+              loginSessionId: trace.loginSessionId,
+              identityPath: trace.identityPath,
+              identityResolved: false,
+              customTokenIssued: false,
+              backendRevision: EMAIL_AUTH_BACKEND_REVISION,
+              failedStage: 'otp_verify_started',
+              statusCode: 400,
+              error: 'EMAIL_CODE_INVALID',
+              timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
+            },
+          });
         }
 
         const otp = await withEmailLoginStage(trace, 'email_code_verified', () => getEmailOtp(codeRef, email), 5000);
         if (!otp.data) {
-          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', stage: 'email_code_verified' });
-          return reply.code(400).send({ ok: false, error: 'EMAIL_CODE_INVALID', message: publicEmailAuthMessage('EMAIL_CODE_INVALID'), diagnostics: { requestId: trace.requestId, failedStage: 'email_code_verified', error: 'EMAIL_CODE_INVALID' } });
+          trace.mark('otp_verify_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', stage: 'email_code_verified' });
+          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', failedStage: 'email_code_verified', internalErrorCode: 'EMAIL_CODE_INVALID' });
+          return reply.code(400).send({
+            ok: false,
+            error: 'EMAIL_CODE_INVALID',
+            message: publicEmailAuthMessage('EMAIL_CODE_INVALID'),
+            diagnostics: {
+              requestId: trace.requestId,
+              authAttemptId: trace.authAttemptId,
+              loginSessionId: trace.loginSessionId,
+              identityPath: trace.identityPath,
+              identityResolved: false,
+              customTokenIssued: false,
+              backendRevision: EMAIL_AUTH_BACKEND_REVISION,
+              failedStage: 'email_code_verified',
+              statusCode: 400,
+              error: 'EMAIL_CODE_INVALID',
+              timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
+            },
+          });
         }
 
         const data = otp.data;
 
         if (otpExpiresMs(data) < Date.now()) {
           await deleteEmailOtp(codeRef, email).catch(() => {});
-          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_EXPIRED', stage: 'email_code_verified' });
-          return reply.code(400).send({ ok: false, error: 'EMAIL_CODE_EXPIRED', message: publicEmailAuthMessage('EMAIL_CODE_EXPIRED'), diagnostics: { requestId: trace.requestId, failedStage: 'email_code_verified', error: 'EMAIL_CODE_EXPIRED' } });
+          trace.mark('otp_verify_failed', 'FAILED', { publicCode: 'EMAIL_CODE_EXPIRED', stage: 'email_code_verified' });
+          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_EXPIRED', failedStage: 'email_code_verified', internalErrorCode: 'EMAIL_CODE_EXPIRED' });
+          return reply.code(400).send({
+            ok: false,
+            error: 'EMAIL_CODE_EXPIRED',
+            message: publicEmailAuthMessage('EMAIL_CODE_EXPIRED'),
+            diagnostics: {
+              requestId: trace.requestId,
+              authAttemptId: trace.authAttemptId,
+              loginSessionId: trace.loginSessionId,
+              identityPath: trace.identityPath,
+              identityResolved: false,
+              customTokenIssued: false,
+              backendRevision: EMAIL_AUTH_BACKEND_REVISION,
+              failedStage: 'email_code_verified',
+              statusCode: 400,
+              error: 'EMAIL_CODE_EXPIRED',
+              timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
+            },
+          });
         }
 
         if ((data.attempts ?? 0) >= 5) {
-          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', stage: 'email_code_verified' });
-          return reply.code(429).send({ ok: false, error: 'EMAIL_CODE_INVALID', message: 'Слишком много попыток. Запросите новый код', diagnostics: { requestId: trace.requestId, failedStage: 'email_code_verified', error: 'EMAIL_CODE_INVALID' } });
+          trace.mark('otp_verify_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', stage: 'email_code_verified' });
+          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', failedStage: 'email_code_verified', internalErrorCode: 'EMAIL_CODE_INVALID' });
+          return reply.code(429).send({
+            ok: false,
+            error: 'EMAIL_CODE_INVALID',
+            message: 'Слишком много попыток. Запросите новый код',
+            diagnostics: {
+              requestId: trace.requestId,
+              authAttemptId: trace.authAttemptId,
+              loginSessionId: trace.loginSessionId,
+              identityPath: trace.identityPath,
+              identityResolved: false,
+              customTokenIssued: false,
+              backendRevision: EMAIL_AUTH_BACKEND_REVISION,
+              failedStage: 'email_code_verified',
+              statusCode: 429,
+              error: 'EMAIL_CODE_INVALID',
+              timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
+            },
+          });
         }
 
         if (data.code !== String(code)) {
           await incrementEmailOtpAttempts(codeRef, email);
           const left = 4 - (data.attempts ?? 0);
-          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', stage: 'email_code_verified' });
-          return reply.code(400).send({ ok: false, error: 'EMAIL_CODE_INVALID', message: `Неверный код. Осталось попыток: ${left}`, diagnostics: { requestId: trace.requestId, failedStage: 'email_code_verified', error: 'EMAIL_CODE_INVALID' } });
+          trace.mark('otp_verify_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', stage: 'email_code_verified', remainingAttempts: left });
+          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_CODE_INVALID', failedStage: 'email_code_verified', internalErrorCode: 'EMAIL_CODE_INVALID' });
+          return reply.code(400).send({
+            ok: false,
+            error: 'EMAIL_CODE_INVALID',
+            message: `Неверный код. Осталось попыток: ${left}`,
+            diagnostics: {
+              requestId: trace.requestId,
+              authAttemptId: trace.authAttemptId,
+              loginSessionId: trace.loginSessionId,
+              identityPath: trace.identityPath,
+              identityResolved: false,
+              customTokenIssued: false,
+              backendRevision: EMAIL_AUTH_BACKEND_REVISION,
+              failedStage: 'email_code_verified',
+              statusCode: 400,
+              error: 'EMAIL_CODE_INVALID',
+              timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
+            },
+          });
         }
 
-        trace.mark('resolve_email_identity_started', 'START', { createIfMissing: true, ...emailPublicMeta(email) });
+        trace.mark('identity_resolve_started', 'START', { createIfMissing: true, ...emailPublicMeta(email) });
         const identity = await withEmailLoginStage(trace, 'resolve_email_user', () => resolveEmailUser(db, email, ref ?? null, { createIfMissing: true }), 9000).catch(error => {
           error.code = error?.code === 'USER_NOT_FOUND' ? 'EMAIL_IDENTITY_CREATE_FAILED' : error?.code;
           throw error;
         });
+        trace.identityResolved = true;
+        trace.mark('identity_resolve_succeeded', 'OK', { userIdHash: hashValue(identity.userId || ''), source: identity.source || null });
+        trace.mark('identity_resolve_completed', 'END', { userIdHash: hashValue(identity.userId || '') , source: identity.source || null });
         trace.mark(identity.source === 'identity_v2_created' ? 'email_identity_created' : 'email_identity_found', 'END', { source: identity.source || null });
+        trace.apgUserIdHash = hashValue(identity.userId || '');
         const userId = identity.userId;
         const ud = identity.user ?? {};
         if (ref || referralContext.referralFlowId) {
@@ -509,18 +1017,30 @@ export default async function emailAuthRoutes(fastify) {
           });
         }
 
+        trace.mark('custom_token_started', 'START', { userIdHash: hashValue(userId || '') });
         const token = await withEmailLoginStage(trace, 'create_custom_token', () => createFirebaseToken(userId, ud), 5000);
+        trace.mark('custom_token_issued', 'OK', { userIdHash: hashValue(userId || '') });
         trace.mark('custom_token_created', 'END', { userId });
+        trace.customTokenIssued = true;
+        trace.expectedUidHash = hashValue(userId || '');
         deleteEmailOtp(codeRef, email).catch(() => {});
         trace.mark('email_code_consumed', 'END');
-        trace.mark('email_auth_completed', 'END', { userId, totalMs: Date.now() - trace.startedAt });
+        trace.mark('email_auth_completed', 'END', { userId, totalMs: Date.now() - trace.startedAt, userIdHash: hashValue(userId || '') });
+        trace.mark('attempt_completed', 'SUCCESS', { finalResult: 'BACKEND_AUTH_SUCCESS' });
         return {
           ok: true,
           token,
           canonicalUserId: userId,
           diagnostics: {
             requestId: trace.requestId,
-            identity: serverFoundation.identityV2.snapshot(),
+            authAttemptId: trace.authAttemptId,
+            loginSessionId: trace.loginSessionId,
+            identityPath: trace.identityPath,
+            identityResolved: trace.identityResolved,
+            customTokenIssued: trace.customTokenIssued,
+            backendRevision: EMAIL_AUTH_BACKEND_REVISION,
+            userIdHash: hashValue(userId || ''),
+            expectedUidHash: trace.expectedUidHash,
             timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
           },
           user: {
@@ -537,6 +1057,18 @@ export default async function emailAuthRoutes(fastify) {
       } catch (error) {
         const classified = classifyEmailLoginError(error);
         const failedStage = error?.failedStage || trace.timeline.findLast?.(item => item.status === 'FAILED')?.stage || 'unknown';
+        if (String(failedStage).includes('resolve') || String(failedStage).includes('identity')) {
+          trace.mark('identity_resolve_failed', 'FAILED', { publicCode: classified.code, internalErrorCode: error?.code || error?.error || null });
+        }
+        if (String(failedStage).includes('custom_token') || String(failedStage).includes('create_custom_token')) {
+          trace.mark('custom_token_failed', 'FAILED', { publicCode: classified.code, internalErrorCode: error?.code || error?.error || null });
+        }
+        const failureCategory = classifyFailureCategory(failedStage, classified.code, error?.code || error?.error);
+        trace.mark('attempt_completed', 'FAILED', {
+          finalResult: 'BACKEND_AUTH_FAILED',
+          failureCategory,
+          failedStage,
+        });
         trace.mark('email_auth_failed', 'FAILED', {
           failedStage,
           publicCode: classified.code,
@@ -561,11 +1093,20 @@ export default async function emailAuthRoutes(fastify) {
           message: publicEmailAuthMessage(classified.code),
           diagnostics: {
             requestId: trace.requestId,
+            authAttemptId: trace.authAttemptId,
+            loginSessionId: trace.loginSessionId,
+            identityPath: trace.identityPath,
+            identityResolved: trace.identityResolved,
+            customTokenIssued: trace.customTokenIssued,
+            backendRevision: EMAIL_AUTH_BACKEND_REVISION,
             failedStage,
             statusCode: classified.statusCode,
             error: classified.code,
-            identity: serverFoundation.identityV2.snapshot(),
             timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
+            expectedUidHash: trace.expectedUidHash,
+            actualUidHash: trace.actualUidHash,
+            finalResult: 'BACKEND_AUTH_FAILED',
+            failureCategory,
           },
         });
       }
@@ -642,10 +1183,14 @@ export default async function emailAuthRoutes(fastify) {
     if (action === 'login') {
       const trace = createEmailLoginTrace(request);
       try {
-        trace.mark('email_auth_request', 'START', { action, createIfMissing: false, ...emailPublicMeta(email) });
+        trace.mark('email_auth_started', 'START', { action, createIfMissing: false, ...emailPublicMeta(email) });
         const { ref } = request.body ?? {};
-        trace.mark('resolve_email_identity_started', 'START', { createIfMissing: false, ...emailPublicMeta(email) });
+        trace.mark('identity_resolve_started', 'START', { createIfMissing: false, ...emailPublicMeta(email) });
         const identity = await withEmailLoginStage(trace, 'resolve_email_user', () => resolveEmailUser(db, email, ref ?? null, { createIfMissing: false }), 9000);
+        trace.identityResolved = true;
+        trace.apgUserIdHash = hashValue(identity.userId || '');
+        trace.mark('identity_resolve_succeeded', 'OK', { userIdHash: trace.apgUserIdHash, source: identity.source || null });
+        trace.mark('identity_resolve_completed', 'END', { userIdHash: trace.apgUserIdHash, source: identity.source || null });
         trace.mark('email_identity_found', 'END', { source: identity.source || null });
         const userId = identity.userId;
         const ud = await withEmailLoginStage(trace, 'load_user_profile', async () => identity.user || await serverFoundation.identityV2.getUser(userId), 7000) || {};
@@ -666,8 +1211,13 @@ export default async function emailAuthRoutes(fastify) {
             request.log.warn({ name: e.name, message: e.message, metadata: e.$metadata || {}, responseBody: e.$response?.body || '' }, 'Postbox verification email failed');
           });
         }
+        trace.mark('custom_token_started', 'START', { userIdHash: trace.apgUserIdHash });
         const token = await withEmailLoginStage(trace, 'create_custom_token', () => createFirebaseToken(userId, ud), 5000);
+        trace.customTokenIssued = true;
+        trace.expectedUidHash = trace.apgUserIdHash;
+        trace.mark('custom_token_issued', 'OK', { userIdHash: trace.apgUserIdHash });
         trace.mark('custom_token_created', 'END', { userId });
+        trace.mark('attempt_completed', 'SUCCESS', { finalResult: 'BACKEND_AUTH_SUCCESS' });
         trace.mark('email_auth_completed', 'END', { userId, totalMs: Date.now() - trace.startedAt });
         return {
           ok: true,
@@ -675,7 +1225,13 @@ export default async function emailAuthRoutes(fastify) {
           canonicalUserId: userId,
           diagnostics: {
             requestId: trace.requestId,
-            identity: serverFoundation.identityV2.snapshot(),
+            authAttemptId: trace.authAttemptId,
+            loginSessionId: trace.loginSessionId,
+            identityPath: trace.identityPath,
+            identityResolved: trace.identityResolved,
+            customTokenIssued: trace.customTokenIssued,
+            backendRevision: EMAIL_AUTH_BACKEND_REVISION,
+            expectedUidHash: trace.expectedUidHash,
             timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
           },
           user: {
@@ -693,6 +1249,18 @@ export default async function emailAuthRoutes(fastify) {
       } catch (error) {
         const classified = classifyEmailLoginError(error);
         const failedStage = error?.failedStage || trace.timeline.findLast?.(item => item.status === 'FAILED')?.stage || 'unknown';
+        if (String(failedStage).includes('resolve') || String(failedStage).includes('identity')) {
+          trace.mark('identity_resolve_failed', 'FAILED', { publicCode: classified.code, internalErrorCode: error?.code || error?.error || null });
+        }
+        if (String(failedStage).includes('custom_token') || String(failedStage).includes('create_custom_token')) {
+          trace.mark('custom_token_failed', 'FAILED', { publicCode: classified.code, internalErrorCode: error?.code || error?.error || null });
+        }
+        const failureCategory = classifyFailureCategory(failedStage, classified.code, error?.code || error?.error);
+        trace.mark('attempt_completed', 'FAILED', {
+          finalResult: 'BACKEND_AUTH_FAILED',
+          failureCategory,
+          failedStage,
+        });
         trace.mark('email_auth_failed', 'FAILED', {
           failedStage,
           code: classified.code,
@@ -719,10 +1287,19 @@ export default async function emailAuthRoutes(fastify) {
           message: publicEmailAuthMessage(classified.code),
           diagnostics: {
             requestId: trace.requestId,
+            authAttemptId: trace.authAttemptId,
+            loginSessionId: trace.loginSessionId,
+            identityPath: trace.identityPath,
+            identityResolved: trace.identityResolved,
+            customTokenIssued: trace.customTokenIssued,
+            backendRevision: EMAIL_AUTH_BACKEND_REVISION,
+            expectedUidHash: trace.expectedUidHash,
+            actualUidHash: trace.actualUidHash,
+            finalResult: 'BACKEND_AUTH_FAILED',
+            failureCategory,
             failedStage,
             statusCode: classified.statusCode,
             error: classified.code,
-            identity: serverFoundation.identityV2.snapshot(),
             timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
           },
         });

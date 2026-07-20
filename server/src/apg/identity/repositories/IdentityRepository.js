@@ -1,5 +1,18 @@
 import { defaultEmailUser, normalizeEmail, safeString } from './IdentityRepositoryUtils.js';
 
+function normalizeTelegramId(value) {
+  const raw = safeString(value, 260);
+  return raw.startsWith('tg_') ? raw.slice(3) : raw;
+}
+
+function normalizeIdentityProviderValue(provider) {
+  return safeString(provider, 80).toLowerCase();
+}
+
+function ensureCanonicalId(user) {
+  return safeString(user?.canonicalUserId || user?.canonical_user_id || user?.id, 260);
+}
+
 export class IdentityRepository {
   constructor({ users, emails, links, roles, sessions }) {
     this.name = 'IdentityRepository';
@@ -24,6 +37,72 @@ export class IdentityRepository {
       return { userId: user.id, canonicalUserId: user.canonicalUserId || user.id, user, source: 'identity_v2_user_email' };
     }
     return null;
+  }
+
+  async resolveByProvider(provider, providerUserId) {
+    const normalizedProvider = normalizeIdentityProviderValue(provider);
+    const normalizedProviderUserId = normalizedProvider === 'telegram' ? normalizeTelegramId(providerUserId) : safeString(providerUserId, 260);
+    const link = await this.links.get(normalizedProvider, normalizedProviderUserId);
+    if (!link?.userId) return null;
+    const user = await this.users.get(link.userId);
+    return user
+      ? {
+          userId: user.id,
+          canonicalUserId: user.canonicalUserId || user.id,
+          user,
+          link,
+          identityId: link?.id || `${provider}:${normalizedProviderUserId}`,
+          source: 'identity_v2_provider_index',
+        }
+      : null;
+  }
+
+  async createTelegramIdentity({ telegramId, telegram = {} }) {
+    const normalized = normalizeTelegramId(telegramId);
+    const userId = `tg_${normalized}`;
+    const user = await this.users.upsert({
+      id: userId,
+      canonicalUserId: userId,
+      authProvider: 'telegram',
+      displayName: telegram.firstName || telegram.username || telegram.tgId || telegram.telegramId || '',
+      firstName: telegram.firstName || null,
+      lastName: telegram.lastName || null,
+      photo: telegram.photo || telegram.photo_url || null,
+      role: 'user',
+      roles: ['user'],
+      email: '',
+      telegramId: normalized,
+      linkedTelegram: {
+        tgId: normalized,
+        telegramId: normalized,
+        firstName: telegram.firstName || null,
+        lastName: telegram.lastName || null,
+        username: telegram.username || null,
+        linkedAt: new Date().toISOString(),
+        ...telegram,
+      },
+      identityStatus: 'canonical',
+      identityVersion: 'identity-v2',
+    });
+    await this.links.set({
+      provider: 'telegram',
+      providerUserId: normalized,
+      userId,
+      canonicalUserId: user.canonicalUserId || userId,
+      metadata: {
+        providerUserId: normalized,
+        firstName: telegram.firstName || null,
+        lastName: telegram.lastName || null,
+        username: telegram.username || null,
+      },
+    });
+    return {
+      userId: user.id,
+      canonicalUserId: user.canonicalUserId || user.id,
+      user,
+      identityId: `telegram:${normalized}`,
+      source: 'identity_v2_created',
+    };
   }
 
   async createEmailIdentity({ email, ref = '' }) {
@@ -76,12 +155,60 @@ export class IdentityRepository {
   async linkTelegram({ telegramId, userId, telegram = {} }) {
     const user = await this.users.get(userId);
     if (!user) throw Object.assign(new Error('Аккаунт не найден.'), { statusCode: 404, code: 'USER_NOT_FOUND' });
-    const existing = await this.links.get('telegram', telegramId);
-    if (existing?.userId && existing.userId !== String(userId)) {
-      throw Object.assign(new Error('Этот Telegram уже привязан к другому аккаунту.'), { statusCode: 409, code: 'TELEGRAM_ALREADY_USED' });
-    }
-    await this.links.set({ provider: 'telegram', providerUserId: telegramId, userId, canonicalUserId: user.canonicalUserId || userId, metadata: telegram });
-    const updated = await this.users.upsert({ ...user, id: userId, linkedTelegram: { ...telegram, tgId: telegramId, linkedAt: new Date().toISOString() } });
-    return { userId, canonicalUserId: updated.canonicalUserId || userId, user: updated, source: 'identity_v2_link_telegram' };
+    const normalizedTelegramId = normalizeTelegramId(telegramId);
+    const adapter = this.links.adapter;
+    const identityId = `telegram:${normalizedTelegramId}`;
+    const payload = {
+      ...telegram,
+      tgId: normalizedTelegramId,
+      telegramId: normalizedTelegramId,
+      linkedAt: new Date().toISOString(),
+    };
+
+    await adapter.transaction(async client => {
+      const upserted = await client.query(
+        `INSERT INTO apg_identity_links (id, provider, provider_user_id, user_id, canonical_user_id, metadata, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, now(), now())
+         ON CONFLICT (id) DO UPDATE SET
+           metadata = CASE
+             WHEN apg_identity_links.user_id = EXCLUDED.user_id THEN apg_identity_links.metadata || EXCLUDED.metadata
+             ELSE apg_identity_links.metadata
+           END,
+           canonical_user_id = CASE
+             WHEN apg_identity_links.user_id = EXCLUDED.user_id THEN COALESCE(NULLIF(EXCLUDED.canonical_user_id, ''), apg_identity_links.canonical_user_id)
+             ELSE apg_identity_links.canonical_user_id
+           END,
+           user_id = apg_identity_links.user_id,
+           updated_at = now()
+         RETURNING id, user_id, canonical_user_id, metadata
+         `,
+        [
+          identityId,
+          'telegram',
+          normalizedTelegramId,
+          safeString(userId, 260),
+          ensureCanonicalId(user),
+          JSON.stringify(payload),
+        ],
+      );
+      if (!upserted?.rows?.length || String(upserted.rows[0]?.user_id || '') !== String(safeString(userId, 260))) {
+        const error = Object.assign(
+          new Error('Этот Telegram уже привязан к другому аккаунту.'),
+          { statusCode: 409, code: 'TELEGRAM_ALREADY_USED' },
+        );
+        throw error;
+      }
+    });
+
+    const existingLink = await this.links.get('telegram', normalizedTelegramId);
+    const updated = await this.users.upsert({ ...user, id: userId, linkedTelegram: { ...telegram, tgId: normalizedTelegramId, linkedAt: new Date().toISOString() } });
+    return {
+      userId,
+      canonicalUserId: updated.canonicalUserId || userId,
+      user: updated,
+      link: existingLink,
+      identityId,
+      source: 'identity_v2_link_telegram',
+    };
   }
 }

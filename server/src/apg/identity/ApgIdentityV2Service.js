@@ -24,6 +24,11 @@ function classify(error) {
   return code || 'IDENTITY_ERROR';
 }
 
+function normalizeTelegramId(value) {
+  const raw = safeString(value, 260);
+  return raw.startsWith('tg_') ? raw.slice(3) : raw;
+}
+
 export class ApgIdentityV2Service {
   constructor({ repository, sessionRepository, legacySource = null, tokenProvider = null, flags = {}, metrics = null } = {}) {
     this.repository = repository;
@@ -124,6 +129,41 @@ export class ApgIdentityV2Service {
       this.metrics.lastLoginTimeMs = Date.now() - startedAt;
       this.metrics.lastSource = identity.source || 'identity_v2';
       return identity;
+    } catch (error) {
+      this.metrics.lastLoginTimeMs = Date.now() - startedAt;
+      this.metrics.lastError = classify(error);
+      throw error;
+    }
+  }
+
+  async resolveTelegramIdentity({ telegramId, telegram = {}, createIfMissing = true } = {}) {
+    const startedAt = Date.now();
+    const normalizedTelegramId = normalizeTelegramId(telegramId);
+    if (!normalizedTelegramId) {
+      const error = Object.assign(new Error('Некорректный Telegram ID.'), { statusCode: 400, code: 'INVALID_TELEGRAM_ID' });
+      this.metrics.lastError = classify(error);
+      throw error;
+    }
+    try {
+      let identity = await this.repository.resolveByProvider('telegram', normalizedTelegramId);
+      if (!identity && createIfMissing) {
+        this.metrics.yandexWrites += 1;
+        identity = await this.repository.createTelegramIdentity({ telegramId: normalizedTelegramId, telegram });
+      }
+      if (!identity?.userId) {
+        const error = Object.assign(new Error('Пользователь не найден.'), { statusCode: 404, code: 'USER_NOT_FOUND' });
+        this.metrics.lastError = classify(error);
+        throw error;
+      }
+      this.metrics.yandexWrites += 1;
+      await this.repository.users.updateLastSeen(identity.userId).catch(() => {});
+      this.metrics.lastLoginTimeMs = Date.now() - startedAt;
+      this.metrics.lastSource = identity.source || 'identity_v2';
+      return {
+        ...identity,
+        identityId: identity.identityId || `telegram:${normalizedTelegramId}`,
+        source: 'identity_v2_telegram_resolve',
+      };
     } catch (error) {
       this.metrics.lastLoginTimeMs = Date.now() - startedAt;
       this.metrics.lastError = classify(error);

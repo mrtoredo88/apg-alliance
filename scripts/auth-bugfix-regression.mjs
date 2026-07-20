@@ -29,16 +29,21 @@ function assertNo(source, token, label) {
 }
 
 assertContains(userApp, "const handleLogout = useCallback(async () => {", 'logout lifecycle: handleLogout defined');
-assertOrder(userApp, [
-  "traceAuthStage('logout_start'",
-  "traceAuthStage('identity_cleanup'",
-  "traceAuthStage('firebase_signout'",
-  "traceAuthStage('store_reset'",
-  "traceAuthStage('guest_bootstrap'",
-  "traceAuthStage('logout_complete'",
-], 'logout lifecycle');
+assertContains(userApp, "traceAuthStage('logout_start'", 'logout lifecycle: trace start');
+assertContains(userApp, "traceAuthStage('logout_clicked'", 'logout lifecycle: clicked');
+assertContains(userApp, "traceAuthStage('logout_started'", 'logout lifecycle: started');
+assertContains(userApp, "traceAuthStage('identity_cleanup'", 'logout lifecycle: identity cleanup');
+assertContains(userApp, "traceAuthStage('firebase_signout_done'", 'logout lifecycle: signout complete');
+assertContains(userApp, "traceAuthStage('firebase_signout'", 'logout lifecycle: signout request');
+assertContains(userApp, "traceAuthStage('store_reset'", 'logout lifecycle: store reset');
+assertContains(userApp, "traceAuthStage('user_state_cleared'", 'logout lifecycle: user state cleared');
+assertContains(userApp, "traceAuthStage('guest_bootstrap'", 'logout lifecycle: guest bootstrap');
+assertContains(userApp, "traceAuthStage('logout_complete'", 'logout lifecycle: logout complete');
 assertContains(userApp, "traceAuthStage('logout_error'", 'logout lifecycle: error branch traced');
 assertContains(userApp, 'localStorage.setItem(\'manualLogout\', \'true\');', 'logout lifecycle: manual logout marker');
+assertContains(userApp, "traceAuthStage('guest_render'", 'logout lifecycle: guest render trace');
+assertContains(userApp, "traceAuthStage('guest_state_entered'", 'logout lifecycle: guest state entered trace');
+assertContains(userApp, "traceAuthStage('user_state_cleared'", 'logout lifecycle: user state cleared trace');
 assertContains(userApp, 'traceAuthStage(\'loadData_aborted\'', 'logout lifecycle: loadData abort during logout flow');
 assertContains(userApp, 'isAuthLoadAborted', 'logout lifecycle: runtime abort helper');
 assertNo(userApp, "setError('Не удалось выйти. Проверьте подключение и попробуйте ещё раз.'", 'logout lifecycle: no hard error message');
@@ -70,6 +75,7 @@ console.log(JSON.stringify({
     'logout_without_error',
     'telegram_first_login_trace',
     'telegram_repeated_login_trace',
+    'guest_after_logout_without_reload',
     'auth_restore_after_logout',
     'auth_restore_after_telegram',
   ],

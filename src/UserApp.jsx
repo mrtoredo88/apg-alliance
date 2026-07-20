@@ -682,6 +682,33 @@ function hasAcceptedCurrentLegal(data) {
 }
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
+const EMAIL_AUTH_AUDIT_ENDPOINT = `${API_BASE_URL}/api/email-auth-audit`;
+const EMAIL_AUTH_AUDIT_ALLOWED_FIELDS = new Set([
+  'requestId',
+  'loginSessionId',
+  'authAttemptId',
+  'stage',
+  'status',
+  'timestamp',
+  'durationMs',
+  'publicErrorCode',
+  'internalErrorCode',
+  'frontendVersion',
+  'identityPath',
+  'identityResolved',
+  'customTokenIssued',
+  'expectedUidHash',
+  'actualUidHash',
+  'apgUserIdHash',
+  'backendRevision',
+  'emailHash',
+  'deviceIdHash',
+  'platform',
+  'appMode',
+  'finalResult',
+  'failureCategory',
+  'failedStage',
+]);
 const CONSENT_SCREEN_DISABLED_FOR_DEMO = false;
 const USER_AUTH_STORAGE_KEYS = [
   'apg_tg_user',
@@ -705,6 +732,102 @@ function clearUserAuthStorage() {
       sessionStorage.removeItem(key);
     } catch {}
   });
+}
+
+function isGuestIdentity(user) {
+  return !user || String(user.id || '').startsWith('guest_');
+}
+
+function sanitizeAuditValue(value, max = 280) {
+  if (value == null) return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value).slice(0, max);
+  }
+  if (value instanceof Date) return value.toISOString().slice(0, max);
+  try {
+    return JSON.stringify(value).slice(0, max);
+  } catch {
+    return String(value).slice(0, max);
+  }
+}
+
+function buildEmailAuthAttemptContextPayload(attempt = {}) {
+  return {
+    requestId: sanitizeAuditValue(attempt.requestId, 120),
+    loginSessionId: sanitizeAuditValue(attempt.loginSessionId, 120),
+    authAttemptId: sanitizeAuditValue(attempt.authAttemptId, 120),
+  };
+}
+
+function buildFrontendEmailVersion() {
+  try {
+    return window?.__APG_BUILD_VERSION__ || window?.__APG_BUILD_DIAGNOSTICS__?.buildVersion || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+function buildFrontendAppMode() {
+  if (typeof window === 'undefined') return 'browser';
+  if (window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true) return 'pwa';
+  if (window.Telegram?.WebApp) return 'telegram';
+  if (/VKAndroidApp|VKiOSApp/.test(navigator.userAgent || '')) return 'vk';
+  return 'browser';
+}
+
+async function hashTextSha256(value) {
+  const normalized = sanitizeAuditValue(value, 220);
+  if (!normalized) return '';
+  try {
+    if (!globalThis.crypto?.subtle) return '';
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('')
+      .slice(0, 64);
+  } catch {
+    return '';
+  }
+}
+
+function sendEmailAuthAudit(event) {
+  if (!event?.authAttemptId || !event?.stage) return;
+  const payload = event.payload || {};
+  const attempt = event;
+  const body = {
+    ...buildEmailAuthAttemptContextPayload(attempt),
+    provider: 'email',
+    stage: sanitizeAuditValue(event.stage, 120),
+    status: sanitizeAuditValue(event.status, 30) || 'OK',
+    frontendVersion: buildFrontendEmailVersion(),
+    appMode: buildFrontendAppMode(),
+    platform: sanitizeAuditValue(navigator?.userAgent, 240),
+    durationMs: Number.isFinite(Number(payload.durationMs)) ? Number(payload.durationMs) : null,
+    publicErrorCode: sanitizeAuditValue(payload.publicErrorCode, 80),
+    internalErrorCode: sanitizeAuditValue(payload.internalErrorCode, 80),
+    identityPath: sanitizeAuditValue(payload.identityPath || attempt.identityPath, 80) || 'identity_v2',
+    identityResolved: Boolean(payload.identityResolved || attempt.identityResolved),
+    customTokenIssued: Boolean(payload.customTokenIssued || attempt.customTokenIssued),
+    expectedUidHash: sanitizeAuditValue(payload.expectedUidHash, 64),
+    actualUidHash: sanitizeAuditValue(payload.actualUidHash, 64),
+    apgUserIdHash: sanitizeAuditValue(payload.apgUserIdHash, 64),
+    backendRevision: sanitizeAuditValue(attempt.backendRevision || payload.backendRevision, 80),
+  };
+  const safePayload = Object.fromEntries(
+    Object.entries(payload)
+      .filter(([key]) => EMAIL_AUTH_AUDIT_ALLOWED_FIELDS.has(key))
+      .map(([key, value]) => [
+        key,
+        key === 'durationMs'
+          ? (Number.isFinite(Number(value)) ? Number(value) : null)
+          : sanitizeAuditValue(value, 260),
+      ]),
+  );
+  void fetch(EMAIL_AUTH_AUDIT_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...body, ...safePayload }),
+  }).catch(() => {});
 }
 
 function traceAuthStage(stage, details = {}) {
@@ -889,6 +1012,8 @@ export function UserApp() {
   });
   const authLoadRunRef                          = useRef(0);
   const loggedOutRef                            = useRef(false);
+  const hasStrongIdentityRef                    = useRef(false);
+  const emailAuthAttemptRef                     = useRef(null);
   const authRenderTraceRef                      = useRef({
     userId: null,
     panel: null,
@@ -1031,6 +1156,26 @@ export function UserApp() {
   useEffect(() => {
     loggedOutRef.current = loggedOut;
   }, [loggedOut]);
+
+  useEffect(() => {
+    hasStrongIdentityRef.current = !isGuestIdentity(user);
+  }, [user?.id]);
+
+  const loggedOutRenderRef = useRef(false);
+
+  useEffect(() => {
+    if (!loggedOut) {
+      loggedOutRenderRef.current = false;
+      return;
+    }
+    if (loggedOutRenderRef.current) return;
+    loggedOutRenderRef.current = true;
+    traceAuthStage('guest_render', {
+      hasAuthUser: !!auth.currentUser?.uid || false,
+      userId: user?.id || null,
+      manualLogout: isManualLogoutFromStorage(),
+    });
+  }, [loggedOut, user?.id]);
 
   useEffect(() => {
     if (loading || loggedOut || consentRequest) return;
@@ -2204,7 +2349,139 @@ export function UserApp() {
       authProvider,
       hasUserAuth,
     });
-  }, [activePanel, loading, loggedOut, networkError, user?.id, user?.authProvider, user?.email, user?.linkedTelegram]);
+    const attempt = emailAuthAttemptRef.current;
+    if (!attempt?.authAttemptId || attempt.homeRenderFired || !attempt.expectedUid) return;
+    attempt.homeRenderFired = true;
+    (async () => {
+      const actualUid = auth.currentUser?.uid || '';
+      const actualUidHash = await hashTextSha256(actualUid);
+      const expectedUidHash = attempt.expectedUidHash || '';
+      await emitEmailAuthAuditEvent('home_render', 'OK', {
+        expectedUidHash,
+        actualUidHash,
+      });
+      if (!attempt.fullAuthCompleted && expectedUidHash && actualUidHash && attempt.expectedUidHash !== actualUidHash) {
+        attempt.fullAuthCompleted = true;
+        await emitEmailAuthAuditEvent('attempt_completed', 'FAILED', {
+          expectedUidHash,
+          actualUidHash,
+          publicErrorCode: 'AUTH_UID_MISMATCH',
+          internalErrorCode: 'AUTH_UID_MISMATCH',
+          finalResult: 'CLIENT_AUTH_FAILED',
+          failureCategory: 'AUTH_STATE_MISMATCH',
+          failedStage: 'home_render',
+        });
+        return;
+      }
+      if (!attempt.fullAuthCompleted) {
+        attempt.fullAuthCompleted = true;
+        await emitEmailAuthAuditEvent('attempt_completed', 'SUCCESS', {
+          expectedUidHash,
+          actualUidHash,
+          finalResult: 'FULL_AUTH_SUCCESS',
+        });
+        clearEmailAuthAttemptTracking();
+      }
+    })();
+  }, [
+    activePanel,
+    clearEmailAuthAttemptTracking,
+    emitEmailAuthAuditEvent,
+    loading,
+    loggedOut,
+    networkError,
+    user?.id,
+    user?.authProvider,
+    user?.email,
+    user?.linkedTelegram,
+  ]);
+
+  const applyLogoutGuestState = useCallback(({
+    runId = null,
+    targetUserId = null,
+    source = 'logout',
+    logoutOk = true,
+    emitLogoutComplete = false,
+  } = {}) => {
+    if (!mountedRef.current) return;
+    loggedOutRef.current = true;
+    const wasGuestUser = !targetUserId || String(targetUserId).startsWith('guest_');
+    clearUserAuthStorage();
+    setUser(null);
+    setUserBookings([]);
+    setPartners([]);
+    setExperts([]);
+    setEvents([]);
+    setNews([]);
+    setNotifications([]);
+    setLokiKnowledge([]);
+    setFavorites([]);
+    setScannedPartnerIds({});
+    setUserTickets(0);
+    setUserReputation(0);
+    setUserKeys(0);
+    setPostVisitMoment(null);
+    setError(null);
+    setNetworkError(false);
+    setConsentError('');
+    setErrorLoggerUser(null);
+    traceAuthStage('store_reset', {
+      runId,
+      source,
+      hadUser: Boolean(targetUserId),
+      hasAuthUser: !!auth.currentUser?.uid || false,
+    });
+    traceAuthStage('user_state_cleared', {
+      runId,
+      source,
+      hadGuestUser: wasGuestUser,
+    });
+    setLoading(false);
+    setLoggedOut(true);
+    traceAuthStage('guest_state_entered', {
+      runId,
+      source,
+      manualLogout: true,
+      logoutOk,
+    });
+    traceAuthStage('guest_bootstrap', {
+      runId,
+      source,
+      manualLogout: true,
+      logoutOk,
+    });
+    if (emitLogoutComplete) {
+      traceAuthStage('logout_complete', {
+        runId,
+        userId: targetUserId || null,
+        durationMs: Date.now() - (logoutFlowRef.current.startedAt || Date.now()),
+        completed: logoutOk,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentAuthUser) => {
+      const hasStrongIdentity = hasStrongIdentityRef.current;
+      const manualLogout = isManualLogoutFromStorage();
+      traceAuthStage('auth_state_changed', {
+        hasAuthUser: !!currentAuthUser?.uid,
+        hasStrongIdentity,
+        loggedOut: loggedOutRef.current,
+        inProgress: logoutFlowRef.current.inProgress,
+        manualLogout,
+        authUid: currentAuthUser?.uid || null,
+      });
+      if (currentAuthUser) return;
+      if (loggedOutRef.current || !hasStrongIdentity || !mountedRef.current) return;
+      applyLogoutGuestState({
+        source: 'auth_state_changed',
+        targetUserId: user?.id || null,
+        emitLogoutComplete: false,
+      });
+    });
+    return () => unsubscribe();
+  }, [applyLogoutGuestState, user?.id]);
 
   useEffect(() => {
     if (loggedOutRef.current) return;
@@ -2258,7 +2535,7 @@ export function UserApp() {
       interestPersistRef.current.timer = setTimeout(save, wait);
       return next;
     });
-  }, [user]);
+  }, [showToast, user]);
 
   // ─── Onboarding ─────────────────────────────────────────────────────────────
 
@@ -3059,6 +3336,54 @@ export function UserApp() {
 
   // ─── Профиль ────────────────────────────────────────────────────────────────
 
+  const emitEmailAuthAuditEvent = useCallback(async (stage, status = 'OK', payload = {}) => {
+    const attempt = emailAuthAttemptRef.current;
+    if (!attempt?.authAttemptId) return;
+    const expectedUid = payload?.expectedUid || attempt?.expectedUid || '';
+    const actualUid = payload?.actualUid || auth.currentUser?.uid || '';
+    sendEmailAuthAudit({
+      ...buildEmailAuthAttemptContextPayload(attempt),
+      stage,
+      status,
+      identityPath: attempt.identityPath || 'identity_v2',
+      identityResolved: attempt.identityResolved === true,
+      customTokenIssued: attempt.customTokenIssued === true,
+      backendRevision: attempt.backendRevision,
+      payload: {
+        ...payload,
+        authProvider: 'email',
+        expectedUidHash: payload.expectedUidHash || (expectedUid ? await hashTextSha256(expectedUid) : ''),
+        actualUidHash: payload.actualUidHash || (actualUid ? await hashTextSha256(actualUid) : ''),
+        apgUserIdHash: attempt.apgUserIdHash || attempt.apgUserIdHashFallback || '',
+      },
+    });
+  }, []);
+
+  const startEmailAuthAttemptTracking = useCallback((emailUser, authPayload = {}) => {
+    const attempt = {
+      ...buildEmailAuthAttemptContextPayload(authPayload),
+      provider: 'email',
+      identityPath: sanitizeAuditValue(authPayload?.identityPath, 80) || 'identity_v2',
+      identityResolved: authPayload?.identityResolved === true,
+      customTokenIssued: authPayload?.customTokenIssued === true,
+      backendRevision: sanitizeAuditValue(authPayload?.backendRevision, 80) || '',
+      expectedUid: sanitizeAuditValue(emailUser?.id, 220),
+      apgUserIdHashFallback: '',
+      homeRenderFired: false,
+      fullAuthCompleted: false,
+      consentFlow: false,
+      authAttemptId: sanitizeAuditValue(authPayload?.authAttemptId || authPayload?.requestId, 120),
+      requestId: sanitizeAuditValue(authPayload?.requestId, 120),
+      loginSessionId: sanitizeAuditValue(authPayload?.loginSessionId, 120),
+    };
+    emailAuthAttemptRef.current = attempt;
+    return attempt;
+  }, []);
+
+  const clearEmailAuthAttemptTracking = useCallback(() => {
+    emailAuthAttemptRef.current = null;
+  }, []);
+
   const completeEmailLogin = useCallback((emailUser) => {
     traceAuthStage('email_login_complete', { userId: emailUser?.id ?? null });
     localStorage.removeItem('manualLogout');
@@ -3068,22 +3393,61 @@ export function UserApp() {
 
   const handleEmailAuthSuccess = useCallback(async (emailUser, authPayload = {}) => {
     if (!emailUser?.id) return;
+    const attempt = startEmailAuthAttemptTracking(emailUser, authPayload);
+    const expectedUid = attempt.expectedUid || '';
+    const expectedUidHash = await hashTextSha256(expectedUid);
+    attempt.expectedUidHash = expectedUidHash;
+    attempt.apgUserIdHash = expectedUidHash;
+    emailAuthAttemptRef.current = attempt;
     const authRefId = authPayload?.referrerId || authPayload?.ref || readPendingReferral({ source: 'UserApp.emailAuthSuccess' }) || null;
     setConsentError('');
     traceAuthStage('AUTH_STARTED', { provider: 'email', profileId: emailUser.id, hasToken: !!authPayload?.token });
     refLog('auth start', { provider: 'email', userId: emailUser.id, hasReferral: !!authRefId, value: authRefId });
     const emailReferralContext = getReferralContext({ ref: authRefId || '', source: 'UserApp.emailAuthSuccess' });
+    let consentRequired = true;
     try {
       if (authPayload?.token) {
         recordEmailLoginStage('firebase_custom_token_start', { profileId: emailUser.id, hasToken: true });
+        await emitEmailAuthAuditEvent('firebase_signin_started', 'START', {
+          expectedUidHash,
+          publicErrorCode: null,
+        });
         await apgIdentity.authenticate({ provider: 'firebaseCustomToken', token: authPayload.token });
         recordEmailLoginStage('firebase_custom_token_end', { profileId: emailUser.id, uid: auth.currentUser?.uid ?? null });
+        await emitEmailAuthAuditEvent('firebase_signin_succeeded', 'OK', {
+          expectedUidHash,
+          actualUidHash: await hashTextSha256(auth.currentUser?.uid || ''),
+          publicErrorCode: null,
+        });
         traceAuthStage('AUTH_SUCCESS', { provider: 'email', profileId: emailUser.id, uid: auth.currentUser?.uid ?? null });
         refLog('auth success', { provider: 'email', userId: emailUser.id, hasReferral: !!authRefId });
+      } else {
+        await emitEmailAuthAuditEvent('firebase_signin_failed', 'FAILED', {
+          expectedUidHash,
+          actualUidHash: '',
+          publicErrorCode: 'NO_TOKEN',
+          internalErrorCode: 'EMAIL_AUTH_NO_TOKEN',
+          finalResult: 'CLIENT_AUTH_FAILED',
+          failureCategory: 'AUTH_STATE_MISMATCH',
+          failedStage: 'firebase_signin',
+        });
+        await emitEmailAuthAuditEvent('attempt_completed', 'FAILED', {
+          expectedUidHash,
+          actualUidHash: '',
+          publicErrorCode: 'NO_TOKEN',
+          internalErrorCode: 'EMAIL_AUTH_NO_TOKEN',
+          finalResult: 'CLIENT_AUTH_FAILED',
+          failureCategory: 'AUTH_STATE_MISMATCH',
+          failedStage: 'firebase_signin',
+        });
       }
       recordEmailLoginStage('auth_state_wait_start', { profileId: emailUser.id });
       await waitForFirebaseUser(String(emailUser.id));
       recordEmailLoginStage('auth_state_wait_end', { profileId: emailUser.id, uid: auth.currentUser?.uid ?? null });
+      await emitEmailAuthAuditEvent('auth_state_changed', 'OK', {
+        expectedUidHash,
+        actualUidHash: await hashTextSha256(auth.currentUser?.uid || ''),
+      });
       traceAuthStage('AUTH_STATE_READY', {
         provider: 'email',
         profileId: emailUser.id,
@@ -3091,6 +3455,9 @@ export function UserApp() {
         isAnonymous: auth.currentUser?.isAnonymous ?? null,
       });
       recordEmailLoginStage('profile_sync_start', { profileId: emailUser.id, hasReferral: !!authRefId });
+      await emitEmailAuthAuditEvent('profile_load_started', 'START', {
+        expectedUidHash,
+      });
       await ensureOwnerAuthSession(emailUser.id, 'email');
       refLog('profile sync started', { stage: 'email_auth_profile_sync', referrerId: authRefId || null, userId: emailUser.id });
       const profileResult = await userAction('profile:sync', {
@@ -3102,6 +3469,11 @@ export function UserApp() {
         referralDeviceId: authPayload?.referralDeviceId || emailReferralContext.deviceId,
         referralPlatform: authPayload?.referralPlatform || emailReferralContext.platform,
         referralClientEvents: drainReferralEventQueue(),
+      });
+      await emitEmailAuthAuditEvent('profile_load_succeeded', 'OK', {
+        expectedUidHash,
+        actualUidHash: await hashTextSha256(auth.currentUser?.uid || ''),
+        created: !!profileResult?.created,
       });
       recordEmailLoginStage('profile_sync_end', { profileId: emailUser.id, created: !!profileResult?.created, consentRequired: !!profileResult?.consentRequired });
       if (profileResult?.created) {
@@ -3125,7 +3497,7 @@ export function UserApp() {
         refLog('recovery skipped', { stage: 'email_profile_sync', referrerId: authRefId, userId: emailUser.id, reason: profileResult?.referralRecoveryReason || 'server_not_awarded' });
       }
       const data = profileResult?.user || {};
-      const consentRequired = profileResult?.consentRequired !== undefined
+      consentRequired = profileResult?.consentRequired !== undefined
         ? !!profileResult.consentRequired
         : !hasAcceptedCurrentLegal(data);
       traceAuthStage(profileResult?.created ? 'PROFILE_CREATED' : 'PROFILE_EXISTS', {
@@ -3138,6 +3510,12 @@ export function UserApp() {
       });
       if (!consentRequired || CONSENT_SCREEN_DISABLED_FOR_DEMO) {
         recordEmailLoginStage('completed', { profileId: emailUser.id, mode: 'email' });
+        attempt.consentFlow = false;
+        await emitEmailAuthAuditEvent('attempt_completed', 'SUCCESS', {
+          expectedUidHash,
+          actualUidHash: await hashTextSha256(auth.currentUser?.uid || ''),
+          finalResult: 'CLIENT_AUTH_SUCCESS',
+        });
         completeEmailLogin({
           ...emailUser,
           consents: data.consents,
@@ -3148,14 +3526,42 @@ export function UserApp() {
       }
     } catch (e) {
       if (authRefId) refLog('retry after reconnect', { stage: 'email_profile_sync', referrerId: authRefId, userId: emailUser.id, reason: e?.message || String(e) });
+      await emitEmailAuthAuditEvent('profile_load_failed', 'FAILED', {
+        expectedUidHash,
+        actualUidHash: await hashTextSha256(auth.currentUser?.uid || ''),
+        publicErrorCode: e?.code || 'PROFILE_BOOTSTRAP_FAILED',
+        internalErrorCode: e?.code || 'PROFILE_BOOTSTRAP_FAILED',
+        finalResult: 'CLIENT_AUTH_FAILED',
+        failureCategory: 'PROFILE_LOAD_FAILED',
+        failedStage: 'profile_load',
+      });
+      await emitEmailAuthAuditEvent('guest_rollback', 'OK', {
+        expectedUidHash,
+        actualUidHash: await hashTextSha256(auth.currentUser?.uid || ''),
+        publicErrorCode: e?.code || 'PROFILE_BOOTSTRAP_FAILED',
+        finalResult: 'CLIENT_AUTH_FAILED',
+        failureCategory: 'GUEST_ROLLBACK_AFTER_SUCCESS',
+        failedStage: 'profile_load',
+      });
+      await emitEmailAuthAuditEvent('attempt_completed', 'FAILED', {
+        expectedUidHash,
+        actualUidHash: await hashTextSha256(auth.currentUser?.uid || ''),
+        publicErrorCode: e?.code || 'PROFILE_BOOTSTRAP_FAILED',
+        internalErrorCode: e?.code || 'PROFILE_BOOTSTRAP_FAILED',
+        finalResult: 'CLIENT_AUTH_FAILED',
+        failureCategory: 'PROFILE_LOAD_FAILED',
+        failedStage: 'profile_load',
+      });
       logError(e, 'UserApp.handleEmailAuthSuccess.checkConsents');
       const error = Object.assign(e instanceof Error ? e : new Error(String(e)), { code: e?.code || 'PROFILE_BOOTSTRAP_FAILED' });
       recordEmailLoginStage('failed', { profileId: emailUser.id, code: error.code, message: error.message, failedStage: 'profile_bootstrap' });
       logFinishLoginError('PROFILE_BOOTSTRAP_FAILED', emailUser, error, { provider: 'email' });
       setConsentError(getAuthErrorMessage(error));
       showToast('Ошибка входа: PROFILE_BOOTSTRAP_FAILED', 'error');
+      clearEmailAuthAttemptTracking();
       return;
     }
+    attempt.consentFlow = true;
     traceAuthStage('CONSENTS_SCREEN', { provider: 'email', profileId: emailUser.id, documentsVersion: LEGAL_VERSION, reason: 'consentRequired' });
     setConsentRequest({
       user: emailUser,
@@ -3165,7 +3571,12 @@ export function UserApp() {
       badge: 'Первый вход',
       notificationsDefault: true,
     });
-  }, [completeEmailLogin, showToast]);
+  }, [
+    clearEmailAuthAttemptTracking,
+    completeEmailLogin,
+    emitEmailAuthAuditEvent,
+    showToast,
+  ]);
 
   const handlePwaEmailLoginOpen = useCallback(() => {
     try {
@@ -3249,6 +3660,15 @@ export function UserApp() {
           }
         }
         traceAuthStage('REDIRECT_HOME', { profileId: targetUser.id, mode: 'email' });
+        const attempt = emailAuthAttemptRef.current;
+        if (attempt?.authAttemptId) {
+          await emitEmailAuthAuditEvent('attempt_completed', 'SUCCESS', {
+            expectedUidHash: attempt.expectedUidHash || '',
+            actualUidHash: await hashTextSha256(auth.currentUser?.uid || ''),
+            finalResult: 'CLIENT_AUTH_SUCCESS',
+          });
+          clearEmailAuthAttemptTracking();
+        }
         completeEmailLogin({
           ...targetUser,
           consents: { ...consentPayload, acceptedAt: new Date().toISOString() },
@@ -3289,7 +3709,14 @@ export function UserApp() {
     } finally {
       if (mountedRef.current) setConsentSaving(false);
     }
-  }, [consentRequest, consentSaving, completeEmailLogin, showToast]);
+  }, [
+    consentRequest,
+    consentSaving,
+    completeEmailLogin,
+    emitEmailAuthAuditEvent,
+    clearEmailAuthAttemptTracking,
+    showToast,
+  ]);
 
   const handleLogout = useCallback(async () => {
     if (logoutFlowRef.current.inProgress) return;
@@ -3311,6 +3738,25 @@ export function UserApp() {
       runId,
       userId: targetUserId || null,
     });
+    traceAuthStage('logout_clicked', {
+      runId,
+      source: 'handleLogout',
+      userId: targetUserId || null,
+    });
+    traceAuthStage('logout_started', {
+      runId,
+      source: 'handleLogout',
+      userId: targetUserId || null,
+    });
+    loggedOutRef.current = true;
+    setLoading(false);
+    setLoggedOut(true);
+    traceAuthStage('guest_state_entered', {
+      runId,
+      source: 'handleLogout_pre',
+      manualLogout: true,
+      logoutOk: true,
+    });
     try {
       localStorage.setItem('manualLogout', 'true');
     } catch {}
@@ -3321,6 +3767,10 @@ export function UserApp() {
     });
     try {
       await apgIdentity.invalidateSession();
+      traceAuthStage('firebase_signout_done', {
+        runId,
+        authUid: auth.currentUser?.uid || null,
+      });
       traceAuthStage('firebase_signout', {
         runId,
         authUid: auth.currentUser?.uid || null,
@@ -3339,51 +3789,18 @@ export function UserApp() {
         showToast('Не удалось выйти из аккаунта. Закрываем сессию локально.');
       }
     } finally {
-      if (isMountedRef.current) {
-        clearUserAuthStorage();
-        setUser(null);
-        setUserBookings([]);
-        setPartners([]);
-        setExperts([]);
-        setEvents([]);
-        setNews([]);
-        setNotifications([]);
-        setLokiKnowledge([]);
-        setFavorites([]);
-        setScannedPartnerIds({});
-        setUserTickets(0);
-        setUserReputation(0);
-        setUserKeys(0);
-        setPostVisitMoment(null);
-        setError(null);
-        setNetworkError(false);
-        setConsentError('');
-        setErrorLoggerUser(null);
-        traceAuthStage('store_reset', {
-          runId,
-          hadUser: !!targetUserId,
-          hasAuthUser: !!auth.currentUser?.uid || false,
-        });
-        setLoading(false);
-        setLoggedOut(true);
-        traceAuthStage('guest_bootstrap', {
-          runId,
-          source: 'handleLogout',
-          manualLogout: true,
-          logoutOk,
-        });
-        traceAuthStage('logout_complete', {
-          runId,
-          userId: targetUserId || null,
-          durationMs: Date.now() - (logoutFlowRef.current.startedAt || Date.now()),
-          completed: logoutOk,
-        });
-      }
+      applyLogoutGuestState({
+        runId,
+        targetUserId,
+        source: 'handleLogout',
+        logoutOk,
+        emitLogoutComplete: true,
+      });
       if (logoutFlowRef.current.inProgress) {
         logoutFlowRef.current.inProgress = false;
       }
     }
-  }, [user]);
+  }, [applyLogoutGuestState, user]);
 
   const handleLoginAfterLogout = useCallback(() => {
     traceAuthStage('auth_session_restart', {

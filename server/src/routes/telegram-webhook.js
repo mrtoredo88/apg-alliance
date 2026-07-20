@@ -4,8 +4,19 @@ import { processTelegramUpdate, pollTelegramUpdates } from '../lib/telegramUpdat
 export default async function telegramWebhookRoutes(fastify) {
   // Webhook оставлен на случай возврата push-доставки; основной канал — getUpdates-поллинг
   fastify.post('/api/telegram-webhook', async (request) => {
+    const requestId = String(request.headers['x-request-id'] || request.headers['x-telegram-bot-api-secret-token'] || '').trim();
+    const payload = request.body ?? {};
+    const messageText = String(payload?.message?.text || '').slice(0, 120);
+    const chatId = String(payload?.message?.chat?.id || payload?.message?.from?.id || '').trim();
+    request.log.info?.({
+      stage: 'telegram_webhook_called',
+      requestId,
+      chatId,
+      updateId: payload?.update_id || null,
+      text: messageText,
+    }, 'telegram-webhook-forensic');
     const db = getDb();
-    await processTelegramUpdate(db, request.body ?? {}, request.log).catch(error => {
+    await processTelegramUpdate(db, payload, request.log).catch(error => {
       request.log.warn({ message: error?.message || String(error) }, 'telegram webhook processing failed');
     });
     return { ok: true };

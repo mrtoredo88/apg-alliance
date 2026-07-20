@@ -28,6 +28,31 @@ const WELCOME_TEXT =
 
 const LINKS_TEXT = '📌 Все наши площадки:';
 
+function safeDebugString(value, max = 280) {
+  return String(value ?? '').trim().slice(0, max);
+}
+
+function safeDebugPayload(value) {
+  if (value == null) return null;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  return safeDebugString(JSON.stringify(value), 280);
+}
+
+async function appendTelegramTimeline(ref, entry = {}, log = console) {
+  if (!ref) return;
+  try {
+    await ref.set({
+      timeline: FieldValue.arrayUnion({
+        at: new Date().toISOString(),
+        ...entry,
+      }),
+      lastTimelineAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+  } catch (error) {
+    log.warn?.({ message: error?.message || String(error) }, 'telegram timeline update failed');
+  }
+}
+
 async function tgSend(chatId, text, extra = {}) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   return fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -172,15 +197,58 @@ export async function processTelegramUpdate(db, update, log = console) {
 
   const from = message.from;
   const text = message.text.trim();
+  const messageId = safeDebugString(update?.update_id, 120);
+  const chatId = safeDebugString(from?.id, 120);
+  log.info?.({
+    messageId,
+    chatId,
+    from: safeDebugPayload(from),
+    text: safeDebugString(text, 120),
+  }, 'telegram-update-received');
 
   const authMatch = text.match(/^\/start auth_([a-f0-9]{32})$/);
   if (authMatch) {
     const state = authMatch[1];
     const ref   = db.collection('telegramAuthSessions').doc(state);
     const snap  = await ref.get();
-
     const session = snap.data() || {};
+    const requestId = safeDebugString(session.requestId, 220);
+    const loginSessionId = safeDebugString(session.loginSessionId, 220);
+    if (snap.exists) {
+      await appendTelegramTimeline(ref, {
+        stage: 'telegram_auth_update_received',
+        messageId,
+        chatId,
+        state,
+        requestId,
+        loginSessionId,
+        telegramSessionId: state,
+        text: safeDebugString(text, 120),
+      }, log);
+    } else {
+      log.warn?.(
+        {
+          stage: 'telegram_auth_update_received_unknown_state',
+          messageId,
+          chatId,
+          state,
+          requestId,
+          loginSessionId,
+          text: safeDebugString(text, 120),
+        },
+        'telegram-auth-update-received'
+      );
+    }
+
     if (!snap.exists || session.status !== 'pending') {
+      await appendTelegramTimeline(ref, {
+        stage: 'telegram_auth_stale',
+        state,
+        requestId,
+        loginSessionId,
+        telegramSessionId: state,
+        reason: snap.exists ? 'not_pending' : 'missing',
+      }, log);
       tgSend(from.id, '⚠️ Ссылка устарела или уже использована. Вернитесь в приложение и нажмите кнопку снова.');
       return { handled: true, kind: 'auth_stale' };
     }
@@ -188,6 +256,14 @@ export async function processTelegramUpdate(db, update, log = console) {
     const expiresAt = session.expiresAt;
     const expired   = (expiresAt?.toDate ? expiresAt.toDate() : new Date(expiresAt)) < new Date();
     if (expired) {
+      await appendTelegramTimeline(ref, {
+        stage: 'telegram_auth_expired',
+        state,
+        requestId,
+        loginSessionId,
+        telegramSessionId: state,
+        expiresAt: safeDebugString(String(session.expiresAt || ''), 120),
+      }, log);
       await ref.update({ status: 'expired' });
       tgSend(from.id, '⚠️ Ссылка устарела. Вернитесь в приложение и нажмите кнопку снова.');
       return { handled: true, kind: 'auth_expired' };
@@ -201,17 +277,21 @@ export async function processTelegramUpdate(db, update, log = console) {
       if (!ownerUserId) {
         linkError = 'owner_not_found';
       } else {
-        const [ownerSnap, linkSnap] = await Promise.all([
-          db.collection('users').doc(ownerUserId).get(),
-          db.collection('tgLinks').doc(tgId).get(),
-        ]);
+        const ownerSnap = await db.collection('users').doc(ownerUserId).get();
         if (!ownerSnap.exists) {
           linkError = 'owner_not_found';
-        } else if (linkSnap.exists && String(linkSnap.data()?.userId || '') !== ownerUserId) {
-          linkError = 'already_linked';
-          linkedOwnerId = String(linkSnap.data()?.userId || '');
         }
       }
+      await appendTelegramTimeline(ref, {
+        stage: 'telegram_auth_link_validation',
+        state,
+        requestId,
+        loginSessionId,
+        telegramSessionId: state,
+        ownerUserId,
+        linkError: linkError || null,
+        linkedOwnerId: linkedOwnerId || null,
+      }, log);
       await ref.update({
         status: 'done',
         linking: true,
@@ -230,6 +310,15 @@ export async function processTelegramUpdate(db, update, log = console) {
           : '✅ Telegram подтверждён. Вернитесь в приложение АПГ — привязка завершится автоматически.',
         { reply_markup: SOCIAL_KEYBOARD },
       );
+      await appendTelegramTimeline(ref, {
+        stage: 'telegram_auth_link_done',
+        state,
+        requestId,
+        loginSessionId,
+        telegramSessionId: state,
+        linkError: linkError || null,
+        linkedOwnerId: linkedOwnerId || null,
+      }, log);
       return { handled: true, kind: 'auth_link' };
     }
 
@@ -238,6 +327,15 @@ export async function processTelegramUpdate(db, update, log = console) {
       ? await resolveReferralSessionReferrer(db, referralSessionId, { markMissing: true, source: 'telegram-bot', userId: tgId })
       : { referrerId: String(session.referrerId || '').trim(), session: null };
     const resolvedReferrerId = sessionResolution.referrerId || String(session.referrerId || '').trim();
+    await appendTelegramTimeline(ref, {
+      stage: 'telegram_auth_resolve_referral',
+      state,
+      requestId,
+      loginSessionId,
+      telegramSessionId: state,
+      referralSessionId: safeDebugString(referralSessionId, 200),
+      resolvedReferrerId: safeDebugString(resolvedReferrerId, 200),
+    }, log);
     await ref.update({
       status:    'done',
       tgUserId:  String(from.id),
@@ -249,6 +347,17 @@ export async function processTelegramUpdate(db, update, log = console) {
       referralSessionId: referralSessionId || null,
       referralCompletedAt: resolvedReferrerId ? FieldValue.serverTimestamp() : null,
     });
+    if (resolvedReferrerId) {
+      await appendTelegramTimeline(ref, {
+        stage: 'telegram_auth_referral_recorded',
+        state,
+        requestId,
+        loginSessionId,
+        telegramSessionId: state,
+        referrerId: safeDebugString(resolvedReferrerId, 200),
+        referralSessionId: safeDebugString(referralSessionId, 200),
+      }, log);
+    }
 
     tgGetPhotoUrl(from.id)
       .then(photoUrl => upsertUser(db, from, photoUrl, {
@@ -272,6 +381,14 @@ export async function processTelegramUpdate(db, update, log = console) {
         }
       })
       .catch(error => log.warn?.({ message: error?.message || String(error) }, 'telegram profile background update failed'));
+    await appendTelegramTimeline(ref, {
+      stage: 'telegram_auth_done',
+      state,
+      requestId,
+      loginSessionId,
+      telegramSessionId: state,
+      resolvedReferrerId: safeDebugString(resolvedReferrerId, 200),
+    }, log);
     tgSend(from.id,
       `✅ Вы вошли в приложение АПГ!\n\nВернитесь в браузер — страница обновится автоматически.\n\n📌 Наши площадки:`,
       { reply_markup: SOCIAL_KEYBOARD },
@@ -322,6 +439,11 @@ export async function pollTelegramUpdates(db, log = console) {
   const stateRef = POLL_STATE_REF(db);
   const startedAt = Date.now();
   let offset = 0;
+  log.info?.({
+    stage: 'telegram_poll_start',
+    startedAt: new Date(startedAt).toISOString(),
+    lockWindowMs: POLL_LOCK_MS,
+  }, 'telegram-poll-forensic');
 
   const acquired = await db.runTransaction(async tx => {
     const snap = await tx.get(stateRef);
@@ -352,6 +474,13 @@ export async function pollTelegramUpdates(db, log = console) {
     }
 
     const updates = Array.isArray(res.result) ? res.result : [];
+    log.info?.({
+      stage: 'telegram_poll_response',
+      offset,
+      incoming: updates.length,
+      got: Array.isArray(res.result) ? res.result.length : 0,
+    }, 'telegram-poll-forensic');
+
     let processed = 0;
     for (const update of updates) {
       try {
