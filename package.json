@@ -151,6 +151,7 @@
     "account:observe": "node scripts/account-observe.mjs",
     "account:cutover": "node scripts/account-cutover.mjs",
     "account:rollback": "node scripts/account-rollback.mjs",
+    "account:remote-preflight": "node scripts/account-remote-preflight.mjs",
     "audit:migration-env": "node scripts/migration-environment-audit.mjs",
     "postgres:diagnostics": "node scripts/postgres-connectivity-diagnostics.mjs",
     "readiness:account": "node scripts/account-readiness.mjs",

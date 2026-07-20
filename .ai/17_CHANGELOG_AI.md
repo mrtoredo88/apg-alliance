@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] chore: PostgreSQL Production Network Integration
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/account-remote-preflight.mjs`, `docs/migration/postgres-network-topology.md`, `docs/migration/migration-operator-runtime.md`, `docs/migration/postgres-connectivity-runbook.md`, `docs/migration/remote-preflight-checklist.md`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Зафиксирован production network path: Yandex Serverless Container `apg-api` использует VPC network `enpa19j9jpki1f67p6kq` и тот же PostgreSQL DSN group.
+- Добавлен read-only `account:remote-preflight`, который выполняет `postgres:diagnostics` и только затем `account:preflight` в production-network runtime без snapshot/import/verify/canary/cutover/deploy.
+- Добавлены topology/runbook/checklist документы для запуска migration operator в том же сетевом контуре, без открытия PostgreSQL наружу.
+**Почему:** локальный `ENOTFOUND` является различием сетевого окружения; migration operator должен использовать уже работающий production VPC path, а не новый публичный доступ к базе.
+
 ## [2026-07-20] chore: Account Core Security & Infrastructure Completion
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/AdminPanel.jsx`, `server/src/routes/raffle-draw.js`, `server/src/routes/activity-index.js`, `scripts/postgres-connectivity-diagnostics.mjs`, `scripts/account-snapshot.mjs`, `scripts/migration-environment-audit.mjs`, `.gitignore`, `docs/security/security-findings-resolution.md`, `docs/migration/postgres-connectivity.md`, `docs/migration/working-tree-cleanup.md`, `docs/migration/final-preflight-status.md`, `package.json`, `.ai/17_CHANGELOG_AI.md`
