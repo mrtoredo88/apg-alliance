@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] feat: Account Core Production Migration Phase 1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/account-operator-deploy.mjs`, `scripts/account-snapshot.mjs`, `scripts/account-conflicts.mjs`, `scripts/account-dry-run.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Operator deploy helper теперь собирает image строго под `linux/amd64` и проверяет manifest перед Yandex Serverless revision deploy.
+- `account:snapshot` создаёт immutable read-only Account Core snapshot с raw JSON вне Git, SHA256 и redacted manifest после успешного remote preflight.
+- `account:conflicts` и `account:dry-run` работают от immutable snapshot, считают P0 conflicts и read-only import plan без PostgreSQL writes/import/verify/canary/cutover.
+**Почему:** Phase 1 должна завершить snapshot readiness: remote preflight → immutable snapshot → conflict analysis → dry run, не переходя к production mutation stages.
+
 ## [2026-07-20] chore: One-Off Account Core Migration Operator
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `ops/migration-operator/Dockerfile`, `ops/migration-operator/server.mjs`, `scripts/account-operator-deploy.mjs`, `scripts/account-operator-invoke.mjs`, `docs/migration/one-off-migration-operator.md`, `package.json`, `.gitignore`, `.ai/17_CHANGELOG_AI.md`

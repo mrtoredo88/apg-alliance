@@ -9,6 +9,7 @@ const IMAGE = `cr.yandex/${REGISTRY_ID}/${CONTAINER_NAME}:${process.env.SOURCE_C
 const NETWORK_ID = 'enpa19j9jpki1f67p6kq';
 const SERVICE_ACCOUNT_ID = 'ajegfv96md2tqri8gjdp';
 const INVOKE_ENV_PATH = 'backups/account-core/remote-preflight/operator-invoke.env';
+const REQUIRED_PLATFORM = { os: 'linux', architecture: 'amd64' };
 const REQUIRED_ENV = [
   'APG_IDENTITY_DATABASE_URL',
   'GOOGLE_APPLICATION_CREDENTIALS',
@@ -83,6 +84,34 @@ function writeInvokeEnv({ url, token }) {
   ].join('\n'), { mode: 0o600 });
 }
 
+function imageManifest(image) {
+  return JSON.parse(run('docker', ['manifest', 'inspect', image]));
+}
+
+function assertAmd64Image(image) {
+  const manifest = imageManifest(image);
+  const platforms = (manifest.manifests || []).map(item => item.platform || {});
+  const ok = platforms.some(platform => platform.os === REQUIRED_PLATFORM.os && platform.architecture === REQUIRED_PLATFORM.architecture);
+  if (!ok) {
+    printRedacted('operatorImage', {
+      ok: false,
+      image,
+      required: REQUIRED_PLATFORM,
+      platforms,
+      valuesPrinted: false,
+    });
+    throw new Error('OPERATOR_IMAGE_NOT_LINUX_AMD64');
+  }
+  printRedacted('operatorImage', {
+    ok: true,
+    image,
+    required: REQUIRED_PLATFORM,
+    platforms,
+    valuesPrinted: false,
+  });
+  return manifest;
+}
+
 function main() {
   const sourceCommit = run('git', ['rev-parse', '--short', 'HEAD']).trim();
   const image = IMAGE.replace(':local', `:${sourceCommit}`);
@@ -107,8 +136,19 @@ function main() {
     valuesPrinted: false,
   });
 
-  run('docker', ['build', '-f', 'ops/migration-operator/Dockerfile', '-t', image, '.'], { stdio: 'inherit' });
-  run('docker', ['push', image], { stdio: 'inherit' });
+  run('docker', [
+    'buildx',
+    'build',
+    '--platform',
+    'linux/amd64',
+    '-f',
+    'ops/migration-operator/Dockerfile',
+    '-t',
+    image,
+    '--push',
+    '.',
+  ], { stdio: 'inherit' });
+  assertAmd64Image(image);
 
   if (!containerExists(CONTAINER_NAME)) {
     runQuiet('yc', ['serverless', 'container', 'create', '--name', CONTAINER_NAME]);
