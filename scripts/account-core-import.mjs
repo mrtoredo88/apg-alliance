@@ -291,6 +291,20 @@ async function tableCounts(client) {
   return out;
 }
 
+async function assertProfileCoverage(pool, label, items) {
+  const userIds = [...new Set(items.map(item => item.userId).filter(Boolean))];
+  if (!userIds.length) return;
+  const result = await pool.query('SELECT user_id FROM apg_account_profiles WHERE user_id = ANY($1::text[])', [userIds]);
+  const found = new Set(result.rows.map(row => normalized(row.user_id)));
+  const missing = userIds.filter(userId => !found.has(normalized(userId)));
+  if (missing.length) {
+    throw Object.assign(new Error(`${label.toUpperCase()}_PROFILE_COVERAGE_MISSING`), {
+      code: `${label.toUpperCase()}_PROFILE_COVERAGE_MISSING`,
+      missingHashes: missing.map(userId => `account_${hash(userId)}`),
+    });
+  }
+}
+
 function batches(items) {
   const out = [];
   for (let index = 0; index < items.length; index += BATCH_SIZE) out.push(items.slice(index, index + BATCH_SIZE));
@@ -389,13 +403,17 @@ async function main() {
   try {
     await pool.query(fs.readFileSync(SCHEMA_PATH, 'utf8'));
     const before = await tableCounts(pool);
-    for (const [label, items, fn] of [
+    const stages = [
       ['profiles', plan.profiles, upsertProfile],
       ['roles', plan.roles, upsertRole],
       ['cabinets', plan.cabinets, upsertCabinet],
       ['telegramLinks', plan.telegramLinks, upsertTelegram],
       ['sessions', plan.sessions, upsertSession],
-    ]) {
+    ];
+    for (const [label, items, fn] of stages) {
+      if (['cabinets', 'telegramLinks', 'sessions'].includes(label)) {
+        await assertProfileCoverage(pool, label, items);
+      }
       const result = await importItems({ pool, label, items, fn, checkpoint });
       totals.inserted += result.inserted;
       totals.updated += result.updated;
@@ -463,7 +481,11 @@ async function main() {
 main().catch(error => {
   const report = {
     status: 'IMPORT_BLOCKED',
-    error: { code: error?.code || '', message: String(error?.message || error).slice(0, 240) },
+    error: {
+      code: error?.code || '',
+      message: String(error?.message || error).slice(0, 240),
+      missingHashes: error?.missingHashes || [],
+    },
     firestoreWrites: 0,
     canaryStarted: false,
     cutoverStarted: false,
