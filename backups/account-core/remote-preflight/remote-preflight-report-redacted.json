@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "generatedAt": "2026-07-20T10:18:10.000Z",
+  "status": "REMOTE_PREFLIGHT_BLOCKED",
+  "sourceCommit": "ab88f027",
+  "operator": {
+    "containerCreated": true,
+    "containerName": "apg-migration-operator",
+    "containerId": "bbatdc5luq828rcn1tav",
+    "revisionCreated": false,
+    "revisionId": null,
+    "imagePushed": true,
+    "image": "cr.yandex/crpvv13u8vr3qjftdvvg/apg-migration-operator:ab88f027",
+    "imageDigest": "sha256:1d13806e6e37b9ad6396fe9b9970cfe5049709f97a265a4dcafcddf0bdfa915b",
+    "vpc": null,
+    "serviceAccount": null,
+    "executionStarted": false
+  },
+  "production": {
+    "apgApiChanged": false,
+    "productionTrafficSwitched": false,
+    "featureFlagsChanged": false,
+    "postgresOpenedPublicly": false,
+    "vpcChanged": false,
+    "dnsChanged": false,
+    "securityGroupsChanged": false
+  },
+  "remotePreflight": {
+    "started": false,
+    "failedLayer": "operator_revision_deploy",
+    "yandexOperationId": "bbac9l7ls7gbhu8igrac",
+    "yandexErrorCode": 13,
+    "yandexErrorMessage": "Internal error",
+    "postgresDnsResolved": false,
+    "tcpSuccessful": false,
+    "tlsSuccessful": false,
+    "postgresSelect1Successful": false,
+    "firebaseAdminInitialized": false
+  },
+  "counters": {
+    "productionDataReads": 0,
+    "firestoreReads": 0,
+    "postgresWrites": 0,
+    "firestoreWrites": 0
+  },
+  "forbiddenActions": {
+    "snapshotStarted": false,
+    "importStarted": false,
+    "verifyStarted": false,
+    "conflictAnalysisStarted": false,
+    "driftStarted": false,
+    "canaryStarted": false,
+    "cutoverStarted": false,
+    "rollbackStarted": false,
+    "productionDataExportStarted": false,
+    "firestoreCollectionsRead": false,
+    "postgresSchemaChanged": false
+  },
+  "nextSafeStep": "Investigate Yandex Serverless Container revision deploy operation bbac9l7ls7gbhu8igrac or retry operator revision deploy after owner approval. Do not run snapshot until remote preflight passes."
+}
