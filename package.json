@@ -128,6 +128,8 @@
     "identity:verify": "node scripts/identity-verify.mjs",
     "test:identity-verify": "node scripts/identity-verify-test.mjs",
     "identity:canary": "node scripts/identity-canary.mjs",
+    "identity:cutover": "node scripts/identity-controlled-cutover.mjs",
+    "test:identity-controlled-cutover": "node scripts/identity-controlled-cutover-test.mjs",
     "test:identity-canary": "node scripts/identity-canary-test.mjs"
   },
   "dependencies": {
