@@ -275,7 +275,50 @@ export class IdentityRepository {
       telegramId: normalizedTelegramId,
     });
 
-    const updated = await this.users.upsert({ ...user, id: userId, linkedTelegram: { ...telegram, tgId: normalizedTelegramId, linkedAt: new Date().toISOString() } });
+    await this.users.upsert({ ...user, id: userId, linkedTelegram: { ...telegram, tgId: normalizedTelegramId, linkedAt: new Date().toISOString() } });
+
+    const persistedLink = await this.links.get('telegram', normalizedTelegramId);
+    if (!persistedLink || String(persistedLink.userId || '') !== String(userId)) {
+      mark('identityRepository.linkTelegram.persistence_verified', 'FAIL', {
+        requestId,
+        userId: safeString(userId, 260),
+        telegramId: normalizedTelegramId,
+        reason: !persistedLink ? 'missing_link' : 'owner_mismatch',
+      });
+      throw Object.assign(
+        new Error('Не удалось надежно сохранить ссылку Telegram.'),
+        { statusCode: 500, code: 'TELEGRAM_LINK_PERSISTENCE_FAILED' },
+      );
+    }
+
+    const persistedUser = await this.users.get(userId);
+    const persistedTelegram = persistedUser?.linkedTelegram && typeof persistedUser.linkedTelegram === 'object'
+      ? persistedUser.linkedTelegram
+      : null;
+    if (
+      !persistedUser
+      || normalizeTelegramId(persistedTelegram?.tgId || persistedTelegram?.telegramId || '') !== normalizedTelegramId
+    ) {
+      mark('identityRepository.linkTelegram.persistence_verified', 'FAIL', {
+        requestId,
+        userId: safeString(userId, 260),
+        telegramId: normalizedTelegramId,
+        persistedUserId: safeString(persistedUser?.id || '', 260),
+        persistedTelegramId: safeString(persistedTelegram?.tgId || persistedTelegram?.telegramId || '', 120),
+      });
+      throw Object.assign(
+        new Error('Не удалось надежно сохранить привязку Telegram.'),
+        { statusCode: 500, code: 'TELEGRAM_LINK_PERSISTENCE_FAILED' },
+      );
+    }
+
+    const updated = persistedUser;
+    mark('identityRepository.linkTelegram.persistence_verified', 'PASS', {
+      requestId,
+      userId: safeString(userId, 260),
+      telegramId: normalizedTelegramId,
+      source: 'normalized_repository_readback',
+    });
     return {
       userId,
       canonicalUserId: updated.canonicalUserId || userId,
