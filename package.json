@@ -130,7 +130,9 @@
     "identity:canary": "node scripts/identity-canary.mjs",
     "identity:cutover": "node scripts/identity-controlled-cutover.mjs",
     "test:identity-controlled-cutover": "node scripts/identity-controlled-cutover-test.mjs",
-    "test:identity-canary": "node scripts/identity-canary-test.mjs"
+    "test:identity-canary": "node scripts/identity-canary-test.mjs",
+    "identity:verify-drift": "node scripts/identity-verify-drift.mjs",
+    "test:identity-verify-drift": "node scripts/identity-verify-drift-test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

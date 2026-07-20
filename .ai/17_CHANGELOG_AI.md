@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-20] chore: Verify Drift Root Cause Analysis v1
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/identity-verify-drift.mjs`, `scripts/identity-verify-drift-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен read-only forensic CLI `npm run identity:verify-drift`, который анализирует расхождение canary-bound Verify hash и текущего `verify-report.json`.
+- Отчёт классифицирует drift по категориям, сравнивает manifest/dry-run/business gate источники, фиксирует отсутствие старого verify payload и сохраняет full/redacted MD+JSON в `backups/identity/verify-drift/`.
+- Добавлен regression-тест, подтверждающий, что baseline не обновляется, Verify/Canary/Cutover не запускаются и production не изменяется.
+**Почему:** Controlled Cutover остановился из-за Verify hash drift; перед любым baseline update нужно доказательно понять причину изменения, а не переписывать эталон под неизвестное состояние.
+
 ## [2026-07-20] chore: Identity Canary Execution v1
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server/src/routes/identity-v2-admin.js`, `server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js`, `scripts/identity-canary.mjs`, `scripts/identity-canary-test.mjs`, `scripts/identity-cutover-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
