@@ -4197,6 +4197,80 @@ async function actionConnectionsList(db, req, actor) {
   };
 }
 
+function publicUserSearchText(user = {}, id = '') {
+  return [
+    id,
+    user.displayName,
+    user.name,
+    user.firstName,
+    user.first_name,
+    user.lastName,
+    user.last_name,
+    user.username,
+    user.company,
+    user.companyName,
+    user.organization,
+    user.partnerName,
+    user.expertName,
+    user.role,
+    user.userRole,
+    user.status,
+    user.specialization,
+    user.city,
+    user.town,
+    user.about,
+    user.bio,
+  ].map(value => safeString(value, 240).toLowerCase().replace(/ё/g, 'е')).filter(Boolean).join(' ');
+}
+
+async function actionConnectionsSearch(db, req, actor) {
+  const query = safeString(req.body?.query, 120).toLowerCase().replace(/ё/g, 'е');
+  if (query.length < 2) return { ok: true, people: [] };
+  const [usersSnap, requests, contactsSnap, blockedSnap] = await Promise.all([
+    db.collection('users').limit(700).get(),
+    querySocialRequestsForUser(db, actor.userId).catch(() => []),
+    db.collection('users').doc(actor.userId).collection('connections').limit(300).get().catch(() => null),
+    db.collection('users').doc(actor.userId).collection('blockedUsers').limit(100).get().catch(() => null),
+  ]);
+  const contacts = (contactsSnap?.docs || []).map(doc => ({ id: doc.id, ...doc.data() }));
+  const blocked = new Set((blockedSnap?.docs || []).map(doc => String(doc.id || doc.data()?.blockedUserId || '')).filter(Boolean));
+  const connected = new Set(contacts
+    .filter(item => normalizeConnectionStatus(item.status) === CONNECTION_STATUS.CONNECTED)
+    .map(item => String(item.contactUserId || item.id || ''))
+    .filter(Boolean));
+  const pendingByUser = new Map();
+  requests
+    .filter(item => item.connection === true && normalizeSocialRequestStatus(item.status, Date.now(), item.expiresAt) === SOCIAL_REQUEST_STATUS.PENDING)
+    .forEach(item => {
+      [item.senderId, item.recipientId].map(String).filter(id => id && id !== String(actor.userId)).forEach(id => pendingByUser.set(id, item));
+    });
+  const people = usersSnap.docs
+    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+    .filter(row => row.id !== actor.userId && !blocked.has(String(row.id)) && !isArchivedUser(row))
+    .filter(row => publicUserSearchText(row, row.id).includes(query))
+    .slice(0, 40)
+    .map(row => {
+      const pending = pendingByUser.get(String(row.id));
+      const status = connected.has(String(row.id))
+        ? CONNECTION_STATUS.CONNECTED
+        : pending
+          ? SOCIAL_REQUEST_STATUS.PENDING
+          : 'stranger';
+      return {
+        ...socialPublicUser(row, row.id),
+        username: safeString(row.username, 80),
+        company: safeString(row.company || row.companyName || row.organization || row.partnerName || row.expertName, 160),
+        city: safeString(row.city || row.town, 120),
+        about: safeString(row.about || row.bio || row.description, 240),
+        status,
+        direction: pending ? socialRequestMirror(pending, actor.userId).direction : '',
+        dialogId: contacts.find(item => String(item.contactUserId || item.id) === String(row.id))?.dialogId || '',
+        shared: buildConnectionSharedContext(actor.user || {}, row),
+      };
+    });
+  return { ok: true, people };
+}
+
 async function actionConnectionsRequest(db, req, actor) {
   const senderId = cleanSocialId(actor.userId);
   const recipientId = cleanSocialId(req.body?.recipientId || req.body?.targetUserId || req.body?.userId);
@@ -4565,6 +4639,7 @@ async function routeAction(db, req, actor) {
   if (action === 'socialMessaging:checkEligibility') return actionSocialCheckEligibility(db, req, actor);
   if (action === 'connections:check') return actionConnectionsCheck(db, req, actor);
   if (action === 'connections:list') return actionConnectionsList(db, req, actor);
+  if (action === 'connections:search') return actionConnectionsSearch(db, req, actor);
   if (action === 'connections:request') return actionConnectionsRequest(db, req, actor);
   if (action === 'connections:accept') return actionConnectionsResolve(db, req, actor, SOCIAL_REQUEST_STATUS.ACCEPTED);
   if (action === 'connections:decline') return actionConnectionsResolve(db, req, actor, SOCIAL_REQUEST_STATUS.DECLINED);

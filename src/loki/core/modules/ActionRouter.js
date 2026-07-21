@@ -12,6 +12,7 @@ const SCREEN_ACTIONS = [
   { id: 'news', words: ['новост', 'что нового', 'лента'], action: LOKI_APP_ACTIONS.OPEN_NEWS_FEED, title: 'Новости', text: 'Открою ленту новостей АПГ.' },
   { id: 'map', words: ['карта', 'маршрут', 'как добраться'], action: LOKI_APP_ACTIONS.OPEN_MAP, title: 'Карта', text: 'Открою карту АПГ.' },
   { id: 'nearby', words: ['рядом', 'поблизости', 'ближайш'], action: LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS, title: 'Рядом', text: 'Открою раздел рядом с доступными местами.' },
+  { id: 'people', words: ['люди', 'друз', 'знаком', 'контакт', 'найди татьян', 'найди анн', 'найди максим', 'добавь', 'напиши'], action: LOKI_APP_ACTIONS.OPEN_PEOPLE, title: 'Люди', text: 'Открою раздел Люди: там можно найти участника, добавить в друзья и написать.' },
   { id: 'notifications', words: ['уведомлен', 'сообщен'], action: LOKI_APP_ACTIONS.SHOW_NOTIFICATIONS, title: 'Уведомления', text: 'Открою уведомления.' },
   { id: 'qr', words: ['скан', 'qr', 'куар'], action: LOKI_APP_ACTIONS.START_QR_SCANNER, title: 'QR-сканер', text: 'Открою сканер QR для получения ключей.' },
   { id: 'faq', words: ['помощ', 'справочник', 'faq', 'как пользоваться'], action: LOKI_APP_ACTIONS.OPEN_REFERENCE, title: 'Справочник', text: 'Открою справочник АПГ.' },
@@ -79,11 +80,11 @@ export const ActionRouter = {
   id: 'actionRouter',
   label: 'Action Router',
   canHandle({ query }) {
-    return includesAny(query, ['открой', 'покажи', 'где', 'найди', 'хочу', 'нужен', 'нужна', 'куда', 'что есть', 'мои']);
+    return includesAny(query, ['открой', 'покажи', 'где', 'найди', 'добавь', 'напиши', 'хочу', 'нужен', 'нужна', 'куда', 'что есть', 'мои']);
   },
   handle({ query, context }) {
     const direct = SCREEN_ACTIONS.find(screen => includesAny(query, screen.words));
-    if (direct && includesAny(query, ['открой', 'покажи', 'где мои', 'где находится', 'где найти'])) {
+    if (direct && includesAny(query, ['открой', 'покажи', 'где мои', 'где находится', 'где найти', 'найди', 'добавь', 'напиши'])) {
       const card = makeActionCard(direct);
       return {
         intent: `action.${direct.id}`,

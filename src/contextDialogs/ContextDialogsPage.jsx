@@ -5,7 +5,7 @@ import { userAction } from '../userApi.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, ScreenHeader } from '../components/Apg2ProfileGlass.jsx';
 import { buildDialogAutoAnswer, buildDialogContext, getDialogObjectLabel } from '../../server-shared/context-dialogs.js';
 import { BOOKING_STATUSES } from '../../server-shared/booking.js';
-import { MESSAGING_FILTERS, buildMessagingSnapshot, buildUnifiedDialogList } from '../messaging/index.js';
+import { buildMessagingSnapshot, buildUnifiedDialogList } from '../messaging/index.js';
 
 function tsMs(value) {
   if (!value) return 0;
@@ -677,21 +677,21 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
   };
 
   if (!uid) {
-    return <GlassPanel><ScreenHeader title="Диалоги" subtitle="Войдите, чтобы задавать вопросы по объектам АПГ" onBack={onBack} /><EmptyStateV2 icon="💬" title="Нужна авторизация" text="Контекстные диалоги доступны участникам АПГ." /></GlassPanel>;
+    return <GlassPanel><ScreenHeader title="Люди" subtitle="Войдите, чтобы общаться с участниками АПГ" onBack={onBack} /><EmptyStateV2 icon="💬" title="Нужна авторизация" text="Диалоги доступны участникам АПГ." /></GlassPanel>;
   }
 
   const dialogList = (
     <div data-dialog-list-panel style={{ display: 'grid', gap: 10, minWidth: 0 }}>
       <div data-messaging-search-sticky style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 6px)', zIndex: 12, display: 'grid', gap: 9, padding: '2px 0 8px', background: 'linear-gradient(180deg, var(--apg2-bg, rgba(14,14,18,0.92)) 72%, transparent)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
-          <input data-messaging-search value={query} onChange={event => setQuery(event.target.value)} placeholder="Поиск сообщений..." style={{ width: '100%', minHeight: 44, borderRadius: 18, border: APG2_PROFILE.glass.border, background: 'rgba(var(--apg2-glass-a,255,255,255),0.09)', color: APG2_PROFILE.text, padding: '0 14px', outline: 'none', fontFamily: 'inherit', fontSize: 14, boxSizing: 'border-box' }} />
+          <input data-messaging-search value={query} onChange={event => setQuery(event.target.value)} placeholder="Поиск людей и сообщений..." style={{ width: '100%', minHeight: 44, borderRadius: 18, border: APG2_PROFILE.glass.border, background: 'rgba(var(--apg2-glass-a,255,255,255),0.09)', color: APG2_PROFILE.text, padding: '0 14px', outline: 'none', fontFamily: 'inherit', fontSize: 14, boxSizing: 'border-box' }} />
           <span style={{ minWidth: 34, height: 34, borderRadius: 999, background: messagingSnapshot.unread ? APG2_PROFILE.gold : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: messagingSnapshot.unread ? '#17120a' : APG2_PROFILE.textMuted, display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 900 }}>{messagingSnapshot.unread}</span>
         </div>
         <div data-messaging-filter-chips style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 2 }}>
           {[
             { id: 'all', label: 'Все' },
             { id: 'partners', label: 'Партнёры' },
-            { id: 'personal', label: 'Личные' },
+            { id: 'personal', label: 'Друзья' },
             { id: 'events', label: 'Мероприятия' },
             { id: 'groups', label: 'Группы' },
             { id: 'unread', label: 'Непрочитанные' },
@@ -788,27 +788,12 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
       <CompactContextCard context={activeContext} isOwner={isOwner} collapsed={false} onToggle={() => {}} onOpenObject={onOpenObject} onAction={runBookingAction} />
       <MessagingContextInfo context={activeContext} onOpenObject={onOpenObject} />
       {isOwner && <OwnerAssist enabled={aiAssist} onToggle={toggleAiAssist} context={activeContext} lastQuestion={lastQuestion} onUse={value => setText(value)} />}
-      <GlassCard data-messaging-dev-panel style={{ borderRadius: 20, padding: 12, display: 'grid', gap: 7 }}>
-        <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '15px', fontWeight: 900, textTransform: 'uppercase' }}>Messaging Dev</div>
-        {[
-          ['Realtime', messagingSnapshot.realtime],
-          ['Dialog Type', activeDialog?.context?.type || activeDialog?.type || 'direct'],
-          ['Unread', String(messagingSnapshot.unread)],
-          ['Participants', String((activeDialog?.participantIds || activeDialog?.ownerUserIds || []).length || 1)],
-          ['Context', activeDialog?.context?.title || 'АПГ'],
-        ].map(([label, value]) => (
-          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px' }}>
-            <span>{label}</span>
-            <strong style={{ color: APG2_PROFILE.text, fontWeight: 820, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</strong>
-          </div>
-        ))}
-      </GlassCard>
     </aside>
   ) : null;
 
   return (
     <GlassPanel>
-      <ScreenHeader title="Сообщения" subtitle="Единая система диалогов АПГ" kicker="Messaging" onBack={onBack} />
+      <ScreenHeader title="Люди" subtitle="Диалоги и личное общение АПГ" kicker="People" onBack={onBack} />
       {error && <GlassCard style={{ borderRadius: 20, padding: 12, marginBottom: 12, color: '#ff8e8e' }}>{error}</GlassCard>}
       <div data-messaging-premium-layout data-layout={desktopLayout ? 'desktop-three-pane' : 'mobile-native'} style={{ display: 'grid', gridTemplateColumns: desktopLayout ? 'minmax(290px, 0.78fr) minmax(430px, 1.42fr) minmax(260px, 0.7fr)' : 'minmax(0,1fr)', gap: desktopLayout ? 14 : 12, alignItems: 'start' }}>
         {(desktopLayout || !activeDialog) && dialogList}

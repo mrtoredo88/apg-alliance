@@ -23,6 +23,7 @@ import { ensureServerReferralSession, getReferralContext, readPendingReferral } 
 import { groupBookingsForProfile, normalizeBooking } from '../server-shared/booking.js';
 import { SOCIAL_PRIVACY, normalizeSocialPrivacy } from './messaging/ConversationEligibility.js';
 import { buildSocialMessagingDevPanel } from './messaging/SocialMessagingSnapshot.js';
+import { PEOPLE_RELATION_STATUS, PEOPLE_TABS, buildPeopleRows, peopleStatusLabel, searchPeopleGroups } from './social/PeopleCore.js';
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
 
@@ -698,6 +699,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const [connectionFilter, setConnectionFilter] = useState('all');
   const [connectionSearch, setConnectionSearch] = useState('');
   const [connectionTarget, setConnectionTarget] = useState(null);
+  const [peopleTab, setPeopleTab] = useState('all');
+  const [peopleSearch, setPeopleSearch] = useState('');
+  const [peopleSearchResults, setPeopleSearchResults] = useState([]);
+  const [peopleSearchLoading, setPeopleSearchLoading] = useState(false);
+  const [peopleDialogs, setPeopleDialogs] = useState([]);
 
   useEffect(() => {
     try {
@@ -794,6 +800,39 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       setConnections(rows.filter(item => item.status === 'connected').sort((a, b) => new Date(b.connectedAt || b.updatedAt || 0).getTime() - new Date(a.connectedAt || a.updatedAt || 0).getTime()));
     }, () => {});
   }, [isGuest, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || isGuest) return undefined;
+    return onSnapshot(collection(db, 'users', String(user.id), 'contextDialogs'), snap => {
+      setPeopleDialogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, () => {});
+  }, [isGuest, user?.id]);
+
+  useEffect(() => {
+    const query = peopleSearch.trim();
+    if (!user?.id || isGuest || query.length < 2) {
+      setPeopleSearchResults([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setPeopleSearchLoading(true);
+      userAction('connections:search', { query })
+        .then(data => {
+          if (!cancelled) setPeopleSearchResults(Array.isArray(data.people) ? data.people : []);
+        })
+        .catch(e => {
+          if (!cancelled) setConnectionError(e?.message || 'Не удалось найти участников АПГ.');
+        })
+        .finally(() => {
+          if (!cancelled) setPeopleSearchLoading(false);
+        });
+    }, 260);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isGuest, peopleSearch, user?.id]);
 
   useEffect(() => {
     const targetId = String(initialConnectionTargetId || '').trim();
@@ -1486,6 +1525,35 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       return true;
     });
   }, [connectionFilter, connectionSearch, connections]);
+  const peopleRows = useMemo(() => buildPeopleRows({
+    users: peopleSearchResults,
+    connections,
+    requests: connectionRequests,
+    dialogs: peopleDialogs,
+    blocked: socialBlockedIds,
+    actor: user,
+  }), [connectionRequests, connections, peopleDialogs, peopleSearchResults, socialBlockedIds, user]);
+  const peopleGroups = useMemo(() => searchPeopleGroups({
+    query: peopleSearch,
+    people: peopleRows,
+    partners,
+    experts: ownedExpert ? [ownedExpert] : [],
+    events,
+  }), [events, ownedExpert, partners, peopleRows, peopleSearch]);
+  const visiblePeopleRows = useMemo(() => {
+    const q = peopleSearch.trim().toLowerCase().replace(/ё/g, 'е');
+    const rows = q ? (peopleGroups.find(group => group.id === 'people')?.rows || []) : peopleRows;
+    if (peopleTab === 'friends') return rows.filter(item => item.relationStatus === PEOPLE_RELATION_STATUS.FRIEND);
+    if (peopleTab === 'requests') return rows.filter(item => item.relationStatus === PEOPLE_RELATION_STATUS.INCOMING || item.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING);
+    if (peopleTab === 'dialogs') return rows.filter(item => item.dialogId);
+    return rows;
+  }, [peopleGroups, peopleRows, peopleSearch, peopleTab]);
+  const peopleCounts = useMemo(() => ({
+    all: peopleRows.length,
+    friends: peopleRows.filter(item => item.relationStatus === PEOPLE_RELATION_STATUS.FRIEND).length,
+    requests: incomingConnectionRequests.length + outgoingConnectionRequests.length,
+    dialogs: peopleRows.filter(item => item.dialogId).length,
+  }), [incomingConnectionRequests.length, outgoingConnectionRequests.length, peopleRows]);
   const connectionDevPanel = useMemo(() => {
     const latest = connections[0] || null;
     const target = connectionTarget || {};
@@ -1555,6 +1623,30 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     const dialogId = item?.dialogId || '';
     if (dialogId) onOpenDialog?.(dialogId);
   }, [onOpenDialog]);
+  const openPersonProfile = useCallback((person) => {
+    if (!person?.id) return;
+    setConnectionTarget({
+      target: person,
+      status: person.relationStatus,
+      action: person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'message' : 'request',
+      dialogId: person.dialogId || '',
+      shared: person.shared || { contacts: [], events: [], partners: [] },
+    });
+  }, []);
+  const runPersonPrimaryAction = useCallback((person) => {
+    if (!person?.id) return;
+    if (person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && person.dialogId) {
+      onOpenDialog?.(person.dialogId);
+      return;
+    }
+    if (person.relationStatus === PEOPLE_RELATION_STATUS.INCOMING && person.request?.id) {
+      updateConnectionRequest(person.request.id, 'accepted');
+      return;
+    }
+    if (person.relationStatus === PEOPLE_RELATION_STATUS.STRANGER) {
+      requestConnection(person.id, 'people');
+    }
+  }, [onOpenDialog, requestConnection, updateConnectionRequest]);
   const handleDesktopReschedule = useCallback((item) => {
     const startAt = prompt('Новая дата и время в формате YYYY-MM-DD HH:mm');
     if (!startAt) return;
@@ -1929,13 +2021,13 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           </section>
         )}
 
-        <GlassSection title="Контакты">
-          <GlassCard data-connections-panel style={{ display: 'grid', gap: 12 }}>
+        <GlassSection title="Люди">
+          <GlassCard data-people-panel data-connections-panel data-connections-dev-panel style={{ display: 'grid', gap: 12 }}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <div style={{ width: 42, height: 42, borderRadius: 17, background: 'rgba(74,144,217,0.14)', color: '#4A90D9', display: 'grid', placeItems: 'center', flexShrink: 0 }}>🤝</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: APG2.text, fontSize: 16, lineHeight: '20px', fontWeight: 860 }}>Цифровые знакомства</div>
-                <div style={{ color: APG2.textMuted, fontSize: 12.5, lineHeight: '18px', marginTop: 3 }}>Контакты появляются после подтверждения знакомства и сразу используют личный диалог АПГ.</div>
+                <div style={{ color: APG2.text, fontSize: 16, lineHeight: '20px', fontWeight: 860 }}>Друзья, заявки и диалоги</div>
+                <div style={{ color: APG2.textMuted, fontSize: 12.5, lineHeight: '18px', marginTop: 3 }}>Ищите участников АПГ, знакомьтесь и пишите прямо из карточки человека.</div>
               </div>
             </div>
             {connectionTarget?.target && (
@@ -1962,8 +2054,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {[
-                ['Контакты', connections.length],
-                ['Новые', connections.filter(item => new Date(item.connectedAt || item.updatedAt || 0).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000).length],
+                ['Друзья', peopleCounts.friends],
+                ['Диалоги', peopleCounts.dialogs],
                 ['Запросы', incomingConnectionRequests.length + outgoingConnectionRequests.length],
               ].map(([label, value]) => (
                 <div key={label} style={{ borderRadius: 16, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', padding: 10, textAlign: 'center' }}>
@@ -1974,6 +2066,24 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             </div>
             {connectionLoading && <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '17px' }}>Синхронизируем знакомства...</div>}
             {connectionError && <div style={{ color: '#E64646', fontSize: 12, lineHeight: '17px' }}>{connectionError}</div>}
+            <GlassInput
+              data-people-search
+              value={peopleSearch}
+              onChange={e => setPeopleSearch(e.target.value)}
+              placeholder="Поиск людей: имя, компания, роль, город"
+            />
+            <div data-people-tabs style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+              {PEOPLE_TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setPeopleTab(tab.id)}
+                  style={{ minHeight: 34, borderRadius: 14, border: `1px solid ${peopleTab === tab.id ? 'rgba(201,168,76,0.44)' : 'rgba(var(--apg2-glass-a,255,255,255),0.14)'}`, background: peopleTab === tab.id ? APG2.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: peopleTab === tab.id ? APG2.gold : APG2.text, padding: '7px 10px', fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {tab.label} {peopleCounts[tab.id] ? peopleCounts[tab.id] : ''}
+                </button>
+              ))}
+            </div>
             {incomingConnectionRequests.slice(0, 3).map(item => (
               <div key={item.id} style={{ borderRadius: 16, padding: 10, border: '1px solid rgba(201,168,76,0.22)', background: 'rgba(201,168,76,0.08)', display: 'grid', gap: 8 }}>
                 <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 820 }}>{item.sender?.displayName || item.senderId || 'Участник АПГ'} хочет познакомиться</div>
@@ -1984,41 +2094,53 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 </div>
               </div>
             ))}
-            {connections.length > 0 ? (
+            {peopleSearchLoading && <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '17px' }}>Ищем участников...</div>}
+            {visiblePeopleRows.length > 0 ? (
               <div style={{ display: 'grid', gap: 8 }}>
-                {connections.slice(0, 3).map(item => (
-                  <button key={item.id} type="button" onClick={() => openConnectionDialog(item)} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 16, padding: 10, display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', cursor: item.dialogId ? 'pointer' : 'default', fontFamily: 'inherit' }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 13, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontWeight: 900, flexShrink: 0 }}>{(item.contact?.displayName || 'А')[0]}</div>
+                {visiblePeopleRows.slice(0, 4).map(person => {
+                  const primaryLabel = person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : person.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отправлено' : person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED ? 'Недоступно' : 'Добавить';
+                  const primaryDisabled = person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING || person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED || (person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && !person.dialogId);
+                  return (
+                  <div key={person.id} data-people-card style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 16, padding: 10, display: 'grid', gap: 9 }}>
+                    <button type="button" onClick={() => openPersonProfile(person)} style={{ border: 0, background: 'transparent', padding: 0, display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {person.photo
+                      ? <img src={person.photo} alt="" style={{ width: 38, height: 38, borderRadius: 14, objectFit: 'cover', flexShrink: 0 }} />
+                      : <div style={{ width: 38, height: 38, borderRadius: 14, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontWeight: 900, flexShrink: 0 }}>{(person.displayName || 'А')[0]}</div>
+                    }
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.contact?.displayName || item.contactUserId}</div>
-                      <div style={{ color: APG2.textMuted, fontSize: 11, lineHeight: '15px' }}>{item.sourceTitle || item.sourceLabel || 'Знакомство АПГ'}</div>
+                      <div style={{ color: APG2.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.displayName}</div>
+                      <div style={{ color: APG2.textMuted, fontSize: 11.5, lineHeight: '16px', marginTop: 1 }}>{[person.company, person.role, person.expert, person.city].filter(Boolean).slice(0, 2).join(' · ') || 'Участник АПГ'}</div>
+                      <div style={{ color: APG2.textSoft, fontSize: 10.5, lineHeight: '15px', marginTop: 4 }}>
+                        {peopleStatusLabel(person.relationStatus)} · {person.shared?.contacts?.length || 0} общих друзей · {person.shared?.events?.length || 0} мероприятий · {person.shared?.partners?.length || 0} партнёров
+                      </div>
                     </div>
-                    {item.dialogId && <span style={{ color: APG2.gold, fontSize: 13 }}>💬</span>}
+                    </button>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <GlassButton onClick={() => runPersonPrimaryAction(person)} disabled={primaryDisabled} tone="gold" style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>{primaryLabel}</GlassButton>
+                      <GlassButton onClick={() => openPersonProfile(person)} style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>Профиль</GlassButton>
+                      {person.phone && <GlassButton onClick={() => openUrl(`tel:${String(person.phone).replace(/[^\d+]/g, '')}`)} style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>Позвонить</GlassButton>}
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ color: APG2.textMuted, fontSize: 12.5, lineHeight: '18px' }}>Найдите человека по имени, компании, роли или городу. Новые друзья и диалоги появятся здесь.</div>
+            )}
+            {peopleSearch.trim() && peopleGroups.filter(group => group.id !== 'people').slice(0, 3).map(group => (
+              <div key={group.id} style={{ display: 'grid', gap: 6 }}>
+                <div style={{ color: APG2.gold, fontSize: 11, lineHeight: '15px', fontWeight: 900, textTransform: 'uppercase' }}>{group.label}</div>
+                {group.rows.slice(0, 2).map(row => (
+                  <button key={row.id || row.name || row.title} type="button" onClick={() => row.address || row.category ? onOpenPartner?.(row) : undefined} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.05)', color: APG2.text, borderRadius: 14, padding: '9px 10px', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
+                    <div style={{ fontSize: 12.5, lineHeight: '17px', fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name || row.title || 'АПГ'}</div>
+                    <div style={{ color: APG2.textMuted, fontSize: 11, lineHeight: '15px', marginTop: 2 }}>{row.category || row.city || row.description || 'Найдено в АПГ'}</div>
                   </button>
                 ))}
               </div>
-            ) : (
-              <div style={{ color: APG2.textMuted, fontSize: 12.5, lineHeight: '18px' }}>Контактов пока нет. Покажите QR-карточку на мероприятии или примите входящий запрос.</div>
-            )}
+            ))}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <GlassButton data-my-contacts-button onClick={() => setShowConnectionsModal(true)} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Мои контакты</GlassButton>
+              <GlassButton data-my-contacts-button onClick={() => setShowConnectionsModal(true)} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Открыть Люди</GlassButton>
               <GlassButton data-digital-business-card onClick={() => setShowBusinessCard(true)} tone="gold" style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Мой QR</GlassButton>
-            </div>
-            <div data-connections-dev-panel style={{ borderRadius: 16, border: '1px solid rgba(74,144,217,0.22)', background: 'rgba(74,144,217,0.08)', padding: 10, display: 'grid', gap: 5 }}>
-              <div style={{ color: '#4A90D9', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6 }}>Dev Panel · Connections</div>
-              {[
-                ['Connection Status', connectionDevPanel.ConnectionStatus],
-                ['Source', connectionDevPanel.Source],
-                ['Shared Events', connectionDevPanel.SharedEvents],
-                ['Shared Partners', connectionDevPanel.SharedPartners],
-                ['Dialog', connectionDevPanel.Dialog],
-                ['Social Graph', connectionDevPanel.SocialGraph],
-              ].map(([label, value]) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: APG2.textMuted, fontSize: 11.5, lineHeight: '15px' }}>
-                  <span>{label}</span>
-                  <strong style={{ color: APG2.text, fontWeight: 820 }}>{value}</strong>
-                </div>
-              ))}
             </div>
           </GlassCard>
         </GlassSection>
@@ -3403,52 +3525,80 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
       {showConnectionsModal && createPortal(
         <ApgModal
-          title="Мои контакты"
-          subtitle="Люди, с которыми вы подтвердили цифровое знакомство."
+          title="Люди"
+          subtitle="Друзья, заявки, поиск и диалоги в одном месте."
           onClose={() => setShowConnectionsModal(false)}
           maxWidth={540}
         >
-          <div data-connections-list style={{ display: 'grid', gap: 12 }}>
+          <div data-people-list data-connections-list style={{ display: 'grid', gap: 12 }}>
             <GlassInput
-              value={connectionSearch}
-              onChange={e => setConnectionSearch(e.target.value)}
-              placeholder="Поиск по имени, компании или роли"
+              data-people-search-modal
+              value={peopleSearch}
+              onChange={e => setPeopleSearch(e.target.value)}
+              placeholder="Поиск людей, компаний, ролей и города"
             />
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {[
-                ['all', 'Все'],
-                ['new', 'Новые'],
-                ['partners', 'Партнёры'],
-                ['experts', 'Эксперты'],
-                ['users', 'Пользователи'],
-              ].map(([id, label]) => (
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+              {PEOPLE_TABS.map(tab => (
                 <button
-                  key={id}
+                  key={tab.id}
                   type="button"
-                  onClick={() => setConnectionFilter(id)}
-                  style={{ minHeight: 34, borderRadius: 14, border: `1px solid ${connectionFilter === id ? 'rgba(201,168,76,0.44)' : 'rgba(var(--apg2-glass-a,255,255,255),0.14)'}`, background: connectionFilter === id ? APG2.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: connectionFilter === id ? APG2.gold : APG2.text, padding: '7px 10px', fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}
+                  onClick={() => setPeopleTab(tab.id)}
+                  style={{ minHeight: 34, borderRadius: 14, border: `1px solid ${peopleTab === tab.id ? 'rgba(201,168,76,0.44)' : 'rgba(var(--apg2-glass-a,255,255,255),0.14)'}`, background: peopleTab === tab.id ? APG2.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: peopleTab === tab.id ? APG2.gold : APG2.text, padding: '7px 10px', fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}
                 >
-                  {label}
+                  {tab.label} {peopleCounts[tab.id] ? peopleCounts[tab.id] : ''}
                 </button>
               ))}
             </div>
-            {filteredConnections.length ? filteredConnections.map(item => (
-              <div key={item.id} style={{ ...APG2.glass, borderRadius: 18, padding: 12, display: 'flex', gap: 11, alignItems: 'center' }}>
-                <div style={{ width: 42, height: 42, borderRadius: 16, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontWeight: 900, flexShrink: 0 }}>{(item.contact?.displayName || 'А')[0]}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: APG2.text, fontSize: 14, lineHeight: '18px', fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.contact?.displayName || item.contactUserId}</div>
-                  <div style={{ color: APG2.textMuted, fontSize: 11.5, lineHeight: '16px', marginTop: 2 }}>{item.contact?.company || item.contact?.role || item.sourceTitle || item.sourceLabel || 'Контакт АПГ'}</div>
-                  {(item.shared?.events?.length || item.shared?.partners?.length || item.shared?.contacts?.length) ? (
-                    <div style={{ color: APG2.textSoft, fontSize: 10.5, lineHeight: '15px', marginTop: 4 }}>
-                      {item.shared?.contacts?.length || 0} общих контакта · {item.shared?.events?.length || 0} мероприятий · {item.shared?.partners?.length || 0} партнёров
-                    </div>
-                  ) : null}
-                </div>
-                <GlassButton onClick={() => openConnectionDialog(item)} disabled={!item.dialogId} tone="gold" style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 12 }}>💬</GlassButton>
+            <div data-social-privacy style={{ borderRadius: 18, border: '1px solid rgba(201,168,76,0.20)', background: 'rgba(201,168,76,0.07)', padding: 12, display: 'grid', gap: 9 }}>
+              <div style={{ color: APG2.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 840 }}>Кто может писать и отправлять заявки</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {[
+                  [SOCIAL_PRIVACY.ALLOWED_RELATIONS, 'Участники АПГ'],
+                  [SOCIAL_PRIVACY.FRIENDS_ONLY, 'Только друзья'],
+                  [SOCIAL_PRIVACY.NOBODY, 'Никто'],
+                ].map(([value, label]) => (
+                  <button key={value} type="button" onClick={() => updateSocialPrivacyServer(value)} style={{ minHeight: 32, borderRadius: 13, border: `1px solid ${socialPrivacy === value ? 'rgba(201,168,76,0.45)' : 'rgba(var(--apg2-glass-a,255,255,255),0.14)'}`, background: socialPrivacy === value ? APG2.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: socialPrivacy === value ? APG2.gold : APG2.textMuted, padding: '6px 9px', fontSize: 11.5, fontWeight: 780, fontFamily: 'inherit', cursor: 'pointer' }}>{label}</button>
+                ))}
               </div>
-            )) : (
-              <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px', textAlign: 'center', padding: 16 }}>Контакты по этому фильтру не найдены.</div>
+            </div>
+            {peopleSearchLoading && <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px', textAlign: 'center', padding: 8 }}>Ищем участников...</div>}
+            {visiblePeopleRows.length ? visiblePeopleRows.map(person => {
+              const primaryLabel = person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : person.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отправлено' : person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED ? 'Недоступно' : 'Добавить в друзья';
+              const primaryDisabled = person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING || person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED || (person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && !person.dialogId);
+              return (
+                <div key={person.id} data-people-card-modal style={{ ...APG2.glass, borderRadius: 18, padding: 12, display: 'grid', gap: 10 }}>
+                  <div style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
+                    {person.photo
+                      ? <img src={person.photo} alt="" style={{ width: 44, height: 44, borderRadius: 16, objectFit: 'cover', flexShrink: 0 }} />
+                      : <div style={{ width: 44, height: 44, borderRadius: 16, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontWeight: 900, flexShrink: 0 }}>{(person.displayName || 'А')[0]}</div>
+                    }
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: APG2.text, fontSize: 14, lineHeight: '18px', fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.displayName}</div>
+                      <div style={{ color: APG2.textMuted, fontSize: 11.5, lineHeight: '16px', marginTop: 2 }}>{[person.company, person.role, person.expert, person.city].filter(Boolean).slice(0, 2).join(' · ') || 'Участник АПГ'}</div>
+                      <div style={{ color: APG2.textSoft, fontSize: 10.5, lineHeight: '15px', marginTop: 4 }}>{peopleStatusLabel(person.relationStatus)} · {person.shared?.contacts?.length || 0} общих друзей · {person.shared?.events?.length || 0} мероприятий · {person.shared?.partners?.length || 0} партнёров</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <GlassButton onClick={() => runPersonPrimaryAction(person)} disabled={primaryDisabled} tone="gold" style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 12 }}>{primaryLabel}</GlassButton>
+                    <GlassButton onClick={() => openPersonProfile(person)} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 12 }}>Профиль</GlassButton>
+                    {person.phone && <GlassButton onClick={() => openUrl(`tel:${String(person.phone).replace(/[^\d+]/g, '')}`)} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 12 }}>Позвонить</GlassButton>}
+                  </div>
+                </div>
+              );
+            }) : (
+              <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px', textAlign: 'center', padding: 16 }}>Люди по этому запросу не найдены.</div>
             )}
+            {peopleSearch.trim() && peopleGroups.filter(group => group.id !== 'people').map(group => (
+              <div key={group.id} style={{ display: 'grid', gap: 7 }}>
+                <div style={{ color: APG2.gold, fontSize: 11, lineHeight: '15px', fontWeight: 900, textTransform: 'uppercase' }}>{group.label}</div>
+                {group.rows.slice(0, 4).map(row => (
+                  <div key={row.id || row.name || row.title} style={{ borderRadius: 15, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.05)', padding: 10 }}>
+                    <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 830 }}>{row.name || row.title || 'АПГ'}</div>
+                    <div style={{ color: APG2.textMuted, fontSize: 11.5, lineHeight: '16px', marginTop: 2 }}>{row.category || row.city || row.description || 'Найдено в АПГ'}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
         </ApgModal>,
         document.body

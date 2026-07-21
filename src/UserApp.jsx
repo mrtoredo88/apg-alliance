@@ -4674,6 +4674,7 @@ export function UserApp() {
     [LOKI_APP_ACTIONS.OPEN_MAP]: () => goPanel('map'),
     [LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS]: () => goPanel('nearby'),
     [LOKI_APP_ACTIONS.SHOW_PROFILE]: () => goPanel('profile'),
+    [LOKI_APP_ACTIONS.OPEN_PEOPLE]: () => goPanel('profile'),
     [LOKI_APP_ACTIONS.SHOW_ACHIEVEMENTS]: () => goPanel('tasks'),
     [LOKI_APP_ACTIONS.SHOW_FAVORITES]: () => goPanel('profile'),
     [LOKI_APP_ACTIONS.SHOW_NOTIFICATIONS]: () => openNotifications(),

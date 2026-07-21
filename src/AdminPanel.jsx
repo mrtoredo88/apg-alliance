@@ -29,6 +29,7 @@ import { formatEventPrice, isPaidEvent } from './eventPrice.js';
 import { telegramShareUrl } from '../server-shared/telegram.js';
 import { getProfileLocations, normalizeLocationsForSave, normalizeLocationIds } from '../server-shared/locations.js';
 import { buildLokiEvolutionCenter, buildLokiQualityCenter, exportLokiQualityCsv } from './loki/analytics/index.js';
+import { buildSocialAnalytics } from './social/PeopleCore.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -4393,6 +4394,9 @@ export const AdminPanel = () => {
   const [qrPartner, setQrPartner]           = useState(null);
   const [analytics, setAnalytics]           = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [socialAnalyticsLoading, setSocialAnalyticsLoading] = useState(false);
+  const [socialRequests, setSocialRequests] = useState([]);
+  const [socialDialogs, setSocialDialogs] = useState([]);
   const [activityLoading, setActivityLoading]   = useState(false);
   const [activityMsg, setActivityMsg]           = useState('');
   const [partnerSearch, setPartnerSearch]   = useState('');
@@ -5058,6 +5062,23 @@ export const AdminPanel = () => {
     });
     return Array.isArray(data.rows) ? data.rows.map(reviveAdminValue) : [];
   };
+
+  const loadSocialAnalytics = useCallback(async () => {
+    setSocialAnalyticsLoading(true);
+    try {
+      const [requests, dialogs] = await Promise.all([
+        fetchAdminEntityList('conversationRequests', 1000),
+        fetchAdminEntityList('contextDialogs', 1000),
+      ]);
+      setSocialRequests(requests);
+      setSocialDialogs(dialogs);
+    } catch (e) {
+      logError(e, 'AdminPanel.loadSocialAnalytics');
+      alert(e.message || 'Не удалось загрузить Social Analytics.');
+    } finally {
+      setSocialAnalyticsLoading(false);
+    }
+  }, []);
 
   const loadReferralAudit = useCallback(async (action = 'referrals:diagnostics') => {
     setReferralLoading(true);
@@ -7341,7 +7362,25 @@ export const AdminPanel = () => {
     if (activeTab === 'ai-import' && !publicFormLinks.length && !publicFormLinksLoading) loadPublicFormLinks();
     if ((activeTab === 'referrals' || activeTab === 'referral-monitoring') && !referralAudit && !referralLoading) loadReferralAudit(activeTab === 'referral-monitoring' ? 'referrals:monitoring' : 'referrals:diagnostics');
     if (activeTab === 'automation' && !automationAudit && !automationLoading) loadAutomationAudit();
-  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, migrationStatus, migrationLoading, runIdentityMigrationAction, adminSecurity, adminSecurityLoading, loadAdminSecurity, aiImportRequests.length, aiImportLoading, loadAiImportRequests, publicFormLinks.length, publicFormLinksLoading, loadPublicFormLinks, referralAudit, referralLoading, loadReferralAudit, automationAudit, automationLoading, loadAutomationAudit]);
+    if (activeTab === 'social-analytics' && !socialRequests.length && !socialAnalyticsLoading) loadSocialAnalytics();
+  }, [activeTab, systemStatus, systemStatusLoading, loadSystemStatus, migrationStatus, migrationLoading, runIdentityMigrationAction, adminSecurity, adminSecurityLoading, loadAdminSecurity, aiImportRequests.length, aiImportLoading, loadAiImportRequests, publicFormLinks.length, publicFormLinksLoading, loadPublicFormLinks, referralAudit, referralLoading, loadReferralAudit, automationAudit, automationLoading, loadAutomationAudit, socialRequests.length, socialAnalyticsLoading, loadSocialAnalytics]);
+
+  const socialConnectionRows = useMemo(() => socialRequests
+    .filter(item => item.connection === true || item.connectionStatus || item.status === 'accepted')
+    .flatMap(item => {
+      const status = item.connectionStatus === 'connected' || item.status === 'accepted' ? 'connected' : item.status;
+      return [
+        { id: `${item.id || item.requestId || 'request'}:sender`, contactUserId: item.recipientId || item.toUserId, status },
+        { id: `${item.id || item.requestId || 'request'}:recipient`, contactUserId: item.senderId || item.fromUserId, status },
+      ];
+    }), [socialRequests]);
+  const socialAnalytics = useMemo(() => buildSocialAnalytics({
+    users: adminMetrics.users,
+    connections: socialConnectionRows,
+    requests: socialRequests,
+    dialogs: socialDialogs,
+    analyticsRows: adminMetrics.adminActivity,
+  }), [adminMetrics.adminActivity, adminMetrics.users, socialConnectionRows, socialDialogs, socialRequests]);
 
   const adminAssistantContext = useMemo(() => buildAdminContext({
     activeTab,
@@ -7577,6 +7616,7 @@ export const AdminPanel = () => {
             { id: 'rotation',  emoji: '🔄', label: 'Ротация' },
             { id: 'activity',  emoji: '🏆', label: 'Активность' },
             { id: 'analytics', emoji: '📊', label: 'Аналитика' },
+            { id: 'social-analytics', emoji: '👥', label: 'Social Analytics', count: socialRequests.length || undefined },
             { id: 'access',    emoji: '🔐', label: 'Доступ' },
             { id: 'identity-migration', emoji: '🧬', label: 'Identity Migration', count: migrationStatus?.architecture?.violations?.length || undefined },
             { id: 'system',    emoji: '🛡', label: 'Система' },
@@ -7591,7 +7631,7 @@ export const AdminPanel = () => {
             const active = activeTab === t.id;
             return (
               <button key={t.id}
-                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'moderation' || t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics' || t.id === 'loki-evolution') loadLokiAnalytics(); if (t.id === 'access') loadAdminSecurity(); if (t.id === 'identity-migration') runIdentityMigrationAction('status'); if (t.id === 'referrals') loadReferralAudit(); if (t.id === 'referral-monitoring') loadReferralAudit('referrals:monitoring'); if (t.id === 'automation') loadAutomationAudit(); }}
+                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'social-analytics') loadSocialAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'moderation' || t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics' || t.id === 'loki-evolution') loadLokiAnalytics(); if (t.id === 'access') loadAdminSecurity(); if (t.id === 'identity-migration') runIdentityMigrationAction('status'); if (t.id === 'referrals') loadReferralAudit(); if (t.id === 'referral-monitoring') loadReferralAudit('referrals:monitoring'); if (t.id === 'automation') loadAutomationAudit(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: isCompact ? '9px 11px' : '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -10827,6 +10867,52 @@ export const AdminPanel = () => {
 
       {/* ── РОТАЦИЯ АМБАССАДОРОВ ── */}
       {activeTab === 'rotation' && <RotationTab experts={experts} A={A} s={s} />}
+
+      {activeTab === 'social-analytics' && (
+        <div>
+          <div style={{ ...s.card, marginBottom: 12 }}>
+            <h2 style={s.h2}>👥 Social Analytics</h2>
+            <p style={{ color: A.textSec, fontSize: 13, lineHeight: '18px', marginBottom: 12 }}>
+              Социальный граф АПГ: люди, друзья, заявки и диалоги без разделения на контакты и сообщения.
+            </p>
+            <button style={{ ...s.btn, ...s.btnPri, opacity: socialAnalyticsLoading ? 0.6 : 1 }} onClick={loadSocialAnalytics} disabled={socialAnalyticsLoading}>
+              {socialAnalyticsLoading ? 'Загружаем...' : 'Обновить Social Analytics'}
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
+            {[
+              { label: 'Пользователи', value: socialAnalytics.users, color: A.blue },
+              { label: 'Дружеские связи', value: socialAnalytics.friends, color: '#4BB34B' },
+              { label: 'Заявки', value: socialAnalytics.requests, color: A.gold },
+              { label: 'Сообщения', value: socialAnalytics.messages, color: '#9B59B6' },
+              { label: 'Среднее друзей', value: socialAnalytics.averageFriends, color: A.blue },
+              { label: 'Принятие заявок', value: `${socialAnalytics.requestAcceptanceRate}%`, color: '#4BB34B' },
+            ].map(stat => (
+              <div key={stat.label} style={{ background: A.chip, borderRadius: 16, padding: 14, border: `1px solid ${stat.color}30` }}>
+                <div style={{ color: stat.color, fontSize: 24, lineHeight: 1, fontWeight: 900 }}>{stat.value}</div>
+                <div style={{ color: A.textSec, fontSize: 11.5, lineHeight: '15px', marginTop: 7 }}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
+          <div style={s.card}>
+            <h2 style={s.h2}>Самые активные пользователи</h2>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {socialAnalytics.activeUsers.length ? socialAnalytics.activeUsers.map((row, index) => (
+                <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '28px minmax(0,1fr) auto', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: `1px solid ${A.border}` }}>
+                  <div style={{ color: A.gold, fontWeight: 900 }}>{index + 1}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: A.text, fontSize: 14, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</div>
+                    <div style={{ color: A.textSec, fontSize: 11 }}>{row.id}</div>
+                  </div>
+                  <div style={{ color: A.blue, fontWeight: 900 }}>{row.score}</div>
+                </div>
+              )) : (
+                <div style={{ color: A.textSec, fontSize: 13, lineHeight: '19px' }}>Данные появятся после первых дружеских связей и диалогов.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── АНАЛИТИКА ── */}
       {activeTab === 'analytics' && (

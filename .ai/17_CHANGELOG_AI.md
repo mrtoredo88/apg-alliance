@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-21] feat: APG Social Platform v2
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/social/PeopleCore.js`, `src/ProfilePanel.jsx`, `src/contextDialogs/ContextDialogsPage.jsx`, `src/UserApp.jsx`, `src/loki/lokiActionTypes.js`, `src/loki/core/modules/ActionRouter.js`, `src/loki/core/capabilities/CapabilityRegistry.js`, `src/loki/core/capabilities/CapabilityMatcher.js`, `src/loki/core/execution/ExecutionRegistry.js`, `src/loki/core/actions/ActionRegistry.js`, `src/AdminPanel.jsx`, `server/src/routes/user-actions.js`, `server/src/routes/admin-actions.js`, `scripts/social-platform-v2-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Раздел профиля “Контакты” превращён в “Люди”: поиск участников, друзья, заявки, диалоги, публичные карточки и privacy-настройка работают в одном UX.
+- Backend получил `connections:search`, Loki получил `OPEN_PEOPLE`, `SEARCH_PEOPLE`, `ADD_FRIEND` и ведёт социальные команды в mobile-safe профильный сценарий.
+- Добавлен Admin “Social Analytics” поверх существующих `conversationRequests`/`contextDialogs` и regression test Social Platform v2.
+**Почему:** пользователю нужна единая социальная система “найти человека → добавить → написать”, без технического разделения на контакты и сообщения.
+
 ## [2026-07-21] feat: Loki Knowledge Evolution Engine v2
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/loki/core/evolution/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/lokiUserMemory.js`, `src/loki/LokiProvider.jsx`, `src/loki/LokiExperience.jsx`, `src/loki/analytics/index.js`, `src/AdminPanel.jsx`, `server/src/routes/user-actions.js`, `scripts/loki-evolution-engine-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
