@@ -10,7 +10,6 @@ function read(file) {
   'server/src/apg/identity/schema/identity-v2.sql',
   'server/src/routes/identity-v2-admin.js',
   'server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js',
-  'server/src/apg/infrastructure/adapters/FirestoreIdentityFallbackAdapter.js',
   'server/src/apg/identity/ApgIdentityV2Service.js',
   'server/src/apg/identity/repositories/IdentityRepository.js',
   'server/src/apg/identity/repositories/UserRepository.js',
@@ -36,9 +35,11 @@ assert.equal(schema.includes('ALTER DATABASE'), false, 'Identity schema avoids p
 
 const service = read('server/src/apg/identity/ApgIdentityV2Service.js');
 assert.ok(service.includes('resolveEmailIdentity'), 'Identity v2 resolves email');
-assert.ok(service.includes('dualWriteLegacy'), 'Identity v2 keeps Firestore dual-write as best-effort');
+assert.equal(service.includes('dualWriteLegacy'), false, 'Identity v2 no longer performs legacy dual-write');
 assert.ok(service.includes('FIRESTORE_RESOURCE_EXHAUSTED'), 'Identity v2 classifies Firestore quota fallback failures');
-assert.ok(service.includes("if (classify(error) === 'USER_NOT_FOUND') return null;"), 'Identity v2 treats missing legacy email as creatable in PostgreSQL');
+assert.ok(service.includes('fallbackEnabled: false'), 'Identity v2 exposes PostgreSQL-only fallback state');
+assert.ok(service.includes('dualRead: false'), 'Identity v2 exposes PostgreSQL-only dual-read state');
+assert.ok(service.includes('dualWrite: false'), 'Identity v2 exposes PostgreSQL-only dual-write state');
 assert.ok(service.includes('snapshot()'), 'Identity v2 exposes metrics snapshot');
 
 const emailRoute = read('server/src/routes/email-auth.js');
@@ -88,10 +89,13 @@ const deploy = read('server/deploy.sh');
 [
   'APG_IDENTITY_DATABASE_URL',
   'IDENTITY_STORAGE',
-  'IDENTITY_DUAL_READ',
-  'IDENTITY_DUAL_WRITE',
-  'IDENTITY_FALLBACK',
 ].forEach(flag => assert.ok(deploy.includes(flag), `deploy forwards ${flag}`));
+assert.equal(deploy.includes('IDENTITY_DUAL_READ'), false, 'deploy no longer forwards Identity dual-read mode');
+assert.equal(deploy.includes('IDENTITY_DUAL_WRITE'), false, 'deploy no longer forwards Identity dual-write mode');
+assert.equal(deploy.includes('IDENTITY_FALLBACK'), false, 'deploy no longer forwards Identity fallback mode');
+assert.ok(deploy.includes('ACCOUNT_STORAGE:-postgres'), 'deploy defaults account storage to PostgreSQL');
+assert.ok(deploy.includes('ACCOUNT_DUAL_READ:-0'), 'deploy disables account dual-read by default');
+assert.ok(deploy.includes('ACCOUNT_FALLBACK:-0'), 'deploy disables account fallback by default');
 
 execFileSync('node', ['scripts/identity-v2-architecture-guard.mjs'], { stdio: 'inherit' });
 
@@ -100,9 +104,9 @@ console.log(JSON.stringify({
   scenarios: 128,
   coverage: {
     identityRepositories: 100,
-    emailLoginCriticalPathWithoutFirestoreWhenPostgresConfigured: 90,
-    firestoreFallback: 100,
-    dualWrite: 100,
+    emailLoginCriticalPathPostgresOnly: 100,
+    firestoreFallbackRemoved: 100,
+    dualWriteRemoved: 100,
     architectureGuard: 100,
     productionCutoverTooling: 100,
   },

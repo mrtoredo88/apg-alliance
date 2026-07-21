@@ -738,6 +738,10 @@ function isGuestIdentity(user) {
   return !user || String(user.id || '').startsWith('guest_');
 }
 
+function hasAuthoritativeLinkedTelegram(userData) {
+  return !!userData && Object.prototype.hasOwnProperty.call(userData, 'linkedTelegram');
+}
+
 function sanitizeAuditValue(value, max = 280) {
   if (value == null) return '';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -1874,11 +1878,13 @@ export function UserApp() {
           });
           if (accountBootstrap?.profile && isMounted.current) {
             const accountProfile = accountBootstrap.profile;
+            const identityOwnsLinkedTelegram = hasAuthoritativeLinkedTelegram(userData);
             userData = {
               ...userData,
               ...accountProfile,
               id: accountBootstrap.canonicalUserId || accountProfile.userId || userData.id,
               canonicalUserId: accountBootstrap.canonicalUserId || accountProfile.canonicalUserId || userData.canonicalUserId,
+              linkedTelegram: identityOwnsLinkedTelegram ? userData.linkedTelegram || null : accountProfile.linkedTelegram || null,
               role: accountBootstrap.roles?.[0] || accountProfile.role || userData.role,
               roles: accountBootstrap.roles || accountProfile.roles || userData.roles,
               partnerId: accountProfile.partnerId ?? userData.partnerId,
@@ -2074,13 +2080,15 @@ export function UserApp() {
               const tickets = Number(data.tickets || 0);
               const reputation = Number(data.reputation || data.keys || 0);
               const reputationStatus = data.reputationStatusLabel ? { label: data.reputationStatusLabel } : getReputationStatus(reputation);
+              const identityOwnsLinkedTelegram = hasAuthoritativeLinkedTelegram(userData);
+              const effectiveLinkedTelegram = identityOwnsLinkedTelegram ? userData.linkedTelegram || null : data.linkedTelegram || null;
               setUser(u => u ? ({
                 ...u,
                 canonicalUserId: data.canonicalUserId || data.id || String(userData.id),
                 ...(data.displayName ? { displayName: data.displayName } : {}),
                 ...(data.email ? { email: data.email } : {}),
                 ...(data.emailVerified !== undefined ? { emailVerified: data.emailVerified } : {}),
-                ...(data.linkedTelegram ? { linkedTelegram: data.linkedTelegram } : {}),
+                linkedTelegram: effectiveLinkedTelegram,
                 ...(data.linkedEmail ? { linkedEmail: data.linkedEmail } : {}),
                 ...(Array.isArray(data.linkedEmails) ? { linkedEmails: data.linkedEmails } : {}),
                 ...(data.notificationPreferences ? { notificationPreferences: data.notificationPreferences } : {}),
@@ -2114,7 +2122,7 @@ export function UserApp() {
               const identityUser = {
                 ...userData,
                 firebaseUid: data.firebaseUid || data.uid || userData.firebaseUid,
-                linkedTelegram: data.linkedTelegram || userData.linkedTelegram,
+                linkedTelegram: effectiveLinkedTelegram,
                 linkedEmail: data.linkedEmail || userData.linkedEmail,
                 normalizedEmail: data.normalizedEmail,
                 partnerId: data.partnerId,

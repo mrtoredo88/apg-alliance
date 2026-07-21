@@ -12,6 +12,9 @@ const telegramCheck = read('server/src/routes/telegram-auth-check.js');
 const serverEmailAuth = read('server/src/routes/email-auth.js');
 const telegramAuthStart = read('server/src/routes/telegram-auth-start.js');
 const telegramUpdates = read('server/src/lib/telegramUpdates.js');
+const identityRepository = read('server/src/apg/identity/repositories/IdentityRepository.js');
+const identityLinkRepository = read('server/src/apg/identity/repositories/IdentityLinkRepository.js');
+const accountRoute = read('server/src/routes/account.js');
 
 function assertOrder(source, tokens, label) {
   let cursor = -1;
@@ -54,6 +57,9 @@ assertContains(userApp, "traceAuthStage('auth_session_restart'", 'logout restart
 assertContains(userApp, 'waitForInitialFirebaseAuth(4500)', 'email restore: extended restore wait for strong identities');
 assertContains(userApp, 'loadData_strong_identity_required', 'strong identity mismatch handled via guest-state fallback');
 assertNo(userApp, 'window.location.reload();', 'email bootstrap path does not force full-page reload');
+assertContains(userApp, 'function hasAuthoritativeLinkedTelegram', 'identity consistency: frontend detects Identity V2 linkedTelegram authority');
+assertContains(userApp, 'linkedTelegram: identityOwnsLinkedTelegram ? userData.linkedTelegram || null : accountProfile.linkedTelegram || null', 'identity consistency: account bootstrap cannot restore stale telegram cache');
+assertContains(userApp, 'linkedTelegram: effectiveLinkedTelegram', 'identity consistency: Firestore profile load cannot restore stale telegram cache');
 
 assertContains(profile, "const waitForAuthStateChanged = useCallback(async (expectedUid", 'telegram pipeline: expectedUid aware wait');
 assertContains(profile, 'current?.uid === expected', 'telegram pipeline: strict uid guard');
@@ -83,12 +89,17 @@ assertContains(serverEmailAuth, 'linkedEmail: ud.linkedEmail || identityEmail', 
 assertContains(serverEmailAuth, "if (action === 'link-email')", 'email link flow: link-email action exists');
 assertContains(serverEmailAuth, "if (action === 'link-telegram')", 'email link flow: link-telegram action exists');
 assertContains(serverEmailAuth, "error: 'link_data_missing'", 'email link flow: link-telegram verifies persisted link before success');
-assertContains(serverEmailAuth, 'TELEGRAM_LINK_PERSISTENCE_FAILED', 'email link flow: persistence failure is explicit');
+assertContains(identityRepository, 'TELEGRAM_LINK_PERSISTENCE_FAILED', 'email link flow: persistence failure is explicit');
 assertContains(userApp, "localStorage.setItem('apg_email_user', JSON.stringify(emailUser));", 'complete email auth persists full user payload');
-assertContains(profile, "action: 'link-telegram', userId: String(user.id)", 'profile: link telegram uses current user id');
-assertContains(profile, 'const returnedLink = linkData?.link || {}', 'profile link telegram validates returned persisted-link payload');
-assertContains(profile, '!returnedLink?.userId || String(returnedLink.userId) !== String(user.id) || !returnedLink?.telegramId', 'profile link telegram does not treat non-persisted responses as success');
+assertContains(profile, 'linking,', 'profile: link telegram passes linking flag');
+assertContains(profile, "ownerUserId: linking ? String(user?.id || '') : ''", 'profile: link telegram uses current user id');
+assertContains(telegramUpdates, 'identityV2.linkTelegram.return', 'telegram update link flow traces Identity V2 return');
 assertContains(profile, "action: 'link-email', email: linkEmailValue, userId: String(user.id)", 'profile: link email uses current user id');
+assertContains(identityLinkRepository, 'async getByUserProvider', 'identity consistency: links can be resolved by Identity V2 user and provider');
+assertContains(identityRepository, 'async decorateUserWithLinks', 'identity consistency: user read model is derived from identity links');
+assertContains(identityRepository, 'linkedTelegram: linkedTelegramFromIdentityLink(telegramLink)', 'identity consistency: missing Identity V2 Telegram link returns null');
+assertContains(accountRoute, 'syncProfileIdentityLinks', 'identity consistency: account bootstrap synchronizes profile links from Identity V2');
+assertContains(accountRoute, 'const linkedTelegram = identityUser.linkedTelegram || null', 'identity consistency: stale accountProfile linkedTelegram is overridden');
 
 assertContains(telegramAuthStart, "const ownerUserId = safeString(body.ownerUserId", 'telegram auth start: ownerUserId from client is passed');
 assertContains(telegramUpdates, 'resolveTelegramLinkOwner', 'telegram updates: owner resolver exists');
@@ -107,5 +118,6 @@ console.log(JSON.stringify({
     'auth_restore_after_logout',
     'auth_restore_after_telegram',
     'email_login_retains_telegram_link_after_logout',
+    'identity_v2_overrides_stale_profile_linked_telegram_after_detach',
   ],
 }, null, 2));

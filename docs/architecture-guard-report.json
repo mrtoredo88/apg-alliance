@@ -1,7 +1,7 @@
 {
   "ok": true,
   "rule": "foundation_layers_use_identity_repository_and_infrastructure_adapters",
-  "checkedFiles": 60,
+  "checkedFiles": 59,
   "layers": {
     "Client Foundation": {
       "checked": 4,
@@ -24,9 +24,9 @@
       "allowedInfrastructure": 7
     },
     "Infrastructure": {
-      "checked": 8,
+      "checked": 7,
       "violations": 0,
-      "allowedInfrastructure": 8
+      "allowedInfrastructure": 7
     },
     "Server Foundation": {
       "checked": 22,
@@ -43,5 +43,5 @@
     "/data/FirestoreAdminAdapter.js",
     "/schema/identity-v2.sql"
   ],
-  "generatedAt": "2026-07-20T08:27:29.817Z"
+  "generatedAt": "2026-07-21T09:11:18.901Z"
 }

@@ -139,11 +139,9 @@ export class ApgIdentityV2Service {
     }
 
     const persistedLink = await this.repository.links.get('telegram', normalizedTelegramId).catch(() => null);
-    const persistedUser = await this.repository.users.get(normalizedUserId).catch(() => null);
-    const persistedTelegram = persistedUser?.linkedTelegram && typeof persistedUser.linkedTelegram === 'object'
-      ? persistedUser.linkedTelegram
-      : null;
-    const persistedTelegramId = normalizeTelegramId(persistedTelegram?.tgId || persistedTelegram?.telegramId || '');
+    const persistedTelegramId = normalizeTelegramId(
+      persistedLink?.providerUserId || persistedLink?.metadata?.tgId || persistedLink?.metadata?.telegramId || '',
+    );
     const requestedTelegramId = normalizeTelegramId(
       telegram?.tgId || telegram?.telegramId || normalizedTelegramId,
     );
@@ -167,7 +165,9 @@ export class ApgIdentityV2Service {
 
   async getUser(userId) {
     this.metrics.yandexReads += 1;
-    return this.repository.users.get(userId);
+    return typeof this.repository.getUser === 'function'
+      ? this.repository.getUser(userId)
+      : this.repository.users.get(userId);
   }
 
   async createSession(input) {

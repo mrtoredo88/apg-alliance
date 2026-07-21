@@ -69,12 +69,19 @@ const runtime = await fetchJson(runtimeUrl);
 
 const containerRevisions = shellJson('yc', ['serverless', 'container', 'revision', 'list', '--container-name', containerName, '--format', 'json']) || [];
 const latest = containerRevisions[0] || {};
-const latestImage = latest.image || '';
-const latestDigest = latest.environment?.IMAGE_DIGEST || '';
+const activeRevision = latest;
+const activeRevisionEnvironment = activeRevision?.image?.environment || activeRevision.environment || {};
+const latestImage = typeof activeRevision.image === 'string'
+  ? activeRevision.image
+  : activeRevision.image?.image_url || '';
+const latestDigest = activeRevision.image?.image_digest || activeRevisionEnvironment?.IMAGE_DIGEST || '';
+const activeRevisionId = activeRevision.id || latest.id || '';
 
 const runtimeImage = String(runtime.payload.image || '').trim();
 const runtimeImageDigestNorm = normalizeDigest(runtimeImage.includes('@') ? runtimeImage.split('@').pop() : runtimeImage);
-const revisionImageDigest = latestImage.includes('@sha256:') ? latestImage.split('@sha256:')[1] : '';
+const revisionImageDigest = typeof latestImage === 'string' && latestImage.includes('@sha256:')
+  ? latestImage.split('@sha256:')[1]
+  : '';
 
 const checks = {
   headShaMatch: false,
@@ -112,11 +119,15 @@ const runtimeTelegramSha = String(runtime.payload.telegramUpdatesSha256 || '').t
 checks.headShaMatch = [headGitLong, headGitShort].includes(runtimeGit) || runtimeGit === expected;
 checks.runtimeImageMatch = Boolean(
   latestImage && runtimeImage && (
-    latestImage === runtimeImage || latestImage.includes(runtimeImage) || runtimeImage.includes(latestImage)
+    latestImage === runtimeImage
+    || latestImage.includes(runtimeImage)
+    || runtimeImage.includes(latestImage)
+    || latestDigest === runtimeImageDigestNorm
+    || runtimeImage === latestDigest
   )
 );
 checks.runtimeGitMatch = Boolean(
-  expected && String(latest?.environment?.GIT_SHA || '').includes(expected.slice(0, 8))
+  expected && String(activeRevisionEnvironment?.GIT_SHA || '').includes(expected.slice(0, 8))
 );
 checks.revisionImageTagMatch = Boolean(expected && latestImage.includes(expected.slice(0, 8)));
 checks.telegramUpdatesMatch = Boolean(runtimeTelegramSha && runtimeTelegramSha === localTelegramSha);
@@ -152,12 +163,12 @@ const summary = {
   checks,
   container: {
     name: containerName,
-    latestId: latest.id || '',
+    latestId: activeRevisionId,
     latestImage,
     latestStatus: latest.status || '',
-    runningGit: latest?.environment?.GIT_SHA || '',
-    runningAppVersion: latest?.environment?.APP_VERSION || '',
-    runningImageDigest: latest?.environment?.IMAGE_DIGEST || '',
+    runningGit: activeRevisionEnvironment?.GIT_SHA || '',
+    runningAppVersion: activeRevisionEnvironment?.APP_VERSION || '',
+    runningImageDigest: latestDigest || '',
   },
   mismatch: {
     headSha: checks.headShaMatch ? '' : 'runtime git did not match HEAD',

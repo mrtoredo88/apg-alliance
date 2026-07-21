@@ -30,6 +30,24 @@ export class IdentityLinkRepository {
     } : null;
   }
 
+  async getByUserProvider(userId, provider) {
+    const safeUserId = safeString(userId, 260);
+    const safeProvider = safeString(provider, 80);
+    const result = await this.adapter.query(
+      'SELECT * FROM apg_identity_links WHERE user_id = $1 AND provider = $2 ORDER BY updated_at DESC LIMIT 1',
+      [safeUserId, safeProvider],
+    );
+    const row = result.rows[0];
+    return row ? {
+      id: row.id,
+      provider: row.provider,
+      providerUserId: row.provider_user_id,
+      userId: row.user_id,
+      canonicalUserId: row.canonical_user_id,
+      metadata: row.metadata || {},
+    } : null;
+  }
+
   async set({ provider, providerUserId, userId, canonicalUserId = userId, metadata = {} }) {
     const safeProvider = safeString(provider, 80);
     const safeProviderUserId = this.normalizeProviderUserId(safeProvider, providerUserId);

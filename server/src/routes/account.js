@@ -81,6 +81,17 @@ function publicProfile(profile = null) {
   };
 }
 
+function syncProfileIdentityLinks(profile = null, identityUser = null) {
+  if (!profile) return null;
+  if (!identityUser) return profile;
+  const linkedTelegram = identityUser.linkedTelegram || null;
+  return {
+    ...profile,
+    linkedTelegram,
+    telegramId: linkedTelegram?.tgId || linkedTelegram?.telegramId || '',
+  };
+}
+
 export default async function accountRoutes(fastify) {
   fastify.post('/api/account/bootstrap', async (request, reply) => {
     const startedAt = Date.now();
@@ -102,11 +113,13 @@ export default async function accountRoutes(fastify) {
         sessionId: safeString(request.body?.sessionId || '', 260),
         telegramId: safeString(request.body?.telegramId || request.body?.tgId || '', 120),
       });
+      const identityUser = await serverFoundation.identityV2.getUser(userId).catch(() => null);
+      const profile = syncProfileIdentityLinks(result.profile, identityUser);
       return reply.send({
         ok: true,
         canary,
         canonicalUserId: result.canonicalUserId,
-        profile: publicProfile(result.profile),
+        profile: publicProfile(profile),
         roles: result.roles,
         permissions: result.permissions,
         cabinets: result.cabinets,

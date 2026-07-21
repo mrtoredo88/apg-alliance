@@ -38,7 +38,7 @@ IMAGE_URI="$IMAGE_NAME:$IMAGE_TAG"
 echo "Deploy commit: $GIT_SHA"
 echo "Image: $IMAGE_URI"
 
-docker build -f "$ROOT_DIR/server/Dockerfile" -t "$IMAGE_URI" \
+docker buildx build --platform linux/amd64 -f "$ROOT_DIR/server/Dockerfile" -t "$IMAGE_URI" \
   --build-arg APP_VERSION="$GIT_SHA_SHORT" \
   --build-arg GIT_SHA="$GIT_SHA" \
   --build-arg BUILD_TIME="$BUILD_TIME" \
@@ -92,10 +92,10 @@ yc serverless container revision deploy \
   --environment GIT_SHA="$GIT_SHA" \
   --environment BUILD_TIME="$BUILD_TIME" \
   --environment IMAGE_DIGEST="$IMAGE_DIGEST" \
-  --environment ACCOUNT_STORAGE="${ACCOUNT_STORAGE_OVERRIDE:-${ACCOUNT_STORAGE:-firestore}}" \
-  --environment ACCOUNT_DUAL_READ="${ACCOUNT_DUAL_READ_OVERRIDE:-${ACCOUNT_DUAL_READ:-1}}" \
+  --environment ACCOUNT_STORAGE="${ACCOUNT_STORAGE_OVERRIDE:-${ACCOUNT_STORAGE:-postgres}}" \
+  --environment ACCOUNT_DUAL_READ="${ACCOUNT_DUAL_READ_OVERRIDE:-${ACCOUNT_DUAL_READ:-0}}" \
   --environment ACCOUNT_DUAL_WRITE="${ACCOUNT_DUAL_WRITE_OVERRIDE:-${ACCOUNT_DUAL_WRITE:-0}}" \
-  --environment ACCOUNT_FALLBACK="${ACCOUNT_FALLBACK_OVERRIDE:-${ACCOUNT_FALLBACK:-1}}" \
+  --environment ACCOUNT_FALLBACK="${ACCOUNT_FALLBACK_OVERRIDE:-${ACCOUNT_FALLBACK:-0}}" \
   --environment ACCOUNT_CANARY="${ACCOUNT_CANARY_OVERRIDE:-${ACCOUNT_CANARY:-0}}" \
   --environment ACCOUNT_CANARY_ALLOWLIST="${ACCOUNT_CANARY_ALLOWLIST_OVERRIDE:-${ACCOUNT_CANARY_ALLOWLIST:-}}"
 

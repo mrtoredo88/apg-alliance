@@ -13,6 +13,23 @@ function ensureCanonicalId(user) {
   return safeString(user?.canonicalUserId || user?.canonical_user_id || user?.id, 260);
 }
 
+function linkedTelegramFromIdentityLink(link = null) {
+  if (!link) return null;
+  const metadata = link.metadata && typeof link.metadata === 'object' ? link.metadata : {};
+  const telegramId = normalizeTelegramId(link.providerUserId || metadata.tgId || metadata.telegramId || '');
+  if (!telegramId) return null;
+  return {
+    ...metadata,
+    tgId: telegramId,
+    telegramId,
+    firstName: metadata.firstName || metadata.first_name || null,
+    lastName: metadata.lastName || metadata.last_name || null,
+    username: metadata.username || metadata.telegramUsername || null,
+    photo: metadata.photo || metadata.photoUrl || metadata.photo_200 || null,
+    linkedAt: metadata.linkedAt || metadata.completedAt || null,
+  };
+}
+
 export class IdentityRepository {
   constructor({ users, emails, links, roles, sessions }) {
     this.name = 'IdentityRepository';
@@ -27,16 +44,29 @@ export class IdentityRepository {
     const normalized = normalizeEmail(email);
     const index = await this.emails.get(normalized);
     if (index?.userId) {
-      const user = await this.users.get(index.userId);
+      const user = await this.getUser(index.userId);
       if (user) return { userId: user.id, canonicalUserId: user.canonicalUserId || user.id, user, source: 'identity_v2_email_index' };
     }
     const users = await this.users.findByEmail(normalized);
     if (users.length) {
-      const user = users[0];
+      const user = await this.decorateUserWithLinks(users[0]);
       await this.emails.set({ email: normalized, userId: user.id, canonicalUserId: user.canonicalUserId || user.id });
       return { userId: user.id, canonicalUserId: user.canonicalUserId || user.id, user, source: 'identity_v2_user_email' };
     }
     return null;
+  }
+
+  async decorateUserWithLinks(user = null) {
+    if (!user?.id) return user;
+    const telegramLink = await this.links.getByUserProvider(user.id, 'telegram');
+    return {
+      ...user,
+      linkedTelegram: linkedTelegramFromIdentityLink(telegramLink),
+    };
+  }
+
+  async getUser(userId) {
+    return this.decorateUserWithLinks(await this.users.get(userId));
   }
 
   async resolveByProvider(provider, providerUserId) {
@@ -44,7 +74,7 @@ export class IdentityRepository {
     const normalizedProviderUserId = normalizedProvider === 'telegram' ? normalizeTelegramId(providerUserId) : safeString(providerUserId, 260);
     const link = await this.links.get(normalizedProvider, normalizedProviderUserId);
     if (!link?.userId) return null;
-    const user = await this.users.get(link.userId);
+    const user = await this.getUser(link.userId);
     return user
       ? {
           userId: user.id,
@@ -291,10 +321,8 @@ export class IdentityRepository {
       );
     }
 
-    const persistedUser = await this.users.get(userId);
-    const persistedTelegram = persistedUser?.linkedTelegram && typeof persistedUser.linkedTelegram === 'object'
-      ? persistedUser.linkedTelegram
-      : null;
+    const persistedUser = await this.getUser(userId);
+    const persistedTelegram = linkedTelegramFromIdentityLink(persistedLink);
     if (
       !persistedUser
       || normalizeTelegramId(persistedTelegram?.tgId || persistedTelegram?.telegramId || '') !== normalizedTelegramId
