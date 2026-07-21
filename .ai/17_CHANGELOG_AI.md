@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-21] fix: People Null Safety Hotfix
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/social/PeopleCore.js`, `scripts/people-null-safety-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- People core helpers стали null-safe для actor/currentUser/person/recommendation/dialog inputs.
+- Добавлен regression test `test:people-null-safety`, закрепляющий desktop/Telegram crash-класс `Cannot read properties of null`.
+**Почему:** production smoke Social Platform v2.1 выявил падение `/#profile` в desktop и Telegram WebApp emulation при `user === null`.
+
 ## [2026-07-21] feat: APG Social Platform v2.1 Final People UX
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/social/PeopleCore.js`, `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `src/loki/core/modules/ActionRouter.js`, `src/AdminPanel.jsx`, `scripts/social-platform-v2-test.mjs`, `.ai/17_CHANGELOG_AI.md`

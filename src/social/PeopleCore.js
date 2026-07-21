@@ -11,6 +11,7 @@ function lower(value = '') {
 }
 
 function idOf(value = {}) {
+  if (!value || typeof value !== 'object') return '';
   return text(value.id || value.userId || value.contactUserId || value.targetUserId || value.recipientId || value.senderId, 180);
 }
 
@@ -40,12 +41,14 @@ export function peopleStatusLabel(status = '') {
 }
 
 export function peoplePresenceLabel(person = {}) {
+  if (!person || typeof person !== 'object') return '';
   if (person.onlineStatus === 'online' || person.online === true) return 'онлайн';
   if (person.onlineStatus === 'recent' || person.lastSeenAt) return 'недавно был';
   return '';
 }
 
 export function publicPerson(user = {}, fallbackId = '') {
+  if (!user || typeof user !== 'object') user = {};
   const id = idOf(user) || text(fallbackId, 180);
   const displayName = text(user.displayName || user.name || [user.firstName || user.first_name, user.lastName || user.last_name].filter(Boolean).join(' '), 160) || 'Участник АПГ';
   return {
@@ -92,6 +95,7 @@ export function recentPeopleGroups(people = [], now = Date.now()) {
 }
 
 export function peopleSuggestionReason(person = {}) {
+  if (!person || typeof person !== 'object') return '';
   const shared = person.shared || {};
   const contacts = list(shared.contacts).length;
   const events = list(shared.events).length;
@@ -105,6 +109,7 @@ export function peopleSuggestionReason(person = {}) {
 }
 
 export function personInterestTags(person = {}) {
+  if (!person || typeof person !== 'object') return [];
   return [
     ...list(person.interests),
     person.role,
@@ -132,6 +137,7 @@ export function buildPeopleSections({ people = [], pinnedIds = [] } = {}) {
 }
 
 export function relationStatusForPerson(person = {}, { connections = [], requests = [], blocked = [], actorId = '' } = {}) {
+  if (!person || typeof person !== 'object') return PEOPLE_RELATION_STATUS.STRANGER;
   const id = idOf(person);
   if (!id) return PEOPLE_RELATION_STATUS.STRANGER;
   if (list(blocked).map(String).includes(String(id))) return PEOPLE_RELATION_STATUS.BLOCKED;
