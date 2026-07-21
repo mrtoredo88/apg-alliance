@@ -1,5 +1,8 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { getDb } from './lib/firebase.js';
 
 import vkNewsRoutes           from './routes/vk-news.js';
@@ -31,6 +34,16 @@ import identityV2AdminRoutes from './routes/identity-v2-admin.js';
 import accountRoutes from './routes/account.js';
 
 const fastify = Fastify({ logger: true, bodyLimit: 8_388_608 });
+
+function fileSha256(relativePath) {
+  const filePath = path.join(process.cwd(), relativePath);
+  try {
+    const data = fs.readFileSync(filePath);
+    return createHash('sha256').update(data).digest('hex');
+  } catch {
+    return '';
+  }
+}
 
 await fastify.register(cors, {
   origin: [
@@ -76,6 +89,14 @@ fastify.register(publicSubmitRoutes);
 fastify.register(partnershipApplicationRoutes);
 fastify.register(identityV2AdminRoutes);
 fastify.register(accountRoutes);
+
+fastify.get('/version', async () => ({
+  git: process.env.GIT_SHA || process.env.APP_VERSION || '',
+  image: process.env.IMAGE_DIGEST || '',
+  build: process.env.BUILD_TIME || '',
+  appVersion: process.env.APP_VERSION || '',
+  telegramUpdatesSha256: fileSha256('src/lib/telegramUpdates.js'),
+}));
 
 fastify.get('/health', async (request, reply) => {
   try {

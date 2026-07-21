@@ -1,5 +1,16 @@
 FROM node:20-alpine
 WORKDIR /app
+
+ARG APP_VERSION=unknown
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
+ARG IMAGE_DIGEST=unknown
+
+ENV APP_VERSION=$APP_VERSION \
+    GIT_SHA=$GIT_SHA \
+    BUILD_TIME=$BUILD_TIME \
+    IMAGE_DIGEST=$IMAGE_DIGEST
+
 COPY server/package.json server/package-lock.json ./
 RUN npm ci --production
 COPY server/src/ ./src/
