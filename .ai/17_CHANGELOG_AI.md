@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-21] feat: APG Social Platform v2.1 Final People UX
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/social/PeopleCore.js`, `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `src/loki/core/modules/ActionRouter.js`, `src/AdminPanel.jsx`, `scripts/social-platform-v2-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- “Люди” доведены до mobile-first messenger UX: закреплённые, недавние, друзья, рекомендации “Возможно, вы знакомы”, smart search и compact bottom sheet.
+- Локи передаёт в People UX query/tab/mode, чтобы команды “Найди Татьяну”, “Покажи друзей”, “Напиши Максиму” открывали нужный social state.
+- Social Analytics расширена метриками сообщений, первого ответа, новых знакомств, принятых/отклонённых заявок и активных сообществ.
+**Почему:** раздел “Люди” должен восприниматься как живая городская социальная сеть, а не как CRM/контакты/технические сообщения.
+
 ## [2026-07-21] feat: APG Social Platform v2
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/social/PeopleCore.js`, `src/ProfilePanel.jsx`, `src/contextDialogs/ContextDialogsPage.jsx`, `src/UserApp.jsx`, `src/loki/lokiActionTypes.js`, `src/loki/core/modules/ActionRouter.js`, `src/loki/core/capabilities/CapabilityRegistry.js`, `src/loki/core/capabilities/CapabilityMatcher.js`, `src/loki/core/execution/ExecutionRegistry.js`, `src/loki/core/actions/ActionRegistry.js`, `src/AdminPanel.jsx`, `server/src/routes/user-actions.js`, `server/src/routes/admin-actions.js`, `scripts/social-platform-v2-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

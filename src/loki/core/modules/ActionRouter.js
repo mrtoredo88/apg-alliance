@@ -50,8 +50,16 @@ function scoreItem(query, item) {
     .reduce((sum, word) => sum + (haystack.includes(word) ? Math.min(6, word.length) : 0), 0);
 }
 
-function makeActionCard(screen) {
-  const action = createLokiAction(screen.action);
+function peoplePayload(query = '') {
+  const clean = normalizeText(query).replace(/^(найди|покажи|добавь|напиши|открой|моих|мои|мне|в)\s+/g, '').replace(/\s+(в друзья|друзья|люди|человека|участника|сообщение)$/g, '').trim();
+  if (/друз/.test(normalizeText(query)) && !/(найди|добавь|напиши)/.test(normalizeText(query))) return { tab: 'friends', mode: 'friends', intent: 'friends' };
+  if (/напиши|сообщен|диалог|чат/.test(normalizeText(query))) return { tab: 'dialogs', mode: 'dialogs', intent: 'message', peopleQuery: clean };
+  if (/заявк/.test(normalizeText(query))) return { tab: 'requests', mode: 'requests', intent: 'requests' };
+  return { tab: 'all', mode: /добавь/.test(normalizeText(query)) ? 'add' : 'search', peopleQuery: clean };
+}
+
+function makeActionCard(screen, query = '') {
+  const action = createLokiAction(screen.action, screen.id === 'people' ? peoplePayload(query) : {});
   return { id: screen.id, type: 'screen', title: screen.title, text: screen.text, action, label: 'Открыть', actions: [{ label: 'Открыть', action }] };
 }
 
@@ -85,7 +93,7 @@ export const ActionRouter = {
   handle({ query, context }) {
     const direct = SCREEN_ACTIONS.find(screen => includesAny(query, screen.words));
     if (direct && includesAny(query, ['открой', 'покажи', 'где мои', 'где находится', 'где найти', 'найди', 'добавь', 'напиши'])) {
-      const card = makeActionCard(direct);
+      const card = makeActionCard(direct, query);
       return {
         intent: `action.${direct.id}`,
         text: `${direct.text} Можно перейти сразу.`,
@@ -106,7 +114,7 @@ export const ActionRouter = {
     }
 
     if (direct) {
-      const card = makeActionCard(direct);
+      const card = makeActionCard(direct, query);
       return {
         intent: `action.${direct.id}`,
         text: direct.text,

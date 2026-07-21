@@ -10886,6 +10886,11 @@ export const AdminPanel = () => {
               { label: 'Заявки', value: socialAnalytics.requests, color: A.gold },
               { label: 'Сообщения', value: socialAnalytics.messages, color: '#9B59B6' },
               { label: 'Среднее друзей', value: socialAnalytics.averageFriends, color: A.blue },
+              { label: 'Среднее сообщений', value: socialAnalytics.averageMessages, color: '#9B59B6' },
+              { label: 'Первый ответ, мин', value: socialAnalytics.averageFirstResponseMinutes, color: A.gold },
+              { label: 'Новые знакомства', value: socialAnalytics.newConnections, color: '#4BB34B' },
+              { label: 'Принятые заявки', value: socialAnalytics.acceptedRequests, color: '#4BB34B' },
+              { label: 'Отклонённые заявки', value: socialAnalytics.declinedRequests, color: A.red },
               { label: 'Принятие заявок', value: `${socialAnalytics.requestAcceptanceRate}%`, color: '#4BB34B' },
             ].map(stat => (
               <div key={stat.label} style={{ background: A.chip, borderRadius: 16, padding: 14, border: `1px solid ${stat.color}30` }}>
@@ -10908,6 +10913,20 @@ export const AdminPanel = () => {
                 </div>
               )) : (
                 <div style={{ color: A.textSec, fontSize: 13, lineHeight: '19px' }}>Данные появятся после первых дружеских связей и диалогов.</div>
+              )}
+            </div>
+          </div>
+          <div style={{ ...s.card, marginTop: 12 }}>
+            <h2 style={s.h2}>Самые активные сообщества</h2>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {socialAnalytics.activeCommunities.length ? socialAnalytics.activeCommunities.map((row, index) => (
+                <div key={row.name} style={{ display: 'grid', gridTemplateColumns: '28px minmax(0,1fr) auto', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: `1px solid ${A.border}` }}>
+                  <div style={{ color: A.gold, fontWeight: 900 }}>{index + 1}</div>
+                  <div style={{ color: A.text, fontSize: 14, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</div>
+                  <div style={{ color: A.blue, fontWeight: 900 }}>{row.score}</div>
+                </div>
+              )) : (
+                <div style={{ color: A.textSec, fontSize: 13, lineHeight: '19px' }}>Данные появятся после активных диалогов по партнёрам, событиям и экспертам.</div>
               )}
             </div>
           </div>

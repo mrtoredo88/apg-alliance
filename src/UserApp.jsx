@@ -1058,6 +1058,7 @@ export function UserApp() {
   const [activePartner, setActivePartner]       = useState(null);
   const [pendingLokiNewsTarget, setPendingLokiNewsTarget] = useState(() => initialDeepLink.type === 'news' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
   const [pendingLokiEventTarget, setPendingLokiEventTarget] = useState(() => initialDeepLink.type === 'event' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
+  const [pendingPeopleAction, setPendingPeopleAction] = useState(null);
   const [initialDialogId, setInitialDialogId] = useState(() => initialDeepLink.type === 'dialogs' ? initialDeepLink.id : '');
   const [pendingDialogRequest, setPendingDialogRequest] = useState(null);
   const [bookingRequest, setBookingRequest] = useState(null);
@@ -4674,7 +4675,15 @@ export function UserApp() {
     [LOKI_APP_ACTIONS.OPEN_MAP]: () => goPanel('map'),
     [LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS]: () => goPanel('nearby'),
     [LOKI_APP_ACTIONS.SHOW_PROFILE]: () => goPanel('profile'),
-    [LOKI_APP_ACTIONS.OPEN_PEOPLE]: () => goPanel('profile'),
+    [LOKI_APP_ACTIONS.OPEN_PEOPLE]: ({ peopleQuery = '', query = '', tab = '', mode = '', intent = '' } = {}) => {
+      setPendingPeopleAction({
+        query: peopleQuery || query || '',
+        tab: tab || (mode === 'friends' || intent === 'friends' ? 'friends' : mode === 'dialogs' || intent === 'message' ? 'dialogs' : mode === 'requests' ? 'requests' : 'all'),
+        open: true,
+        nonce: Date.now(),
+      });
+      goPanel('profile');
+    },
     [LOKI_APP_ACTIONS.SHOW_ACHIEVEMENTS]: () => goPanel('tasks'),
     [LOKI_APP_ACTIONS.SHOW_FAVORITES]: () => goPanel('profile'),
     [LOKI_APP_ACTIONS.SHOW_NOTIFICATIONS]: () => openNotifications(),
@@ -5282,6 +5291,7 @@ export function UserApp() {
                     onOpenBookingDialog={openBookingContextDialog}
                     onOpenBookingReview={openBookingReview}
                     initialConnectionTargetId={initialDeepLink.type === 'profile-user' ? initialDeepLink.id : ''}
+                    initialPeopleAction={pendingPeopleAction}
                     desktopOverview={desktopOverview}
                     desktopMode={desktopDevice}
                     onBack={() => goPanel('home')}

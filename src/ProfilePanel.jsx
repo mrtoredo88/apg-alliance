@@ -23,7 +23,7 @@ import { ensureServerReferralSession, getReferralContext, readPendingReferral } 
 import { groupBookingsForProfile, normalizeBooking } from '../server-shared/booking.js';
 import { SOCIAL_PRIVACY, normalizeSocialPrivacy } from './messaging/ConversationEligibility.js';
 import { buildSocialMessagingDevPanel } from './messaging/SocialMessagingSnapshot.js';
-import { PEOPLE_RELATION_STATUS, PEOPLE_TABS, buildPeopleRows, peopleStatusLabel, searchPeopleGroups } from './social/PeopleCore.js';
+import { PEOPLE_RELATION_STATUS, PEOPLE_TABS, buildPeopleRows, buildPeopleSections, peoplePresenceLabel, peopleStatusLabel, peopleSuggestionReason, personInterestTags, searchPeopleGroups } from './social/PeopleCore.js';
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
 
@@ -631,7 +631,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingDialog, onOpenBookingReview, initialConnectionTargetId = '', desktopOverview = null, desktopMode = false, onBack }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingDialog, onOpenBookingReview, initialConnectionTargetId = '', initialPeopleAction = null, desktopOverview = null, desktopMode = false, onBack }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showWorkspaceDiagnostics, setShowWorkspaceDiagnostics] = useState(false);
@@ -704,6 +704,14 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const [peopleSearchResults, setPeopleSearchResults] = useState([]);
   const [peopleSearchLoading, setPeopleSearchLoading] = useState(false);
   const [peopleDialogs, setPeopleDialogs] = useState([]);
+  const [peopleSheet, setPeopleSheet] = useState(null);
+  const [pinnedPeopleIds, setPinnedPeopleIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`apg_people_pins_${String(user?.id || 'guest')}`) || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     try {
@@ -711,10 +719,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       setSocialPrivacy(normalizeSocialPrivacy(stored.privacy || user?.socialMessagingPrivacy));
       setSocialRequests(Array.isArray(stored.requests) ? stored.requests : []);
       setSocialBlockedIds(Array.isArray(stored.blocked) ? stored.blocked : []);
+      setPinnedPeopleIds(JSON.parse(localStorage.getItem(`apg_people_pins_${String(user?.id || 'guest')}`) || '[]'));
     } catch {
       setSocialPrivacy(normalizeSocialPrivacy(user?.socialMessagingPrivacy));
       setSocialRequests([]);
       setSocialBlockedIds([]);
+      setPinnedPeopleIds([]);
     }
   }, [socialStorageKey, user?.socialMessagingPrivacy]);
 
@@ -833,6 +843,16 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       clearTimeout(timer);
     };
   }, [isGuest, peopleSearch, user?.id]);
+
+  useEffect(() => {
+    if (!initialPeopleAction?.nonce) return;
+    if (initialPeopleAction.tab) setPeopleTab(initialPeopleAction.tab);
+    if (initialPeopleAction.query) {
+      setPeopleSearch(initialPeopleAction.query);
+      setShowConnectionsModal(true);
+    }
+    if (initialPeopleAction.open === true) setShowConnectionsModal(true);
+  }, [initialPeopleAction?.nonce]);
 
   useEffect(() => {
     const targetId = String(initialConnectionTargetId || '').trim();
@@ -1554,6 +1574,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     requests: incomingConnectionRequests.length + outgoingConnectionRequests.length,
     dialogs: peopleRows.filter(item => item.dialogId).length,
   }), [incomingConnectionRequests.length, outgoingConnectionRequests.length, peopleRows]);
+  const peopleSections = useMemo(() => buildPeopleSections({ people: peopleRows, pinnedIds: pinnedPeopleIds }), [peopleRows, pinnedPeopleIds]);
   const connectionDevPanel = useMemo(() => {
     const latest = connections[0] || null;
     const target = connectionTarget || {};
@@ -1625,6 +1646,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   }, [onOpenDialog]);
   const openPersonProfile = useCallback((person) => {
     if (!person?.id) return;
+    setPeopleSheet(person);
     setConnectionTarget({
       target: person,
       status: person.relationStatus,
@@ -1633,6 +1655,17 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       shared: person.shared || { contacts: [], events: [], partners: [] },
     });
   }, []);
+  const togglePinnedPerson = useCallback((personId) => {
+    const id = String(personId || '').trim();
+    if (!id) return;
+    setPinnedPeopleIds(prev => {
+      const next = prev.includes(id) ? prev.filter(item => item !== id) : [id, ...prev].slice(0, 24);
+      try {
+        localStorage.setItem(`apg_people_pins_${String(user?.id || 'guest')}`, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, [user?.id]);
   const runPersonPrimaryAction = useCallback((person) => {
     if (!person?.id) return;
     if (person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && person.dialogId) {
@@ -2084,6 +2117,73 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 </button>
               ))}
             </div>
+            {!peopleSearch.trim() && (
+              <div data-people-smart-sections style={{ display: 'grid', gap: 13 }}>
+                {peopleSections.favorites.length > 0 && (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 900 }}>⭐ Избранные</div>
+                    <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+                      {peopleSections.favorites.slice(0, 8).map(person => (
+                        <button key={person.id} type="button" onClick={() => person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && person.dialogId ? onOpenDialog?.(person.dialogId) : openPersonProfile(person)} style={{ width: 86, flex: '0 0 86px', border: '1px solid rgba(201,168,76,0.20)', background: 'rgba(201,168,76,0.08)', borderRadius: 18, padding: 8, display: 'grid', justifyItems: 'center', gap: 6, fontFamily: 'inherit', cursor: 'pointer', animation: 'fadeInUp 0.28s ease both' }}>
+                          {person.photo ? <img src={person.photo} alt="" style={{ width: 42, height: 42, borderRadius: 16, objectFit: 'cover' }} /> : <div style={{ width: 42, height: 42, borderRadius: 16, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontWeight: 900 }}>{(person.displayName || 'А')[0]}</div>}
+                          <div style={{ color: APG2.text, fontSize: 11.5, lineHeight: '14px', fontWeight: 820, textAlign: 'center', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.displayName}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {peopleSections.recentGroups.length > 0 && (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 900 }}>🟢 Недавние</div>
+                    {peopleSections.recentGroups.slice(0, 3).map(group => (
+                      <div key={group.id} style={{ display: 'grid', gap: 6 }}>
+                        <div style={{ color: APG2.textMuted, fontSize: 11, lineHeight: '15px', fontWeight: 760 }}>{group.label}</div>
+                        {group.rows.slice(0, 2).map(person => (
+                          <button key={`${group.id}:${person.id}`} type="button" onClick={() => person.dialogId ? onOpenDialog?.(person.dialogId) : openPersonProfile(person)} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', borderRadius: 16, padding: 9, display: 'flex', gap: 9, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', animation: 'fadeInUp 0.3s ease both' }}>
+                            {person.photo ? <img src={person.photo} alt="" style={{ width: 34, height: 34, borderRadius: 13, objectFit: 'cover' }} /> : <div style={{ width: 34, height: 34, borderRadius: 13, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontWeight: 900 }}>{(person.displayName || 'А')[0]}</div>}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ color: APG2.text, fontSize: 12.5, lineHeight: '16px', fontWeight: 830, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.displayName}</div>
+                              <div style={{ color: APG2.textMuted, fontSize: 10.5, lineHeight: '14px', marginTop: 1 }}>{peoplePresenceLabel(person) || person.company || 'Недавний диалог'}</div>
+                            </div>
+                            <span style={{ color: APG2.gold, fontSize: 14 }}>💬</span>
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {peopleSections.friends.length > 0 && (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 900 }}>👥 Друзья</div>
+                    {peopleSections.friends.slice(0, 3).map(person => (
+                      <button key={person.id} type="button" onClick={() => person.dialogId ? onOpenDialog?.(person.dialogId) : openPersonProfile(person)} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', borderRadius: 16, padding: 9, display: 'flex', gap: 9, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', animation: 'fadeInUp 0.32s ease both' }}>
+                        {person.photo ? <img src={person.photo} alt="" style={{ width: 36, height: 36, borderRadius: 14, objectFit: 'cover' }} /> : <div style={{ width: 36, height: 36, borderRadius: 14, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontWeight: 900 }}>{(person.displayName || 'А')[0]}</div>}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: APG2.text, fontSize: 12.8, lineHeight: '17px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.displayName}</div>
+                          <div style={{ color: APG2.textMuted, fontSize: 10.8, lineHeight: '15px' }}>{person.company || person.role || peoplePresenceLabel(person) || 'Друг АПГ'}</div>
+                        </div>
+                        <span style={{ color: APG2.gold, fontSize: 14 }}>💬</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {peopleSections.suggestions.length > 0 && (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 900 }}>✨ Возможно, вы знакомы</div>
+                    {peopleSections.suggestions.slice(0, 3).map(person => (
+                      <button key={person.id} type="button" onClick={() => openPersonProfile(person)} style={{ border: '1px solid rgba(74,144,217,0.18)', background: 'rgba(74,144,217,0.08)', borderRadius: 16, padding: 10, display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', animation: 'fadeInUp 0.34s ease both' }}>
+                        {person.photo ? <img src={person.photo} alt="" style={{ width: 38, height: 38, borderRadius: 14, objectFit: 'cover' }} /> : <div style={{ width: 38, height: 38, borderRadius: 14, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontWeight: 900 }}>{(person.displayName || 'А')[0]}</div>}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.displayName}</div>
+                          <div style={{ color: '#4A90D9', fontSize: 11, lineHeight: '15px', marginTop: 1, fontWeight: 780 }}>{peopleSuggestionReason(person)}</div>
+                        </div>
+                        <GlassButton onClick={(e) => { e.stopPropagation(); requestConnection(person.id, 'suggestion'); }} tone="gold" style={{ minHeight: 30, borderRadius: 13, padding: '5px 9px', fontSize: 11 }}>Добавить</GlassButton>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {incomingConnectionRequests.slice(0, 3).map(item => (
               <div key={item.id} style={{ borderRadius: 16, padding: 10, border: '1px solid rgba(201,168,76,0.22)', background: 'rgba(201,168,76,0.08)', display: 'grid', gap: 8 }}>
                 <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 820 }}>{item.sender?.displayName || item.senderId || 'Участник АПГ'} хочет познакомиться</div>
@@ -2094,6 +2194,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 </div>
               </div>
             ))}
+            <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 900 }}>{peopleSearch.trim() ? 'Smart Search' : 'Все пользователи'}</div>
             {peopleSearchLoading && <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '17px' }}>Ищем участников...</div>}
             {visiblePeopleRows.length > 0 ? (
               <div style={{ display: 'grid', gap: 8 }}>
@@ -2102,22 +2203,28 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                   const primaryDisabled = person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING || person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED || (person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && !person.dialogId);
                   return (
                   <div key={person.id} data-people-card style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 16, padding: 10, display: 'grid', gap: 9 }}>
-                    <button type="button" onClick={() => openPersonProfile(person)} style={{ border: 0, background: 'transparent', padding: 0, display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <button type="button" onClick={() => person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && person.dialogId ? onOpenDialog?.(person.dialogId) : openPersonProfile(person)} style={{ border: 0, background: 'transparent', padding: 0, display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
                     {person.photo
                       ? <img src={person.photo} alt="" style={{ width: 38, height: 38, borderRadius: 14, objectFit: 'cover', flexShrink: 0 }} />
                       : <div style={{ width: 38, height: 38, borderRadius: 14, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontWeight: 900, flexShrink: 0 }}>{(person.displayName || 'А')[0]}</div>
                     }
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ color: APG2.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.displayName}</div>
-                      <div style={{ color: APG2.textMuted, fontSize: 11.5, lineHeight: '16px', marginTop: 1 }}>{[person.company, person.role, person.expert, person.city].filter(Boolean).slice(0, 2).join(' · ') || 'Участник АПГ'}</div>
+                      <div style={{ color: APG2.textMuted, fontSize: 11.5, lineHeight: '16px', marginTop: 1 }}>{[person.company, person.role, person.expert, peoplePresenceLabel(person)].filter(Boolean).slice(0, 2).join(' · ') || 'Участник АПГ'}</div>
                       <div style={{ color: APG2.textSoft, fontSize: 10.5, lineHeight: '15px', marginTop: 4 }}>
                         {peopleStatusLabel(person.relationStatus)} · {person.shared?.contacts?.length || 0} общих друзей · {person.shared?.events?.length || 0} мероприятий · {person.shared?.partners?.length || 0} партнёров
                       </div>
+                      {personInterestTags(person).length > 0 && (
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6 }}>
+                          {personInterestTags(person).slice(0, 3).map(tag => <span key={tag} style={{ color: APG2.textMuted, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', borderRadius: 999, padding: '3px 7px', fontSize: 10, lineHeight: '12px' }}>{tag}</span>)}
+                        </div>
+                      )}
                     </div>
                     </button>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       <GlassButton onClick={() => runPersonPrimaryAction(person)} disabled={primaryDisabled} tone="gold" style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>{primaryLabel}</GlassButton>
                       <GlassButton onClick={() => openPersonProfile(person)} style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>Профиль</GlassButton>
+                      <GlassButton onClick={() => togglePinnedPerson(person.id)} style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>{pinnedPeopleIds.includes(String(person.id)) ? 'Открепить' : 'Закрепить'}</GlassButton>
                       {person.phone && <GlassButton onClick={() => openUrl(`tel:${String(person.phone).replace(/[^\d+]/g, '')}`)} style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>Позвонить</GlassButton>}
                     </div>
                   </div>
@@ -3601,6 +3708,57 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             ))}
           </div>
         </ApgModal>,
+        document.body
+      )}
+
+      {peopleSheet && createPortal(
+        <div
+          data-people-bottom-sheet
+          onClick={e => { if (e.target === e.currentTarget) setPeopleSheet(null); }}
+          style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.42)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 12px calc(var(--safe-bottom, 0px) + 12px)', animation: 'fadeInUp 0.18s ease both' }}
+        >
+          <div style={{ width: '100%', maxWidth: 520, borderRadius: '28px 28px 24px 24px', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: 'linear-gradient(180deg, rgba(var(--apg2-panel-rgb,22,22,26),0.98), rgba(var(--apg2-panel-rgb,22,22,26),0.94))', boxShadow: '0 -22px 54px rgba(0,0,0,0.36)', padding: 16, display: 'grid', gap: 13, boxSizing: 'border-box', animation: 'fadeInUp 0.26s ease both' }}>
+            <div style={{ width: 44, height: 4, borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.20)', justifySelf: 'center' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '68px minmax(0,1fr) auto', gap: 13, alignItems: 'center' }}>
+              {peopleSheet.photo ? <img src={peopleSheet.photo} alt="" style={{ width: 68, height: 68, borderRadius: 24, objectFit: 'cover' }} /> : <div style={{ width: 68, height: 68, borderRadius: 24, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontSize: 25, fontWeight: 950 }}>{(peopleSheet.displayName || 'А')[0]}</div>}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: APG2.text, fontSize: 20, lineHeight: '25px', fontWeight: 940, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{peopleSheet.displayName}</div>
+                <div style={{ color: APG2.textMuted, fontSize: 12.5, lineHeight: '18px', marginTop: 4 }}>{[peopleSheet.company, peopleSheet.role, peopleSheet.expert, peoplePresenceLabel(peopleSheet)].filter(Boolean).slice(0, 3).join(' · ') || 'Участник АПГ'}</div>
+              </div>
+              <button type="button" onClick={() => togglePinnedPerson(peopleSheet.id)} aria-label="Закрепить человека" style={{ width: 38, height: 38, borderRadius: '50%', border: '1px solid rgba(201,168,76,0.26)', background: pinnedPeopleIds.includes(String(peopleSheet.id)) ? APG2.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.07)', color: APG2.gold, fontSize: 17, cursor: 'pointer' }}>⭐</button>
+            </div>
+            {(peopleSheet.about || peopleSheet.city || peopleSuggestionReason(peopleSheet)) && (
+              <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>
+                {peopleSheet.about || peopleSuggestionReason(peopleSheet) || peopleSheet.city}
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {[
+                ['Друзья', peopleSheet.shared?.contacts?.length || 0],
+                ['Мероприятия', peopleSheet.shared?.events?.length || 0],
+                ['Партнёры', peopleSheet.shared?.partners?.length || 0],
+              ].map(([label, value]) => (
+                <div key={label} style={{ borderRadius: 16, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', padding: 9, textAlign: 'center' }}>
+                  <div style={{ color: APG2.text, fontSize: 18, lineHeight: '21px', fontWeight: 930 }}>{value}</div>
+                  <div style={{ color: APG2.textMuted, fontSize: 10, lineHeight: '13px', marginTop: 2 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+            {personInterestTags(peopleSheet).length > 0 && (
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                {personInterestTags(peopleSheet).map(tag => <span key={tag} style={{ color: APG2.textSoft, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 999, padding: '5px 9px', fontSize: 11.5, lineHeight: '14px' }}>{tag}</span>)}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <GlassButton onClick={() => { runPersonPrimaryAction(peopleSheet); if (peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND) setPeopleSheet(null); }} tone="gold" style={{ flex: 1, minHeight: 40 }}>{peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Заявка отправлена' : 'Добавить'}</GlassButton>
+              <GlassButton onClick={() => setPeopleSheet(null)} style={{ flex: 1, minHeight: 40 }}>Открыть полный профиль</GlassButton>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <GlassButton onClick={() => { setPeopleSearch(peopleSheet.displayName || ''); setShowConnectionsModal(true); }} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 12 }}>Поиск</GlassButton>
+              {peopleSheet.phone && <GlassButton onClick={() => openUrl(`tel:${String(peopleSheet.phone).replace(/[^\d+]/g, '')}`)} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 12 }}>Позвонить</GlassButton>}
+            </div>
+          </div>
+        </div>,
         document.body
       )}
 
