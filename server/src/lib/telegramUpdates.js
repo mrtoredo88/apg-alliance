@@ -106,6 +106,47 @@ function canAttachReferral(referrerId, userId) {
   return !!referrerId && !!userId && referrerId !== userId && !referrerId.startsWith('guest_') && !userId.startsWith('guest_');
 }
 
+function buildTelegramProfilePayload(from = {}, photoUrl = '') {
+  const avatar = safeDebugString(photoUrl, 1000);
+  const payload = {
+    firstName: from.first_name ?? null,
+    lastName: from.last_name ?? null,
+    username: from.username ?? null,
+  };
+  if (avatar) {
+    payload.photo = avatar;
+    payload.photo_200 = avatar;
+    payload.photoUrl = avatar;
+  }
+  return payload;
+}
+
+async function syncTelegramAvatarToCanonicalProfile(db, userId, from = {}, photoUrl = '', log = console) {
+  const avatar = safeDebugString(photoUrl, 1000);
+  const canonicalUserId = safeDebugString(userId, 260);
+  if (!db || !canonicalUserId || !avatar) return false;
+  try {
+    await db.collection('users').doc(canonicalUserId).set({
+      photo: avatar,
+      linkedTelegram: {
+        tgId: String(from.id || ''),
+        telegramId: String(from.id || ''),
+        ...buildTelegramProfilePayload(from, avatar),
+        linkedAt: new Date().toISOString(),
+      },
+      lastSeen: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return true;
+  } catch (error) {
+    log.warn?.({
+      userId: canonicalUserId,
+      telegramId: safeDebugString(from.id, 120),
+      message: error?.message || String(error),
+    }, 'telegram avatar canonical profile sync failed');
+    return false;
+  }
+}
+
 async function upsertUser(db, from, photoUrl, referral = {}) {
   const uid      = `tg_${from.id}`;
   const userRef  = db.collection('users').doc(uid);
@@ -283,6 +324,7 @@ export async function processTelegramUpdate(db, update, log = console) {
       const ownerUserId = String(session.ownerUserId || '').trim();
       let linkError = '';
       let linkedOwnerId = ownerUserId || null;
+      let linkedPhotoUrl = null;
 
       const resolvedOwnerUserId = await resolveTelegramLinkOwner(ownerUserId);
       if (!resolvedOwnerUserId) {
@@ -293,12 +335,7 @@ export async function processTelegramUpdate(db, update, log = console) {
           const telegramLinkParams = {
             telegramId: String(from.id),
             userId: resolvedOwnerUserId,
-            telegram: {
-              firstName: from.first_name ?? null,
-              lastName: from.last_name ?? null,
-              username: from.username ?? null,
-              photo: null,
-            },
+            telegram: buildTelegramProfilePayload(from),
           };
           log.info?.({
             state,
@@ -338,6 +375,30 @@ export async function processTelegramUpdate(db, update, log = console) {
             ? 'already_linked'
             : 'link_failed';
         }
+        if (!linkError) {
+          try {
+            linkedPhotoUrl = await tgGetPhotoUrl(from.id);
+            if (linkedPhotoUrl) {
+              const telegramAvatarParams = {
+                telegramId: String(from.id),
+                userId: resolvedOwnerUserId,
+                telegram: buildTelegramProfilePayload(from, linkedPhotoUrl),
+              };
+              await serverFoundation.identityV2.linkTelegram(telegramAvatarParams);
+              await syncTelegramAvatarToCanonicalProfile(db, resolvedOwnerUserId, from, linkedPhotoUrl, log);
+            }
+          } catch (error) {
+            log.warn?.({
+              state,
+              requestId,
+              loginSessionId,
+              telegramSessionId: state,
+              stage: 'telegram_avatar_sync_after_link.throw',
+              code: error?.code || null,
+              message: safeDebugString(error?.message, 220),
+            }, 'telegram-update-linking-forensic');
+          }
+        }
       }
       await appendTelegramTimeline(ref, {
         stage: 'telegram_auth_link_validation',
@@ -358,7 +419,8 @@ export async function processTelegramUpdate(db, update, log = console) {
         firstName: from.first_name ?? '',
         lastName: from.last_name ?? '',
         username: from.username ?? '',
-        photoUrl: null,
+        photoUrl: linkedPhotoUrl || null,
+        photo_200: linkedPhotoUrl || null,
         completedAt: FieldValue.serverTimestamp(),
       });
       tgSend(from.id,
@@ -394,13 +456,15 @@ export async function processTelegramUpdate(db, update, log = console) {
       referralSessionId: safeDebugString(referralSessionId, 200),
       resolvedReferrerId: safeDebugString(resolvedReferrerId, 200),
     }, log);
+    const photoUrl = await tgGetPhotoUrl(from.id);
     await ref.update({
       status:    'done',
       tgUserId:  String(from.id),
       firstName: from.first_name ?? '',
       lastName:  from.last_name  ?? '',
       username:  from.username   ?? '',
-      photoUrl:  null,
+      photoUrl:  photoUrl || null,
+      photo_200: photoUrl || null,
       referrerId: resolvedReferrerId || null,
       referralSessionId: referralSessionId || null,
       referralCompletedAt: resolvedReferrerId ? FieldValue.serverTimestamp() : null,
@@ -417,8 +481,8 @@ export async function processTelegramUpdate(db, update, log = console) {
       }, log);
     }
 
-    tgGetPhotoUrl(from.id)
-      .then(photoUrl => upsertUser(db, from, photoUrl, {
+    Promise.resolve(photoUrl)
+      .then(resolvedPhotoUrl => upsertUser(db, from, resolvedPhotoUrl, {
         referrerId: resolvedReferrerId,
         referralSessionId,
         referralFlowId: session.referralFlowId || sessionResolution.session?.data?.flowId || '',

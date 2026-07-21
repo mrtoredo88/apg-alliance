@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-21] fix: Telegram Avatar Sync After Linking
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server/src/lib/telegramUpdates.js`, `server/src/routes/telegram-auth-check.js`, `scripts/telegram-avatar-sync-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Telegram linking после успешной Identity V2 привязки теперь переиспользует существующий `getUserProfilePhotos`/`getChat` lookup и сохраняет avatar в session, Identity link metadata и `users/{canonicalUser}.photo`.
+- Normal Telegram login ждёт avatar lookup до `status: done`, чтобы `/api/telegram-auth-check` мог вернуть `photo_200` сразу.
+- Добавлен regression contract для new/existing Telegram link, Telegram login, email login после link и canonical merge/profile sync сценариев.
+**Почему:** после Identity V2 link Telegram успешно привязывался, но avatar оставался `null` и не попадал в канонический профиль.
+
 ## [2026-07-20] fix: Email Session Restore Race
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/UserApp.jsx`, `scripts/auth-lifecycle-smoke.mjs`, `.ai/17_CHANGELOG_AI.md`

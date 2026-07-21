@@ -46,6 +46,17 @@ function buildLinkedTelegramPayload(data = {}, tgId = null) {
   };
 }
 
+async function resolveLinkedTelegramPhoto(db, userId) {
+  const normalizedUserId = safeString(userId, 260);
+  if (!normalizedUserId) return '';
+  const identityUser = await serverFoundation.identityV2.getUser(normalizedUserId).catch(() => null);
+  const identityTelegramPhoto = safeString(identityUser?.linkedTelegram?.photo || identityUser?.linkedTelegram?.photoUrl || identityUser?.linkedTelegram?.photo_200 || '', 500);
+  if (identityTelegramPhoto) return identityTelegramPhoto;
+  const snap = await db.collection('users').doc(normalizedUserId).get().catch(() => null);
+  const data = snap?.exists ? (snap.data() || {}) : {};
+  return safeString(data.linkedTelegram?.photo || data.linkedTelegram?.photoUrl || data.linkedTelegram?.photo_200 || '', 500);
+}
+
 function compareSessionIds(query, data) {
   const hasExplicitRequestId = typeof query.requestId === 'string' && query.requestId.trim().length > 0;
   const normalized = {
@@ -192,7 +203,9 @@ export default async function telegramAuthCheckRoutes(fastify) {
         const tgId = `tg_${data.tgUserId}`;
         if (data.linking === true) {
           const { ownerUserId, linkedOwnerId, resolvedOwnerId } = resolveTelegramOwnerForResponse(data);
-          const linkedTelegram = buildLinkedTelegramPayload(data, tgId);
+          const linkedPhoto = safeString(data.photoUrl || data.photo_200 || data.photo || '', 500)
+            || await resolveLinkedTelegramPhoto(db, resolvedOwnerId);
+          const linkedTelegram = buildLinkedTelegramPayload({ ...data, photoUrl: linkedPhoto || data.photoUrl }, tgId);
           const isLinked = !String(data.linkError || '').trim();
           await ref.set({ checkedAt: new Date() }, { merge: true }).catch(() => {});
           return {
@@ -209,7 +222,7 @@ export default async function telegramAuthCheckRoutes(fastify) {
               first_name: data.firstName ?? '',
               last_name: data.lastName ?? '',
               username: data.username ?? '',
-              photo_200: data.photoUrl ?? null,
+              photo_200: linkedPhoto || null,
             },
             identityV2Attempted: true,
             diagnostics: buildTelegramAuthDiagnostics({
@@ -237,6 +250,7 @@ export default async function telegramAuthCheckRoutes(fastify) {
             telegramId: normalizedTelegramId,
             createIfMissing: true,
           });
+          const resolvedPhoto = safeString(data.photoUrl || data.photo_200 || data.photo || identity.user?.photo || identity.user?.linkedTelegram?.photo || '', 500);
           const tokenStartedAt = Date.now();
           const token = await serverFoundation.identityV2.createCustomToken(identity.userId, identity.user || {});
           return {
@@ -248,7 +262,7 @@ export default async function telegramAuthCheckRoutes(fastify) {
               first_name: data.firstName ?? '',
               last_name: data.lastName ?? '',
               username: data.username ?? null,
-              photo_200: data.photoUrl ?? null,
+              photo_200: resolvedPhoto || null,
               email: identity.user?.email || '',
             },
             diagnostics: buildTelegramAuthDiagnostics({
