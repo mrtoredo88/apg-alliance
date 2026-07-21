@@ -1,5 +1,3 @@
-import { getDb } from '../lib/firebase.js';
-import { FirestoreIdentityFallbackAdapter } from './infrastructure/adapters/FirestoreIdentityFallbackAdapter.js';
 import { PostgresIdentityAdapter } from './infrastructure/adapters/PostgresIdentityAdapter.js';
 import { FirebaseAdminIdentityProvider } from './identity/providers/FirebaseAdminIdentityProvider.js';
 import { ApgIdentityV2Service } from './identity/ApgIdentityV2Service.js';
@@ -14,7 +12,6 @@ import {
 
 export function createIdentityV2({
   postgresAdapter = new PostgresIdentityAdapter(),
-  legacySource = new FirestoreIdentityFallbackAdapter(getDb),
   tokenProvider = new FirebaseAdminIdentityProvider(),
   flags = {},
 } = {}) {
@@ -24,5 +21,5 @@ export function createIdentityV2({
   const roles = new RoleRepository(postgresAdapter);
   const sessions = new SessionRepository(postgresAdapter);
   const repository = new IdentityRepository({ users, emails, links, roles, sessions });
-  return new ApgIdentityV2Service({ repository, sessionRepository: sessions, legacySource, tokenProvider, flags });
+  return new ApgIdentityV2Service({ repository, sessionRepository: sessions, tokenProvider, flags });
 }

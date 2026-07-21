@@ -6,7 +6,6 @@ import { getDbMessaging } from '../lib/firebase.js';
 import webpush from 'web-push';
 import { ECONOMY_CONFIG, ECONOMY_VERSION, calculateTicketExchange, economyMigrationPatch, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
 import { upsertErrorLog } from '../../../server-shared/error-log.js';
-import { buildIdentityDiagnostics, resolveFirebaseIdentity } from '../lib/identityCore.js';
 import { hasRole, ROLES } from '../../../server-shared/role-engine.js';
 import {
   CONTEXT_DIALOG_TYPES,
@@ -348,24 +347,19 @@ function mergePushSubscriptions(existing = [], current = null) {
 }
 
 async function resolveActor(db, decoded) {
-  const identity = await resolveFirebaseIdentity(db, decoded.uid).catch(() => null);
-  if (identity?.userId) return identity;
-
-  const direct = await db.collection('users').doc(decoded.uid).get().catch(() => null);
-  if (direct?.exists) return { uid: decoded.uid, userId: decoded.uid, user: direct.data() || {}, source: 'users.uid' };
-
-  const map = await db.collection('auth_map').doc(decoded.uid).get().catch(() => null);
-  const mappedUserId = map?.exists ? safeUserId(map.data()?.vkId || map.data()?.userId) : '';
-  if (mappedUserId) {
-    const mapped = await db.collection('users').doc(mappedUserId).get().catch(() => null);
-    return { uid: decoded.uid, userId: mappedUserId, user: mapped?.data?.() || {}, source: 'auth_map' };
+  const identity = await serverFoundation.identityV2.getUser(decoded.uid).catch(() => null);
+  if (!identity?.id && !identity?.userId) {
+    const error = new Error('Пользователь Identity не найден.');
+    error.statusCode = 401;
+    error.code = 'USER_NOT_FOUND';
+    throw error;
   }
-
-  for (const field of ['firebaseUid', 'authUid']) {
-    const snap = await db.collection('users').where(field, '==', decoded.uid).limit(1).get().catch(() => null);
-    if (snap?.docs?.[0]) return { uid: decoded.uid, userId: snap.docs[0].id, user: snap.docs[0].data() || {}, source: `users.${field}` };
-  }
-  return { uid: decoded.uid, userId: decoded.uid, user: {}, source: 'token' };
+  return {
+    uid: decoded.uid,
+    userId: safeUserId(identity?.id || identity?.userId || ''),
+    user: identity?.user || identity || {},
+    source: 'identity_v2',
+  };
 }
 
 async function requireActor(req) {
@@ -421,22 +415,34 @@ async function audit(db, req, actor, action, targetType, targetId, result = 'suc
 
 async function actionAuthLink(db, req, actor) {
   const userId = safeUserId(req.body?.userId);
-  if (!userId) throw Object.assign(new Error('Не указан пользователь.'), { statusCode: 400 });
-  if ((userId.startsWith('email:') || userId.startsWith('tg_')) && actor.uid !== userId) {
-    await audit(db, req, actor, 'auth:linkUser:blocked', 'auth_map', actor.uid, 'blocked', { requestedUserId: userId, reason: 'strong_identity_required' });
+  if (!userId) {
+    throw Object.assign(new Error('Не указан пользователь.'), { statusCode: 400 });
+  }
+  if ((userId.startsWith('email:') || userId.startsWith('tg_')) && actor.uid !== userId && actor.userId !== userId) {
+    await audit(db, req, actor, 'auth:linkUser:blocked', 'identity', actor.uid, 'blocked', { requestedUserId: userId, reason: 'strong_identity_required' });
     throw Object.assign(new Error('Для этого аккаунта требуется повторная авторизация.'), { statusCode: 403 });
   }
-  await db.collection('auth_map').doc(actor.uid).set({
-    vkId: userId,
+  if (userId !== actor.userId && userId.startsWith('email:')) {
+    const target = await serverFoundation.identityV2.resolveEmailIdentity({ email: safeString(userId.slice(6)), createIfMissing: false }).catch(() => null);
+    if (target?.userId && target.userId !== actor.userId) {
+      await audit(db, req, actor, 'auth:linkUser:blocked', 'identity', actor.uid, 'blocked', { requestedUserId: userId, reason: 'identity_mismatch' });
+      throw Object.assign(new Error('Нельзя привязать чужую учётную запись.'), { statusCode: 403 });
+    }
+  }
+  if (userId !== actor.userId && userId.startsWith('tg_')) {
+    const target = await serverFoundation.identityV2.resolveTelegramIdentity({ telegramId: safeString(userId.slice(3)), createIfMissing: false }).catch(() => null);
+    if (target?.userId && target.userId !== actor.userId) {
+      await audit(db, req, actor, 'auth:linkUser:blocked', 'identity', actor.uid, 'blocked', { requestedUserId: userId, reason: 'identity_mismatch' });
+      throw Object.assign(new Error('Нельзя привязать чужую учётную запись.'), { statusCode: 403 });
+    }
+  }
+  await audit(db, req, { ...actor, userId }, 'auth:linkUser', 'identity', actor.uid);
+  return {
+    ok: true,
     userId,
-    canonicalUserId: actor.user?.canonicalUserId || userId,
-    source: safeString(req.body?.source || 'user-actions', 80),
-    identityVersion: 'identity-core-v1',
-    updatedAt: FieldValue.serverTimestamp(),
-    createdAt: FieldValue.serverTimestamp(),
-  }, { merge: true });
-  await audit(db, req, { ...actor, userId }, 'auth:linkUser', 'auth_map', actor.uid);
-  return { ok: true, userId, canonicalUserId: actor.user?.canonicalUserId || userId };
+    canonicalUserId: actor.user?.canonicalUserId || actor.userId || userId,
+    identityStatus: actor.user?.identityStatus || 'canonical',
+  };
 }
 
 async function actionIdentityDiagnostics(db, req, actor) {
@@ -444,14 +450,91 @@ async function actionIdentityDiagnostics(db, req, actor) {
   if (requestedUserId && requestedUserId !== actor.userId && actor.uid !== requestedUserId) {
     assertOwner(actor);
   }
-  const email = safeString(req.body?.email || actor.user?.email || actor.user?.linkedEmail, 220).toLowerCase();
-  const diagnostics = await buildIdentityDiagnostics(db, {
-    userId: requestedUserId || actor.userId,
-    email,
-    firebaseUid: actor.uid,
-  });
-  await audit(db, req, actor, 'identity:diagnostics', 'users', diagnostics.canonicalUserId || requestedUserId, 'success', { documents: diagnostics.documents.length });
-  return diagnostics;
+  const normalizedEmail = safeString(req.body?.email || actor.user?.email || actor.user?.linkedEmail, 220).toLowerCase();
+  const normalizedRequested = requestedUserId || actor.userId;
+  const normalizeRoles = (roles = []) => Array.from(new Set((Array.isArray(roles) ? roles : [roles || 'user']).map((value) => safeString(value, 80)).filter(Boolean)));
+  const documents = [];
+  const addDoc = (doc = {}) => {
+    const id = safeString(doc.id, 260);
+    if (!id || documents.some(item => item.id === id)) return;
+    documents.push({
+      id,
+      canonicalUserId: safeString(doc.canonicalUserId || doc.canonical_user_id || doc.id, 260),
+      role: safeString(doc.role || 'user', 80),
+      userRole: safeString(doc.userRole || doc.role || 'user', 80),
+      roles: normalizeRoles(doc.roles || ['user']),
+      identityStatus: safeString(doc.identityStatus || doc.identity_version || doc.identityVersion || 'legacy', 80),
+      score: 1000 + (Array.isArray(doc.roles) ? doc.roles.length * 10 : 0),
+    });
+  };
+  const collectFromUser = async (identity, fallbackId = '') => {
+    if (!identity) return;
+    const doc = identity.user || identity;
+    const userId = doc.id || doc.userId || fallbackId;
+    if (userId) addDoc({ ...doc, id: safeUserId(userId) });
+  };
+
+  const actorUser = requestedUserId ? await serverFoundation.identityV2.getUser(requestedUserId).catch(() => null) : null;
+  const requestedAliasIsEmail = String(normalizedRequested).startsWith('email:');
+  const requestedAliasIsTelegram = String(normalizedRequested).startsWith('tg_');
+  if (requestedAliasIsEmail) {
+    const aliasUser = await serverFoundation.identityV2.resolveEmailIdentity({
+      email: safeString(normalizedRequested.slice(6)),
+      createIfMissing: false,
+    }).catch(() => null);
+    if (aliasUser) await collectFromUser(aliasUser, aliasUser.userId || aliasUser.id || normalizedRequested);
+  } else if (requestedAliasIsTelegram) {
+    const aliasUser = await serverFoundation.identityV2.resolveTelegramIdentity({
+      telegramId: safeString(normalizedRequested),
+      createIfMissing: false,
+    }).catch(() => null);
+    if (aliasUser) await collectFromUser(aliasUser, aliasUser.userId || aliasUser.id || normalizedRequested);
+  } else if (normalizedRequested) {
+    await collectFromUser(await serverFoundation.identityV2.getUser(normalizedRequested).catch(() => null), normalizedRequested);
+  }
+
+  if (normalizedEmail) {
+    const emailUser = await serverFoundation.identityV2.resolveEmailIdentity({
+      email: normalizedEmail,
+      createIfMissing: false,
+    }).catch(() => null);
+    if (emailUser) await collectFromUser(emailUser, emailUser.userId || emailUser.id || `email:${normalizedEmail}`);
+  }
+  if (actor.uid && actorUser?.userId !== normalizedRequested && actorUser?.userId !== actor.userId) {
+    await collectFromUser(actorUser, actor.userId);
+  }
+  if (documents.length === 0) {
+    await collectFromUser(actor, actor.userId);
+  }
+
+  const canonical = documents.length ? documents.sort((left, right) => right.score - left.score)[0] : null;
+  const actorCanonical = safeUserId(canonical?.canonicalUserId || actor.user?.canonicalUserId || requestedUserId || actor.userId);
+  const openedUserId = safeUserId(requestedUserId || actor.userId || actor.uid);
+  const canonicalUserId = safeUserId(canonical?.id || canonical?.canonicalUserId || actorCanonical || openedUserId);
+  const canonicalDoc = documents.find(row => row.id === canonicalUserId) || documents.find(row => row.canonicalUserId === canonicalUserId);
+  const roles = normalizeRoles(canonicalDoc?.roles || actor.user?.roles || actor.user?.role || ['user']);
+  const userDocs = canonicalDoc || {};
+  const partnerCabinetIds = Array.isArray(userDocs.partnerCabinetIds) ? userDocs.partnerCabinetIds : [];
+  const expertCabinetIds = Array.isArray(userDocs.expertCabinetIds) ? userDocs.expertCabinetIds : [];
+  const cabinets = {
+    partnerCabinetIds: Array.from(new Set(partnerCabinetIds.map(item => safeString(item, 220)).filter(Boolean))),
+    expertCabinetIds: Array.from(new Set(expertCabinetIds.map(item => safeString(item, 220)).filter(Boolean))),
+  };
+  const reason = canonicalUserId
+    ? `Identity V2 выбрал ${canonicalUserId} по identity users.` 
+    : 'Canonical User не найден.';
+  await audit(db, req, actor, 'identity:diagnostics', 'identity', canonicalUserId || openedUserId, 'success', { documents: documents.length });
+  return {
+    ok: true,
+    canonicalUserId,
+    openedUserId,
+    email: normalizedEmail,
+    firebaseUid: safeString(actor.uid, 220),
+    roles,
+    cabinets,
+    documents,
+    reason,
+  };
 }
 
 async function actionProfileSync(db, req, actor) {

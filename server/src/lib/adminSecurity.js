@@ -1,6 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb, getDbAuth } from './firebase.js';
-import { resolveFirebaseIdentity } from './identityCore.js';
+import { serverFoundation } from '../apg/index.js';
 import { getPrimaryRole, normalizeRole as normalizeSharedRole, ROLE_REGISTRY } from '../../../server-shared/role-engine.js';
 
 export const ROLE_PERMISSIONS = {
@@ -38,23 +38,8 @@ function getBearerToken(request) {
 }
 
 async function findUserByFirebaseUid(db, uid) {
-  const identity = await resolveFirebaseIdentity(db, uid).catch(() => null);
-  if (identity?.userId) return { id: identity.userId, data: identity.user || {}, source: identity.source || 'identity_core' };
-
-  const direct = await db.collection('users').doc(uid).get().catch(() => null);
-  if (direct?.exists) return { id: direct.id, data: direct.data() || {}, source: 'users.uid' };
-
-  const map = await db.collection('auth_map').doc(uid).get().catch(() => null);
-  const mappedUserId = map?.exists ? String(map.data()?.vkId || map.data()?.userId || '').trim() : '';
-  if (mappedUserId) {
-    const mapped = await db.collection('users').doc(mappedUserId).get().catch(() => null);
-    if (mapped?.exists) return { id: mapped.id, data: mapped.data() || {}, source: 'auth_map' };
-  }
-
-  for (const field of ['firebaseUid', 'authUid']) {
-    const snap = await db.collection('users').where(field, '==', uid).limit(1).get().catch(() => null);
-    if (snap?.docs?.[0]) return { id: snap.docs[0].id, data: snap.docs[0].data() || {}, source: `users.${field}` };
-  }
+  const identity = await serverFoundation.identityV2.getUser(uid).catch(() => null);
+  if (identity?.id) return { id: identity.id, data: identity, source: 'identity_v2' };
   return null;
 }
 
@@ -68,17 +53,30 @@ export async function requireAdminPermission(request, permission) {
   }
 
   const decoded = await getDbAuth().verifyIdToken(token);
-  const claimRole = normalizeRole(decoded.role || decoded.userRole || (decoded.owner ? 'owner' : decoded.admin ? 'admin' : ''));
   const userRecord = await findUserByFirebaseUid(db, decoded.uid);
-  const adminStatus = String(userRecord?.data?.adminStatus || userRecord?.data?.status || 'active').toLowerCase();
-  if (userRecord?.data && adminStatus && adminStatus !== 'active') {
-    const error = new Error('Доступ администратора отключён.');
-    error.statusCode = 403;
-    error.role = normalizeRole(userRecord.data.role || userRecord.data.userRole || claimRole);
+  if (!userRecord) {
+    const error = new Error('Пользователь Identity не найден.');
+    error.statusCode = 401;
+    error.code = 'USER_NOT_FOUND';
     throw error;
   }
-  const userRole = getPrimaryRole(userRecord?.data || { role: claimRole });
-  const role = roleRank(claimRole) > roleRank(userRole) ? claimRole : userRole;
+
+  const adminStatus = String(userRecord.data.adminStatus || userRecord.data.status || 'active').toLowerCase();
+  if (adminStatus && adminStatus !== 'active') {
+    const error = new Error('Доступ администратора отключён.');
+    error.statusCode = 403;
+    error.role = normalizeRole(userRecord.data.role || userRecord.data.userRole);
+    throw error;
+  }
+  const userRole = getPrimaryRole(userRecord?.data || {});
+  if (!userRole) {
+    const error = new Error('Роль администратора не определена в Identity.');
+    error.statusCode = 403;
+    error.code = 'ROLE_NOT_DEFINED';
+    error.role = 'user';
+    throw error;
+  }
+  const role = normalizeRole(userRole);
 
   if (!hasPermission(role, permission)) {
     const error = new Error('Недостаточно прав для административного действия.');

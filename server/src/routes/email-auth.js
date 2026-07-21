@@ -3,7 +3,6 @@ import crypto from 'node:crypto';
 import { APP_URL } from '../lib/config.js';
 import { getDb } from '../lib/firebase.js';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { resolveFirebaseIdentity } from '../lib/identityCore.js';
 import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
 import { recordReferralClientEventsAsync, recordReferralEventAsync, referralContextFromBody } from '../lib/referralEvents.js';
 import { resolveReferralSessionReferrer } from '../lib/referralSessions.js';
@@ -23,42 +22,25 @@ async function resolveActorFromIdentity(request) {
 
   const decoded = await serverFoundation.identity.verifySession({ token });
   const uid = String(decoded.uid || '');
-  const fallback = () => ({ uid, userId: uid, user: {}, source: 'token' });
-
-  const byPgUserId = isIdentityUserId(uid) ? await serverFoundation.identityV2.getUser(uid).catch(() => null) : null;
-  if (byPgUserId?.id) {
-    return {
-      uid,
-      userId: byPgUserId.id,
-      user: byPgUserId,
-      source: 'identity_v2_user',
-    };
+  if (!isIdentityUserId(uid)) {
+    const error = new Error('Неверный identity token.');
+    error.statusCode = 401;
+    throw error;
   }
 
-  const identity = await resolveFirebaseIdentity(getDb(), uid).catch(() => null);
-  if (identity?.userId) {
-    const canonical = await serverFoundation.identityV2.getUser(identity.userId).catch(() => null);
-    if (canonical?.id) {
-      return {
-        uid,
-        userId: canonical.id,
-        user: canonical,
-        source: `${identity.source || 'identity_core'}_resolved_to_identity_v2`,
-      };
-    }
+  const byPgUser = await serverFoundation.identityV2.getUser(uid).catch(() => null);
+  if (!byPgUser?.id) {
+    const error = new Error('Пользователь не найден в Identity runtime.');
+    error.statusCode = 401;
+    throw error;
   }
 
-  const direct = await getDb().collection('users').doc(uid).get().catch(() => null);
-  if (direct?.exists) return { uid, userId: uid, user: direct.data() || {}, source: 'users.uid' };
-
-  const map = await getDb().collection('auth_map').doc(uid).get().catch(() => null);
-  const mappedUserId = map?.exists ? safeString(map.data()?.userId || map.data()?.vkId, 180) : '';
-  if (mappedUserId) {
-    const mapped = await getDb().collection('users').doc(mappedUserId).get().catch(() => null);
-    return { uid, userId: mappedUserId, user: mapped?.data?.() || {}, source: 'auth_map' };
-  }
-
-  return fallback();
+  return {
+    uid,
+    userId: byPgUser.id,
+    user: byPgUser,
+    source: 'identity_v2_user',
+  };
 }
 
 const FROM = 'noreply@myapg.ru';
@@ -679,7 +661,7 @@ async function sendVerificationEmail(db, email, userId, appUrl) {
 }
 
 function shouldWriteLegacyIdentitySideEffects() {
-  return !serverFoundation.identityV2.isPostgresPrimary?.() || serverFoundation.identityV2.isLegacyDualWriteEnabled?.();
+  return false;
 }
 
 async function resolveEmailUser(db, email, ref, { createIfMissing = false } = {}) {
@@ -1056,7 +1038,9 @@ export default async function emailAuthRoutes(fastify) {
         }
 
         trace.mark('identity_resolve_started', 'START', { createIfMissing: true, ...emailPublicMeta(email) });
-        const identity = await withEmailLoginStage(trace, 'resolve_email_user', () => resolveEmailUser(db, email, ref ?? null, { createIfMissing: true }), 9000).catch(error => {
+        const identity = await withEmailLoginStage(trace, 'resolve_email_user', () => resolveEmailUser(db, email, ref ?? null, {
+          createIfMissing: true,
+        }), 9000).catch(error => {
           error.code = error?.code === 'USER_NOT_FOUND' ? 'EMAIL_IDENTITY_CREATE_FAILED' : error?.code;
           throw error;
         });
@@ -1295,7 +1279,9 @@ export default async function emailAuthRoutes(fastify) {
         trace.mark('email_auth_started', 'START', { action, createIfMissing: false, ...emailPublicMeta(email) });
         const { ref } = request.body ?? {};
         trace.mark('identity_resolve_started', 'START', { createIfMissing: false, ...emailPublicMeta(email) });
-        const identity = await withEmailLoginStage(trace, 'resolve_email_user', () => resolveEmailUser(db, email, ref ?? null, { createIfMissing: false }), 9000);
+        const identity = await withEmailLoginStage(trace, 'resolve_email_user', () => resolveEmailUser(db, email, ref ?? null, {
+          createIfMissing: false,
+        }), 9000);
         trace.identityResolved = true;
         trace.apgUserIdHash = hashValue(identity.userId || '');
         trace.mark('identity_resolve_succeeded', 'OK', { userIdHash: trace.apgUserIdHash, source: identity.source || null });

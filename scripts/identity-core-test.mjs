@@ -6,7 +6,7 @@ import {
   normalizeRole,
   selectCanonicalUserForTest,
   shouldMigrateLegacyData,
-} from '../server/src/lib/identityCore.js';
+} from '../server/src/legacy/identity/identityCore.js';
 import { canUseDesktopWorkspace, DESKTOP_WORKSPACE_FLAG, getWorkspaceUserRoles } from '../src/workspace/WorkspaceFeatureFlags.js';
 
 assert.equal(normalizeRole('OWNER'), 'owner');

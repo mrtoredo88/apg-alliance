@@ -35,9 +35,6 @@ yc serverless container revision deploy \
   --environment APG_IDENTITY_DATABASE_URL="$(get_env APG_IDENTITY_DATABASE_URL)" \
   --environment IDENTITY_PROVIDER="$(get_env IDENTITY_PROVIDER)" \
   --environment IDENTITY_STORAGE="$(get_env IDENTITY_STORAGE)" \
-  --environment IDENTITY_DUAL_READ="$(get_env IDENTITY_DUAL_READ)" \
-  --environment IDENTITY_DUAL_WRITE="${IDENTITY_DUAL_WRITE_OVERRIDE:-false}" \
-  --environment IDENTITY_FALLBACK="$(get_env IDENTITY_FALLBACK)" \
   --environment ACCOUNT_STORAGE="${ACCOUNT_STORAGE_OVERRIDE:-${ACCOUNT_STORAGE:-firestore}}" \
   --environment ACCOUNT_DUAL_READ="${ACCOUNT_DUAL_READ_OVERRIDE:-${ACCOUNT_DUAL_READ:-1}}" \
   --environment ACCOUNT_DUAL_WRITE="${ACCOUNT_DUAL_WRITE_OVERRIDE:-${ACCOUNT_DUAL_WRITE:-0}}" \

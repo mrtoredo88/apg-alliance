@@ -4,7 +4,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getDb } from '../lib/firebase.js';
 import { adminReplyError, requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 import { APP_URL } from '../lib/config.js';
-import { resolveEmailIdentity } from '../lib/identityCore.js';
+import { serverFoundation } from '../apg/index.js';
 import { ECONOMY_VERSION, economyMigrationPatch } from '../../../server-shared/economy-engine.js';
 import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, buildLifecyclePatch, contentTitle, getLifecycleAutoRecommendation, normalizeContentStatus, summarizeLifecycle } from '../../../server-shared/content-lifecycle.js';
 import { hasRole, ROLES } from '../../../server-shared/role-engine.js';
@@ -649,10 +649,11 @@ async function findAuthUser(db, { userId = '', email = '' } = {}) {
     if (snap.exists) return { id: snap.id, ...(snap.data() || {}) };
   }
   if (!normalizedEmail) return null;
-  const fields = ['email', 'linkedEmail', 'normalizedEmail'];
-  for (const field of fields) {
-    const snap = await db.collection('users').where(field, '==', normalizedEmail).limit(1).get();
-    if (!snap.empty) return { id: snap.docs[0].id, ...(snap.docs[0].data() || {}) };
+  const identity = await serverFoundation.identityV2.resolveEmailIdentity({ email: normalizedEmail, createIfMissing: false }).catch(() => null);
+  if (identity?.userId) {
+    const snap = await db.collection('users').doc(String(identity.userId)).get().catch(() => null);
+    const data = snap?.exists ? snap.data() || {} : identity.user || {};
+    return { id: String(identity.userId), ...serializeAdminValue(data) };
   }
   return null;
 }
@@ -689,22 +690,24 @@ async function readTelegramAuthSessions(db, user = {}) {
 async function buildTelegramAuthDiagnostics(db, request) {
   await requireAdminPermission(request, 'users:read');
   const user = await findAuthUser(db, { userId: request.body?.userId, email: request.body?.email });
-  if (!user) return { ok: true, found: false, reason: 'user_not_found', sessions: [], tgLinks: [], conflicts: [] };
+  if (!user) return { ok: true, found: false, reason: 'user_not_found', sessions: [], telegramLinks: [], conflicts: [] };
   const tgId = user.linkedTelegram?.tgId || user.telegramId || user.tgId || (String(user.id).startsWith('tg_') ? user.id : '');
-  const [sessions, linksByUserSnap, tgProfileSnap, tgLinkSnap] = await Promise.all([
-    readTelegramAuthSessions(db, user),
-    db.collection('tgLinks').where('userId', '==', user.id).limit(10).get(),
-    tgId ? db.collection('users').doc(tgId).get() : Promise.resolve(null),
-    tgId ? db.collection('tgLinks').doc(tgId).get() : Promise.resolve(null),
-  ]);
-  const tgLinks = new Map();
-  linksByUserSnap.docs.forEach(doc => tgLinks.set(doc.id, { id: doc.id, ...(doc.data() || {}) }));
-  if (tgLinkSnap?.exists) tgLinks.set(tgLinkSnap.id, { id: tgLinkSnap.id, ...(tgLinkSnap.data() || {}) });
+  const identityLink = tgId ? await serverFoundation.identityV2.repository.links.get('telegram', String(tgId).replace(/^tg_/, '')).catch(() => null) : null;
+  const sessions = await readTelegramAuthSessions(db, user);
+  const telegramLinks = [];
+  if (identityLink?.providerUserId) {
+    telegramLinks.push({
+      id: identityLink.id || String(identityLink.providerUserId),
+      userId: identityLink.userId || null,
+      telegramId: identityLink.providerUserId,
+      createdAt: authDate(identityLink.createdAt || null),
+      updatedAt: authDate(identityLink.updatedAt || null),
+    });
+  }
   const conflicts = [];
-  [...tgLinks.values()].forEach(link => {
-    if (link.userId && String(link.userId) !== String(user.id)) conflicts.push({ type: 'tg_link_owner_mismatch', telegramId: link.id, userId: link.userId });
+  telegramLinks.forEach(link => {
+    if (link.userId && String(link.userId) !== String(user.id)) conflicts.push({ type: 'tg_link_owner_mismatch', telegramId: link.telegramId || link.id, userId: link.userId });
   });
-  if (tgProfileSnap?.exists && tgProfileSnap.id !== user.id) conflicts.push({ type: 'telegram_profile_exists', userId: tgProfileSnap.id });
   const activeSession = sessions.find(item => item.status === 'pending') || null;
   const lastSession = sessions[0] || null;
   return {
@@ -712,11 +715,17 @@ async function buildTelegramAuthDiagnostics(db, request) {
     found: true,
     user: authUserSummary(user.id, user),
     emailAuthStatus: user.email || user.linkedEmail ? (user.emailVerified === false ? 'email_unverified' : 'email_present') : 'email_missing',
-    telegramLinkStatus: conflicts.length ? 'conflict' : ([...tgLinks.values()].length ? 'linked' : 'not_linked'),
+    telegramLinkStatus: conflicts.length ? 'conflict' : (telegramLinks.length ? 'linked' : 'not_linked'),
     activeSession,
     lastSession,
     sessions,
-    tgLinks: [...tgLinks.values()].map(link => ({ id: link.id, userId: link.userId || null, telegramId: link.telegramId || link.id, createdAt: authDate(link.createdAt), updatedAt: authDate(link.updatedAt) })),
+    telegramLinks: telegramLinks.map(link => ({
+      id: link.id,
+      userId: link.userId || null,
+      telegramId: link.telegramId || link.id,
+      createdAt: authDate(link.createdAt),
+      updatedAt: authDate(link.updatedAt),
+    })),
     conflicts,
   };
 }
@@ -1332,23 +1341,12 @@ async function collectPartnerOwnerIdentity(db, user, email) {
 async function findUserByEmail(db, email) {
   const normalized = normalizeEmail(email);
   if (!normalized) return null;
-  const identity = await resolveEmailIdentity(db, { email: normalized, createIfMissing: false }).catch(() => null);
+  const identity = await serverFoundation.identityV2.resolveEmailIdentity({ email: normalized, createIfMissing: false }).catch(() => null);
   if (identity?.userId) {
     const snap = await db.collection('users').doc(identity.userId).get().catch(() => null);
-    if (snap?.exists) return { id: snap.id, ...serializeAdminValue(snap.data() || {}) };
+    const data = snap?.exists ? snap.data() || {} : identity.user || {};
+    return { id: identity.userId, ...serializeAdminValue(data) };
   }
-  const indexSnap = await db.collection('emailIndex').doc(normalized).get().catch(() => null);
-  const candidates = [];
-  if (indexSnap?.exists && indexSnap.data()?.userId) candidates.push(String(indexSnap.data().userId));
-  candidates.push(`email:${normalized}`);
-  for (const id of [...new Set(candidates)]) {
-    const snap = await db.collection('users').doc(id).get().catch(() => null);
-    if (snap?.exists) return { id: snap.id, ...serializeAdminValue(snap.data() || {}) };
-  }
-  const byEmail = await db.collection('users').where('email', '==', normalized).limit(1).get().catch(() => null);
-  if (byEmail && !byEmail.empty) return { id: byEmail.docs[0].id, ...serializeAdminValue(byEmail.docs[0].data() || {}) };
-  const byLinkedEmail = await db.collection('users').where('linkedEmail', '==', normalized).limit(1).get().catch(() => null);
-  if (byLinkedEmail && !byLinkedEmail.empty) return { id: byLinkedEmail.docs[0].id, ...serializeAdminValue(byLinkedEmail.docs[0].data() || {}) };
   return null;
 }
 

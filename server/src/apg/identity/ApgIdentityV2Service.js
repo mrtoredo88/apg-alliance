@@ -5,14 +5,7 @@ function defaultFlags(flags = {}) {
   return {
     identityProvider: process.env.IDENTITY_PROVIDER || flags.IDENTITY_PROVIDER || flags.identityProvider || 'firebase',
     identityStorage: process.env.IDENTITY_STORAGE || flags.IDENTITY_STORAGE || flags.identityStorage || 'postgres',
-    identityFallback: process.env.IDENTITY_FALLBACK ?? flags.IDENTITY_FALLBACK ?? flags.identityFallback ?? '1',
-    identityDualWrite: process.env.IDENTITY_DUAL_WRITE ?? flags.IDENTITY_DUAL_WRITE ?? flags.identityDualWrite ?? '1',
-    identityDualRead: process.env.IDENTITY_DUAL_READ ?? flags.IDENTITY_DUAL_READ ?? flags.identityDualRead ?? '1',
   };
-}
-
-function enabled(value) {
-  return !['0', 'false', 'off', 'disabled', 'no'].includes(String(value ?? '').toLowerCase());
 }
 
 function classify(error) {
@@ -30,10 +23,9 @@ function normalizeTelegramId(value) {
 }
 
 export class ApgIdentityV2Service {
-  constructor({ repository, sessionRepository, legacySource = null, tokenProvider = null, flags = {}, metrics = null } = {}) {
+  constructor({ repository, sessionRepository, tokenProvider = null, flags = {}, metrics = null } = {}) {
     this.repository = repository;
     this.sessionRepository = sessionRepository;
-    this.legacySource = legacySource;
     this.tokenProvider = tokenProvider;
     this.flags = defaultFlags(flags);
     this.metrics = metrics || {
@@ -42,10 +34,6 @@ export class ApgIdentityV2Service {
       repository: repository?.name || 'IdentityRepository',
       yandexReads: 0,
       yandexWrites: 0,
-      firestoreReads: 0,
-      firestoreWrites: 0,
-      firestoreFallbacks: 0,
-      fallbackCount: 0,
       lastLoginTimeMs: null,
       lastError: null,
       lastSource: null,
@@ -57,11 +45,10 @@ export class ApgIdentityV2Service {
       provider: this.flags.identityProvider,
       storage: this.flags.identityStorage,
       repository: this.repository?.name || 'IdentityRepository',
-      fallbackEnabled: enabled(this.flags.identityFallback),
-      dualRead: enabled(this.flags.identityDualRead),
-      dualWrite: enabled(this.flags.identityDualWrite),
+      fallbackEnabled: false,
+      dualRead: false,
+      dualWrite: false,
       ...this.metrics,
-      legacy: this.legacySource?.snapshot?.() || null,
     };
   }
 
@@ -69,59 +56,19 @@ export class ApgIdentityV2Service {
     return String(this.flags.identityStorage || '').toLowerCase() === 'postgres';
   }
 
-  isLegacyDualWriteEnabled() {
-    return enabled(this.flags.identityDualWrite);
-  }
-
   async resolveEmailIdentity({ email, ref = '', createIfMissing = true } = {}) {
     const startedAt = Date.now();
     const normalized = normalizeEmail(email);
     if (!normalized) throw Object.assign(new Error('Некорректный email.'), { statusCode: 400, code: 'INVALID_EMAIL' });
     try {
-      let identity = null;
-      let fallbackUnavailable = false;
-      if (this.repository && enabled(this.flags.identityDualRead)) {
-        try {
-          this.metrics.yandexReads += 1;
-          identity = await this.repository.resolveByEmail(normalized);
-        } catch (error) {
-          this.metrics.lastError = classify(error);
-          if (classify(error) !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
-        }
-      }
-      if (!identity && this.legacySource && enabled(this.flags.identityFallback)) {
-        this.metrics.fallbackCount += 1;
-        const legacy = await this.legacySource.resolveEmailIdentity({ email: normalized, ref, createIfMissing: false }).catch(error => {
-          this.metrics.lastError = classify(error);
-          if (classify(error) === 'FIRESTORE_RESOURCE_EXHAUSTED') {
-            fallbackUnavailable = true;
-            return null;
-          }
-          if (classify(error) === 'USER_NOT_FOUND') return null;
-          throw error;
-        });
-        if (legacy?.userId && this.repository) {
-          this.metrics.yandexWrites += 1;
-          identity = await this.repository.importLegacyIdentity({ ...legacy, email: normalized });
-        } else if (legacy?.userId) {
-          identity = legacy;
-        }
-      }
-      if (!identity && fallbackUnavailable) {
-        throw Object.assign(new Error('Identity fallback is temporarily unavailable.'), { statusCode: 503, code: 'IDENTITY_FALLBACK_UNAVAILABLE' });
-      }
+      this.metrics.yandexReads += 1;
+      const identity = await this.repository.resolveByEmail(normalized);
       if (!identity && createIfMissing) {
-        try {
-          this.metrics.yandexWrites += 1;
-          identity = await this.repository.createEmailIdentity({ email: normalized, ref });
-          this.dualWriteLegacy(identity).catch(() => {});
-        } catch (error) {
-          this.metrics.lastError = classify(error);
-          if (classify(error) !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
-          if (!this.legacySource || !enabled(this.flags.identityFallback)) throw error;
-          this.metrics.fallbackCount += 1;
-          identity = await this.legacySource.resolveEmailIdentity({ email: normalized, ref, createIfMissing });
-        }
+        this.metrics.yandexWrites += 1;
+        const created = await this.repository.createEmailIdentity({ email: normalized, ref });
+        this.metrics.lastLoginTimeMs = Date.now() - startedAt;
+        this.metrics.lastSource = created.source || 'identity_v2_created';
+        return created;
       }
       if (!identity?.userId) throw Object.assign(new Error('Пользователь не найден.'), { statusCode: 404, code: 'USER_NOT_FOUND' });
       this.metrics.yandexWrites += 1;
@@ -171,47 +118,13 @@ export class ApgIdentityV2Service {
     }
   }
 
-  async dualWriteLegacy(identity) {
-    if (!this.legacySource || !enabled(this.flags.identityDualWrite)) return null;
-    const user = identity?.user || {};
-    const userId = safeString(identity?.userId || identity?.canonicalUserId, 260);
-    if (!userId) return null;
-    this.metrics.firestoreWrites += 1;
-    await this.legacySource.writeUser(userId, {
-      ...user,
-      canonicalUserId: userId,
-      identityStatus: user.identityStatus || 'canonical',
-      identityVersion: 'identity-v2-dual-write',
-    });
-    const email = normalizeEmail(user.email || user.linkedEmail);
-    if (email) {
-      this.metrics.firestoreWrites += 2;
-      await this.legacySource.linkEmail({ email, userId });
-    }
-    return { ok: true };
-  }
-
   async linkEmail({ email, userId, firebaseUid = '' }) {
     const result = await this.repository.linkEmail({ email, userId, firebaseUid });
     this.metrics.yandexWrites += 2;
-    if (this.legacySource && enabled(this.flags.identityDualWrite)) {
-      this.legacySource.linkEmail({ email: normalizeEmail(email), userId, firebaseUid }).catch(() => {});
-    }
     return result;
   }
 
-  async linkTelegram({ telegramId, userId, telegram = {}, firebaseUid = '', debug = null } = {}) {
-    const mark = typeof debug?.mark === 'function'
-      ? debug.mark
-      : () => {};
-    const trace = {
-      requestId: safeString(debug?.requestId || '', 120),
-      userId: safeString(userId, 260),
-      telegramId: normalizeTelegramId(telegramId),
-      actor: safeString(debug?.actorUserId, 120),
-    };
-    mark('identityV2.linkTelegram.entered', 'PASS', trace);
-
+  async linkTelegram({ telegramId, userId, telegram = {}, firebaseUid = '' } = {}) {
     const normalizedTelegramId = normalizeTelegramId(telegramId);
     const normalizedUserId = safeString(userId, 260);
     let result = null;
@@ -220,30 +133,10 @@ export class ApgIdentityV2Service {
         telegramId: normalizedTelegramId,
         userId: normalizedUserId,
         telegram,
-        debug: {
-          requestId: trace.requestId,
-          mark,
-          actorUserId: trace.actor,
-        },
       });
     } catch (error) {
-      mark('identityV2.linkTelegram.entered_repository_result', 'FAIL', {
-        requestId: trace.requestId,
-        userId: normalizedUserId,
-        telegramId: normalizedTelegramId,
-        publicError: safeString(error?.message || error?.code || error?.error || '', 160),
-        internalCode: safeString(error?.code || error?.statusCode || error?.error || 'unknown', 120),
-      });
       throw error;
     }
-
-    mark('identityV2.linkTelegram.entered_repository_result', 'PASS', {
-      requestId: trace.requestId,
-      userId: normalizedUserId,
-      telegramId: normalizedTelegramId,
-      linkUserId: safeString(result?.link?.userId || '', 260),
-      linkTelegramId: safeString(result?.link?.providerUserId || result?.link?.telegramId || '', 120),
-    });
 
     const persistedLink = await this.repository.links.get('telegram', normalizedTelegramId).catch(() => null);
     const persistedUser = await this.repository.users.get(normalizedUserId).catch(() => null);
@@ -254,39 +147,21 @@ export class ApgIdentityV2Service {
     const requestedTelegramId = normalizeTelegramId(
       telegram?.tgId || telegram?.telegramId || normalizedTelegramId,
     );
-    if (
-      !persistedLink
-      || String(persistedLink.userId || '') !== normalizedUserId
-      || !persistedTelegramId
-      || persistedTelegramId !== requestedTelegramId
-    ) {
+      if (
+        !persistedLink
+        || String(persistedLink.userId || '') !== normalizedUserId
+        || !persistedTelegramId
+        || persistedTelegramId !== requestedTelegramId
+      ) {
       const error = Object.assign(
         new Error('Не удалось надежно сохранить привязку Telegram.'),
         { statusCode: 500, code: 'TELEGRAM_LINK_PERSISTENCE_FAILED' },
       );
       this.metrics.lastError = classify(error);
-      mark('identityV2.linkTelegram.persistence_verified', 'FAIL', {
-        requestId: trace.requestId,
-        expectedUserId: normalizedUserId,
-        expectedTelegramId: requestedTelegramId,
-        actualLinkUserId: safeString(persistedLink?.userId || '', 260),
-        actualTelegramId: safeString(persistedTelegramId || '', 120),
-        code: 'TELEGRAM_LINK_PERSISTENCE_FAILED',
-      });
       throw error;
     }
 
-    mark('identityV2.linkTelegram.persistence_verified', 'PASS', {
-      requestId: trace.requestId,
-      userId: normalizedUserId,
-      telegramId: requestedTelegramId,
-      source: result?.source || '',
-    });
-
     this.metrics.yandexWrites += 2;
-    if (this.legacySource && enabled(this.flags.identityDualWrite)) {
-      this.legacySource.linkTelegram({ telegramId, userId, telegram, firebaseUid }).catch(() => {});
-    }
     return result;
   }
 

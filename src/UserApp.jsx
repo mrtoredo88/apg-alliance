@@ -937,16 +937,9 @@ async function ensureOwnerAuthSession(userId, source = 'auth') {
   };
 
   const checkOrCreateMap = async () => {
-    const current = await ensureAnonymous('owner_map');
-    const mapRef = doc(db, 'auth_map', current.uid);
-    const mapSnap = await getDoc(mapRef);
-    if (mapSnap.exists()) {
-      const mappedId = String(mapSnap.data()?.vkId ?? '');
-      traceAuthStage('auth_map_found', { source, uid: current.uid, userId: targetUserId, mappedId });
-      return mappedId === targetUserId;
-    }
+    await ensureAnonymous('owner_session_link');
     await userAction('auth:linkUser', { userId: targetUserId, source });
-    traceAuthStage('auth_map_created', { source, uid: current.uid, userId: targetUserId });
+    traceAuthStage('owner_session_linked', { source, userId: targetUserId });
     return true;
   };
 
@@ -955,7 +948,7 @@ async function ensureOwnerAuthSession(userId, source = 'auth') {
     const current = auth.currentUser;
     if (current?.uid === targetUserId) {
       await userAction('auth:linkUser', { userId: targetUserId, source }).catch(error => {
-        traceAuthStage('strong_identity_auth_map_repair_failed', { source, userId: targetUserId, uid: current.uid, error: error?.message ?? String(error) });
+        traceAuthStage('strong_identity_link_failed', { source, userId: targetUserId, uid: current.uid, error: error?.message ?? String(error) });
       });
       traceAuthStage('strong_identity_session_ready', { source, userId: targetUserId, uid: current.uid });
       return current;
@@ -965,7 +958,7 @@ async function ensureOwnerAuthSession(userId, source = 'auth') {
   }
   if (await checkOrCreateMap()) return auth.currentUser;
 
-  traceAuthStage('auth_map_mismatch', { source, userId: targetUserId, uid: auth.currentUser?.uid ?? null });
+  traceAuthStage('owner_session_mismatch', { source, userId: targetUserId, uid: auth.currentUser?.uid ?? null });
   await apgIdentity.invalidateSession().catch(() => {});
   const current = await ensureFirebaseAnonymousAuth(auth, signInAnonymousThroughIdentity, {
     source: `owner_recreate_${source}`,

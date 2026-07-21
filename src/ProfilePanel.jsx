@@ -926,6 +926,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 owner_not_found: 'Не удалось подтвердить владельца аккаунта.',
                 already_linked: 'Этот Telegram уже связан с другим аккаунтом.',
                 session_stale: 'Ссылка устарела, создайте новую.',
+                link_failed: 'Не удалось привязать Telegram. Попробуйте ещё раз.',
               }[data.linkError] || 'Не удалось привязать Telegram. Попробуйте ещё раз.';
               throw new Error(errorText);
             }
@@ -936,20 +937,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               username: data.user?.username ?? null,
               photo: data.user?.photo_200 ?? null,
             };
-            const linkRes = await fetch(`${API_BASE_URL}/api/email-auth`, {
-              method: 'POST',
-              headers: await getAuthHeaders(),
-              body: JSON.stringify({ action: 'link-telegram', userId: String(user.id), ...tgPayload }),
-            });
-            const linkData = await linkRes.json().catch(() => ({}));
-            const returnedLink = linkData?.link || {};
-            if (
-              !linkRes.ok || linkData.ok === false
-              || !returnedLink?.userId || String(returnedLink.userId) !== String(user.id)
-              || !returnedLink?.telegramId
-            ) {
-              throw new Error(linkData.message || 'telegram_link_failed');
-            }
             const userPatch = {
               linkedTelegram: tgPayload,
             };

@@ -59,5 +59,4 @@ export { ServerDataAdapter } from './data/ServerDataAdapter.js';
 export { FirestoreAdminAdapter } from './data/FirestoreAdminAdapter.js';
 export { ServerRepository } from './data/ServerRepository.js';
 export { PostgresIdentityAdapter } from './infrastructure/adapters/PostgresIdentityAdapter.js';
-export { FirestoreIdentityFallbackAdapter } from './infrastructure/adapters/FirestoreIdentityFallbackAdapter.js';
 export * from './account/index.js';

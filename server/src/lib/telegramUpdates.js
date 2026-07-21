@@ -1,6 +1,5 @@
 import { APP_URL } from './config.js';
 import { FieldValue } from 'firebase-admin/firestore';
-import { resolveFirebaseIdentity } from './identityCore.js';
 import { telegramUrl } from '../../../server-shared/telegram.js';
 import { ECONOMY_VERSION, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
 import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
@@ -95,20 +94,12 @@ async function tgGetPhotoUrl(userId) {
   }
 }
 
-async function resolveTelegramLinkOwner(db, ownerUserId) {
+async function resolveTelegramLinkOwner(ownerUserId) {
   const rawOwnerUserId = String(ownerUserId || '').trim();
   if (!rawOwnerUserId) return '';
 
   const asIdentity = await serverFoundation.identityV2.getUser(rawOwnerUserId).catch(() => null);
-  if (asIdentity?.id) return asIdentity.id;
-
-  const legacyIdentity = await resolveFirebaseIdentity(db, rawOwnerUserId).catch(() => null);
-  if (legacyIdentity?.userId) {
-    const fallback = await serverFoundation.identityV2.getUser(legacyIdentity.userId).catch(() => null);
-    if (fallback?.id) return fallback.id;
-  }
-
-  return '';
+  return asIdentity?.id || '';
 }
 
 function canAttachReferral(referrerId, userId) {
@@ -291,14 +282,29 @@ export async function processTelegramUpdate(db, update, log = console) {
     if (session.linking === true) {
       const ownerUserId = String(session.ownerUserId || '').trim();
       let linkError = '';
-      const resolvedOwnerUserId = await resolveTelegramLinkOwner(db, ownerUserId);
-      let linkedOwnerId = resolvedOwnerUserId || ownerUserId || null;
-      if (!ownerUserId) {
-        linkError = 'owner_not_found';
-      } else if (!resolvedOwnerUserId) {
+      let linkedOwnerId = ownerUserId || null;
+
+      const resolvedOwnerUserId = await resolveTelegramLinkOwner(ownerUserId);
+      if (!resolvedOwnerUserId) {
         linkError = 'owner_not_found';
       } else {
         linkedOwnerId = resolvedOwnerUserId;
+          try {
+            await serverFoundation.identityV2.linkTelegram({
+              telegramId: String(from.id),
+              userId: resolvedOwnerUserId,
+              telegram: {
+              firstName: from.first_name ?? null,
+                lastName: from.last_name ?? null,
+                username: from.username ?? null,
+                photo: null,
+              },
+            });
+          } catch (error) {
+            linkError = error?.code === 'TELEGRAM_ALREADY_USED'
+              ? 'already_linked'
+              : 'link_failed';
+          }
       }
       await appendTelegramTimeline(ref, {
         stage: 'telegram_auth_link_validation',
@@ -336,6 +342,7 @@ export async function processTelegramUpdate(db, update, log = console) {
         telegramSessionId: state,
         linkError: linkError || null,
         linkedOwnerId: linkedOwnerId || null,
+        linkUserId: resolvedOwnerUserId || null,
       }, log);
       return { handled: true, kind: 'auth_link' };
     }

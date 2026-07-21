@@ -1,8 +1,8 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDb, getDbAuth } from '../lib/firebase.js';
 import { verifyPasswordRecord } from '../../../server-shared/admin-password.js';
-import { resolveEmailIdentity } from '../lib/identityCore.js';
 import { CAPABILITIES, getPrimaryRole, hasCapability, hasRole, ROLES } from '../../../server-shared/role-engine.js';
+import { serverFoundation } from '../apg/index.js';
 
 function getDeviceInfo(request) {
   return {
@@ -36,21 +36,24 @@ export default async function adminLoginRoutes(fastify) {
     }).catch(() => {});
 
     try {
-      const identity = await resolveEmailIdentity(db, { email, createIfMissing: false }).catch(() => null);
-      const userDoc = identity?.userId ? await db.collection('users').doc(identity.userId).get() : null;
-      if (!userDoc?.exists) {
+      const identity = await serverFoundation.identityV2.resolveEmailIdentity({ email, createIfMissing: false }).catch(() => null);
+      const user = identity?.user || {};
+      const userId = identity?.userId ? String(identity.userId) : '';
+      const userDoc = userId ? await db.collection('users').doc(userId).get().catch(() => null) : null;
+      if (!identity && !userDoc?.exists) {
         await log('error', { code: 'ADMIN_NOT_FOUND' });
         return reply.code(401).send({ ok: false, code: 'INVALID_CREDENTIALS', error: 'Неверный email или пароль администратора.' });
       }
-      const user = userDoc.data() || {};
+      const persistedUser = userDoc?.exists ? userDoc.data() || {} : {};
+      const combinedUser = { ...persistedUser, ...user };
       const role = getPrimaryRole(user);
       const status = String(user.adminStatus || user.status || 'active').toLowerCase();
       if (!hasCapability(user, CAPABILITIES.canOpenAdminPanel) || status !== 'active') {
         await log('error', { code: 'FORBIDDEN_ROLE', role, status });
         return reply.code(403).send({ ok: false, code: 'FORBIDDEN_ROLE', error: 'Доступ администратора отключён.' });
       }
-      const uid = String(user.firebaseUid || user.authUid || userDoc.id);
-      const credentialSnap = await db.collection('adminCredentials').doc(uid).get();
+      const uid = String(combinedUser.firebaseUid || combinedUser.authUid || userId || userDoc?.id || email);
+      const credentialSnap = await db.collection('adminCredentials').doc(uid).get().catch(() => null);
       const credential = credentialSnap.exists ? credentialSnap.data() || {} : {};
       if (!verifyPasswordRecord(password, credential.password)) {
         await log('error', { code: 'INVALID_CREDENTIALS', role });
@@ -60,7 +63,7 @@ export default async function adminLoginRoutes(fastify) {
       const owner = hasRole(user, ROLES.owner);
       await auth.setCustomUserClaims(uid, { role, owner, admin: true }).catch(() => {});
       const customToken = await auth.createCustomToken(uid, { role, owner, admin: true });
-      await userDoc.ref.set({ lastLoginAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      if (userDoc?.ref) await userDoc.ref.set({ lastLoginAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       await log('success', { role, uid });
       return reply.send({ ok: true, customToken, actor: { uid, email, role, mustChangePassword: Boolean(user.mustChangePassword) } });
     } catch (error) {

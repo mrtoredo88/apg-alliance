@@ -1,6 +1,6 @@
 import { createHash, createHmac } from 'crypto';
-import { getDb, getDbAuth } from '../lib/firebase.js';
-import { FieldValue } from 'firebase-admin/firestore';
+import { getDbAuth } from '../lib/firebase.js';
+import { serverFoundation } from '../apg/index.js';
 
 function verifyTelegramHash(data, botToken) {
   const { hash, ...rest } = data;
@@ -37,43 +37,27 @@ export default async function verifyTelegramRoutes(fastify) {
       return reply.code(403).send({ ok: false, error: 'invalid_hash' });
     }
 
-    const db  = getDb();
-    const uid = `tg_${id}`;
-
-    const userRef  = db.collection('users').doc(uid);
-    const userSnap = await userRef.get();
-    const profilePatch = {
-      authProvider: 'telegram',
-      firstName: first_name ?? null,
-      lastName:  last_name  ?? null,
-      photo:     photo_url  ?? null,
-      lastSeen:  FieldValue.serverTimestamp(),
-    };
-
-    if (!userSnap.exists) {
-      await userRef.set({
-        keys: 0, favorites: [], scannedPartners: {},
-        completedTasks: [], streak: 0, onboardingDone: false,
-        scanDates: [], lastBonusDate: new Date().toLocaleDateString('sv'),
-        referredBy: null,
-        registeredAt: FieldValue.serverTimestamp(),
-        ...profilePatch,
-      });
-      db.collection('stats').doc('global').set(
-        { userCount: FieldValue.increment(1) }, { merge: true }
-      ).catch(() => {});
-    } else {
-      await userRef.update(profilePatch);
-    }
-
-    // Если Telegram привязан к email-аккаунту — возвращаем токен для него
-    const linkSnap = await db.collection('tgLinks').doc(uid).get();
-    const targetUserId = linkSnap.exists ? String(linkSnap.data().userId || uid) : uid;
-    const token = await getDbAuth().createCustomToken(targetUserId);
+    const identity = await serverFoundation.identityV2.resolveTelegramIdentity({
+      telegramId: String(id),
+      createIfMissing: true,
+      telegram: {
+        firstName: first_name ?? null,
+        lastName: last_name ?? null,
+        username: username ?? null,
+        photo: photo_url ?? null,
+      },
+    });
+    const token = await getDbAuth().createCustomToken(identity.userId);
+    const identityUser = identity.user || {};
     return {
       ok: true,
       token,
-      user: { id: targetUserId, first_name, last_name: last_name ?? '', photo_200: photo_url ?? null },
+      user: {
+        id: identity.userId,
+        first_name: first_name || identityUser.firstName || identityUser.displayName || '',
+        last_name: last_name || identityUser.lastName || '',
+        photo_200: photo_url || identityUser.photo || null,
+      },
     };
   });
 }

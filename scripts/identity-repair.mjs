@@ -2,7 +2,7 @@
 // Запуск: node scripts/identity-repair.mjs [--dry-run]
 import { readFileSync } from 'node:fs';
 import { getDb } from '../server/src/lib/firebase.js';
-import { dataRichness, shouldMigrateLegacyData, migrateLegacyUserData } from '../server/src/lib/identityCore.js';
+import { dataRichness, shouldMigrateLegacyData, migrateLegacyUserData } from '../server/src/legacy/identity/identityCore.js';
 
 const dryRun = process.argv.includes('--dry-run');
 const envFile = new URL('../server/.env', import.meta.url);
