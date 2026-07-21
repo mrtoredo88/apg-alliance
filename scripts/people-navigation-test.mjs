@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 const profile = await readFile(new URL('../src/ProfilePanel.jsx', import.meta.url), 'utf8');
 const glass = await readFile(new URL('../src/components/Apg2ProfileGlass.jsx', import.meta.url), 'utf8');
+const userApp = await readFile(new URL('../src/UserApp.jsx', import.meta.url), 'utf8');
 const executionRegistry = await readFile(new URL('../src/loki/core/execution/ExecutionRegistry.js', import.meta.url), 'utf8');
 
 assert.match(profile, /const openPeopleNavigation = useCallback\(\(event\) => \{[\s\S]*?setPeopleSheet\(null\);[\s\S]*?setShowBusinessCard\(false\);[\s\S]*?setShowConnectionsModal\(true\);[\s\S]*?\}, \[\]\);/, 'Open People action closes conflicting overlays and opens People modal');
@@ -18,6 +19,8 @@ assert.match(profile, /showBusinessCard && createPortal\([\s\S]*?title="Цифр
 assert.match(profile, /businessCardUrl = useMemo\(\(\) => `\$\{APP_URL\.replace\(\/\\\/\+\$\/, ''\)\}\/profile\/\$\{encodeURIComponent\(String\(user\?\.id \|\| ''\)\)\}`/, 'QR card uses the current user profile URL safely');
 
 assert.match(glass, /export function GlassButton\(\{ children, onClick[\s\S]*?type = 'button'[\s\S]*?<button[\s\S]*?type=\{type\}[\s\S]*?onClick=\{onClick\}/, 'GlassButton keeps action buttons clickable and non-submit by default');
+assert.match(userApp, /setShowPwaInstallGuide\(activePanel !== 'profile' && shouldShowPwaInstallGuide/, 'PWA install guide does not steal first profile action clicks');
+assert.match(userApp, /open=\{activePanel !== 'profile' && showPwaInstallGuide/, 'PWA install guide cannot overlay Profile People actions');
 assert.match(executionRegistry, /route\('profile', '\/profile#people'\)/, 'Loki People navigation still targets the unified People UX');
 
 const platformTargets = ['mobile', 'desktop', 'telegram-webapp'];

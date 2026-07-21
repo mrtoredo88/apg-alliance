@@ -1178,9 +1178,9 @@ export function UserApp() {
   useEffect(() => {
     if (loading || loggedOut || consentRequest) return;
     const vkShell = isVK();
-    setShowPwaInstallGuide(shouldShowPwaInstallGuide({ user, isVk: vkShell }));
+    setShowPwaInstallGuide(activePanel !== 'profile' && shouldShowPwaInstallGuide({ user, isVk: vkShell }));
     setShowPwaEmailHint(shouldShowPwaEmailHint({ user, isVk: vkShell }));
-  }, [loading, loggedOut, consentRequest, user?.id]);
+  }, [activePanel, loading, loggedOut, consentRequest, user?.id]);
 
   useEffect(() => {
     const handler = event => setFirstJourneyStored(event.detail || loadFirstJourneyProgress());
@@ -5773,7 +5773,7 @@ export function UserApp() {
           )}
 
           <PwaInstallGuide
-            open={showPwaInstallGuide && splashDone && !loading && !showOnboarding && !isScannerOpen && !loggedOut && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest)}
+            open={activePanel !== 'profile' && showPwaInstallGuide && splashDone && !loading && !showOnboarding && !isScannerOpen && !loggedOut && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest)}
             onClose={() => setShowPwaInstallGuide(false)}
           />
 
