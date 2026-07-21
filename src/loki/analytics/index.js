@@ -6,6 +6,7 @@ import { buildRecommendationAnalytics } from './RecommendationAnalytics.js';
 import { buildProactiveAnalytics } from './ProactiveAnalytics.js';
 import { calculateLokiQualityScore } from './QualityScore.js';
 import { generateLokiQualityInsights } from './InsightGenerator.js';
+import { buildKnowledgeEvolutionAnalytics, buildStructuredKnowledgeIndex } from '../core/evolution/index.js';
 
 function csvEscape(value) {
   const text = String(value ?? '');
@@ -29,6 +30,42 @@ export function buildLokiQualityCenter(rows = [], opportunityEvents = []) {
   const quality = calculateLokiQualityScore({ conversations, intents, fallback, journey, recommendations, proactive });
   const insights = generateLokiQualityInsights({ conversations, intents, fallback, journey, recommendations, proactive, quality });
   return { conversations, intents, fallback, journey, recommendations, proactive, quality, insights };
+}
+
+export function buildLokiEvolutionCenter(rows = [], appState = {}) {
+  const experiences = rows.map(row => ({
+    query: row.query,
+    intent: row.intent,
+    source: row.source,
+    success: row.success !== false,
+    fallback: Boolean(row.fallback || row.fallbackUsed),
+    responseTimeMs: Number(row.ms || row.responseTimeMs || 0),
+    answer: row.answer || '',
+    topic: String(row.query || '').toLowerCase().replace(/ё/g, 'е'),
+    createdAt: row.createdAt || row.timestamp || '',
+  }));
+  const feedbackEvents = rows
+    .filter(row => row.feedbackScore != null && Number(row.feedbackScore) !== 0)
+    .map(row => ({ score: Number(row.feedbackScore), type: Number(row.feedbackScore) > 0 ? 'positive' : 'negative' }));
+  const unknownTopics = experiences.filter(row => row.fallback).map(row => ({ topic: row.topic, count: 1, category: row.intent, lastDate: row.createdAt }));
+  const structuredIndex = buildStructuredKnowledgeIndex(appState);
+  const analytics = buildKnowledgeEvolutionAnalytics({ experiences, feedbackEvents, unknownTopics, structuredIndex, analyticsRows: rows });
+  return {
+    ...analytics,
+    growth: structuredIndex.counts,
+    learningQueue: analytics.knowledgeCandidates,
+    progress: [
+      { label: 'Personal Memory', value: analytics.metrics.memoryUsage },
+      { label: 'Knowledge Index', value: analytics.metrics.knowledgeHitRate },
+      { label: 'Feedback Loop', value: Math.max(0, analytics.metrics.feedbackScore) },
+      { label: 'Fallback Reduction', value: analytics.metrics.fallbackReduction },
+    ],
+    timeline: rows.slice(0, 20).map(row => ({
+      title: row.intent || 'loki',
+      text: row.query || row.source || '',
+      createdAt: row.createdAt || row.timestamp || '',
+    })),
+  };
 }
 
 export function exportLokiQualityCsv(kind, center) {

@@ -6,6 +6,7 @@ import { explainLastKnowledgeIndex, isKnowledgeIndexExplainQuery, runLokiKnowled
 import { runReasoningEngine } from '../reasoning/ReasoningEngine.js';
 import { runJourneyEngine } from '../journey/JourneyEngine.js';
 import { runLokiMemoryEngine } from '../memory/MemoryEngine.js';
+import { explainLastKnowledgeEvolution, isKnowledgeEvolutionExplainQuery, runLokiKnowledgeEvolution } from '../evolution/index.js';
 import { runLokiPlanner } from '../planner/Planner.js';
 import { runLokiToolLayer } from '../tools/ToolCenter.js';
 import { runLokiWorkflowEngine } from '../workflows/WorkflowEngine.js';
@@ -307,6 +308,9 @@ function runLokiKnowledgeEngineImpl({ text: question, appState = {}, context = n
   if (isDecisionExplainQuery(question)) {
     return attachDecision(explainLastDecision(context?.memory || {}), question, context);
   }
+  if (isKnowledgeEvolutionExplainQuery(question)) {
+    return attachDecision(explainLastKnowledgeEvolution(context?.memory || {}), question, context);
+  }
   const sourceState = context?.appState || appState?.appState || appState;
   trace('STEP 11.1 Knowledge provider start', {});
   const knowledge = buildLokiKnowledgeProvider({ ...sourceState, activeContext: context?.memory?.activeContext || sourceState.activeContext });
@@ -452,7 +456,25 @@ function runLokiKnowledgeEngineImpl({ text: question, appState = {}, context = n
     controlledExecutionSnapshot: controlledExecutionResult.controlledExecutionSnapshot,
     memory: { ...(contextWithMemory?.memory || {}), knowledgeSnapshot: knowledgeIndexResult.knowledgeSnapshot, lastKnowledgeSnapshot: knowledgeIndexResult.knowledgeSnapshot, lastKnowledgeIndexSearch: knowledgeIndexResult.knowledgeIndexSearch, workflowSnapshot, conversationSnapshot: conversationContext?.snapshot, lastConversationSession: conversationContext?.session, capabilityContext: capabilityResult.capabilityContext, capabilitySnapshot: capabilityResult.capabilitySnapshot, lastCapabilityContext: capabilityResult.capabilityContext, skillContext: skillResult.skillContext, skillSnapshot: skillResult.skillSnapshot, lastSkillContext: skillResult.skillContext, executionContext: executionResult.executionContext, executionSnapshot: executionResult.executionSnapshot, lastExecutionContext: executionResult.executionContext, controlledExecutionContext: controlledExecutionResult.controlledExecutionContext, controlledExecutionSnapshot: controlledExecutionResult.controlledExecutionSnapshot, lastControlledExecutionContext: controlledExecutionResult.controlledExecutionContext },
   };
-  const finalize = result => attachKnowledgeIndex(attachDecision(attachControlledExecution(attachExecution(attachSkill(attachCapability(result, capabilityResult), skillResult), executionResult), controlledExecutionResult), effectiveQuestion, contextWithWorkflow), knowledgeIndexResult);
+  const finalize = result => {
+    const enriched = attachKnowledgeIndex(attachDecision(attachControlledExecution(attachExecution(attachSkill(attachCapability(result, capabilityResult), skillResult), executionResult), controlledExecutionResult), effectiveQuestion, contextWithWorkflow), knowledgeIndexResult);
+    const evolution = runLokiKnowledgeEvolution({
+      question: effectiveQuestion,
+      result: enriched,
+      appState: sourceState,
+      context: contextWithWorkflow,
+      memory: contextWithWorkflow?.memory || {},
+      userMemory: sourceState?.userMemory || contextWithWorkflow?.userMemory || {},
+      knowledgeIndexResult,
+    });
+    return {
+      ...enriched,
+      evolutionContext: evolution.evolutionContext,
+      evolutionSnapshot: evolution.evolutionSnapshot,
+      learningPatch: evolution.learningPatch,
+      personalMemoryPatch: evolution.personalMemoryPatch,
+    };
+  };
   const continuationResult = runLokiAgentContinuation({ question: effectiveQuestion, context: contextWithWorkflow });
   trace('STEP 12 Agent continuation checked', { handled: Boolean(continuationResult) });
   if (continuationResult) return finalize({ ...continuationResult, knowledge, reasoningContext: effectiveReasoning?.reasoningContext, conversationContext, journeyContext: contextJourney?.journeyContext, memoryContext: memoryResult?.memoryContext });

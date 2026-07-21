@@ -28,7 +28,7 @@ import { findEventConflicts, formatConflictLabel } from './eventSchedule.js';
 import { formatEventPrice, isPaidEvent } from './eventPrice.js';
 import { telegramShareUrl } from '../server-shared/telegram.js';
 import { getProfileLocations, normalizeLocationsForSave, normalizeLocationIds } from '../server-shared/locations.js';
-import { buildLokiQualityCenter, exportLokiQualityCsv } from './loki/analytics/index.js';
+import { buildLokiEvolutionCenter, buildLokiQualityCenter, exportLokiQualityCsv } from './loki/analytics/index.js';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -7585,12 +7585,13 @@ export const AdminPanel = () => {
             { id: 'ai-drafts', emoji: '🤖', label: 'Черновики ИИ' },
             { id: 'loki-knowledge', emoji: '🧠', label: 'База знаний Локи', count: lokiKnowledge.length || undefined },
             { id: 'loki-analytics', emoji: '📈', label: 'AI Center: Loki Quality', count: lokiAnalytics.length || undefined },
+            { id: 'loki-evolution', emoji: '🧬', label: 'Loki Evolution Center', count: lokiAnalytics.length || undefined },
             { id: 'diag',      emoji: '📡', label: 'Диагностика' },
           ].map(t => {
             const active = activeTab === t.id;
             return (
               <button key={t.id}
-                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'moderation' || t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics') loadLokiAnalytics(); if (t.id === 'access') loadAdminSecurity(); if (t.id === 'identity-migration') runIdentityMigrationAction('status'); if (t.id === 'referrals') loadReferralAudit(); if (t.id === 'referral-monitoring') loadReferralAudit('referrals:monitoring'); if (t.id === 'automation') loadAutomationAudit(); }}
+                onClick={() => { setActiveTab(t.id); if (t.id === 'analytics' && !analytics) loadAnalytics(); if (t.id === 'errors') loadErrors(); if (t.id === 'comments' || t.id === 'moderation') loadNewsComments(); if (t.id === 'moderation' || t.id === 'ai-import') loadAiImportRequests(); if (t.id === 'loki-knowledge') loadLokiKnowledge(); if (t.id === 'loki-analytics' || t.id === 'loki-evolution') loadLokiAnalytics(); if (t.id === 'access') loadAdminSecurity(); if (t.id === 'identity-migration') runIdentityMigrationAction('status'); if (t.id === 'referrals') loadReferralAudit(); if (t.id === 'referral-monitoring') loadReferralAudit('referrals:monitoring'); if (t.id === 'automation') loadAutomationAudit(); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: isCompact ? '9px 11px' : '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -8128,6 +8129,123 @@ export const AdminPanel = () => {
           </div>
         </div>
       )}
+
+      {activeTab === 'loki-evolution' && (() => {
+        const center = buildLokiEvolutionCenter(lokiAnalytics, { partners, experts, events, news });
+        const metrics = [
+          ['Knowledge Hit Rate', `${center.metrics.knowledgeHitRate}%`, A.green],
+          ['Learning Rate', `${center.metrics.learningRate}%`, A.gold],
+          ['Feedback Score', `${center.metrics.feedbackScore}`, center.metrics.feedbackScore >= 0 ? A.green : A.red],
+          ['Fallback Rate', `${center.metrics.fallbackRate}%`, center.metrics.fallbackRate <= 10 ? A.green : A.red],
+          ['Memory Usage', `${center.metrics.memoryUsage}%`, A.gold],
+          ['Knowledge Growth', center.metrics.knowledgeGrowth, A.text],
+          ['LLM Usage', `${center.metrics.llmUsage}%`, A.textSec],
+          ['Unknown Topics', center.metrics.unknownTopicCount, center.metrics.unknownTopicCount ? A.red : A.green],
+        ];
+        return (
+          <div style={{ display: 'grid', gap: 12 }}>
+            <div style={s.card}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <h2 style={{ ...s.h2, margin: 0 }}>🧬 Loki Evolution Center</h2>
+                  <p style={{ margin: '6px 0 0', color: A.textSec, fontSize: 13 }}>Два контура: личная оперативная память обновляется сразу, глобальные знания идут в индекс и очередь владельца. Официальная база из диалогов не меняется автоматически.</p>
+                </div>
+                <button style={{ ...s.btn, ...s.btnGray, padding: '6px 12px', fontSize: 12 }} onClick={loadLokiAnalytics}>{lokiAnalyticsLoading ? '⏳' : '↻ Обновить'}</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
+                {metrics.map(([label, value, color]) => (
+                  <div key={label} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${A.border}`, borderRadius: 14, padding: 14 }}>
+                    <div style={{ color, fontSize: 23, fontWeight: 900, lineHeight: 1 }}>{value}</div>
+                    <div style={{ color: A.textSec, fontSize: 11, marginTop: 6 }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: viewportWidth < 960 ? '1fr' : '1fr 1fr', gap: 12 }}>
+              <div style={s.card}>
+                <h2 style={s.h2}>Learning Queue</h2>
+                {center.learningQueue.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Кандидатов пока нет.</p> : center.learningQueue.slice(0, 12).map(row => (
+                  <div key={row.id || row.topic} style={{ ...s.row, alignItems: 'flex-start' }}>
+                    <span style={{ color: A.text, fontSize: 13, lineHeight: '18px', flex: 1 }}>{row.topic}</span>
+                    <span style={{ color: A.gold, fontWeight: 900 }}>{row.frequency}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={s.card}>
+                <h2 style={s.h2}>Unknown Topics</h2>
+                {center.unknownTopics.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Неизвестных тем нет.</p> : center.unknownTopics.slice(0, 12).map(row => (
+                  <div key={row.topic} style={s.row}>
+                    <span style={{ color: A.text, fontSize: 13, lineHeight: '18px', flex: 1 }}>{row.topic}</span>
+                    <span style={{ color: A.red, fontWeight: 900 }}>{row.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: viewportWidth < 960 ? '1fr' : '1fr 1fr 1fr', gap: 12 }}>
+              <div style={s.card}>
+                <h2 style={s.h2}>Knowledge Growth</h2>
+                {Object.entries(center.growth).map(([label, value]) => (
+                  <div key={label} style={s.row}>
+                    <span style={{ color: A.text, fontSize: 13 }}>{label}</span>
+                    <span style={{ color: A.gold, fontWeight: 900 }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={s.card}>
+                <h2 style={s.h2}>Learning Progress</h2>
+                {center.progress.map(row => (
+                  <div key={row.label} style={{ display: 'grid', gap: 5, marginBottom: 9 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ color: A.text, fontSize: 13, flex: 1 }}>{row.label}</span>
+                      <span style={{ color: A.gold, fontWeight: 900 }}>{row.value}%</span>
+                    </div>
+                    <div style={{ height: 5, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.max(0, Math.min(100, row.value))}%`, height: '100%', background: A.gold, borderRadius: 999 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={s.card}>
+                <h2 style={s.h2}>Memory Statistics</h2>
+                {[
+                  ['Feedback', center.feedback.total],
+                  ['Positive', center.feedback.positive],
+                  ['Negative', center.feedback.negative],
+                  ['Top Questions', center.topUserQuestions.length],
+                ].map(([label, value]) => (
+                  <div key={label} style={s.row}>
+                    <span style={{ color: A.text, fontSize: 13 }}>{label}</span>
+                    <span style={{ color: A.gold, fontWeight: 900 }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: viewportWidth < 960 ? '1fr' : '1fr 1fr', gap: 12 }}>
+              <div style={s.card}>
+                <h2 style={s.h2}>Worst Answers</h2>
+                {center.worstAnswers.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Критичных ответов пока нет.</p> : center.worstAnswers.slice(0, 10).map(row => (
+                  <div key={`${row.query}-${row.createdAt}`} style={{ padding: '9px 0', borderBottom: `1px solid ${A.border}` }}>
+                    <div style={{ color: A.text, fontSize: 13, lineHeight: '18px', fontWeight: 800 }}>{row.query}</div>
+                    <div style={{ color: A.textSec, fontSize: 12, lineHeight: '17px' }}>{row.intent || 'unknown'}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={s.card}>
+                <h2 style={s.h2}>Evolution Timeline</h2>
+                {center.timeline.length === 0 ? <p style={{ color: A.textSec, fontSize: 14 }}>Событий пока нет.</p> : center.timeline.slice(0, 12).map((row, index) => (
+                  <div key={`${row.title}-${index}`} style={{ padding: '9px 0', borderBottom: `1px solid ${A.border}` }}>
+                    <div style={{ color: A.gold, fontSize: 12, fontWeight: 900 }}>{row.title}</div>
+                    <div style={{ color: A.textSec, fontSize: 12, lineHeight: '17px' }}>{row.text}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {activeTab === 'loki-analytics' && (() => {
         const center = buildLokiQualityCenter(lokiAnalytics);

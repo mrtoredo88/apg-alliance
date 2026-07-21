@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-21] feat: Loki Knowledge Evolution Engine v2
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/loki/core/evolution/*`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/lokiUserMemory.js`, `src/loki/LokiProvider.jsx`, `src/loki/LokiExperience.jsx`, `src/loki/analytics/index.js`, `src/AdminPanel.jsx`, `server/src/routes/user-actions.js`, `scripts/loki-evolution-engine-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:**
+- Добавлен safe two-contour evolution layer Локи: персональная память учится локально, глобальные знания обновляются только как структурный индекс и owner-reviewed кандидаты.
+- Loki pipeline теперь прикрепляет evolution context/snapshot, self-quality, unknown topics, feedback и learning queue без автоправки официальной базы.
+- Добавлен Admin “Loki Evolution Center” и synthetic regression на 701 диалог, 200 вопросов, 50 unknown topics, 100 feedback events и 700 memory events.
+**Почему:** Локи должен улучшаться на данных АПГ и опыте общения, но без риска самовольного изменения официальных знаний, ролей или бизнес-данных.
+
 ## [2026-07-21] fix: Loki Mobile Capability Navigation
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/UserApp.jsx`, `src/loki/lokiActionTypes.js`, `src/loki/LokiExperience.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/lokiSuggestions.js`, `src/loki/core/platformCapabilities.js`, `src/loki/core/actions/ActionExecutor.js`, `src/loki/core/actions/ActionRegistry.js`, `src/loki/core/actions/ActionValidator.js`, `src/loki/core/capabilities/CapabilityContext.js`, `src/loki/core/capabilities/CapabilityMatcher.js`, `src/loki/core/capabilities/CapabilityRegistry.js`, `src/loki/core/execution/ExecutionRegistry.js`, `src/loki/core/execution/ExecutionResolver.js`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/modules/ActionRouter.js`, `scripts/loki-platform-capability-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

@@ -124,6 +124,15 @@ export function LokiExperience({ loki }) {
   const contextTitle = activeNewsContext?.title || activeNewsContext?.article?.title || '';
   const summaryToSpeak = activeNewsContext?.initialAnswer || conversation.find(item => item.from === 'loki')?.text || '';
   const showDebug = isLokiUserDebugVisible();
+  const memoryChips = useMemo(() => {
+    const memory = loki.userMemory || {};
+    return [
+      ...(memory.interests || []).map(value => ({ type: 'interests', value, label: `Интерес: ${value}` })),
+      ...(memory.frequentQuestions || []).slice(0, 4).map(value => ({ type: 'frequentQuestions', value, label: `Вопрос: ${value}` })),
+      ...(memory.visitedPartners || []).slice(0, 4).map(value => ({ type: 'visitedPartners', value, label: `Партнёр: ${value}` })),
+      ...(memory.favoriteExperts || []).slice(0, 4).map(value => ({ type: 'favoriteExperts', value, label: `Эксперт: ${value}` })),
+    ].filter(item => item.value).slice(0, 10);
+  }, [loki.userMemory]);
 
   useEffect(() => {
     setConversation(buildInitialConversation(loki));
@@ -324,6 +333,25 @@ export function LokiExperience({ loki }) {
               </button>
             ))}
           </div>
+
+          {!!memoryChips.length && (
+            <div style={{ ...APG2_PROFILE.glass, borderRadius: 20, padding: 10, display: 'grid', gap: 8, border: '1px solid rgba(215,184,106,0.13)' }}>
+              <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '15px', fontWeight: 860 }}>Личная память</div>
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+                {memoryChips.map(item => (
+                  <button
+                    key={`${item.type}-${item.value}`}
+                    type="button"
+                    onClick={() => loki.clearUserMemoryItem?.(item.type, item.value)}
+                    title="Удалить из памяти"
+                    style={{ flex: '0 0 auto', minHeight: 30, borderRadius: 999, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2_PROFILE.textSoft, fontSize: 10.5, lineHeight: '14px', fontWeight: 760, padding: '0 10px', fontFamily: 'inherit', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
+                    {item.label} ×
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {conversation.map(item => (
             <div key={item.id} style={{ display: 'grid', justifyItems: item.from === 'user' ? 'end' : 'start', gap: 8 }}>

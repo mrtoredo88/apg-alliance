@@ -14,10 +14,25 @@ const CATEGORY_HINTS = [
 
 export const DEFAULT_LOKI_USER_MEMORY = {
   favoriteCategories: {},
+  interests: [],
+  visitedPartners: [],
+  favoriteExperts: [],
+  frequentQuestions: [],
+  preferences: {},
+  lastActions: [],
+  typicalRoutes: [],
+  favoriteLanguage: 'ru',
   frequentIntents: {},
   queryHours: {},
   lastQueries: [],
   lokiMemory: null,
+  experienceMemory: [],
+  feedbackEvents: [],
+  knowledgeCandidates: [],
+  unknownTopics: [],
+  lastExperience: null,
+  lastFeedback: null,
+  lastQuality: null,
   updatedAt: null,
 };
 
@@ -42,6 +57,29 @@ export function clearLokiUserMemory() {
   } catch {}
 }
 
+export function clearLokiUserMemoryItem(type, key) {
+  const memory = loadLokiUserMemory();
+  const value = memory?.[type];
+  if (Array.isArray(value)) {
+    saveLokiUserMemory({ ...memory, [type]: value.filter(item => String(item) !== String(key)) });
+    return loadLokiUserMemory();
+  }
+  if (value && typeof value === 'object') {
+    const nextValue = { ...value };
+    delete nextValue[key];
+    saveLokiUserMemory({ ...memory, [type]: nextValue });
+    return loadLokiUserMemory();
+  }
+  return memory;
+}
+
+export function mergeLokiLearningPatch(memory, patch = {}) {
+  if (!patch || typeof patch !== 'object') return memory;
+  const next = { ...memory, ...patch };
+  saveLokiUserMemory(next);
+  return { ...DEFAULT_LOKI_USER_MEMORY, ...next, updatedAt: new Date().toISOString() };
+}
+
 export function learnFromLokiQuery(memory, query, result) {
   const text = String(query ?? '').toLowerCase().replace(/ё/g, 'е');
   const favoriteCategories = { ...(memory?.favoriteCategories ?? {}) };
@@ -56,7 +94,8 @@ export function learnFromLokiQuery(memory, query, result) {
   queryHours[bucket] = (queryHours[bucket] ?? 0) + 1;
   const lastQueries = [text].filter(Boolean).concat(memory?.lastQueries ?? []).slice(0, 8);
   const collected = collectMemorySignals({ memory: memory?.lokiMemory, query: text, result });
-  const next = { favoriteCategories, frequentIntents, queryHours, lastQueries, lokiMemory: collected.memory };
+  const learningPatch = result?.learningPatch && typeof result.learningPatch === 'object' ? result.learningPatch : {};
+  const next = { ...learningPatch, favoriteCategories: { ...favoriteCategories, ...(learningPatch.favoriteCategories || {}) }, frequentIntents, queryHours, lastQueries, lokiMemory: collected.memory };
   saveLokiUserMemory(next);
   return { ...DEFAULT_LOKI_USER_MEMORY, ...next, updatedAt: new Date().toISOString() };
 }

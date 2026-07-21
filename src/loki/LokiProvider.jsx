@@ -909,6 +909,11 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     setUserMemory(loadLokiUserMemory());
   }, []);
 
+  const clearUserMemoryItem = useCallback(async (type, key) => {
+    const { clearLokiUserMemoryItem } = await loadLokiUserMemoryModule();
+    setUserMemory(clearLokiUserMemoryItem(type, key));
+  }, []);
+
   const displayMessage = useCallback((eventType, payload = {}) => {
     const config = getBehaviorForEvent(eventType);
     const priority = payload.priority ?? config.priority ?? LOKI_MESSAGE_PRIORITY.NORMAL;
@@ -1342,7 +1347,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       const personalityPatch = result.personalityPhraseId
         ? { personalityHistory: (await loadLokiPersonalityModule()).rememberPersonalityPhrase(memory.personalityHistory, { id: result.personalityPhraseId }) }
         : {};
-      if (result.knowledgeSnapshot || result.reasoningContext || result.conversationContext || result.capabilityContext || result.skillContext || result.executionContext || result.controlledExecutionContext || result.journeyContext || result.memoryContext || result.planContext || result.workflowContext || result.agentContext || result.personalityPhraseId || result.toolContext) updateMemory({
+      if (result.knowledgeSnapshot || result.reasoningContext || result.conversationContext || result.capabilityContext || result.skillContext || result.executionContext || result.controlledExecutionContext || result.journeyContext || result.memoryContext || result.evolutionContext || result.planContext || result.workflowContext || result.agentContext || result.personalityPhraseId || result.toolContext) updateMemory({
         ...(result.knowledgeSnapshot ? { lastKnowledgeSnapshot: result.knowledgeSnapshot, lastKnowledgeIndexSearch: result.knowledgeIndexSearch || null } : {}),
         ...(result.reasoningContext ? { lastReasoningContext: result.reasoningContext } : {}),
         ...(result.conversationContext ? { lastConversationContext: result.conversationContext, lastConversationSession: result.conversationContext.session } : {}),
@@ -1352,6 +1357,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         ...(result.controlledExecutionContext ? { lastControlledExecutionContext: result.controlledExecutionContext, lastControlledExecutionSnapshot: result.controlledExecutionSnapshot } : {}),
         ...(result.journeyContext ? { lastJourneyContext: result.journeyContext } : {}),
         ...(result.memoryContext ? { lastMemoryContext: result.memoryContext } : {}),
+        ...(result.evolutionContext ? { lastEvolutionContext: result.evolutionContext, lastEvolutionSnapshot: result.evolutionSnapshot } : {}),
         ...(result.planContext ? { lastPlanContext: result.planContext } : {}),
         ...(result.workflowContext ? { lastWorkflowContext: result.workflowContext } : {}),
         ...(result.agentContext ? { lastAgentContext: result.agentContext, lastAgentSession: result.agentContext.session } : {}),
@@ -1550,6 +1556,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         ...(normalizedResult.controlledExecutionContext ? { lastControlledExecutionContext: normalizedResult.controlledExecutionContext, lastControlledExecutionSnapshot: normalizedResult.controlledExecutionSnapshot } : {}),
         ...(normalizedResult.journeyContext ? { lastJourneyContext: normalizedResult.journeyContext } : {}),
         ...(normalizedResult.memoryContext ? { lastMemoryContext: normalizedResult.memoryContext } : {}),
+        ...(normalizedResult.evolutionContext ? { lastEvolutionContext: normalizedResult.evolutionContext, lastEvolutionSnapshot: normalizedResult.evolutionSnapshot } : {}),
         ...(normalizedResult.planContext ? { lastPlanContext: normalizedResult.planContext } : {}),
         ...(normalizedResult.workflowContext ? { lastWorkflowContext: normalizedResult.workflowContext } : {}),
         ...(normalizedResult.agentContext ? { lastAgentContext: normalizedResult.agentContext, lastAgentSession: normalizedResult.agentContext.session } : {}),
@@ -1584,6 +1591,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
           ms: Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt),
           success: true,
           source: 'loki_experience',
+          knowledgeHit: normalizedResult.evolutionContext?.analytics?.metrics?.knowledgeHitRate || 0,
+          feedbackScore: normalizedResult.evolutionContext?.analytics?.metrics?.feedbackScore || 0,
+          fallback: Boolean(normalizedResult.evolutionContext?.learning?.quality?.fallback),
         },
       }).catch(e => logError(e, 'LokiProvider.analytics'));
       updateHistory(prev => addLokiHistoryItem(prev, {
@@ -1742,6 +1752,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     handleCharacterTap,
     showMessage,
     resetUserMemory,
+    clearUserMemoryItem,
     visible,
     openExperience: () => {
       recordLokiTapTrace('provider_open_enter', {
@@ -1792,7 +1803,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     setMode: (mode) => persistSettings({ ...settings, mode }),
     setPersonalityMode: (personalityMode) => persistSettings({ ...settings, personalityMode }),
   };
-  }, [action, activeContext, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, lokiDerived, memory, message, openContextExperience, pendingFirstJourneyQuestion, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
+  }, [action, activeContext, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, clearUserMemoryItem, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, lokiDerived, memory, message, openContextExperience, pendingFirstJourneyQuestion, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
 
   return <LokiContext.Provider value={value}>{children}</LokiContext.Provider>;
 }

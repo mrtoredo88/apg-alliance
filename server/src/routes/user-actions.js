@@ -2300,6 +2300,9 @@ async function actionLokiAnalytics(db, req, actor) {
     panel: safeString(payload.panel, 80),
     ms: Math.max(0, Math.min(60000, Number(payload.ms || 0))),
     success: payload.success !== false,
+    knowledgeHit: Math.max(0, Math.min(100, Number(payload.knowledgeHit || 0))),
+    feedbackScore: Math.max(-100, Math.min(100, Number(payload.feedbackScore || 0))),
+    fallback: Boolean(payload.fallback),
     source: safeString(payload.source || 'loki', 80),
   };
   await db.collection('lokiAnalytics').add({

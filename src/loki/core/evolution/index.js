@@ -1,0 +1,11 @@
+export { buildConversationExperience } from './ConversationLearning.js';
+export { detectLokiFeedback, scoreFeedback } from './FeedbackEngine.js';
+export { appendExperience, summarizeExperience } from './ExperienceEngine.js';
+export { buildKnowledgeCandidates, buildUnknownTopics } from './KnowledgeCandidateEngine.js';
+export { buildPersonalMemoryPatch } from './MemoryRanker.js';
+export { buildStructuredKnowledgeIndex, buildKnowledgeUpdatePolicy } from './KnowledgeUpdater.js';
+export { evaluateKnowledgeQuality } from './KnowledgeQuality.js';
+export { runLearningEngine } from './LearningEngine.js';
+export { buildKnowledgeEvolutionAnalytics } from './KnowledgeAnalytics.js';
+export { buildKnowledgeSchedulerState } from './KnowledgeScheduler.js';
+export { runLokiKnowledgeEvolution, buildEvolutionSnapshot, explainLastKnowledgeEvolution, isKnowledgeEvolutionExplainQuery } from './KnowledgeEvolutionEngine.js';
