@@ -1,4 +1,5 @@
 import { getCapabilityRegistry } from './CapabilityRegistry.js';
+import { isCapabilityAvailableForPlatform } from '../platformCapabilities.js';
 
 const SYNONYMS = {
   BOOK_APPOINTMENT: ['записаться', 'запись', 'бронь', 'прием', 'приём', 'хочу прийти', 'забронировать', 'запиши меня'],
@@ -65,6 +66,7 @@ export function matchCapabilities({ question = '', intent = {}, conversation = n
   ].filter(Boolean).join(' ');
   const registry = getCapabilityRegistry();
   return registry
+    .filter(capability => isCapabilityAvailableForPlatform(capability, { context }))
     .map(capability => {
       const aliases = [...capability.aliases, ...(SYNONYMS[capability.id] || [])];
       const aliasScore = aliases.reduce((sum, alias) => Math.max(sum, phraseScore(source, alias)), 0);

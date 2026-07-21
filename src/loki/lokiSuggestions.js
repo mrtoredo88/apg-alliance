@@ -41,9 +41,9 @@ export function getLokiSuggestion({ eventType, activePanel, payload = {} }) {
   if (eventType === LOKI_EVENTS.USER_LOGIN || eventType === LOKI_EVENTS.RETURN_VISIT) {
     return {
       title: 'Начнём с города',
-      text: 'Могу показать партнёров рядом или открыть сканер.',
-      action: createLokiAction(LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS),
-      label: 'Что рядом?',
+      text: 'Могу показать, что интересного сегодня, или открыть сканер.',
+      action: createLokiAction(LOKI_APP_ACTIONS.OPEN_OFFERS),
+      label: 'Что интересного?',
     };
   }
 

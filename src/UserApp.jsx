@@ -1321,8 +1321,8 @@ export function UserApp() {
   }, [navigatePanel]);
 
   const handleOpenPartners = useCallback(() => {
-    goPanel('partners');
-  }, [goPanel]);
+    goPanel(isCurrentDesktopDevice(workspaceWidth) ? 'partners' : 'offers');
+  }, [goPanel, workspaceWidth]);
 
   const openContextDialog = useCallback((type, item, source = 'ui') => {
     if (!type || !item) return;
@@ -4608,13 +4608,14 @@ export function UserApp() {
     registeredEventIds,
     completedTasks,
     platform: isVK() ? 'vk-miniapp' : 'web-app',
+    devicePlatform: desktopDevice ? 'desktop' : workspaceMode === WORKSPACE_MODES.tablet ? 'tablet' : 'mobile',
     workspace: { mode: workspaceMode },
     connectionContext: {
       contactCount: Array.isArray(user?.connectionIds) ? user.connectionIds.length : 0,
       activeTargetId: initialDeepLink.type === 'profile-user' ? initialDeepLink.id : '',
       source: initialDeepLink.type === 'profile-user' ? 'profile_deeplink' : '',
     },
-  }), [activePanel, adaptiveInterestProfile, apgNews, completedTasks, continueExperience, customTasks, dailySummary, enrichedPartners, events, experts, favorites, homeExperience, initialDeepLink, intelligenceTick, interestModelSnapshot, lastScanDate, lokiKnowledge, notifications, readLaterNews, recommendations, registeredEventIds, savedNews, unreadCount, user, userBookings, userKeys, workspaceMode]);
+  }), [activePanel, adaptiveInterestProfile, apgNews, completedTasks, continueExperience, customTasks, dailySummary, desktopDevice, enrichedPartners, events, experts, favorites, homeExperience, initialDeepLink, intelligenceTick, interestModelSnapshot, lastScanDate, lokiKnowledge, notifications, readLaterNews, recommendations, registeredEventIds, savedNews, unreadCount, user, userBookings, userKeys, workspaceMode]);
 
   useEffect(() => {
     if (performanceReadyRef.current.loki || loading) return;
@@ -4665,6 +4666,7 @@ export function UserApp() {
     },
     [LOKI_APP_ACTIONS.OPEN_PRIZE]: () => goPanel('rewards'),
     [LOKI_APP_ACTIONS.OPEN_PARTNERS]: handleOpenPartners,
+    [LOKI_APP_ACTIONS.OPEN_OFFERS]: () => goPanel('offers'),
     [LOKI_APP_ACTIONS.OPEN_EXPERTS]: () => goPanel('experts'),
     [LOKI_APP_ACTIONS.OPEN_EVENTS]: () => goPanel('events'),
     [LOKI_APP_ACTIONS.OPEN_NEWS_FEED]: () => goPanel('news'),

@@ -8,6 +8,8 @@ export const CAPABILITY_CATEGORIES = {
   SEARCH: 'Search',
 };
 
+const ALL_PLATFORMS = ['desktop', 'mobile', 'tablet', 'embedded'];
+
 const CAPABILITIES = [
   { id: 'OPEN_HOME', title: 'Открыть главную', description: 'Переход на главный экран АПГ.', aliases: ['главная', 'домой', 'на главную', 'home'], requiredParameters: [], optionalParameters: [], requiredRole: 'user', requiredTools: [], relatedScreens: ['home'], priority: 70, category: CAPABILITY_CATEGORIES.NAVIGATION },
   { id: 'OPEN_PROFILE', title: 'Открыть профиль', description: 'Показать профиль пользователя.', aliases: ['профиль', 'мой профиль', 'личный профиль', 'аккаунт'], requiredParameters: [], optionalParameters: [], requiredRole: 'user', requiredTools: ['user'], relatedScreens: ['profile'], priority: 78, category: CAPABILITY_CATEGORIES.NAVIGATION },
@@ -66,6 +68,7 @@ const REGISTRY = CAPABILITIES.map(item => ({
   requiredTools: [],
   relatedScreens: [],
   requiredRole: 'user',
+  supportedPlatforms: ALL_PLATFORMS,
   priority: 50,
   ...item,
 }));

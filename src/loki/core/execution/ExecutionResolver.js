@@ -1,5 +1,6 @@
 import { getCapabilityById } from '../capabilities/CapabilityRegistry.js';
 import { getExecutionDefinition } from './ExecutionRegistry.js';
+import { normalizeLokiPlatform } from '../platformCapabilities.js';
 
 function list(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
@@ -49,6 +50,16 @@ function mergeResolved(...rows) {
   }, {});
 }
 
+function resolvePlatformExecution(execution = {}, platformInput = {}) {
+  if (!execution) return null;
+  const platform = normalizeLokiPlatform(platformInput);
+  return {
+    ...execution,
+    navigation: execution.platformNavigation?.[platform] || execution.navigation || null,
+    actionType: execution.platformActionType?.[platform] || execution.actionType || '',
+  };
+}
+
 function titleForParameter(parameter = '') {
   const labels = {
     partnerId: 'партнёра',
@@ -84,7 +95,7 @@ export function resolveExecution(input = {}) {
   const capabilityContext = input.capabilityContext || {};
   const capabilityId = capabilityContext.capability || input.capability || '';
   const capability = getCapabilityById(capabilityId);
-  const execution = getExecutionDefinition(capabilityId);
+  const execution = resolvePlatformExecution(getExecutionDefinition(capabilityId), { context: input.context });
   if (!capability || !execution) {
     return {
       capability: capabilityId,
@@ -109,7 +120,7 @@ export function resolveExecution(input = {}) {
   const missingParameters = required.filter(name => !clean(resolvedParameters[name]));
   const sourceOrder = list(capabilityContext.executionOrder).length ? capabilityContext.executionOrder : [{ order: 1, capability: capabilityId }];
   const executionOrder = sourceOrder.map((row, index) => {
-    const rowExecution = getExecutionDefinition(row.capability);
+    const rowExecution = resolvePlatformExecution(getExecutionDefinition(row.capability), { context: input.context });
     const rowCapability = getCapabilityById(row.capability);
     const rowRequired = list(rowExecution?.requiredParameters?.length ? rowExecution.requiredParameters : rowCapability?.requiredParameters);
     const rowResolved = mergeResolved(resolveFromKnowledge(row.capability, input.knowledge), resolveQuestionParameters(input.question), row.resolvedParameters, capabilityContext.resolved);

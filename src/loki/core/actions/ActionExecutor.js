@@ -3,8 +3,9 @@ import { LOKI_ACTION_CENTER_EVENTS } from './ActionRegistry.js';
 import { validateLokiAction } from './ActionValidator.js';
 
 export async function executeLokiAction(actionRequest, { appActions = {}, appState = {}, actor = {}, onEvent = null } = {}) {
-  const action = normalizeLokiActionRequest(actionRequest);
-  const validation = validateLokiAction(action, { appActions, appState, actor });
+  const requestedAction = normalizeLokiActionRequest(actionRequest);
+  const validation = validateLokiAction(requestedAction, { appActions, appState, actor });
+  const action = validation.action || requestedAction;
   if (!validation.ok) {
     onEvent?.({ type: LOKI_ACTION_CENTER_EVENTS.FAILED, action, actionType: action?.type || '', status: 'failed', reason: validation.reason });
     return { ok: false, reason: validation.reason, action };

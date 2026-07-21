@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-21] fix: Loki Mobile Capability Navigation
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/UserApp.jsx`, `src/loki/lokiActionTypes.js`, `src/loki/LokiExperience.jsx`, `src/loki/LokiProvider.jsx`, `src/loki/lokiSuggestions.js`, `src/loki/core/platformCapabilities.js`, `src/loki/core/actions/ActionExecutor.js`, `src/loki/core/actions/ActionRegistry.js`, `src/loki/core/actions/ActionValidator.js`, `src/loki/core/capabilities/CapabilityContext.js`, `src/loki/core/capabilities/CapabilityMatcher.js`, `src/loki/core/capabilities/CapabilityRegistry.js`, `src/loki/core/execution/ExecutionRegistry.js`, `src/loki/core/execution/ExecutionResolver.js`, `src/loki/core/knowledge/SmartAnswerPipeline.js`, `src/loki/core/modules/ActionRouter.js`, `scripts/loki-platform-capability-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Capability/execution/action layers Локи теперь учитывают `devicePlatform` и заменяют desktop-only `openPartners` на mobile-safe `openOffers` для mobile/tablet/embedded.
+- Быстрый сценарий Локи на mobile синхронизирован с основным потоком “Что интересного сегодня” вместо desktop-каталога партнёров.
+- Добавлен regression test для mobile/tablet/embedded/desktop навигации Локи.
+**Почему:** Локи не должен предлагать и выполнять переходы, которые гарантированно ведут пользователя в недоступный desktop-only экран на мобильной версии.
+
 ## [2026-07-21] chore: Tatyana Admin Balance Recovery Tool
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `scripts/recover-tatyana-admin-balance.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

@@ -7,7 +7,7 @@ import { recordLokiMessageTrace, resetLokiMessageTrace } from './lokiMessageTrac
 import { inspectLokiResponseText, isLokiUserDebugVisible } from './lokiResponseText.js';
 
 const QUICK_ACTIONS = [
-  { label: '📍 Что рядом?', text: 'Что рядом?', action: createLokiAction(LOKI_APP_ACTIONS.SHOW_NEAREST_PARTNERS) },
+  { label: '✨ Что интересного?', text: 'Что интересного сегодня?', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_OFFERS) },
   { label: '🎁 Мои призы', text: 'Какие призы доступны?', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_PRIZE) },
   { label: '🎉 События', text: 'Что интересного сегодня?', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_EVENT) },
   { label: '☕ Найти кафе', text: 'Где выпить кофе?' },

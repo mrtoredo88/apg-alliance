@@ -1,4 +1,5 @@
 import { LOKI_APP_ACTIONS, normalizeLokiActionRequest } from '../../lokiActionTypes.js';
+import { resolveLokiActionForPlatform } from '../platformCapabilities.js';
 import { getActionDefinition } from './ActionRegistry.js';
 
 function list(value) {
@@ -62,7 +63,7 @@ function requiresEntity(action = {}) {
 }
 
 export function validateLokiAction(actionRequest, { appState = {}, appActions = null, actor = {} } = {}) {
-  const action = normalizeLokiActionRequest(actionRequest);
+  const action = resolveLokiActionForPlatform(normalizeLokiActionRequest(actionRequest), { appState });
   if (!action?.type) return { ok: false, reason: 'Не удалось распознать действие Локи.', action: null };
   const definition = getActionDefinition(action);
   if (!definition) return { ok: false, reason: 'Такое действие пока не поддерживается в АПГ.', action };

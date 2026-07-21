@@ -21,6 +21,7 @@ import {
 import { learnFromPanelVisit, learnFromRecommendationResult } from './LokiLearning.js';
 import { buildLokiMessageTimeoutFallback, recordLokiMessageTrace, recordLokiRequestDiagnostics, recordLokiPipelineError, recordLokiPipelineReturn } from './lokiMessageTrace.js';
 import { inspectLokiResponseText, normalizeLokiResponseText } from './lokiResponseText.js';
+import { resolveLokiActionForPlatform } from './core/platformCapabilities.js';
 import { markLokiStage } from '../performance/index.js';
 import {
   DEFAULT_LOKI_SETTINGS,
@@ -471,6 +472,28 @@ function normalizeDashboardCard(row = {}, fallbackType = 'recommendation') {
       { label: 'Подробнее', action },
       { label: 'Скрыть', localAction: 'hideRecommendation' },
     ].filter(Boolean).slice(0, 4),
+  };
+}
+
+function sanitizeCardActionsForPlatform(card = {}, appState = {}) {
+  if (!card || typeof card !== 'object') return card;
+  return {
+    ...card,
+    action: card.action ? resolveLokiActionForPlatform(card.action, { appState }) : card.action,
+    actions: Array.isArray(card.actions)
+      ? card.actions.map(item => item?.action ? { ...item, action: resolveLokiActionForPlatform(item.action, { appState }) } : item)
+      : card.actions,
+  };
+}
+
+function sanitizeLokiResultActionsForPlatform(result = {}, appState = {}) {
+  if (!result || typeof result !== 'object') return result;
+  return {
+    ...result,
+    executeAction: result.executeAction ? resolveLokiActionForPlatform(result.executeAction, { appState }) : result.executeAction,
+    autoAction: result.autoAction ? resolveLokiActionForPlatform(result.autoAction, { appState }) : result.autoAction,
+    card: result.card ? sanitizeCardActionsForPlatform(result.card, appState) : result.card,
+    cards: Array.isArray(result.cards) ? result.cards.map(card => sanitizeCardActionsForPlatform(card, appState)) : result.cards,
   };
 }
 
@@ -1381,14 +1404,14 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       const contextResult = buildNewsContextAnswer(activeContext, text, appState);
       if (contextResult) {
         const contextInspection = inspectLokiResponseText(contextResult.text);
-        const normalizedContextResult = {
+        const normalizedContextResult = sanitizeLokiResultActionsForPlatform({
           ...contextResult,
           text: contextInspection.text,
           debug: {
             ...(contextResult.debug || {}),
             pipelineTimeline: traceTimeline(),
           },
-        };
+        }, appState);
         if (contextInspection.fallbackUsed) {
           recordLokiMessageTrace('STOP Response Normalizer failed', {
             errorCode: contextInspection.rawEmpty ? 'EMPTY_CONTEXT_TEXT' : 'BLOCKED_CONTEXT_TEXT',
@@ -1489,14 +1512,14 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
           intent: result.intent || '',
         });
       }
-      const normalizedResult = {
+      const normalizedResult = sanitizeLokiResultActionsForPlatform({
         ...result,
         text: resultInspection.text,
         debug: {
           ...(result.debug || {}),
           pipelineTimeline: traceTimeline(),
         },
-      };
+      }, appState);
       if (normalizedResult.capabilityContext) markLokiStage('capability', { capability: normalizedResult.capabilityContext.capability || normalizedResult.capabilitySnapshot?.Capability || '' });
       if (normalizedResult.skillContext) markLokiStage('skills', { skill: normalizedResult.skillContext.skill || normalizedResult.skillSnapshot?.['Selected Skill'] || '' });
       if (normalizedResult.executionContext || normalizedResult.controlledExecutionContext) markLokiStage('execution', { ready: Boolean(normalizedResult.executionContext?.ready || normalizedResult.controlledExecutionContext?.executionReady) });

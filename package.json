@@ -24,6 +24,7 @@
     "test:loki-agent": "node scripts/loki-agent-test.mjs",
     "test:loki-conversation": "node scripts/loki-conversation-test.mjs",
     "test:loki-capability": "node scripts/loki-capability-test.mjs",
+    "test:loki-platform-capability": "node scripts/loki-platform-capability-test.mjs",
     "test:loki-execution": "node scripts/loki-execution-bridge-test.mjs",
     "test:loki-controlled-execution": "node scripts/loki-controlled-execution-test.mjs",
     "test:loki-skills": "node scripts/loki-skills-test.mjs",

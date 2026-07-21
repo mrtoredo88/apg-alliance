@@ -12,6 +12,8 @@ export function buildCapabilityContext({ question = '', resolution = {}, convers
     alternatives: resolution.alternatives || [],
     relatedTools: capability?.requiredTools || [],
     relatedScreens: capability?.relatedScreens || [],
+    supportedPlatforms: capability?.supportedPlatforms || [],
+    platform: context?.appState?.devicePlatform || context?.appState?.platform || context?.platform || '',
     executionOrder: resolution.executionOrder || [],
     matchedAliases: resolution.matchedAliases || [],
     requiredRole: capability?.requiredRole || 'user',

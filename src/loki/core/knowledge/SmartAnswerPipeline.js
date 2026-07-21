@@ -347,6 +347,7 @@ function runLokiKnowledgeEngineImpl({ text: question, appState = {}, context = n
   const effectiveIntent = conversationResult?.effectiveIntent || intent;
   const contextWithConversation = {
     ...(context || {}),
+    appState: sourceState,
     memory: {
       ...(context?.memory || {}),
       knowledgeSnapshot: knowledgeIndexResult.knowledgeSnapshot,
