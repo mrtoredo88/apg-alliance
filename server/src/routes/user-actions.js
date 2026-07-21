@@ -240,6 +240,52 @@ function stripUndefined(input = {}) {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
 }
 
+function profileValueScore(value) {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'boolean') return value ? 2 : 1;
+  if (Array.isArray(value)) return value.length;
+  if (typeof value === 'object') return Object.keys(value).length;
+  const text = safeString(value, 1000);
+  if (!text) return 0;
+  if (/^[^@\s]+@[^@\s]+$/.test(text)) return 1;
+  return text.includes(' ') ? text.length + 20 : text.length;
+}
+
+function isEmailLocalPartValue(value, userId = '', email = '') {
+  const text = safeString(value, 300).toLowerCase();
+  if (!text) return false;
+  const normalizedEmail = safeString(email || (userId.startsWith('email:') ? userId.slice(6) : ''), 300).toLowerCase();
+  const localPart = normalizedEmail.split('@')[0] || '';
+  return !!localPart && text === localPart;
+}
+
+function isRicherProfileValue(next, current, key, context = {}) {
+  if (next === undefined) return false;
+  if (next === null || next === '') return false;
+  if (key === 'photo') return !current || profileValueScore(next) >= profileValueScore(current);
+  if (key === 'emailVerified') return next === true || current === undefined;
+  if (['displayName', 'firstName', 'lastName'].includes(key)) {
+    if (isEmailLocalPartValue(next, context.userId, context.email)) return !current;
+    if (!current) return true;
+    return profileValueScore(next) > profileValueScore(current);
+  }
+  if (!current) return true;
+  return profileValueScore(next) >= profileValueScore(current);
+}
+
+export function buildSafeProfileSyncPatch(current = {}, incoming = {}, context = {}) {
+  const patch = {};
+  for (const [key, value] of Object.entries(incoming || {})) {
+    if (['keys', 'reputation', 'completedTasks', 'roles', 'role', 'friends', 'friendIds', 'connectionIds', 'socialConnectionIds', 'linkedTelegram', 'linkedAccounts', 'identityAliases', 'canonicalUserId', 'partnerId', 'partnerCabinetIds', 'ownerPartnerId'].includes(key)) continue;
+    if (key === 'email') {
+      if (value && (!current.email || safeString(current.email, 300).toLowerCase() === safeString(value, 300).toLowerCase())) patch.email = value;
+      continue;
+    }
+    if (isRicherProfileValue(value, current[key], key, { ...context, email: current.email || incoming.email })) patch[key] = value;
+  }
+  return patch;
+}
+
 function boolFromLegacy(value) {
   return value === true || value === 'true' || value === 1 || value === '1';
 }
@@ -608,7 +654,8 @@ async function actionProfileSync(db, req, actor) {
       });
       referralRecoveryStatus = referralDecision.status;
       referralRecoveryReason = referralDecision.reason;
-      const patch = { ...profile, lastSeen: FieldValue.serverTimestamp() };
+      const safeProfilePatch = buildSafeProfileSyncPatch(before, profile, { userId });
+      const patch = { ...safeProfilePatch, lastSeen: FieldValue.serverTimestamp() };
       let keyIncrement = 0;
       let reputationIncrement = 0;
       consentStatus = getConsentStatus(before);
@@ -656,7 +703,7 @@ async function actionProfileSync(db, req, actor) {
       const reputationStatus = getReputationStatus(newReputation);
       userDoc = {
         ...before,
-        ...Object.fromEntries(Object.entries(profile).filter(([, v]) => v !== null)),
+        ...safeProfilePatch,
         ...(referralDecision.markInvitedRewarded ? {
           referredBy: referralDecision.effectiveReferrerId,
           referralBonusGranted: true,

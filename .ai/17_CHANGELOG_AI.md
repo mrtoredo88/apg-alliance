@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-21] fix: Preserve Rich Profile During Email Sync
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `server/src/routes/user-actions.js`, `scripts/profile-sync-preservation-test.mjs`, `scripts/tatyana-account-recovery.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Восстановлен canonical-профиль Татьяны Гордеевой через backup/dry-run/apply/verify recovery-процедуру с rollback-пакетом.
+- `profile:sync` больше не затирает богатый профиль default email payload: имена, фото, email verification, роли, ключи, репутация, задачи и социальные/бизнес-связи защищены от деградации.
+- Добавлен regression test на сценарий Email OTP после Telegram/canonical профиля.
+**Почему:** после Identity V2 email login канонический профиль мог деградировать до `gordeeva.tatyana`, `photo=null`, `emailVerified=false` из-за небезопасного client profile merge.
+
 ## [2026-07-21] fix: Telegram Avatar Sync After Linking
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server/src/lib/telegramUpdates.js`, `server/src/routes/telegram-auth-check.js`, `scripts/telegram-avatar-sync-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
