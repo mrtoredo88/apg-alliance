@@ -15,6 +15,15 @@
 
 ---
 
+## [2026-07-21] chore: Tatyana Admin Balance Recovery Tool
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `scripts/recover-tatyana-admin-balance.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** chore
+**Что изменено:**
+- Добавлен allowlist-only recovery script для административного восстановления баланса ключей Татьяны Гордеевой с backup, dry-run, rollback, optimistic lock и audit trail.
+- Скрипт меняет только `users/email:gordeeva.tatyana@mail.ru.keys` и создаёт записи аудита в `adminActivity`/`accountRecoveryAudit`.
+**Почему:** владелец системы принял решение о единичном административном восстановлении исторического баланса после identity/profile recovery.
+
 ## [2026-07-21] fix: Preserve Rich Profile During Email Sync
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `server/src/routes/user-actions.js`, `scripts/profile-sync-preservation-test.mjs`, `scripts/tatyana-account-recovery.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
