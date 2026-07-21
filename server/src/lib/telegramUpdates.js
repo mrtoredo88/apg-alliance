@@ -289,22 +289,55 @@ export async function processTelegramUpdate(db, update, log = console) {
         linkError = 'owner_not_found';
       } else {
         linkedOwnerId = resolvedOwnerUserId;
-          try {
-            await serverFoundation.identityV2.linkTelegram({
-              telegramId: String(from.id),
-              userId: resolvedOwnerUserId,
-              telegram: {
+        try {
+          const telegramLinkParams = {
+            telegramId: String(from.id),
+            userId: resolvedOwnerUserId,
+            telegram: {
               firstName: from.first_name ?? null,
-                lastName: from.last_name ?? null,
-                username: from.username ?? null,
-                photo: null,
-              },
-            });
-          } catch (error) {
-            linkError = error?.code === 'TELEGRAM_ALREADY_USED'
-              ? 'already_linked'
-              : 'link_failed';
-          }
+              lastName: from.last_name ?? null,
+              username: from.username ?? null,
+              photo: null,
+            },
+          };
+          log.info?.({
+            state,
+            requestId,
+            loginSessionId,
+            telegramSessionId: state,
+            stage: 'identityV2.linkTelegram.enter',
+            payload: {
+              telegramId: telegramLinkParams.telegramId,
+              userId: telegramLinkParams.userId,
+            },
+          }, 'telegram-update-linking-forensic');
+          const linkResult = await serverFoundation.identityV2.linkTelegram(telegramLinkParams);
+          log.info?.({
+            state,
+            requestId,
+            loginSessionId,
+            telegramSessionId: state,
+            stage: 'identityV2.linkTelegram.return',
+            returnValue: safeDebugString(
+              linkResult === undefined ? 'undefined' : JSON.stringify(linkResult),
+              360,
+            ),
+          }, 'telegram-update-linking-forensic');
+        } catch (error) {
+          log.warn?.({
+            state,
+            requestId,
+            loginSessionId,
+            telegramSessionId: state,
+            stage: 'identityV2.linkTelegram.throw',
+            code: error?.code || null,
+            message: safeDebugString(error?.message, 220),
+            stack: error?.stack ? String(error.stack).slice(0, 300) : null,
+          }, 'telegram-update-linking-forensic');
+          linkError = error?.code === 'TELEGRAM_ALREADY_USED'
+            ? 'already_linked'
+            : 'link_failed';
+        }
       }
       await appendTelegramTimeline(ref, {
         stage: 'telegram_auth_link_validation',
