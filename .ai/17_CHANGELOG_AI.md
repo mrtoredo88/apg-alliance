@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-22] fix: People Navigation Buttons Hotfix
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/ProfilePanel.jsx`, `scripts/people-navigation-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Кнопки “Открыть Люди” и “Мой QR” в профильной карточке переведены на стабильные navigation handlers.
+- Обработчики изолируют click/pointer propagation, закрывают конфликтующий People Bottom Sheet и открывают ровно нужную модалку.
+- Добавлен regression `test:people-navigation` для People/QR navigation на mobile, desktop и Telegram WebApp контекстах.
+**Почему:** production Social Platform v2.1.2 выявил неработающие быстрые действия “Открыть Люди” и “Мой QR”.
+
 ## [2026-07-21] fix: People Actions Buttons Hotfix
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/ProfilePanel.jsx`, `scripts/people-actions-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
