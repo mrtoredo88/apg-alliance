@@ -29,6 +29,7 @@ function logTelegramAuthStart(logger, entry = {}) {
     loginSessionId: entry.loginSessionId,
     ownerUserId: entry.ownerUserId,
     ownerEmail: entry.ownerEmail,
+    linking: entry.linking,
     source: entry.source,
     referralSessionId: entry.referralSessionId,
   };
@@ -50,15 +51,21 @@ function safeTimelineEvent(stage, requestId, state, loginSessionId, telegramSess
 export default async function telegramAuthStartRoutes(fastify) {
   fastify.post('/api/telegram-auth-start', async (request, reply) => {
     const body = request.body ?? {};
-    const linking = normalizeBoolean(body.linking);
     const ownerUserId = safeString(body.ownerUserId, 200);
     const ownerEmail = safeString(body.email || body.ownerEmail, 220).toLowerCase();
     const source = safeString(body.source, 120) || 'profile_panel';
     const requestId = safeRequestId(request, `tg_req_${Date.now().toString(36)}_${randomBytes(6).toString('hex')}`);
     const loginSessionId = safeString(body.loginSessionId || body.sessionId || body.authSessionId, 220);
+
+    const hasExplicitLinking = Object.prototype.hasOwnProperty.call(body, 'linking');
+    const linkingFromBody = hasExplicitLinking ? normalizeBoolean(body.linking) : null;
+    const shouldInferLinking = source === 'profile_panel' && (!!ownerUserId || !!ownerEmail);
+    const linking = hasExplicitLinking ? linkingFromBody : shouldInferLinking;
+
     if (linking && !ownerUserId) {
       return reply.code(400).send({ ok: false, message: 'owner_required' });
     }
+
     const state = randomBytes(16).toString('hex');
     const db = getDb();
     const referralSession = await createOrRestoreReferralSession(db, request, {
@@ -99,6 +106,7 @@ export default async function telegramAuthStartRoutes(fastify) {
       loginSessionId,
       ownerUserId,
       ownerEmail,
+      linking: linking === true,
       source,
       referralSessionId: referralSessionId || null,
     });
@@ -111,7 +119,7 @@ export default async function telegramAuthStartRoutes(fastify) {
         type: REFERRAL_EVENT_TYPES.SESSION_TELEGRAM_LINKED,
         status: 'started',
         source: 'telegram-auth-start',
-        metadata: { state, linking },
+        metadata: { state, linking: linking === true },
       });
     }
     return {
