@@ -21,7 +21,7 @@
 **Тип:** fix
 **Что изменено:**
 - Кнопки “Открыть Люди” и “Мой QR” в профильной карточке переведены на стабильные navigation handlers.
-- Обработчики изолируют click/pointer propagation, закрывают конфликтующий People Bottom Sheet и открывают ровно нужную модалку.
+- Обработчики изолируют click propagation, закрывают конфликтующий People Bottom Sheet и открывают ровно нужную модалку.
 - PWA install guide больше не монтируется поверх Profile panel и не перехватывает первые клики по People/QR actions.
 - Добавлен regression `test:people-navigation` для People/QR navigation на mobile, desktop и Telegram WebApp контекстах.
 **Почему:** production Social Platform v2.1.2 выявил неработающие быстрые действия “Открыть Люди” и “Мой QR”.

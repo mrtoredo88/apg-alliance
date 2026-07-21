@@ -2336,8 +2336,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               </div>
             ))}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <GlassButton data-my-contacts-button onPointerDown={event => event.stopPropagation()} onClick={openPeopleNavigation} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Открыть Люди</GlassButton>
-              <GlassButton data-digital-business-card onPointerDown={event => event.stopPropagation()} onClick={openBusinessCardNavigation} tone="gold" style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Мой QR</GlassButton>
+              <GlassButton data-my-contacts-button onClick={openPeopleNavigation} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Открыть Люди</GlassButton>
+              <GlassButton data-digital-business-card onClick={openBusinessCardNavigation} tone="gold" style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Мой QR</GlassButton>
             </div>
           </GlassCard>
         </GlassSection>

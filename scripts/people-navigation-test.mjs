@@ -11,8 +11,10 @@ assert.match(profile, /const openBusinessCardNavigation = useCallback\(\(event\)
 assert.match(profile, /openPeopleNavigation = useCallback\(\(event\) => \{[\s\S]*?event\?\.preventDefault\?\.\(\);[\s\S]*?event\?\.stopPropagation\?\.\(\);/, 'Open People action isolates click propagation');
 assert.match(profile, /openBusinessCardNavigation = useCallback\(\(event\) => \{[\s\S]*?event\?\.preventDefault\?\.\(\);[\s\S]*?event\?\.stopPropagation\?\.\(\);/, 'My QR action isolates click propagation');
 
-assert.match(profile, /data-my-contacts-button[\s\S]*?onPointerDown=\{event => event\.stopPropagation\(\)\}[\s\S]*?onClick=\{openPeopleNavigation\}/, 'Open People button is wired to the stable navigation handler');
-assert.match(profile, /data-digital-business-card[\s\S]*?onPointerDown=\{event => event\.stopPropagation\(\)\}[\s\S]*?onClick=\{openBusinessCardNavigation\}/, 'My QR button is wired to the stable navigation handler');
+assert.match(profile, /data-my-contacts-button[\s\S]*?onClick=\{openPeopleNavigation\}/, 'Open People button is wired to the stable navigation handler');
+assert.match(profile, /data-digital-business-card[\s\S]*?onClick=\{openBusinessCardNavigation\}/, 'My QR button is wired to the stable navigation handler');
+assert.doesNotMatch(profile, /data-my-contacts-button[\s\S]{0,180}onPointerDown=\{event => event\.stopPropagation\(\)\}/, 'Open People button does not stop pointerdown before React click delivery');
+assert.doesNotMatch(profile, /data-digital-business-card[\s\S]{0,180}onPointerDown=\{event => event\.stopPropagation\(\)\}/, 'My QR button does not stop pointerdown before React click delivery');
 
 assert.match(profile, /showConnectionsModal && createPortal\([\s\S]*?title="Люди"[\s\S]*?data-people-list/, 'Open People renders the People modal portal');
 assert.match(profile, /showBusinessCard && createPortal\([\s\S]*?title="Цифровая карточка"[\s\S]*?data-business-card-modal[\s\S]*?<QRCodeSVG value=\{businessCardUrl\}/, 'My QR renders the QR business card portal');
