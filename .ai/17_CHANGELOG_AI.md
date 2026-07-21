@@ -15,6 +15,16 @@
 
 ---
 
+## [2026-07-21] fix: People Actions Buttons Hotfix
+**Коммит:** `см. финальный отчёт`
+**Файлы:** `src/ProfilePanel.jsx`, `scripts/people-actions-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:**
+- Кнопка “Написать” в People больше не отключается у друзей без локального `dialogId`: она открывает/создаёт direct dialog через существующий `dialog:open`.
+- Отправка и принятие заявки теперь сразу синхронизируют карточку, Bottom Sheet, search rows и connection target без refresh.
+- Добавлен regression `test:people-actions` для состояний stranger/outgoing/incoming/friend и локального обновления действий.
+**Почему:** production Social Platform v2.1 показал неработающие нижние кнопки карточки пользователя в разделе “Люди”.
+
 ## [2026-07-21] fix: People Null Safety Hotfix
 **Коммит:** `см. финальный отчёт`
 **Файлы:** `src/social/PeopleCore.js`, `scripts/people-null-safety-test.mjs`, `package.json`, `.ai/17_CHANGELOG_AI.md`

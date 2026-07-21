@@ -50,6 +50,13 @@ function safeTraceString(value, max = 220) {
   return String(value ?? '').trim().slice(0, max);
 }
 
+function profilePersonId(value = '') {
+  if (value && typeof value === 'object') {
+    return String(value.id || value.userId || value.contactUserId || value.targetUserId || value.recipientId || value.senderId || '').trim();
+  }
+  return String(value || '').trim();
+}
+
 function createTraceId(prefix = 'tg') {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 10)}`;
 }
@@ -1593,6 +1600,24 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     blocked: socialBlockedIds,
     privacy: socialPrivacy,
   }), [socialBlockedIds, socialPrivacy, socialRequests, user]);
+  const patchPeoplePerson = useCallback((targetId, patch = {}) => {
+    const id = profilePersonId(targetId);
+    if (!id) return;
+    const merge = (person) => {
+      if (profilePersonId(person) !== id) return person;
+      const next = { ...person, ...patch };
+      if (!patch.request && person?.request) next.request = person.request;
+      if (!patch.shared && person?.shared) next.shared = person.shared;
+      if (!patch.dialogId && person?.dialogId) next.dialogId = person.dialogId;
+      return next;
+    };
+    setPeopleSearchResults(prev => prev.map(merge));
+    setPeopleSheet(prev => prev ? merge(prev) : prev);
+    setConnectionTarget(prev => {
+      if (profilePersonId(prev?.target) !== id) return prev;
+      return { ...(prev || {}), ...patch, target: merge(prev.target || {}) };
+    });
+  }, []);
   const updateSocialRequest = useCallback((requestId, status) => {
     setSocialError('');
     const action = status === 'accepted' ? 'socialMessaging:accept' : status === 'declined' ? 'socialMessaging:decline' : status === 'cancelled' ? 'socialMessaging:cancel' : '';
@@ -1624,26 +1649,76 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     setConnectionError('');
     userAction('connections:request', { targetUserId: id, source })
       .then(data => {
-        if (data.request) setConnectionRequests(prev => [data.request, ...prev.filter(item => String(item.id) !== String(data.request.id))]);
+        const request = data.request || null;
+        const relationStatus = data.dialogId || data.status === 'connected'
+          ? PEOPLE_RELATION_STATUS.FRIEND
+          : PEOPLE_RELATION_STATUS.OUTGOING;
+        const patch = {
+          relationStatus,
+          status: relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'connected' : 'pending',
+          direction: request?.direction || (relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'outgoing' : ''),
+          dialogId: data.dialogId || request?.dialogId || '',
+        };
+        if (request) patch.request = request;
+        if (request?.shared || data.connection?.shared || data.target?.shared) patch.shared = request?.shared || data.connection?.shared || data.target?.shared;
+        if (request) setConnectionRequests(prev => [request, ...prev.filter(item => String(item.id) !== String(request.id))]);
+        patchPeoplePerson(id, patch);
         if (data.dialogId) onOpenDialog?.(data.dialogId);
-        if (connectionTarget?.target?.id === id) setConnectionTarget(prev => ({ ...(prev || {}), ...data, action: data.dialogId ? 'message' : 'pending' }));
+        if (connectionTarget?.target?.id === id) setConnectionTarget(prev => ({ ...(prev || {}), ...data, ...patch, action: data.dialogId ? 'message' : 'pending' }));
       })
       .catch(e => setConnectionError(e?.message || 'Не удалось отправить запрос на знакомство.'));
-  }, [connectionTarget?.target?.id, onOpenDialog]);
+  }, [connectionTarget?.target?.id, onOpenDialog, patchPeoplePerson]);
   const updateConnectionRequest = useCallback((requestId, status) => {
     const action = status === 'accepted' ? 'connections:accept' : 'connections:decline';
+    const currentRequest = connectionRequests.find(item => String(item.id) === String(requestId));
+    const targetId = String(currentRequest?.senderId || '') === String(user?.id || '') ? currentRequest?.recipientId : currentRequest?.senderId;
     setConnectionError('');
     userAction(action, { requestId })
       .then(data => {
         if (data.request) setConnectionRequests(prev => prev.map(item => String(item.id) === String(requestId) ? data.request : item));
+        if (status === 'accepted' && data.connection) {
+          setConnections(prev => [data.connection, ...prev.filter(item => profilePersonId(item) !== profilePersonId(data.connection))]);
+        }
+        if (targetId) {
+          const nextStatus = status === 'accepted' ? PEOPLE_RELATION_STATUS.FRIEND : PEOPLE_RELATION_STATUS.STRANGER;
+          patchPeoplePerson(targetId, {
+            relationStatus: nextStatus,
+            status: nextStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'connected' : 'stranger',
+            direction: '',
+            request: data.request || currentRequest || null,
+            dialogId: data.dialogId || data.connection?.dialogId || data.request?.dialogId || '',
+            shared: data.connection?.shared || data.request?.shared || currentRequest?.shared || null,
+          });
+        }
         if (data.dialogId) onOpenDialog?.(data.dialogId);
       })
       .catch(e => setConnectionError(e?.message || 'Не удалось обновить знакомство.'));
-  }, [onOpenDialog]);
+  }, [connectionRequests, onOpenDialog, patchPeoplePerson, user?.id]);
   const openConnectionDialog = useCallback((item) => {
     const dialogId = item?.dialogId || '';
     if (dialogId) onOpenDialog?.(dialogId);
   }, [onOpenDialog]);
+  const openPersonDialog = useCallback((person) => {
+    const id = profilePersonId(person);
+    if (!id) return;
+    userAction('dialog:open', {
+      type: 'direct',
+      objectId: id,
+      targetUserId: id,
+      context: { type: 'direct', objectId: id, targetUserId: id, title: person?.displayName || '' },
+    })
+      .then(data => {
+        if (!data.dialogId) throw new Error('Не удалось открыть диалог.');
+        patchPeoplePerson(id, {
+          relationStatus: PEOPLE_RELATION_STATUS.FRIEND,
+          status: 'connected',
+          direction: '',
+          dialogId: data.dialogId,
+        });
+        onOpenDialog?.(data.dialogId);
+      })
+      .catch(e => setConnectionError(e?.message || 'Не удалось открыть диалог.'));
+  }, [onOpenDialog, patchPeoplePerson]);
   const openPersonProfile = useCallback((person) => {
     if (!person?.id) return;
     setPeopleSheet(person);
@@ -1668,8 +1743,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   }, [user?.id]);
   const runPersonPrimaryAction = useCallback((person) => {
     if (!person?.id) return;
-    if (person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && person.dialogId) {
-      onOpenDialog?.(person.dialogId);
+    if (person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND) {
+      if (person.dialogId) onOpenDialog?.(person.dialogId);
+      else openPersonDialog(person);
       return;
     }
     if (person.relationStatus === PEOPLE_RELATION_STATUS.INCOMING && person.request?.id) {
@@ -1679,7 +1755,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     if (person.relationStatus === PEOPLE_RELATION_STATUS.STRANGER) {
       requestConnection(person.id, 'people');
     }
-  }, [onOpenDialog, requestConnection, updateConnectionRequest]);
+  }, [onOpenDialog, openPersonDialog, requestConnection, updateConnectionRequest]);
   const handleDesktopReschedule = useCallback((item) => {
     const startAt = prompt('Новая дата и время в формате YYYY-MM-DD HH:mm');
     if (!startAt) return;
@@ -2171,14 +2247,14 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                   <div style={{ display: 'grid', gap: 8 }}>
                     <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 900 }}>✨ Возможно, вы знакомы</div>
                     {peopleSections.suggestions.slice(0, 3).map(person => (
-                      <button key={person.id} type="button" onClick={() => openPersonProfile(person)} style={{ border: '1px solid rgba(74,144,217,0.18)', background: 'rgba(74,144,217,0.08)', borderRadius: 16, padding: 10, display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', animation: 'fadeInUp 0.34s ease both' }}>
+                      <div key={person.id} role="button" tabIndex={0} onClick={() => openPersonProfile(person)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openPersonProfile(person); }} style={{ border: '1px solid rgba(74,144,217,0.18)', background: 'rgba(74,144,217,0.08)', borderRadius: 16, padding: 10, display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', animation: 'fadeInUp 0.34s ease both' }}>
                         {person.photo ? <img src={person.photo} alt="" style={{ width: 38, height: 38, borderRadius: 14, objectFit: 'cover' }} /> : <div style={{ width: 38, height: 38, borderRadius: 14, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontWeight: 900 }}>{(person.displayName || 'А')[0]}</div>}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.displayName}</div>
                           <div style={{ color: '#4A90D9', fontSize: 11, lineHeight: '15px', marginTop: 1, fontWeight: 780 }}>{peopleSuggestionReason(person)}</div>
                         </div>
                         <GlassButton onClick={(e) => { e.stopPropagation(); requestConnection(person.id, 'suggestion'); }} tone="gold" style={{ minHeight: 30, borderRadius: 13, padding: '5px 9px', fontSize: 11 }}>Добавить</GlassButton>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -2200,7 +2276,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               <div style={{ display: 'grid', gap: 8 }}>
                 {visiblePeopleRows.slice(0, 4).map(person => {
                   const primaryLabel = person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : person.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отправлено' : person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED ? 'Недоступно' : 'Добавить';
-                  const primaryDisabled = person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING || person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED || (person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && !person.dialogId);
+                  const primaryDisabled = person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING || person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED;
                   return (
                   <div key={person.id} data-people-card style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 16, padding: 10, display: 'grid', gap: 9 }}>
                     <button type="button" onClick={() => person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && person.dialogId ? onOpenDialog?.(person.dialogId) : openPersonProfile(person)} style={{ border: 0, background: 'transparent', padding: 0, display: 'flex', gap: 10, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -3671,7 +3747,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             {peopleSearchLoading && <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px', textAlign: 'center', padding: 8 }}>Ищем участников...</div>}
             {visiblePeopleRows.length ? visiblePeopleRows.map(person => {
               const primaryLabel = person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : person.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отправлено' : person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED ? 'Недоступно' : 'Добавить в друзья';
-              const primaryDisabled = person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING || person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED || (person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && !person.dialogId);
+              const primaryDisabled = person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING || person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED;
               return (
                 <div key={person.id} data-people-card-modal style={{ ...APG2.glass, borderRadius: 18, padding: 12, display: 'grid', gap: 10 }}>
                   <div style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
@@ -3750,7 +3826,14 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               </div>
             )}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <GlassButton onClick={() => { runPersonPrimaryAction(peopleSheet); if (peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND) setPeopleSheet(null); }} tone="gold" style={{ flex: 1, minHeight: 40 }}>{peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Заявка отправлена' : 'Добавить'}</GlassButton>
+              <GlassButton
+                onClick={() => { runPersonPrimaryAction(peopleSheet); if (peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && peopleSheet.dialogId) setPeopleSheet(null); }}
+                disabled={peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING || peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED}
+                tone="gold"
+                style={{ flex: 1, minHeight: 40 }}
+              >
+                {peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Заявка отправлена' : 'Добавить'}
+              </GlassButton>
               <GlassButton onClick={() => setPeopleSheet(null)} style={{ flex: 1, minHeight: 40 }}>Открыть полный профиль</GlassButton>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
