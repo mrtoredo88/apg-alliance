@@ -47,6 +47,7 @@ function buildLinkedTelegramPayload(data = {}, tgId = null) {
 }
 
 function compareSessionIds(query, data) {
+  const hasExplicitRequestId = typeof query.requestId === 'string' && query.requestId.trim().length > 0;
   const normalized = {
     requestId: safeString(query.requestId || '', 180),
     loginSessionId: safeString(query.loginSessionId || '', 220),
@@ -59,7 +60,7 @@ function compareSessionIds(query, data) {
   };
 
   const mismatches = [];
-  if (normalized.requestId && stored.requestId && normalized.requestId !== stored.requestId) {
+  if (hasExplicitRequestId && normalized.requestId && stored.requestId && normalized.requestId !== stored.requestId) {
     mismatches.push({
       key: 'requestId',
       query: normalized.requestId,
@@ -83,12 +84,16 @@ function compareSessionIds(query, data) {
   return mismatches;
 }
 
+export { compareSessionIds };
+
 export default async function telegramAuthCheckRoutes(fastify) {
   fastify.get('/api/telegram-auth-check', async (request, reply) => {
     reply.header('Cache-Control', 'no-store, no-cache, must-revalidate');
 
     const { state } = request.query;
-    const requestId = safeString(request.headers['x-request-id'] || request.query?.requestId, 180);
+    const explicitRequestId = safeString(request.query?.requestId, 180);
+    const requestId = safeString(explicitRequestId || request.headers['x-request-id'], 180);
+    const headerRequestId = safeString(request.headers['x-request-id'], 180);
     const loginSessionId = safeString(request.query?.loginSessionId, 220);
     const telegramSessionId = safeString(request.query?.telegramSessionId, 220);
     if (!state) return reply.code(400).send({ status: 'error' });
@@ -102,6 +107,7 @@ export default async function telegramAuthCheckRoutes(fastify) {
       stage: 'telegram_auth_check_start',
       state,
       requestId,
+      headerRequestId,
       telegramSessionId,
       loginSessionId,
     }, 'telegram-auth-check-forensic');
@@ -129,11 +135,11 @@ export default async function telegramAuthCheckRoutes(fastify) {
       const resolvedRequestId = safeString(data?.requestId || requestId, 180);
       const resolvedLoginSessionId = safeString(data?.loginSessionId || loginSessionId, 220);
       const resolvedTelegramSessionId = safeString(data?.telegramSessionId || telegramSessionId || state, 220);
-      if (requestId && resolvedRequestId && requestId !== resolvedRequestId) {
+      if (explicitRequestId && resolvedRequestId && explicitRequestId !== resolvedRequestId) {
         request.log.warn?.({
           stage: 'telegram_auth_check_request_id_mismatch',
           state,
-          requestId,
+          requestId: explicitRequestId,
           resolvedRequestId,
           loginSessionId,
           resolvedLoginSessionId,
