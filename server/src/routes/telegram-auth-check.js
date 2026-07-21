@@ -25,6 +25,27 @@ function buildTelegramAuthDiagnostics(source = {}) {
   };
 }
 
+function resolveTelegramOwnerForResponse(data = {}) {
+  const ownerUserId = safeString(data.ownerUserId || '', 220);
+  const linkedOwnerId = safeString(data.linkedOwnerId || '', 220);
+  return {
+    ownerUserId,
+    linkedOwnerId,
+    resolvedOwnerId: linkedOwnerId || ownerUserId || null,
+  };
+}
+
+function buildLinkedTelegramPayload(data = {}, tgId = null) {
+  return {
+    tgId: tgId || null,
+    firstName: safeString(data.firstName || data.first_name || '', 200) || null,
+    lastName: safeString(data.lastName || data.last_name || '', 200) || null,
+    username: safeString(data.username || data.telegramUsername || '', 200) || null,
+    photo: safeString(data.photoUrl || data.photo_200 || data.photo || '', 280) || null,
+    linkedAt: data.completedAt || null,
+  };
+}
+
 export default async function telegramAuthCheckRoutes(fastify) {
   fastify.get('/api/telegram-auth-check', async (request, reply) => {
     reply.header('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -97,15 +118,21 @@ export default async function telegramAuthCheckRoutes(fastify) {
       if (data.status === 'done') {
         const tgId = `tg_${data.tgUserId}`;
         if (data.linking === true) {
+          const { ownerUserId, linkedOwnerId, resolvedOwnerId } = resolveTelegramOwnerForResponse(data);
+          const linkedTelegram = buildLinkedTelegramPayload(data, tgId);
+          const isLinked = !String(data.linkError || '').trim();
           await ref.set({ checkedAt: new Date() }, { merge: true }).catch(() => {});
           return {
             status: 'done',
             linking: true,
+            linked: isLinked,
+            ownerUserId: ownerUserId || null,
+            linkedOwnerId: linkedOwnerId || null,
+            linkedTelegram,
             tgId,
             linkError: data.linkError || null,
-            linkedOwnerId: data.linkedOwnerId || data.ownerUserId || null,
             user: {
-              id: data.ownerUserId || null,
+              id: resolvedOwnerId || null,
               first_name: data.firstName ?? '',
               last_name: data.lastName ?? '',
               username: data.username ?? '',
@@ -121,8 +148,8 @@ export default async function telegramAuthCheckRoutes(fastify) {
               elapsedMs: Date.now() - startAt,
               identityV2Attempted: true,
               identitySource: 'identity_v2_pending',
-              identityPath: data.ownerUserId ? 'telegram_auth_check_linking' : null,
-              note: data.ownerUserId ? `linking_owner=${data.ownerUserId}` : 'linking_owner_missing',
+              identityPath: ownerUserId ? 'telegram_auth_check_linking' : null,
+              note: ownerUserId ? `linking_owner=${ownerUserId}` : 'linking_owner_missing',
             }),
           };
         }

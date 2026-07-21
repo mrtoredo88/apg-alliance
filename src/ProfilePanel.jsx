@@ -900,11 +900,13 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         if (tgStateRef.current !== state) return;
         if (data.status === 'done') {
           const responseIsLinking = data.linking === true || tgLinkingRef.current;
+          const hasLinkState = responseIsLinking || data.linked === true;
+          const responseHasLinkOwner = safeTraceString(data.ownerUserId || data.linkedOwnerId || data.user?.id || '', 220);
           const checkDiagnostics = data.diagnostics || {};
           traceAuthStage('telegram_done', {
             state,
             userId: data.user?.id ?? null,
-            linking: responseIsLinking,
+            linking: hasLinkState,
             linkError: data.linkError || null,
             ...tgAuthTraceRef.current,
             ...checkDiagnostics,
@@ -912,14 +914,14 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           traceAuthStage('telegram_auth_done', {
             state,
             userId: data.user?.id ?? null,
-            linking: responseIsLinking,
+            linking: hasLinkState,
             linkError: data.linkError || null,
             ...tgAuthTraceRef.current,
             ...checkDiagnostics,
           });
           tgStateRef.current = null;
           localStorage.removeItem('apg_tg_pending');
-          if (responseIsLinking && user?.id) {
+          if (hasLinkState && (user?.id || responseHasLinkOwner)) {
             tgLinkingRef.current = false;
             if (data.linkError) {
               const errorText = {
@@ -930,7 +932,14 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               }[data.linkError] || 'Не удалось привязать Telegram. Попробуйте ещё раз.';
               throw new Error(errorText);
             }
-            const tgPayload = {
+            const linkedTelegramFromServer = data.linkedTelegram;
+            const tgPayload = linkedTelegramFromServer ? {
+              tgId: linkedTelegramFromServer.tgId || data.tgId || null,
+              firstName: linkedTelegramFromServer.firstName ?? '',
+              lastName: linkedTelegramFromServer.lastName ?? null,
+              username: linkedTelegramFromServer.username ?? null,
+              photo: linkedTelegramFromServer.photo ?? null,
+            } : {
               tgId: data.tgId,
               firstName: data.user?.first_name ?? '',
               lastName: data.user?.last_name ?? null,
