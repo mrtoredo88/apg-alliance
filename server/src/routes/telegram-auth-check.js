@@ -46,6 +46,43 @@ function buildLinkedTelegramPayload(data = {}, tgId = null) {
   };
 }
 
+function compareSessionIds(query, data) {
+  const normalized = {
+    requestId: safeString(query.requestId || '', 180),
+    loginSessionId: safeString(query.loginSessionId || '', 220),
+    telegramSessionId: safeString(query.telegramSessionId || query.state || '', 220),
+  };
+  const stored = {
+    requestId: safeString(data?.requestId || '', 180),
+    loginSessionId: safeString(data?.loginSessionId || '', 220),
+    telegramSessionId: safeString(data?.telegramSessionId || data?.state || '', 220),
+  };
+
+  const mismatches = [];
+  if (normalized.requestId && stored.requestId && normalized.requestId !== stored.requestId) {
+    mismatches.push({
+      key: 'requestId',
+      query: normalized.requestId,
+      session: stored.requestId,
+    });
+  }
+  if (normalized.loginSessionId && stored.loginSessionId && normalized.loginSessionId !== stored.loginSessionId) {
+    mismatches.push({
+      key: 'loginSessionId',
+      query: normalized.loginSessionId,
+      session: stored.loginSessionId,
+    });
+  }
+  if (normalized.telegramSessionId && stored.telegramSessionId && normalized.telegramSessionId !== stored.telegramSessionId) {
+    mismatches.push({
+      key: 'telegramSessionId',
+      query: normalized.telegramSessionId,
+      session: stored.telegramSessionId,
+    });
+  }
+  return mismatches;
+}
+
 export default async function telegramAuthCheckRoutes(fastify) {
   fastify.get('/api/telegram-auth-check', async (request, reply) => {
     reply.header('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -113,6 +150,36 @@ export default async function telegramAuthCheckRoutes(fastify) {
           loginSessionId: resolvedLoginSessionId,
           sessionStatus: data?.status || 'unknown',
         }, 'telegram-auth-check-forensic');
+      }
+
+      const mismatches = compareSessionIds({ requestId, loginSessionId, telegramSessionId, state }, data);
+      if (mismatches.length > 0) {
+        request.log.warn?.({
+          stage: 'telegram_auth_check_session_mismatch',
+          state,
+          mismatches,
+          requestId,
+          resolvedRequestId,
+          loginSessionId,
+          resolvedLoginSessionId,
+          telegramSessionId,
+          resolvedTelegramSessionId,
+        }, 'telegram-auth-check-forensic');
+        return {
+          status: 'failed',
+          reason: 'session_mismatch',
+          mismatches,
+          diagnostics: buildTelegramAuthDiagnostics({
+            stage: 'session_mismatch',
+            state,
+            requestId: resolvedRequestId,
+            loginSessionId: resolvedLoginSessionId,
+            telegramSessionId: resolvedTelegramSessionId,
+            elapsedMs: Date.now() - startAt,
+            identityV2Attempted: false,
+            note: `session_mismatch:${mismatches.map(item => `${item.key}:${item.query}->${item.session}`).join(';')}`,
+          }),
+        };
       }
 
       if (data.status === 'done') {
