@@ -21,6 +21,8 @@ assert.ok(profileSource.includes('DesktopNewsRow'), 'desktop profile should show
 assert.ok(profileSource.includes('function resolveProfileAvatar'), 'profile must normalize avatar fields from every identity provider');
 assert.ok(profileSource.includes('user.linkedTelegram?.photo'), 'profile avatar must fall back to linked Telegram photo');
 assert.ok(profileSource.includes('src={profileAvatarUrl}'), 'desktop profile must render the normalized avatar');
+assert.ok(profileSource.includes("userAction('telegramAvatar:refresh'"), 'desktop profile must restore a missing linked Telegram avatar');
+assert.ok(profileSource.includes('refreshedTelegramAvatar || storedProfileAvatarUrl'), 'desktop profile must render a freshly restored avatar immediately');
 assert.ok(profileSource.includes('Городской баланс'), 'desktop profile hero must promote a professional balance and progress block');
 assert.ok(!profileSource.includes('WorkspaceRelatedLinks'), 'user profile must not embed Workspace related links');
 assert.ok(!profileSource.includes('WorkspaceDialogsCRM'), 'user profile must not embed Workspace CRM dialogs');

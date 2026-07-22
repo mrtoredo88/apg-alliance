@@ -27,6 +27,9 @@ const telegramUpdates = read('server/src/lib/telegramUpdates.js');
 const telegramCheck = read('server/src/routes/telegram-auth-check.js');
 const emailAuth = read('server/src/routes/email-auth.js');
 const userActions = read('server/src/routes/user-actions.js');
+const telegramAvatar = read('server/src/lib/telegramAvatar.js');
+const objectStorage = read('server/src/lib/objectStorage.js');
+const profilePanel = read('src/ProfilePanel.jsx');
 
 assertContains(telegramUpdates, 'async function tgGetPhotoUrl(userId)', 'shared avatar retrieval routine exists');
 assertContains(telegramUpdates, 'function buildTelegramProfilePayload', 'telegram payload centralizes avatar fields');
@@ -66,6 +69,15 @@ assertContains(telegramCheck, 'photo_200: resolvedPhoto || null', 'login auth-ch
 
 assertContains(emailAuth, 'photo: linkedTelegram?.photo || linkedTelegram?.photoUrl || null', 'email login after Telegram link preserves linked avatar');
 assertContains(userActions, 'photo: safeString(input.photo || input.photo_200, 1000) || null', 'profile sync accepts returned photo_200');
+assertContains(telegramAvatar, 'getUserProfilePhotos', 'server refresh loads the current Telegram profile photo');
+assertContains(telegramAvatar, 'getFile', 'server refresh resolves the Telegram file');
+assertContains(telegramAvatar, 'putPublicObject', 'Telegram avatar is copied to permanent APG storage');
+assertNotContains(telegramAvatar, 'return `https://api.telegram.org/file/bot', 'raw bot-token file URL is never returned to clients');
+assertContains(objectStorage, 'https://${HOST}/${BUCKET}/${key}', 'object storage returns a public token-free URL');
+assertContains(userActions, "action === 'telegramAvatar:refresh'", 'authenticated avatar refresh action is routed');
+assertContains(userActions, 'photo_200: photo', 'avatar refresh persists desktop-compatible photo field');
+assertContains(profilePanel, "userAction('telegramAvatar:refresh'", 'profile automatically repairs a missing Telegram avatar');
+assertContains(profilePanel, "!value.includes('api.telegram.org/file/bot')", 'profile refuses legacy URLs that expose bot credentials');
 
 console.log('TELEGRAM_AVATAR_SYNC_REGRESSION_OK');
 console.log(JSON.stringify({
@@ -76,5 +88,7 @@ console.log(JSON.stringify({
     'telegram_login_avatar_sync',
     'email_login_after_telegram_link_avatar_preserved',
     'identity_merge_canonical_profile_avatar_sync',
+    'permanent_token_free_avatar_storage',
+    'desktop_missing_avatar_self_repair',
   ],
 }, null, 2));

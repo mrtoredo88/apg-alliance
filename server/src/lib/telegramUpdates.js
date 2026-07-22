@@ -6,6 +6,7 @@ import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observabil
 import { serverFoundation } from '../apg/index.js';
 import { completeReferralSessionAsync, resolveReferralSessionReferrer } from './referralSessions.js';
 import { recordReferralEventAsync } from './referralEvents.js';
+import { fetchAndStoreTelegramAvatar } from './telegramAvatar.js';
 
 const TELEGRAM_HELPER_URL = `${APP_URL}/#/telegram-helper`;
 
@@ -100,32 +101,9 @@ async function tgSend(chatId, text, extra = {}) {
   }, 'send_message').catch(() => {});
 }
 
-async function tgFileUrl(fileId) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const r = await telegramFetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`, {}, 'get_file').then(r => r.json());
-  if (!r.ok || !r.result?.file_path) return null;
-  return `https://api.telegram.org/file/bot${token}/${r.result.file_path}`;
-}
-
 async function tgGetPhotoUrl(userId) {
   try {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    const photosRes = await telegramFetch(
-      `https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`, {}, 'get_user_profile_photos'
-    ).then(r => r.json());
-    if (photosRes.ok && photosRes.result?.photos?.length) {
-      const sizes = photosRes.result.photos[0];
-      const url   = await tgFileUrl(sizes[sizes.length - 1].file_id);
-      if (url) return url;
-    }
-    const chatRes = await telegramFetch(
-      `https://api.telegram.org/bot${token}/getChat?chat_id=${userId}`, {}, 'get_chat'
-    ).then(r => r.json());
-    if (chatRes.ok && chatRes.result?.photo?.big_file_id) {
-      const url = await tgFileUrl(chatRes.result.photo.big_file_id);
-      if (url) return url;
-    }
-    return null;
+    return await fetchAndStoreTelegramAvatar(userId, `tg_${userId}`);
   } catch {
     return null;
   }

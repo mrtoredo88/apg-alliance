@@ -135,7 +135,9 @@ function resolveProfileAvatar(user = {}) {
     user.linkedTelegram?.photoUrl,
     user.linkedTelegram?.photo_200,
   ];
-  return candidates.map(value => String(value || '').trim()).find(Boolean) || '';
+  return candidates
+    .map(value => String(value || '').trim())
+    .find(value => value && !value.includes('api.telegram.org/file/bot')) || '';
 }
 
 function peopleEmptyTitle(tab = 'all', hasSearch = false) {
@@ -719,6 +721,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const [tgError, setTgError] = useState('');
   const [tgStep, setTgStep] = useState('idle');
   const [tgBotUrl, setTgBotUrl] = useState('');
+  const [refreshedTelegramAvatar, setRefreshedTelegramAvatar] = useState('');
   const [showEmailAuth, setShowEmailAuth] = useState(false);
   const [showLinkEmail, setShowLinkEmail] = useState(false);
   const [linkEmailValue, setLinkEmailValue] = useState('');
@@ -729,6 +732,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const tgStateRef = useRef(null);
   const tgLinkingRef = useRef(false);
   const tgActionRef = useRef(0);
+  const telegramAvatarRefreshRef = useRef('');
+  const onUserUpdateRef = useRef(onUserUpdate);
+  const linkedTelegramRef = useRef(user?.linkedTelegram || {});
+  onUserUpdateRef.current = onUserUpdate;
+  linkedTelegramRef.current = user?.linkedTelegram || {};
   const tgAuthTraceRef = useRef({
     requestId: '',
     loginSessionId: '',
@@ -1430,7 +1438,46 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
   const isDark = appearance === 'dark';
   const safeUser = user || { first_name: 'Участник', last_name: 'АПГ', photo_200: null };
-  const profileAvatarUrl = resolveProfileAvatar(safeUser);
+  const storedProfileAvatarUrl = resolveProfileAvatar(safeUser);
+  const profileAvatarUrl = refreshedTelegramAvatar || storedProfileAvatarUrl;
+  const linkedTelegramId = String(
+    user?.linkedTelegram?.tgId
+      || user?.linkedTelegram?.telegramId
+      || user?.telegramId
+      || (String(user?.id || '').startsWith('tg_') ? user.id : ''),
+  ).replace(/^tg_/, '');
+
+  useEffect(() => {
+    const userId = String(user?.id || '');
+    if (!userId || userId.startsWith('guest_') || !linkedTelegramId || storedProfileAvatarUrl) return;
+    const refreshKey = `${userId}:${linkedTelegramId}`;
+    if (telegramAvatarRefreshRef.current === refreshKey) return;
+    telegramAvatarRefreshRef.current = refreshKey;
+    let cancelled = false;
+    userAction('telegramAvatar:refresh', { userId })
+      .then(result => {
+        const photo = String(result?.photo || '').trim();
+        if (cancelled || !photo) return;
+        setRefreshedTelegramAvatar(photo);
+        onUserUpdateRef.current?.({
+          photo,
+          photo_200: photo,
+          linkedTelegram: {
+            ...linkedTelegramRef.current,
+            tgId: linkedTelegramId,
+            telegramId: linkedTelegramId,
+            photo,
+            photoUrl: photo,
+            photo_200: photo,
+          },
+        });
+      })
+      .catch(error => {
+        telegramAvatarRefreshRef.current = '';
+        logError(error, 'ProfilePanel.telegramAvatar.refresh');
+      });
+    return () => { cancelled = true; };
+  }, [linkedTelegramId, storedProfileAvatarUrl, user?.id]);
   const level = getLevel(userKeys);
   const nextLevel = getNextLevel(userKeys);
   const isPrivilegedProfile = String(user?.id || '') === '988504' || hasCapability(user || {}, CAPABILITIES.canOpenAdminPanel);

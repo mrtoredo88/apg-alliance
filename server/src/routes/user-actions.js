@@ -74,6 +74,7 @@ import { buildReferralRecoveryDecision } from '../../../server-shared/referral-r
 import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
 import { recordReferralClientEventsAsync, recordReferralEventAsync, referralContextFromBody } from '../lib/referralEvents.js';
 import { completeReferralSessionAsync, resolveReferralSessionReferrer } from '../lib/referralSessions.js';
+import { fetchAndStoreTelegramAvatar, normalizeTelegramId } from '../lib/telegramAvatar.js';
 import {
   buildWorkspaceEventBase,
   buildWorkspaceEventDuplicate,
@@ -947,6 +948,38 @@ async function actionProfilePatch(db, req, actor) {
   await writeAccountProfileBestEffort(userId, patch, { bootstrap: { profileUpdate: true } });
   await audit(db, req, actor, 'profile:update', 'users', userId, 'success', { fields: Object.keys(patch) });
   return { ok: true, userId, patch: req.body?.patch || {} };
+}
+
+async function actionTelegramAvatarRefresh(db, req, actor) {
+  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userRef = db.collection('users').doc(userId);
+  const userSnap = await userRef.get();
+  const user = userSnap.data() || {};
+  const linkedTelegram = user.linkedTelegram && typeof user.linkedTelegram === 'object' ? user.linkedTelegram : {};
+  const telegramId = normalizeTelegramId(
+    linkedTelegram.tgId || linkedTelegram.telegramId || user.telegramId || (userId.startsWith('tg_') ? userId : ''),
+  );
+  if (!telegramId) throw Object.assign(new Error('Telegram не привязан к профилю.'), { statusCode: 409, code: 'TELEGRAM_NOT_LINKED' });
+
+  const photo = await fetchAndStoreTelegramAvatar(telegramId, userId);
+  if (!photo) return { ok: true, userId, photo: null, reason: 'telegram_photo_missing' };
+  const nextLinkedTelegram = {
+    ...linkedTelegram,
+    tgId: telegramId,
+    telegramId,
+    photo,
+    photoUrl: photo,
+    photo_200: photo,
+  };
+  await userRef.set({
+    photo,
+    photo_200: photo,
+    linkedTelegram: nextLinkedTelegram,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await writeAccountProfileBestEffort(userId, { photo, photo_200: photo, linkedTelegram: nextLinkedTelegram }, { bootstrap: { telegramAvatarRefresh: true } });
+  await audit(db, req, actor, 'telegramAvatar:refresh', 'users', userId, 'success', { telegramId });
+  return { ok: true, userId, photo };
 }
 
 async function actionProfileAcceptConsent(db, req, actor) {
@@ -4568,6 +4601,7 @@ async function routeAction(db, req, actor) {
   if (action === 'identity:diagnostics') return actionIdentityDiagnostics(db, req, actor);
   if (action === 'profile:sync') return actionProfileSync(db, req, actor);
   if (action === 'profile:update') return actionProfilePatch(db, req, actor);
+  if (action === 'telegramAvatar:refresh') return actionTelegramAvatarRefresh(db, req, actor);
   if (action === 'profile:acceptConsent') return actionProfileAcceptConsent(db, req, actor);
   if (action === 'profile:consentStatus') return actionProfileConsentStatus(db, req, actor);
   if (action === 'profile:forceAcceptConsent') return actionProfileForceAcceptConsent(db, req, actor);
