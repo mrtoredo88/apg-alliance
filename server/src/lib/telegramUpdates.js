@@ -29,6 +29,7 @@ const WELCOME_TEXT =
 
 const LINKS_TEXT = '📌 Все наши площадки:';
 const TELEGRAM_FETCH_TIMEOUT_MS = 3500;
+const TELEGRAM_POLL_TIMEOUT_MS = 12000;
 
 function safeDebugString(value, max = 280) {
   return String(value ?? '').trim().slice(0, max);
@@ -55,11 +56,11 @@ async function appendTelegramTimeline(ref, entry = {}, log = console) {
   }
 }
 
-async function telegramFetch(url, options = {}, stage = 'telegram_api') {
+async function telegramFetch(url, options = {}, stage = 'telegram_api', timeoutMs = TELEGRAM_FETCH_TIMEOUT_MS) {
   try {
     return await fetch(url, {
       ...options,
-      signal: AbortSignal.timeout(TELEGRAM_FETCH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
     const diagnostics = new Error(`${stage}:${error?.name === 'TimeoutError' ? 'timeout' : 'fetch_failed'}`);
@@ -603,7 +604,7 @@ export async function pollTelegramUpdates(db, log = console) {
         limit: 50,
         allowed_updates: ['message'],
       }),
-    }, 'get_updates').then(r => r.json());
+    }, 'get_updates', TELEGRAM_POLL_TIMEOUT_MS).then(r => r.json());
 
     if (!res.ok) {
       const errorText = `${res.error_code || ''} ${res.description || 'getUpdates failed'}`.trim().slice(0, 200);

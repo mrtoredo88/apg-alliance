@@ -18,7 +18,7 @@
 ## [2026-07-22] fix: Telegram Auth Production Delivery
 **Файлы:** `server/src/lib/telegramUpdates.js`, `scripts/telegram-auth-production-path-test.mjs`, `scripts/telegram-avatar-sync-test.mjs`, `package.json`, `.ai/04_API.md`, `.ai/08_TELEGRAM.md`, `.ai/17_CHANGELOG_AI.md`
 **Тип:** critical production fix
-**Что изменено:** Telegram auth пишет `status: done` до необязательных outbound-вызовов аватара и bot reply. Telegram Bot API получил timeout 3.5 секунды; polling сохраняет actionable error code. Production contract остаётся `POLLING_PRIMARY` с пустым webhook.
+**Что изменено:** Telegram auth пишет `status: done` до необязательных outbound-вызовов аватара и bot reply. Необязательные Telegram Bot API calls получили timeout 3.5 секунды, `getUpdates` — 12 секунд; polling сохраняет actionable error code. Production contract остаётся `POLLING_PRIMARY` с пустым webhook.
 **Первопричина:** реальный `/start auth_*` был получен `getUpdates`, но auth-check request был отменён HTTP 499 во время `tgGetPhotoUrl`; session осталась pending и истекла. Включённый webhook одновременно показывал `Connection timed out`.
 **Проверка:** `npm run test:telegram-auth-production-path`, `npm run test:telegram-avatar-sync`, `node scripts/telegram-auth-check-regression.mjs`, `npm run build`.
 
