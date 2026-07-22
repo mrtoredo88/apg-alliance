@@ -40,23 +40,22 @@ assertNotContains(telegramUpdates, 'photo: null', 'Telegram link metadata must n
 
 assertOrder(telegramUpdates, [
   'stage: \'identityV2.linkTelegram.return\'',
-  'linkedPhotoUrl = await tgGetPhotoUrl(from.id);',
-  'await serverFoundation.identityV2.linkTelegram(telegramAvatarParams);',
-  'await syncTelegramAvatarToCanonicalProfile(db, resolvedOwnerUserId, from, linkedPhotoUrl, log);',
-], 'new Telegram link syncs avatar after successful Identity V2 link');
+  "status: 'done'",
+  '.then(() => tgGetPhotoUrl(from.id))',
+  'await syncTelegramAvatarToCanonicalProfile(db, resolvedOwnerUserId, from, photoUrl, log);',
+], 'new Telegram link persists auth before best-effort avatar sync');
 
-assertContains(telegramUpdates, 'telegram_avatar_sync_after_link.throw', 'existing Telegram link avatar sync is best-effort after link success');
+assertContains(telegramUpdates, 'telegram_avatar_sync_after_done', 'existing Telegram link avatar sync is best-effort after auth completion');
 assertContains(telegramUpdates, 'photoUrl: linkedPhotoUrl || null', 'link session stores photoUrl');
 assertContains(telegramUpdates, 'photo_200: linkedPhotoUrl || null', 'link session stores photo_200');
 
 assertOrder(telegramUpdates, [
-  'const photoUrl = await tgGetPhotoUrl(from.id);',
   'status:    \'done\'',
-  'photoUrl:  photoUrl || null',
-  'photo_200: photoUrl || null',
-  'Promise.resolve(photoUrl)',
-  'upsertUser(db, from, resolvedPhotoUrl',
-], 'Telegram login waits for avatar before auth-check sees done');
+  'completedAt: FieldValue.serverTimestamp()',
+  'Promise.resolve()',
+  '.then(() => tgGetPhotoUrl(from.id))',
+  'return upsertUser(db, from, resolvedPhotoUrl',
+], 'Telegram login exposes done before optional avatar retrieval');
 
 assertContains(telegramCheck, 'async function resolveLinkedTelegramPhoto', 'auth-check can load linked avatar from profile');
 assertContains(telegramCheck, 'const linkedPhoto = safeString(data.photoUrl || data.photo_200 || data.photo || \'\', 500)', 'linking auth-check starts from session avatar');

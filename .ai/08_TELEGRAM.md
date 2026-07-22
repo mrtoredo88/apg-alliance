@@ -90,6 +90,11 @@ localStorage['apg_tg_user'] = { id, name, photo, ... }
 UserApp перезагружает данные пользователя
 ```
 
+Критический порядок completion: после валидации `/start auth_*` backend сначала пишет
+`telegramAuthSessions.status = done` и `completedAt`. Загрузка Telegram-аватара, обновление профиля
+и отправка bot-сообщения выполняются best-effort после completion и не могут блокировать вход.
+Вызовы Telegram Bot API ограничены timeout 3.5 секунды и пишут диагностический `lastErrorCode` для polling.
+
 ### Состояния сессии
 
 | Состояние | Описание |

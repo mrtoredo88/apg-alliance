@@ -80,6 +80,7 @@
     "test:qr-diagnostics": "node scripts/qr-diagnostics-test.mjs",
     "test:telegram-url": "node scripts/telegram-url-test.mjs",
     "test:telegram-avatar-sync": "node scripts/telegram-avatar-sync-test.mjs",
+    "test:telegram-auth-production-path": "node scripts/telegram-auth-production-path-test.mjs",
     "test:community-feed": "node scripts/community-feed-test.mjs",
     "test:profile-timeline": "node scripts/profile-timeline-test.mjs",
     "test:workspace-news-distribution": "node scripts/workspace-news-distribution-test.mjs",

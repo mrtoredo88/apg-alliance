@@ -28,6 +28,7 @@ const WELCOME_TEXT =
 Здесь можно авторизоваться, открыть Локи и быстро попасть в экосистему АПГ 👇`;
 
 const LINKS_TEXT = '📌 Все наши площадки:';
+const TELEGRAM_FETCH_TIMEOUT_MS = 3500;
 
 function safeDebugString(value, max = 280) {
   return String(value ?? '').trim().slice(0, max);
@@ -54,18 +55,32 @@ async function appendTelegramTimeline(ref, entry = {}, log = console) {
   }
 }
 
+async function telegramFetch(url, options = {}, stage = 'telegram_api') {
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: AbortSignal.timeout(TELEGRAM_FETCH_TIMEOUT_MS),
+    });
+  } catch (error) {
+    const diagnostics = new Error(`${stage}:${error?.name === 'TimeoutError' ? 'timeout' : 'fetch_failed'}`);
+    diagnostics.cause = error;
+    diagnostics.code = error?.name === 'TimeoutError' ? 'TELEGRAM_API_TIMEOUT' : 'TELEGRAM_API_FETCH_FAILED';
+    throw diagnostics;
+  }
+}
+
 async function tgSend(chatId, text, extra = {}) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  return fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+  return telegramFetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({ chat_id: chatId, text, ...extra }),
-  }).catch(() => {});
+  }, 'send_message').catch(() => {});
 }
 
 async function tgFileUrl(fileId) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const r = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`).then(r => r.json());
+  const r = await telegramFetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`, {}, 'get_file').then(r => r.json());
   if (!r.ok || !r.result?.file_path) return null;
   return `https://api.telegram.org/file/bot${token}/${r.result.file_path}`;
 }
@@ -73,16 +88,16 @@ async function tgFileUrl(fileId) {
 async function tgGetPhotoUrl(userId) {
   try {
     const token = process.env.TELEGRAM_BOT_TOKEN;
-    const photosRes = await fetch(
-      `https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`
+    const photosRes = await telegramFetch(
+      `https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`, {}, 'get_user_profile_photos'
     ).then(r => r.json());
     if (photosRes.ok && photosRes.result?.photos?.length) {
       const sizes = photosRes.result.photos[0];
       const url   = await tgFileUrl(sizes[sizes.length - 1].file_id);
       if (url) return url;
     }
-    const chatRes = await fetch(
-      `https://api.telegram.org/bot${token}/getChat?chat_id=${userId}`
+    const chatRes = await telegramFetch(
+      `https://api.telegram.org/bot${token}/getChat?chat_id=${userId}`, {}, 'get_chat'
     ).then(r => r.json());
     if (chatRes.ok && chatRes.result?.photo?.big_file_id) {
       const url = await tgFileUrl(chatRes.result.photo.big_file_id);
@@ -375,30 +390,6 @@ export async function processTelegramUpdate(db, update, log = console) {
             ? 'already_linked'
             : 'link_failed';
         }
-        if (!linkError) {
-          try {
-            linkedPhotoUrl = await tgGetPhotoUrl(from.id);
-            if (linkedPhotoUrl) {
-              const telegramAvatarParams = {
-                telegramId: String(from.id),
-                userId: resolvedOwnerUserId,
-                telegram: buildTelegramProfilePayload(from, linkedPhotoUrl),
-              };
-              await serverFoundation.identityV2.linkTelegram(telegramAvatarParams);
-              await syncTelegramAvatarToCanonicalProfile(db, resolvedOwnerUserId, from, linkedPhotoUrl, log);
-            }
-          } catch (error) {
-            log.warn?.({
-              state,
-              requestId,
-              loginSessionId,
-              telegramSessionId: state,
-              stage: 'telegram_avatar_sync_after_link.throw',
-              code: error?.code || null,
-              message: safeDebugString(error?.message, 220),
-            }, 'telegram-update-linking-forensic');
-          }
-        }
       }
       await appendTelegramTimeline(ref, {
         stage: 'telegram_auth_link_validation',
@@ -423,6 +414,27 @@ export async function processTelegramUpdate(db, update, log = console) {
         photo_200: linkedPhotoUrl || null,
         completedAt: FieldValue.serverTimestamp(),
       });
+      if (!linkError && resolvedOwnerUserId) {
+        Promise.resolve()
+          .then(() => tgGetPhotoUrl(from.id))
+          .then(async photoUrl => {
+            if (!photoUrl) return;
+            await serverFoundation.identityV2.linkTelegram({
+              telegramId: String(from.id),
+              userId: resolvedOwnerUserId,
+              telegram: buildTelegramProfilePayload(from, photoUrl),
+            });
+            await syncTelegramAvatarToCanonicalProfile(db, resolvedOwnerUserId, from, photoUrl, log);
+            await ref.set({ photoUrl, photo_200: photoUrl }, { merge: true });
+          })
+          .catch(error => log.warn?.({
+            state,
+            requestId,
+            stage: 'telegram_avatar_sync_after_done',
+            code: error?.code || null,
+            message: safeDebugString(error?.message, 220),
+          }, 'telegram-update-linking-forensic'));
+      }
       tgSend(from.id,
         linkError
           ? '⚠️ Не удалось подключить Telegram. Вернитесь в приложение — там показана причина.'
@@ -456,15 +468,15 @@ export async function processTelegramUpdate(db, update, log = console) {
       referralSessionId: safeDebugString(referralSessionId, 200),
       resolvedReferrerId: safeDebugString(resolvedReferrerId, 200),
     }, log);
-    const photoUrl = await tgGetPhotoUrl(from.id);
     await ref.update({
       status:    'done',
       tgUserId:  String(from.id),
       firstName: from.first_name ?? '',
       lastName:  from.last_name  ?? '',
       username:  from.username   ?? '',
-      photoUrl:  photoUrl || null,
-      photo_200: photoUrl || null,
+      photoUrl:  null,
+      photo_200: null,
+      completedAt: FieldValue.serverTimestamp(),
       referrerId: resolvedReferrerId || null,
       referralSessionId: referralSessionId || null,
       referralCompletedAt: resolvedReferrerId ? FieldValue.serverTimestamp() : null,
@@ -481,12 +493,16 @@ export async function processTelegramUpdate(db, update, log = console) {
       }, log);
     }
 
-    Promise.resolve(photoUrl)
-      .then(resolvedPhotoUrl => upsertUser(db, from, resolvedPhotoUrl, {
+    Promise.resolve()
+      .then(() => tgGetPhotoUrl(from.id))
+      .then(async resolvedPhotoUrl => {
+        if (resolvedPhotoUrl) await ref.set({ photoUrl: resolvedPhotoUrl, photo_200: resolvedPhotoUrl }, { merge: true });
+        return upsertUser(db, from, resolvedPhotoUrl, {
         referrerId: resolvedReferrerId,
         referralSessionId,
         referralFlowId: session.referralFlowId || sessionResolution.session?.data?.flowId || '',
-      }))
+        });
+      })
       .then(() => {
         if (referralSessionId) completeReferralSessionAsync(db, referralSessionId, { userId: tgId, authType: 'telegram', source: 'telegram-bot' });
         if (resolvedReferrerId) {
@@ -578,7 +594,7 @@ export async function pollTelegramUpdates(db, log = console) {
   if (!acquired) return { ok: true, skipped: 'locked' };
 
   try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`, {
+    const res = await telegramFetch(`https://api.telegram.org/bot${token}/getUpdates`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -587,7 +603,7 @@ export async function pollTelegramUpdates(db, log = console) {
         limit: 50,
         allowed_updates: ['message'],
       }),
-    }).then(r => r.json());
+    }, 'get_updates').then(r => r.json());
 
     if (!res.ok) {
       const errorText = `${res.error_code || ''} ${res.description || 'getUpdates failed'}`.trim().slice(0, 200);
@@ -624,7 +640,14 @@ export async function pollTelegramUpdates(db, log = console) {
     return { ok: true, received: updates.length, processed, tookMs: Date.now() - startedAt };
   } catch (error) {
     const errorText = String(error?.message || error).slice(0, 200);
-    await stateRef.set({ lockUntil: 0, lastPollAt: FieldValue.serverTimestamp(), lastError: errorText }, { merge: true }).catch(() => {});
-    return { ok: false, reason: errorText };
+    const errorCode = safeDebugString(error?.code || error?.cause?.code || error?.cause?.cause?.code, 120) || null;
+    log.warn?.({
+      stage: 'telegram_poll_fetch_failed',
+      error: errorText,
+      errorCode,
+      cause: safeDebugString(error?.cause?.message || error?.cause?.cause?.message, 200) || null,
+    }, 'telegram-poll-forensic');
+    await stateRef.set({ lockUntil: 0, lastPollAt: FieldValue.serverTimestamp(), lastError: errorText, lastErrorCode: errorCode }, { merge: true }).catch(() => {});
+    return { ok: false, reason: errorText, errorCode };
   }
 }
