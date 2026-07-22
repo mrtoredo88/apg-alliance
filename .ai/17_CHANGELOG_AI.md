@@ -15,6 +15,12 @@
 
 ---
 
+## [2026-07-22] feat: APG Health Runtime Status
+**Файлы:** `server/src/routes/system-status.js`, `src/ApgHealthPage.jsx`, `scripts/apg-health-status-test.mjs`, `package.json`, `.ai/04_API.md`, `.ai/08_TELEGRAM.md`, `.ai/13_DEPLOYMENT.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** `/api/system-status` отдаёт production runtime, Telegram delivery mode, polling diagnostics и digest последних Telegram auth sessions. APG Health получил вкладку Runtime с frontend/backend version parity, состоянием `POLLING_PRIMARY`, last error code и последними auth sessions.
+**Почему:** после Telegram auth инцидента нужен быстрый owner-facing status слой, который показывает версии, polling freshness и первую причину auth-сбоев без ручного forensic.
+
 ## [2026-07-22] fix: Telegram Auth Production Delivery
 **Файлы:** `server/src/lib/telegramUpdates.js`, `scripts/telegram-auth-production-path-test.mjs`, `scripts/telegram-avatar-sync-test.mjs`, `package.json`, `.ai/04_API.md`, `.ai/08_TELEGRAM.md`, `.ai/17_CHANGELOG_AI.md`
 **Тип:** critical production fix

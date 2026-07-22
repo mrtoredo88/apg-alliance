@@ -224,7 +224,9 @@ npm run deploy   # vite build + vk-miniapps-deploy
 - в фоне — Yandex timer-триггер `apg-telegram-poll` раз в минуту → `/api/telegram-poll`
   (секрет CRON_SECRET, создаётся в `server/deploy-cron.sh`);
 - offset и метрики — в Firestore `config/telegramPolling`; статус виден в
-  `/api/system-status` → `telegramAuth` (админка → Диагностика).
+  `/api/system-status` → `telegramAuth` и в APG Health → Runtime.
+- APG Health → Runtime также сверяет frontend `/version.json`, backend `/version`
+  и показывает последние `telegramAuthSessions` для быстрого production triage.
 - VPC `default` использует NAT gateway `apg-telegram-egress` и route table
   `apg-backend-egress` (`0.0.0.0/0`), привязанную к трём default subnet. Этот route нужен
   container для Telegram Bot API egress при сохранении private network access к PostgreSQL.

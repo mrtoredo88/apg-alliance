@@ -88,6 +88,13 @@ function formatKb(value) {
   return num > 0 ? `${Math.round(num * 10) / 10} KB` : '—';
 }
 
+function formatDateTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
 export function ApgHealthPage({ nav = 'health', user = null, partners = [], experts = [], events = [], news = [], customTasks = [], userCount = 0, totalScans = 0, onBack, onGoAdmin }) {
   const [checks, setChecks]           = useState(null);
   const [checking, setChecking]       = useState(true);
@@ -102,6 +109,7 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
   const [performanceCopied, setPerformanceCopied] = useState(false);
   const [emailLoginDiagnostics, setEmailLoginDiagnostics] = useState(() => readEmailLoginDiagnostics());
   const [architectureStatus, setArchitectureStatus] = useState(null);
+  const [releaseStatus, setReleaseStatus] = useState(null);
 
   const runChecks = useCallback(async () => {
     setChecking(true);
@@ -140,15 +148,32 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
     }
   }, []);
 
+  const refreshReleaseStatus = useCallback(async () => {
+    const result = { checkedAt: new Date().toISOString(), frontend: null, backend: null, error: null };
+    try {
+      const [frontendResponse, backendResponse] = await Promise.all([
+        fetch(`/version.json?_=${Date.now()}`, { cache: 'no-store' }),
+        fetch(`${API_BASE_URL}/version?_=${Date.now()}`, { cache: 'no-store' }),
+      ]);
+      result.frontend = frontendResponse.ok ? await frontendResponse.json().catch(() => null) : { error: `HTTP ${frontendResponse.status}` };
+      result.backend = backendResponse.ok ? await backendResponse.json().catch(() => null) : { error: `HTTP ${backendResponse.status}` };
+    } catch (error) {
+      result.error = error?.message || 'Runtime status unavailable';
+    }
+    setReleaseStatus(result);
+    return result;
+  }, []);
+
   useEffect(() => {
     runChecks();
     refreshPushDiagnostics();
     refreshArchitectureStatus();
+    refreshReleaseStatus();
     getDocs(query(collection(db, 'errorLogs'), orderBy('createdAt', 'desc'), limit(20)))
       .then(snap => setErrorLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
       .catch(() => {})
       .finally(() => setLoadingLogs(false));
-  }, [refreshArchitectureStatus, refreshPushDiagnostics, runChecks]);
+  }, [refreshArchitectureStatus, refreshPushDiagnostics, refreshReleaseStatus, runChecks]);
 
   const refreshPerformance = useCallback(() => {
     const report = forcePerformanceSnapshot('health_refresh');
@@ -268,6 +293,15 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
   const firebaseStartupRows = performanceTimeline
     .filter(item => String(item.stage || '').startsWith('firebase_'))
     .slice(-18);
+  const frontendVersion = releaseStatus?.frontend?.v || performanceReport?.version || '—';
+  const backendVersion = releaseStatus?.backend?.appVersion || architectureStatus?.runtime?.backend?.appVersion || architectureStatus?.api?.version || '—';
+  const backendGit = releaseStatus?.backend?.git || architectureStatus?.runtime?.backend?.git || '—';
+  const releaseParity = frontendVersion !== '—' && backendVersion !== '—'
+    ? String(backendVersion).startsWith(String(frontendVersion).slice(0, 8)) || String(frontendVersion).startsWith(String(backendVersion).slice(0, 8))
+    : null;
+  const telegramAuth = architectureStatus?.telegramAuth || {};
+  const telegramSessions = architectureStatus?.telegramAuthSessions || {};
+  const recentTelegramSessions = Array.isArray(telegramSessions.recent) ? telegramSessions.recent : [];
 
   const warnColor = { error: 'rgba(230,70,70,0.34)', warn: 'rgba(255,165,0,0.34)', info: 'rgba(215,184,106,0.28)' };
   const warnIcon  = { error: '🔴', warn: '🟡', info: 'ℹ️' };
@@ -278,7 +312,7 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
         <ScreenHeader title="APG Health" subtitle="Диагностика системы" kicker="OWNER" onBack={onBack} />
 
         <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))', gap: 6, marginTop: 0 }}>
-          {[['overview', 'Обзор'], ['entities', 'Данные'], ['activity', 'Активность'], ['push', 'Push'], ['email', 'Email'], ['architecture', 'Arch'], ['performance', 'Perf']].map(([id, label]) => (
+          {[['overview', 'Обзор'], ['runtime', 'Runtime'], ['entities', 'Данные'], ['activity', 'Активность'], ['push', 'Push'], ['email', 'Email'], ['architecture', 'Arch'], ['performance', 'Perf']].map(([id, label]) => (
             <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
           ))}
         </GlassCard>
@@ -326,6 +360,12 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                   ok={checks?.backend?.ok ?? false} pending={checking}
                   detail={checking ? 'Проверяем...' : checks?.backend?.ok ? `OK · ${checks.backend.ms}ms` : (checks?.backend?.error ?? 'Ошибка')}
                 />
+                <StatusRow
+                  label="Telegram Auth"
+                  ok={telegramAuth.ok ?? false}
+                  pending={!architectureStatus}
+                  detail={architectureStatus ? `${telegramAuth.deliveryMode || telegramAuth.mode || 'unknown'} · poll age ${telegramAuth.pollAgeSec ?? '—'}s` : 'Проверяем runtime...'}
+                />
               </GlassCard>
               <GlassButton onClick={runChecks} disabled={checking} style={{ width: '100%', marginTop: 10 }}>
                 {checking ? 'Проверяем...' : '↻ Перепроверить'}
@@ -366,6 +406,68 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                 <GlassButton onClick={() => setActiveTab('entities')} style={{ borderRadius: 20, minHeight: 48 }}>📊 Данные</GlassButton>
                 <GlassButton onClick={() => setActiveTab('activity')} style={{ borderRadius: 20, minHeight: 48 }}>📋 Активность</GlassButton>
                 <GlassButton onClick={runChecks} disabled={checking} style={{ borderRadius: 20, minHeight: 48 }}>↻ Сервисы</GlassButton>
+              </div>
+            </GlassSection>
+          </>
+        )}
+
+        {activeTab === 'runtime' && (
+          <>
+            <GlassSection title="Production Runtime">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Frontend version" value={frontendVersion} tone={frontendVersion !== '—' ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Backend version" value={backendVersion} tone={backendVersion !== '—' ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Backend git" value={backendGit} />
+                <DiagnosticLine label="Backend image" value={releaseStatus?.backend?.image || architectureStatus?.runtime?.backend?.image || '—'} />
+                <DiagnosticLine label="Backend build" value={releaseStatus?.backend?.build || architectureStatus?.runtime?.backend?.build || '—'} />
+                <DiagnosticLine label="Release parity" value={releaseParity == null ? '—' : releaseParity ? 'MATCH' : 'DIFFERENT'} tone={releaseParity == null ? 'default' : releaseParity ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Status checked" value={formatDateTime(releaseStatus?.checkedAt || architectureStatus?.checkedAt)} />
+              </GlassCard>
+            </GlassSection>
+
+            <GlassSection title="Telegram Auth Runtime">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Delivery mode" value={telegramAuth.deliveryMode || telegramAuth.mode || '—'} tone={telegramAuth.ok ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Webhook URL" value={telegramAuth.webhookUrl || 'empty'} tone={!telegramAuth.webhookUrl ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Last poll" value={formatDateTime(telegramAuth.lastPollAt)} tone={telegramAuth.ok ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Poll age" value={telegramAuth.pollAgeSec == null ? '—' : `${telegramAuth.pollAgeSec}s`} tone={telegramAuth.ok ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Last update" value={formatDateTime(telegramAuth.lastUpdateAt)} />
+                <DiagnosticLine label="Processed total" value={telegramAuth.processedTotal ?? '—'} />
+                <DiagnosticLine label="Last error" value={telegramAuth.lastError || '—'} tone={telegramAuth.lastError ? 'bad' : 'ok'} />
+                <DiagnosticLine label="Last error code" value={telegramAuth.lastErrorCode || '—'} tone={telegramAuth.lastErrorCode ? 'bad' : 'ok'} />
+                <DiagnosticLine label="Pending sessions" value={telegramAuth.pendingSessions ?? telegramSessions.pending ?? '—'} tone={(telegramAuth.pendingSessions ?? 0) > 0 ? 'bad' : 'ok'} />
+                <DiagnosticLine label="Recent expired" value={telegramAuth.expiredRecentSessions ?? telegramSessions.expired ?? '—'} tone={(telegramAuth.expiredRecentSessions ?? 0) > 0 ? 'bad' : 'ok'} />
+                <DiagnosticLine label="Last auth done" value={formatDateTime(telegramAuth.lastAuthDoneAt || telegramSessions.lastDoneAt)} />
+                <DiagnosticLine label="Last auth failure" value={telegramAuth.lastAuthFailureReason || telegramSessions.lastFailureReason || '—'} tone={(telegramAuth.lastAuthFailureReason || telegramSessions.lastFailureReason) ? 'bad' : 'ok'} />
+              </GlassCard>
+            </GlassSection>
+
+            <GlassSection title="Recent Telegram Auth Sessions">
+              {recentTelegramSessions.length === 0 ? (
+                <EmptyStateV2 icon="🔐" title="Сессий нет" text="Backend пока не вернул последние Telegram auth sessions." />
+              ) : (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {recentTelegramSessions.map(session => {
+                    const ok = session.status === 'done';
+                    const bad = ['expired', 'failed', 'error'].includes(session.status) || session.failureReason;
+                    return (
+                      <GlassCard key={session.id} style={{ borderRadius: 20, padding: '11px 12px', border: `1px solid ${bad ? 'rgba(248,113,113,0.34)' : ok ? 'rgba(74,222,128,0.28)' : 'rgba(215,184,106,0.26)'}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                          <span style={{ color: ok ? '#4ade80' : bad ? '#f87171' : APG2_PROFILE.gold, fontSize: 12, fontWeight: 900 }}>{session.status}</span>
+                          <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11, fontWeight: 800 }}>{formatDateTime(session.createdAt)}</span>
+                        </div>
+                        <div style={{ color: APG2_PROFILE.text, fontSize: 12, fontWeight: 820, marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session.telegramSessionId || session.id}</div>
+                        <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '16px', marginTop: 4 }}>
+                          {[session.source, session.lastTimelineStage, session.failureReason, session.tgUserId ? `tg ${session.tgUserId}` : ''].filter(Boolean).join(' · ') || '—'}
+                        </div>
+                      </GlassCard>
+                    );
+                  })}
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+                <GlassButton onClick={refreshArchitectureStatus} style={{ minHeight: 48, borderRadius: 20 }}>↻ Telegram</GlassButton>
+                <GlassButton onClick={refreshReleaseStatus} style={{ minHeight: 48, borderRadius: 20 }}>↻ Runtime</GlassButton>
               </div>
             </GlassSection>
           </>

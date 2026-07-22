@@ -52,6 +52,7 @@
     "test:home-profile-dashboard": "node scripts/home-profile-dashboard-test.mjs",
     "test:first-journey": "node scripts/first-journey-test.mjs",
     "test:performance-observatory": "node scripts/performance-observatory-test.mjs",
+    "test:apg-health-status": "node scripts/apg-health-status-test.mjs",
     "test:bootstrap-scheduler": "node scripts/bootstrap-scheduler-test.mjs",
     "test:home-hydration": "node scripts/home-hydration-test.mjs",
     "test:home-cache": "node scripts/home-cache-test.mjs",

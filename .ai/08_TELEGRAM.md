@@ -171,6 +171,16 @@ Authorization: Bearer <Firebase ID Token текущего пользовател
 
 Доступ: **только Admin SDK**. Client code не может ни читать, ни писать.
 
+### Production monitoring
+
+APG Health → Runtime читает admin-only `/api/system-status` и показывает:
+- `POLLING_PRIMARY`, пустой webhook и freshness `lastPollAt/pollAgeSec`;
+- `lastErrorCode` из `config/telegramPolling`;
+- последние `telegramAuthSessions` с `status`, `lastTimelineStage`, `failureReason`;
+- frontend/backend version parity.
+
+Этот экран предназначен для быстрого triage Telegram login без ручного поиска по Firestore.
+
 ### `tgLinks/{tgId}`
 
 ```js
