@@ -13,7 +13,7 @@ assert.match(start, /requestId,[\s\S]*loginSessionId: loginSessionId \|\| null,[
 assert.match(updates, /authMatch[\s\S]*telegram_auth_update_received[\s\S]*status:\s*'done'/, 'auth update reaches done');
 assert.match(updates, /await ref\.update\(\{[\s\S]*status:\s*'done'[\s\S]*completedAt:[\s\S]*Promise\.resolve\(\)[\s\S]*tgGetPhotoUrl/, 'done is persisted before optional avatar fetch');
 assert.match(updates, /timeoutMs = TELEGRAM_FETCH_TIMEOUT_MS[\s\S]*AbortSignal\.timeout\(timeoutMs\)/, 'Telegram API calls have a bounded timeout');
-assert.match(updates, /get_updates', TELEGRAM_POLL_TIMEOUT_MS/, 'getUpdates has a separate timeout within the container budget');
+assert.match(updates, /TELEGRAM_POLL_ATTEMPTS = 3[\s\S]*telegramPollFetch[\s\S]*get_updates', TELEGRAM_POLL_TIMEOUT_MS/, 'getUpdates retries within a separate container-safe timeout');
 assert.match(updates, /telegram_poll_fetch_failed[\s\S]*errorCode[\s\S]*lastErrorCode/, 'poll failures expose actionable diagnostics');
 assert.match(updates, /conflict:\s*res\.error_code === 409/, 'webhook and polling conflict is detected');
 assert.match(check, /status:\s*'expired'[\s\S]*stage:\s*'done_expired'/, 'expired sessions return a clear status and diagnostic stage');

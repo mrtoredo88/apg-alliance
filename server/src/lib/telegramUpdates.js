@@ -29,7 +29,8 @@ const WELCOME_TEXT =
 
 const LINKS_TEXT = '📌 Все наши площадки:';
 const TELEGRAM_FETCH_TIMEOUT_MS = 3500;
-const TELEGRAM_POLL_TIMEOUT_MS = 12000;
+const TELEGRAM_POLL_TIMEOUT_MS = 7000;
+const TELEGRAM_POLL_ATTEMPTS = 3;
 
 function safeDebugString(value, max = 280) {
   return String(value ?? '').trim().slice(0, max);
@@ -68,6 +69,26 @@ async function telegramFetch(url, options = {}, stage = 'telegram_api', timeoutM
     diagnostics.code = error?.name === 'TimeoutError' ? 'TELEGRAM_API_TIMEOUT' : 'TELEGRAM_API_FETCH_FAILED';
     throw diagnostics;
   }
+}
+
+async function telegramPollFetch(url, options = {}, log = console) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= TELEGRAM_POLL_ATTEMPTS; attempt += 1) {
+    try {
+      return await telegramFetch(url, options, 'get_updates', TELEGRAM_POLL_TIMEOUT_MS);
+    } catch (error) {
+      lastError = error;
+      log.warn?.({
+        stage: 'telegram_poll_fetch_retry',
+        attempt,
+        attempts: TELEGRAM_POLL_ATTEMPTS,
+        error: safeDebugString(error?.message, 160),
+        errorCode: safeDebugString(error?.code || error?.cause?.code, 120) || null,
+      }, 'telegram-poll-forensic');
+      if (attempt < TELEGRAM_POLL_ATTEMPTS) await new Promise(resolve => setTimeout(resolve, attempt * 200));
+    }
+  }
+  throw lastError;
 }
 
 async function tgSend(chatId, text, extra = {}) {
@@ -595,7 +616,7 @@ export async function pollTelegramUpdates(db, log = console) {
   if (!acquired) return { ok: true, skipped: 'locked' };
 
   try {
-    const res = await telegramFetch(`https://api.telegram.org/bot${token}/getUpdates`, {
+    const res = await telegramPollFetch(`https://api.telegram.org/bot${token}/getUpdates`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -604,7 +625,7 @@ export async function pollTelegramUpdates(db, log = console) {
         limit: 50,
         allowed_updates: ['message'],
       }),
-    }, 'get_updates', TELEGRAM_POLL_TIMEOUT_MS).then(r => r.json());
+    }, log).then(r => r.json());
 
     if (!res.ok) {
       const errorText = `${res.error_code || ''} ${res.description || 'getUpdates failed'}`.trim().slice(0, 200);

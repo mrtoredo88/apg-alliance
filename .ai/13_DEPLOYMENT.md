@@ -225,6 +225,9 @@ npm run deploy   # vite build + vk-miniapps-deploy
   (секрет CRON_SECRET, создаётся в `server/deploy-cron.sh`);
 - offset и метрики — в Firestore `config/telegramPolling`; статус виден в
   `/api/system-status` → `telegramAuth` (админка → Диагностика).
+- VPC `default` использует NAT gateway `apg-telegram-egress` и route table
+  `apg-backend-egress` (`0.0.0.0/0`), привязанную к трём default subnet. Этот route нужен
+  container для Telegram Bot API egress при сохранении private network access к PostgreSQL.
 
 ⚠️ Webhook НЕ устанавливать: при активном webhook getUpdates возвращает 409 и
 поллинг перестаёт работать. Если когда-то возвращаете webhook — сначала уберите

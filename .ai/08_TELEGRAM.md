@@ -93,7 +93,7 @@ UserApp перезагружает данные пользователя
 Критический порядок completion: после валидации `/start auth_*` backend сначала пишет
 `telegramAuthSessions.status = done` и `completedAt`. Загрузка Telegram-аватара, обновление профиля
 и отправка bot-сообщения выполняются best-effort после completion и не могут блокировать вход.
-Необязательные вызовы Telegram Bot API ограничены timeout 3.5 секунды, `getUpdates` — 12 секунд внутри 30-секундного container budget. Polling пишет диагностический `lastErrorCode`.
+Необязательные вызовы Telegram Bot API ограничены timeout 3.5 секунды. `getUpdates` делает до трёх попыток по 7 секунд внутри 30-секундного container budget. Polling пишет диагностический `lastErrorCode`.
 
 ### Состояния сессии
 
