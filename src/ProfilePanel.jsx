@@ -124,6 +124,20 @@ function peopleContextLine(person = {}) {
   return [person.company, person.role, person.expert, peoplePresenceLabel(person), person.city].filter(Boolean).slice(0, 2).join(' · ') || 'Участник АПГ';
 }
 
+function resolveProfileAvatar(user = {}) {
+  const candidates = [
+    user.photo_200,
+    user.photo,
+    user.avatarUrl,
+    user.avatar,
+    user.photoUrl,
+    user.linkedTelegram?.photo,
+    user.linkedTelegram?.photoUrl,
+    user.linkedTelegram?.photo_200,
+  ];
+  return candidates.map(value => String(value || '').trim()).find(Boolean) || '';
+}
+
 function peopleEmptyTitle(tab = 'all', hasSearch = false) {
   if (hasSearch) return 'Никого не нашли';
   if (tab === 'friends') return 'Друзей пока нет';
@@ -377,17 +391,6 @@ function DesktopEmpty({ title, text }) {
     <div style={{ borderRadius: 8, border: `1px dashed ${DP.border}`, background: DP.controlSoft, padding: 16, textAlign: 'center' }}>
       <div style={{ color: DP.text, fontSize: 14, fontWeight: 860 }}>{title}</div>
       {text && <div style={{ color: DP.soft, fontSize: 12.5, lineHeight: '18px', marginTop: 4 }}>{text}</div>}
-    </div>
-  );
-}
-
-function DesktopKpi({ icon, label, value, sub }) {
-  return (
-    <div style={dpCard({ padding: 13, minHeight: 82, boxShadow: '0 12px 30px var(--apg2-elev-shadow, rgba(86,62,30,0.055))', display: 'grid', alignContent: 'center', justifyItems: 'center', textAlign: 'center' })}>
-      <div style={{ color: DP.gold, fontSize: 20, lineHeight: '22px' }}>{icon}</div>
-      <div style={{ color: DP.text, fontSize: 22, lineHeight: '27px', fontWeight: 940, marginTop: 4 }}>{value}</div>
-      <div style={{ color: DP.soft, fontSize: 12, lineHeight: '15px', marginTop: 1 }}>{label}</div>
-      {sub && <div style={{ color: DP.muted, fontSize: 10.5, lineHeight: '14px', marginTop: 5 }}>{sub}</div>}
     </div>
   );
 }
@@ -1077,6 +1080,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             };
             const userPatch = {
               linkedTelegram: tgPayload,
+              ...(tgPayload.photo ? { photo_200: tgPayload.photo, photo: tgPayload.photo } : {}),
             };
             onUserUpdate(userPatch);
             try {
@@ -1426,6 +1430,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
   const isDark = appearance === 'dark';
   const safeUser = user || { first_name: 'Участник', last_name: 'АПГ', photo_200: null };
+  const profileAvatarUrl = resolveProfileAvatar(safeUser);
   const level = getLevel(userKeys);
   const nextLevel = getNextLevel(userKeys);
   const isPrivilegedProfile = String(user?.id || '') === '988504' || hasCapability(user || {}, CAPABILITIES.canOpenAdminPanel);
@@ -1942,49 +1947,67 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
           <div style={{ maxWidth: 1320, margin: '0 auto', display: 'grid', gap: 16 }}>
             {desktopOverview ? <DesktopTopOverview {...desktopOverview} activeSection="profile" /> : null}
-            <header style={dpCard({ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, background: DP.control })}>
-              <button type="button" onClick={() => onBack?.()} style={{ ...dpButton('light', { minHeight: 36, background: 'transparent', borderColor: 'transparent' }) }}>← Назад в приложение</button>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: DP.text, fontSize: 18, lineHeight: '23px', fontWeight: 940 }}>Мой профиль</div>
-                <div style={{ color: DP.soft, fontSize: 12, lineHeight: '16px' }}>Ключи, записи, избранное и настройки участника</div>
+            <header style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 2px' }}>
+              <button type="button" onClick={() => onBack?.()} style={{ ...dpButton('light', { minHeight: 36, background: 'transparent', borderColor: 'transparent', padding: '6px 8px' }) }}>← В приложение</button>
+              <div style={{ width: 1, height: 18, background: DP.border }} />
+              <div style={{ color: DP.muted, fontSize: 12.5, fontWeight: 760 }}>Личный кабинет</div>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                <button type="button" onClick={onOpenReference} aria-label="Справка о профиле" style={dpButton('light', { width: 38, height: 38, minHeight: 38, padding: 0 })}>?</button>
+                <button type="button" onClick={() => setShowProfileEditor(true)} style={dpButton('primary', { minHeight: 38, padding: '8px 14px' })}>Редактировать профиль</button>
               </div>
-              <button type="button" onClick={() => setShowProfileEditor(true)} style={dpButton('primary')}>✎ Редактировать профиль</button>
-              <button type="button" onClick={onOpenReference} style={dpButton('light', { width: 38, height: 38, minHeight: 38, padding: 0 })}>•••</button>
             </header>
 
-            <section style={dpCard({ padding: 22, background: DP.strong, display: 'grid', gridTemplateColumns: 'minmax(360px, 1fr) minmax(420px, 0.95fr)', gap: 24, alignItems: 'center' })}>
-              <div style={{ display: 'grid', gridTemplateColumns: '124px minmax(0,1fr)', gap: 20, alignItems: 'center' }}>
-                <div style={{ position: 'relative', width: 124, height: 124 }}>
-                  {safeUser.photo_200
-                    ? <img src={safeUser.photo_200} alt="" loading="lazy" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(200,155,60,0.32)', boxShadow: '0 18px 42px rgba(31,26,20,0.16)' }} />
-                    : <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'linear-gradient(135deg,rgba(200,155,60,0.22),var(--apg2-control-strong, rgba(255,255,255,0.72)))', border: '3px solid rgba(200,155,60,0.24)', display: 'grid', placeItems: 'center', color: DP.gold, fontSize: 42, fontWeight: 950 }}>{displayName[0] || 'А'}</div>
-                  }
-                  <button type="button" onClick={() => setShowProfileEditor(true)} aria-label="Изменить профиль" style={{ position: 'absolute', right: -2, bottom: 5, width: 38, height: 38, borderRadius: '50%', border: `1px solid ${DP.border}`, background: DP.controlStrong, color: DP.text, boxShadow: '0 10px 24px var(--apg2-elev-shadow, rgba(31,26,20,0.12))', cursor: 'pointer', fontSize: 15 }}>✎</button>
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <h1 style={{ margin: 0, color: DP.text, fontSize: 30, lineHeight: '36px', fontWeight: 960, overflowWrap: 'anywhere' }}>{displayName}</h1>
-                    <span style={{ color: DP.blue, fontSize: 18 }}>●</span>
+            <section style={dpCard({ padding: 0, overflow: 'hidden', position: 'relative', background: 'radial-gradient(circle at 92% 5%, rgba(201,168,76,0.18), transparent 36%), radial-gradient(circle at 5% 100%, rgba(74,144,217,0.10), transparent 34%), linear-gradient(145deg, var(--apg2-control-strong, rgba(255,255,255,0.90)), var(--apg2-control, rgba(255,255,255,0.68)))' })}>
+              <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(0,1.15fr) minmax(430px,0.85fr)', gap: 30, alignItems: 'stretch', padding: '30px 32px 26px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '152px minmax(0,1fr)', gap: 26, alignItems: 'center' }}>
+                  <div style={{ position: 'relative', width: 152, height: 152 }}>
+                    <div style={{ position: 'absolute', inset: 0, borderRadius: 44, background: 'linear-gradient(145deg,rgba(200,155,60,0.22),rgba(255,255,255,0.46))', border: '1px solid rgba(200,155,60,0.28)', display: 'grid', placeItems: 'center', color: DP.gold, fontSize: 48, fontWeight: 950, boxShadow: '0 24px 58px rgba(31,26,20,0.14), inset 0 1px 0 rgba(255,255,255,0.62)' }}>{displayName[0] || 'А'}</div>
+                    {profileAvatarUrl && <img src={profileAvatarUrl} alt="" loading="eager" referrerPolicy="no-referrer" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', borderRadius: 44, objectFit: 'cover', border: '3px solid rgba(200,155,60,0.32)', boxSizing: 'border-box', boxShadow: '0 24px 58px rgba(31,26,20,0.16)' }} />}
+                    <button type="button" onClick={() => setShowProfileEditor(true)} aria-label="Изменить фотографию" style={{ position: 'absolute', right: -5, bottom: 8, width: 42, height: 42, borderRadius: 16, border: `1px solid ${DP.border}`, background: DP.controlStrong, color: DP.text, boxShadow: '0 12px 28px var(--apg2-elev-shadow, rgba(31,26,20,0.15))', cursor: 'pointer', fontSize: 15 }}>✎</button>
                   </div>
-                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 8 }}>
-                    <span style={{ borderRadius: 999, background: DP.goldSoft, color: DP.gold, padding: '5px 9px', fontSize: 12, lineHeight: '15px', fontWeight: 850 }}>{roleLabel}</span>
-                    <span style={{ borderRadius: 999, background: DP.controlSoft, color: DP.soft, padding: '5px 9px', fontSize: 12, lineHeight: '15px', fontWeight: 760 }}>{level.emoji} {level.label}</span>
-                  </div>
-                  <div style={{ color: DP.soft, fontSize: 14, lineHeight: '20px', marginTop: 10 }}>{profileAbout || 'Краткое описание пока не заполнено.'}</div>
-                  <div style={{ display: 'grid', gap: 5, marginTop: 12, color: DP.muted, fontSize: 12.5, lineHeight: '17px' }}>
-                    {ownedPartner?.name && <div>Партнёр: {ownedPartner.name}</div>}
-                    {ownedExpert?.name && <div>Эксперт: {ownedExpert.name}</div>}
-                    {joinedText && <div>В АПГ с {joinedText}</div>}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: '#4BB34B', fontSize: 10.5, lineHeight: '13px', fontWeight: 850, letterSpacing: 0.7, textTransform: 'uppercase' }}><span aria-hidden="true">●</span> Активный участник</div>
+                    <h1 style={{ margin: '7px 0 0', color: DP.text, fontSize: 36, lineHeight: '41px', fontWeight: 950, letterSpacing: -0.8, overflowWrap: 'anywhere' }}>{displayName}</h1>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 9 }}>
+                      <span style={{ borderRadius: 999, background: DP.goldSoft, color: DP.gold, padding: '6px 10px', fontSize: 11.5, lineHeight: '14px', fontWeight: 850 }}>{roleLabel}</span>
+                      <span style={{ color: DP.soft, fontSize: 12, lineHeight: '16px', fontWeight: 760 }}>{level.label} · {userKeys} ключей</span>
+                    </div>
+                    <div style={{ color: DP.soft, fontSize: 14, lineHeight: '21px', marginTop: 13, maxWidth: 520 }}>{profileAbout || 'Расскажите немного о себе, чтобы участникам АПГ было проще познакомиться с вами.'}</div>
+                    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 14, color: DP.muted, fontSize: 11.5, lineHeight: '15px', fontWeight: 680 }}>
+                      {ownedPartner?.name && <span>Партнёр · {ownedPartner.name}</span>}
+                      {ownedExpert?.name && <span>Эксперт · {ownedExpert.name}</span>}
+                      {joinedText && <span>В АПГ с {joinedText}</span>}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 10 }}>
-                <DesktopKpi icon="🗝" label="Ключей" value={userKeys} sub={nextLevel ? `До ${nextLevel.label}: ${toNext}` : 'Максимум'} />
-                <DesktopKpi icon="★" label="Уровень" value={level.label} sub={`${pct}% прогресс`} />
-                <DesktopKpi icon="🏆" label="Достижения" value={`${unlockedCount}/${achievements.length}`} sub="Получено" />
-                <DesktopKpi icon="♡" label="Избранное" value={favorites.length} sub="Партнёры" />
-                <DesktopKpi icon="📅" label="Записи" value={activeBookings.length} sub="Ближайшие" />
+                <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', gap: 12, paddingLeft: 28, borderLeft: `1px solid ${DP.border}` }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 16, alignItems: 'end', padding: '2px 2px 12px' }}>
+                    <div>
+                      <div style={{ color: DP.muted, fontSize: 10.5, fontWeight: 820, letterSpacing: 0.8, textTransform: 'uppercase' }}>Городской баланс</div>
+                      <div style={{ color: DP.text, fontSize: 42, lineHeight: '46px', fontWeight: 950, marginTop: 4 }}>{userKeys}</div>
+                      <div style={{ color: DP.gold, fontSize: 11.5, fontWeight: 820 }}>ключей АПГ</div>
+                    </div>
+                    <div style={{ minWidth: 180 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: DP.soft, fontSize: 11, lineHeight: '14px', fontWeight: 760, marginBottom: 7 }}><span>{nextLevel ? `До ${nextLevel.label}` : 'Максимальный уровень'}</span><b style={{ color: DP.gold }}>{pct}%</b></div>
+                      <DesktopProgress value={pct} color={level.color || DP.gold} />
+                      <div style={{ color: DP.muted, fontSize: 10.5, lineHeight: '14px', marginTop: 6 }}>{nextLevel ? `Осталось ${toNext} ключей` : 'Все уровни открыты'}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', borderRadius: 18, border: `1px solid ${DP.border}`, background: DP.controlSoft, overflow: 'hidden' }}>
+                    {[
+                      ['Уровень', level.label],
+                      ['Достижения', `${unlockedCount}/${achievements.length}`],
+                      ['Избранное', favorites.length],
+                      ['Записи', activeBookings.length],
+                    ].map(([label, value], index) => (
+                      <div key={label} style={{ minWidth: 0, padding: '13px 10px', textAlign: 'center', borderLeft: index ? `1px solid ${DP.border}` : 0 }}>
+                        <div style={{ color: DP.text, fontSize: typeof value === 'number' ? 21 : 15, lineHeight: '24px', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+                        <div style={{ color: DP.muted, fontSize: 10.2, lineHeight: '13px', fontWeight: 730, marginTop: 4 }}>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -2133,8 +2156,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           </div>
           <div style={{ position: 'relative', zIndex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              {safeUser.photo_200
-                ? <img src={safeUser.photo_200} alt="" loading="lazy" style={{ width: 56, height: 56, borderRadius: 21, objectFit: 'cover', border: '2px solid rgba(215,184,106,0.48)', boxShadow: '0 14px 34px rgba(0,0,0,0.30)' }} />
+              {profileAvatarUrl
+                ? <img src={profileAvatarUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: 56, height: 56, borderRadius: 21, objectFit: 'cover', border: '2px solid rgba(215,184,106,0.48)', boxShadow: '0 14px 34px rgba(0,0,0,0.30)' }} />
                 : <div style={{ width: 56, height: 56, borderRadius: 21, background: 'linear-gradient(145deg,rgba(215,184,106,0.3),rgba(255,255,255,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: APG2.text, fontSize: 23, fontWeight: 850 }}>{displayName[0]}</div>
               }
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -3070,8 +3093,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 {/* Аватар */}
                 <div style={{ width: 72, height: 72, borderRadius: '50%', padding: 2.5, background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', flexShrink: 0 }}>
                   <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: '#101012' }}>
-                    {safeUser.photo_200
-                      ? <img src={safeUser.photo_200} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {profileAvatarUrl
+                      ? <img src={profileAvatarUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 900, color: '#C9A84C', background: 'rgba(201,168,76,0.12)' }}>
                           {(safeUser.displayName || safeUser.first_name || '?')[0].toUpperCase()}
                         </div>
@@ -3995,8 +4018,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         >
           <div data-business-card-modal style={{ display: 'grid', gap: 14 }}>
             <div style={{ ...APG2.glass, borderRadius: 24, padding: 16, textAlign: 'center', display: 'grid', gap: 10, justifyItems: 'center' }}>
-              {safeUser.photo_200
-                ? <img src={safeUser.photo_200} alt="" style={{ width: 74, height: 74, borderRadius: 26, objectFit: 'cover', border: '2px solid rgba(201,168,76,0.36)' }} />
+              {profileAvatarUrl
+                ? <img src={profileAvatarUrl} alt="" referrerPolicy="no-referrer" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: 74, height: 74, borderRadius: 26, objectFit: 'cover', border: '2px solid rgba(201,168,76,0.36)' }} />
                 : <div style={{ width: 74, height: 74, borderRadius: 26, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontSize: 28, fontWeight: 900 }}>{displayName[0] || 'А'}</div>
               }
               <div>

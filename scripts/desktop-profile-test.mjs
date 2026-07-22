@@ -18,6 +18,10 @@ assert.ok(profileSource.includes('DesktopProfileEditor'), 'desktop profile shoul
 assert.ok(profileSource.includes('DesktopBookingRow'), 'desktop profile should show compact booking rows');
 assert.ok(profileSource.includes('DesktopFavoriteRow'), 'desktop profile should show compact favorite rows');
 assert.ok(profileSource.includes('DesktopNewsRow'), 'desktop profile should show compact saved news rows');
+assert.ok(profileSource.includes('function resolveProfileAvatar'), 'profile must normalize avatar fields from every identity provider');
+assert.ok(profileSource.includes('user.linkedTelegram?.photo'), 'profile avatar must fall back to linked Telegram photo');
+assert.ok(profileSource.includes('src={profileAvatarUrl}'), 'desktop profile must render the normalized avatar');
+assert.ok(profileSource.includes('Городской баланс'), 'desktop profile hero must promote a professional balance and progress block');
 assert.ok(!profileSource.includes('WorkspaceRelatedLinks'), 'user profile must not embed Workspace related links');
 assert.ok(!profileSource.includes('WorkspaceDialogsCRM'), 'user profile must not embed Workspace CRM dialogs');
 assert.ok(!profileSource.includes('DesktopWorkspace'), 'user profile must not embed Desktop Workspace');
