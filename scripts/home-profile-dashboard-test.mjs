@@ -10,7 +10,7 @@ const requiredDesktopProps = [
   'profileLatestActivity',
   'profileProgressColor',
   'Личный городской кабинет',
-  'Сегодня для вас:',
+  'Участник АПГ',
 ];
 
 const missingDesktopProps = requiredDesktopProps.filter(token => !desktopSource.includes(token) && !homeSource.includes(token));
@@ -18,16 +18,16 @@ if (missingDesktopProps.length) {
   throw new Error(`Home profile dashboard is missing desktop profile signals: ${missingDesktopProps.join(', ')}`);
 }
 
-if (!desktopSource.includes("gridTemplateColumns: '72px minmax(0, 1fr) auto'") || !desktopSource.includes('conic-gradient(${progressColor}')) {
+if (!desktopSource.includes("gridTemplateColumns: '88px minmax(0, 1fr) auto'") || !desktopSource.includes('conic-gradient(${progressColor}')) {
   throw new Error('DesktopTopOverview must render the V3 profile dashboard hero with a real progress-ring avatar.');
 }
 
-if (!desktopSource.includes('primaryStats') || !desktopSource.includes('safeStats.slice(0, 4)')) {
-  throw new Error('Desktop profile dashboard must promote a compact four-KPI strip.');
+if (!desktopSource.includes('supportingStats') || !desktopSource.includes('safeStats.slice(0, 4)')) {
+  throw new Error('Desktop profile dashboard must separate balance from three supporting KPIs.');
 }
 
-if (!desktopSource.includes('stat.sub') || !homeSource.includes('sub: keysToNext > 0')) {
-  throw new Error('Desktop profile dashboard KPIs must include short contextual hints from existing data.');
+if (!desktopSource.includes('balanceStat.value') || !homeSource.includes('sub: keysToNext > 0')) {
+  throw new Error('Desktop profile dashboard must promote the real key balance and preserve contextual source data.');
 }
 
 if (!homeSource.includes('eventsTodayCount') || !homeSource.includes('todayForYou')) {

@@ -18,11 +18,11 @@ Backend: Vercel Serverless Functions и Fastify/Yandex Serverless Containers; т
 
 Firebase: Firestore, Firebase Auth, Firebase Admin SDK на backend, Firebase Cloud Messaging для push.
 
-PWA: включён `manifest.json`, `display: standalone`, `scope: /`, `start_url: /`, service worker с navigation fallback на `/index.html`.
+PWA: основная production-платформа на `https://myapg.ru`; включён `manifest.json`, `display: standalone`, `scope: /`, `start_url: /`, service worker с navigation fallback на `/index.html`.
 
 Telegram Mini App: не используется. Подтверждён Telegram bot/auth flow.
 
-VK Mini App: основная платформа; используется VK Bridge, App ID указан в проектной документации как `54601851`.
+VK Mini App: дополнительный канал распространения; используется VK Bridge, App ID указан в проектной документации как `54601851`.
 
 ## Подсистемы
 

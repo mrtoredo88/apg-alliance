@@ -265,12 +265,14 @@
 - Firestore коллекции использует: VK identity maps into `users` and `auth_map` through app/backend flows.
 - Backend endpoint использует: `/api/vk-news` for VK news import/sync; auth/user bootstrap uses Firebase/backend flows.
 - Глобальные состояния изменяет: VK initialization state, user identity bootstrap, sharing/copy/geodata permission flows.
-- Маршруты его открывают: app is intended as VK Mini App primary platform; browser routes still handled by `App`.
+- Маршруты его открывают: VK Mini App is a secondary distribution channel; the primary PWA routes are handled by `App`.
 - BottomSheet связаны: none.
 - Portal используются: none directly.
 - Критические зависимости: VK Bridge availability, user info retrieval, VK-specific video/social behavior, App ID consistency, non-haptic constraint.
 
 ## PWA
+
+- Роль: primary production platform на `https://myapg.ru`; VK Mini App остаётся secondary distribution channel.
 
 - Кто использует: installed web app users, `main.jsx`, `App`, `public/sw.js`, manifest consumers, push flow.
 - Что использует он: `public/manifest.json`, `public/sw.js`, BrowserRouter path routes, service worker registration, Cache Storage.

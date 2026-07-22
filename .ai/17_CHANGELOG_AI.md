@@ -15,6 +15,20 @@
 
 ---
 
+## [2026-07-22] feat: новый цифровой паспорт участника на главной
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/components/DesktopUI.jsx`, `scripts/home-profile-dashboard-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** desktop-карточка профиля пересобрана в спокойный цифровой паспорт: увеличен аватар, баланс и уровень получили ясную иерархию, прогресс стал главным смысловым блоком, статистика упрощена, а вторичные действия перестали конкурировать с открытием профиля.
+**Почему:** прежняя карточка была перегружена плашками, эмодзи и одинаковыми по весу элементами, из-за чего личность пользователя и текущая цель терялись.
+
+## [2026-07-22] docs: PWA закреплена как основная платформа
+**Коммит:** `локально, без коммита`
+**Файлы:** `README.md`, `AGENTS.md`, `.ai/00_START_HERE.md`, `.ai/00_PROJECT_STATE.md`, `.ai/01_PROJECT_OVERVIEW.md`, `.ai/02_ARCHITECTURE.md`, `.ai/08_TELEGRAM.md`, `.ai/12_SECURITY.md`, `.ai/16_DECISIONS.md`, `.ai/18_ARCHITECTURE_MAP.md`, `.ai/19_DEPENDENCY_MAP.md`, `.ai/19_PROMPTS.md`, `.ai/20_GLOSSARY.md`, `.ai/memory/decisions.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** docs
+**Что изменено:** во всей актуальной проектной документации PWA на `https://myapg.ru` зафиксирована как основная production-платформа; VK Mini App обозначен как дополнительный канал распространения и авторизации.
+**Почему:** документация должна отражать текущий production baseline и не направлять разработку на исторически устаревший VK-first сценарий.
+
 ## [2026-07-22] fix: People Hub Duplicate Action Buttons
 **Коммит:** `локально, без коммита`
 **Файлы:** `src/ProfilePanel.jsx`, `scripts/people-messaging-notifications-test.mjs`, `.ai/17_CHANGELOG_AI.md`
