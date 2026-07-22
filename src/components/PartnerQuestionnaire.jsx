@@ -60,7 +60,7 @@ function completion(fields, files, tariff) {
 }
 
 export function PartnerQuestionnaire({ fields, files, onField, onFiles, onRemoveFile, uploading }) {
-  const [open, setOpen] = useState({ tariff: true, main: true, offer: true, media: false, contacts: false, premium: false, comment: false });
+  const [open, setOpen] = useState({ tariff: true, main: true, offer: true, media: true, contacts: true, premium: false, comment: false });
   const [videoInput, setVideoInput] = useState('');
   const [videoError, setVideoError] = useState('');
   const tariff = normalizePartnerTariff(fields.tariff);

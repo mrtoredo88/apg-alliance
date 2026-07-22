@@ -318,6 +318,7 @@ function analyze(type, fields, files) {
     experience: cleanText(fields.experience, 2000),
     services: cleanText(fields.services || fields.program),
     offer: cleanText(fields.offer || fields.bonus || fields.gift),
+    gift: cleanText(fields.gift || fields.bonus),
     cost: cleanText(fields.cost),
     date: cleanText(fields.date || fields.eventDate),
     source: cleanText(fields.source || fields.organizer || fields.provider),

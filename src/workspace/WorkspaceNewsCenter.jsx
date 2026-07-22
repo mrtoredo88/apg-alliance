@@ -132,15 +132,15 @@ function Empty({ title, text }) {
   );
 }
 
-function NewsRow({ item, view, selected, onOpen, onSubmit, onArchive }) {
+function NewsRow({ item, view, selected, onOpen, onSubmit, onArchive, compactMode = false }) {
   const stats = getNewsStats(item);
   const image = getNewsImage(item);
   const status = workspaceNewsStatus(item);
   const apgPublication = isApgNewsPublication(item);
   const statusColor = status === 'published' ? UI.green : status === 'moderation' || status === 'scheduled' ? UI.gold : status === 'archived' ? UI.muted : UI.blue;
-  const compact = view === 'table';
+  const compact = view === 'table' || compactMode;
   return (
-    <button onClick={() => onOpen(item)} style={{ ...card({ padding: compact ? 10 : 12, display: 'grid', gridTemplateColumns: compact ? '1fr auto' : '86px minmax(0,1fr) auto', gap: 12, alignItems: 'center', width: '100%', textAlign: 'left', boxShadow: selected ? '0 18px 44px rgba(200,155,60,0.18)' : '0 10px 28px rgba(82,60,30,0.06)', border: selected ? '1px solid rgba(200,155,60,0.42)' : `1px solid ${UI.line}` }), fontFamily: 'inherit', cursor: 'pointer' }}>
+    <button onClick={() => onOpen(item)} style={{ ...card({ padding: compact ? 10 : 12, display: 'grid', gridTemplateColumns: compact ? 'minmax(0,1fr)' : '86px minmax(0,1fr) auto', gap: compact ? 10 : 12, alignItems: 'center', width: '100%', textAlign: 'left', boxShadow: selected ? '0 18px 44px rgba(200,155,60,0.18)' : '0 10px 28px rgba(82,60,30,0.06)', border: selected ? '1px solid rgba(200,155,60,0.42)' : `1px solid ${UI.line}` }), fontFamily: 'inherit', cursor: 'pointer' }}>
       {!compact && <div style={{ width: 86, height: 64, borderRadius: 8, overflow: 'hidden', background: 'rgba(200,155,60,0.14)', display: 'grid', placeItems: 'center', color: UI.gold, fontSize: 24 }}>{image ? <img src={image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '📰'}</div>}
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -160,7 +160,7 @@ function NewsRow({ item, view, selected, onOpen, onSubmit, onArchive }) {
           <span>{stats.likes} реакций</span>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 6, justifyItems: 'end' }}>
+      <div style={{ display: 'flex', gap: 6, justifyContent: compact ? 'flex-start' : 'flex-end', flexWrap: 'wrap' }}>
         {!apgPublication && status !== 'archived' && <span onClick={event => { event.stopPropagation(); onSubmit(item); }} style={button('primary', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>Опубликовать в АПГ</span>}
         {status !== 'archived' && <span onClick={event => { event.stopPropagation(); onArchive(item); }} style={button('light', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>Архив</span>}
       </div>
@@ -351,7 +351,7 @@ function Preview({ item }) {
   );
 }
 
-export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpenPanel, onToast }) {
+export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpenPanel, onToast, compact = false }) {
   const initialIntent = useMemo(() => readWorkspaceLinkIntent('content') || {}, []);
   const [items, setItems] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -432,37 +432,37 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
   }
 
   return (
-    <div data-workspace-news-center style={{ display: 'grid', gap: 14 }}>
-      <section style={card({ padding: 18, background: 'var(--apg-workspace-panel-accent, linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82)))' })}>
+    <div data-workspace-news-center style={{ display: 'grid', gap: compact ? 10 : 14 }}>
+      <section style={card({ padding: compact ? 14 : 18, background: 'var(--apg-workspace-panel-accent, linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82)))' })}>
         <div style={{ display: 'flex', gap: 14, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 260 }}>
+          <div style={{ minWidth: compact ? 0 : 260 }}>
             <div style={{ color: UI.gold, fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0 }}>Контент-центр</div>
-            <h1 style={{ margin: '5px 0 0', color: UI.text, fontSize: 30, lineHeight: '36px', fontWeight: 940 }}>Лента и публикации</h1>
-            <div style={{ color: UI.soft, fontSize: 14.5, lineHeight: '21px', marginTop: 5 }}>{profile.name || profile.title}: новости, фото, видео, советы, истории, кейсы, черновики, модерация и статистика.</div>
+            <h1 style={{ margin: '5px 0 0', color: UI.text, fontSize: compact ? 23 : 30, lineHeight: compact ? '28px' : '36px', fontWeight: 940 }}>Лента и публикации</h1>
+            <div style={{ color: UI.soft, fontSize: compact ? 13 : 14.5, lineHeight: compact ? '19px' : '21px', marginTop: 5 }}>{profile.name || profile.title}: новости, фото, видео, советы, истории, кейсы, черновики, модерация и статистика.</div>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={load} style={button('light')}>{loading ? 'Обновляем...' : 'Обновить'}</button>
-            <button onClick={() => setSelected({ ...defaultDraft(profile, role.id), id: '' })} style={button('primary')}>Создать публикацию</button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', width: compact ? '100%' : undefined }}>
+            <button onClick={load} style={button('light', compact ? { flex: 1 } : {})}>{loading ? 'Обновляем...' : 'Обновить'}</button>
+            <button onClick={() => setSelected({ ...defaultDraft(profile, role.id), id: '' })} style={button('primary', compact ? { flex: 1 } : {})}>Создать публикацию</button>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(118px,1fr))', gap: 10, marginTop: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit,minmax(${compact ? 92 : 118}px,1fr))`, gap: compact ? 7 : 10, marginTop: compact ? 12 : 16 }}>
           <Kpi label="Всего" value={kpis.total} />
           <Kpi label="Черновики" value={kpis.draft} color={UI.blue} />
           <Kpi label="На модерации" value={kpis.moderation} color={UI.gold} />
           <Kpi label="Опубликовано" value={kpis.published} color={UI.green} />
-          <Kpi label="Запланировано" value={kpis.scheduled} />
-          <Kpi label="Архив" value={kpis.archived} color={UI.muted} />
-          <Kpi label="Просмотры" value={kpis.views} />
-          <Kpi label="Комментарии" value={kpis.comments} />
+          {!compact && <Kpi label="Запланировано" value={kpis.scheduled} />}
+          {!compact && <Kpi label="Архив" value={kpis.archived} color={UI.muted} />}
+          {!compact && <Kpi label="Просмотры" value={kpis.views} />}
+          {!compact && <Kpi label="Комментарии" value={kpis.comments} />}
         </div>
       </section>
 
       {error && <div style={card({ padding: 12, color: UI.red, background: 'rgba(217,93,84,0.10)', boxShadow: 'none' })}>{error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(360px,1fr) minmax(380px,0.78fr)', gap: 14, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: compact ? 'minmax(0,1fr)' : 'minmax(360px,1fr) minmax(380px,0.78fr)', gap: compact ? 10 : 14, alignItems: 'start' }}>
         <div style={{ display: 'grid', gap: 10 }}>
           <div style={card({ padding: 12 })}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(145px,1fr))', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit,minmax(${compact ? 128 : 145}px,1fr))`, gap: 8 }}>
               <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Поиск по заголовку, тегам, тексту" style={input()} />
               <select value={status} onChange={event => setStatus(event.target.value)} style={button('light')}>{STATUS_FILTERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
               <select value={category} onChange={event => setCategory(event.target.value)} style={button('light')}>{NEWS_CATEGORIES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
@@ -470,24 +470,28 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
               <select value={view} onChange={event => setView(event.target.value)} style={button('light')}><option value="cards">Карточки</option><option value="table">Таблица</option><option value="calendar">Календарь публикаций</option></select>
             </div>
           </div>
-          {loading ? <div style={card({ padding: 18, color: UI.soft })}>Загружаем публикации...</div> : !filtered.length ? <Empty title="Публикаций нет" text="Создайте первую новость или измените фильтры." /> : filtered.map(item => <NewsRow key={item.id} item={item} view={view} selected={selected?.id === item.id} onOpen={setSelected} onSubmit={submit} onArchive={archive} />)}
+          {loading ? <div style={card({ padding: 18, color: UI.soft })}>Загружаем публикации...</div> : !filtered.length ? <Empty title="Публикаций нет" text="Создайте первую новость или измените фильтры." /> : filtered.map(item => <NewsRow key={item.id} item={item} view={view} selected={selected?.id === item.id} onOpen={setSelected} onSubmit={submit} onArchive={archive} compactMode={compact} />)}
         </div>
         <div style={{ display: 'grid', gap: 10 }}>
           <NewsEditor item={selected} profile={profile} role={role} events={events.filter(event => String(event.partnerId || event.expertId || event.submittedProfileId || '') === String(profile.id || ''))} onSaved={upsert} onCreatedFromEvent={createFromEvent} onClose={() => setSelected(null)} onToast={onToast} />
-          <Preview item={selected} />
-          <WorkspaceRelatedLinks
-            links={buildWorkspaceRelatedLinks({ source: 'news', item: selected || {}, events, profile })}
-            actions={actions}
-            emptyText="Выберите новость, чтобы увидеть связанные мероприятия, автора и аналитику."
-          />
-          <div style={card({ padding: 14 })}>
-            <div style={{ color: UI.text, fontSize: 16, fontWeight: 910 }}>Комментарии</div>
-            <div style={{ display: 'grid', gap: 8, marginTop: 9 }}>
-              {comments.slice(0, 6).map(comment => <div key={comment.id} style={{ color: UI.soft, fontSize: 12.5, lineHeight: '18px' }}><b style={{ color: UI.text }}>{comment.userName}</b>: {comment.text}</div>)}
-              {!comments.length && <div style={{ color: UI.muted, fontSize: 12.5 }}>Комментариев пока нет или новость ещё не опубликована.</div>}
-              <button onClick={() => onOpenPanel?.('news')} style={button('light', { minHeight: 32, padding: '6px 8px', fontSize: 12 })}>Открыть публичную ленту</button>
+          {!compact && <Preview item={selected} />}
+          {!compact && (
+            <WorkspaceRelatedLinks
+              links={buildWorkspaceRelatedLinks({ source: 'news', item: selected || {}, events, profile })}
+              actions={actions}
+              emptyText="Выберите новость, чтобы увидеть связанные мероприятия, автора и аналитику."
+            />
+          )}
+          {!compact && (
+            <div style={card({ padding: 14 })}>
+              <div style={{ color: UI.text, fontSize: 16, fontWeight: 910 }}>Комментарии</div>
+              <div style={{ display: 'grid', gap: 8, marginTop: 9 }}>
+                {comments.slice(0, 6).map(comment => <div key={comment.id} style={{ color: UI.soft, fontSize: 12.5, lineHeight: '18px' }}><b style={{ color: UI.text }}>{comment.userName}</b>: {comment.text}</div>)}
+                {!comments.length && <div style={{ color: UI.muted, fontSize: 12.5 }}>Комментариев пока нет или новость ещё не опубликована.</div>}
+                <button onClick={() => onOpenPanel?.('news')} style={button('light', { minHeight: 32, padding: '6px 8px', fontSize: 12 })}>Открыть публичную ленту</button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

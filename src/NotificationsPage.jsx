@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 
 import { db } from './firebase';
@@ -6,6 +6,7 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
 import { T, GLASS } from './design.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import { buildNotificationCenter, notificationActionLabel, notificationCategory, notificationPriority } from './notifications/NotificationCenter.js';
 import { formatRelativeTime } from './utils/time.js';
 
 const NOTIFICATION_CATEGORIES = [
@@ -89,15 +90,18 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
     .filter(n => matchesTarget(n, userKeys, lastScanDate))
     .filter(n => {
       if (preferences.onlyCritical && !['critical', 'important'].includes(n.priority) && n.category !== 'important') return false;
-      const category = n.category || 'important';
+      const category = notificationCategory(n);
       if (preferences[category] === false) return false;
       if (filter === 'unread' && !isUnread(n)) return false;
       if (filter === 'archived' && !n.archived) return false;
-      if (filter !== 'all' && filter !== 'unread' && filter !== 'archived' && category !== filter) return false;
+      if (filter === 'urgent' && notificationPriority(n) !== 'high' && !isUnread(n)) return false;
+      if (filter === 'actionable' && !notificationActionLabel(n)) return false;
+      if (filter !== 'all' && filter !== 'unread' && filter !== 'archived' && filter !== 'urgent' && filter !== 'actionable' && category !== filter) return false;
       const q = queryText.trim().toLowerCase();
       if (q && !`${n.title || ''} ${n.body || ''}`.toLowerCase().includes(q)) return false;
       return true;
     });
+  const notificationCenter = useMemo(() => buildNotificationCenter({ notifications, isUnread }), [notifications, readAllAt, lastSeenTs]);
 
   const updatePreference = async (key, value) => {
     const next = key === 'all'
@@ -123,10 +127,10 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
   };
 
   if (variant === 'v2') {
-    const unreadCount = notifications.filter(isUnread).length;
+    const unreadCount = notificationCenter.unread;
     return (
       <GlassPanel>
-        <ScreenHeader title="Уведомления" subtitle={`${notifications.length} сообщений · ${unreadCount} новых`} kicker="АПГ сообщает" onBack={onBack} />
+        <ScreenHeader title="Уведомления" subtitle={`${notificationCenter.rows.length} сообщений · ${unreadCount} новых`} kicker="АПГ сообщает" onBack={onBack} />
         {!notificationsEnabled && (
           <GlassCard tone="gold" style={{ borderRadius: 34, padding: 18, marginBottom: 18 }}>
             <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
@@ -143,6 +147,7 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
           <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
             <StatPill label="всего" value={notifications.length} tone="gold" />
             <StatPill label="новых" value={unreadCount} />
+            <StatPill label="важных" value={notificationCenter.high} />
           </div>
         )}
         <GlassCard style={{ borderRadius: 24, padding: 12, marginBottom: 14 }}>
@@ -158,7 +163,9 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
             {[
               ['all', 'Все'],
+              ['urgent', 'Важное'],
               ['unread', 'Новые'],
+              ['actionable', 'Действия'],
               ['archived', 'Архив'],
               ...NOTIFICATION_CATEGORIES.slice(0, 7).map(([id, label]) => [id, label]),
             ].map(([id, label]) => (
@@ -184,14 +191,37 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
             </div>
           )}
         </GlassCard>
+        <GlassCard data-notification-priority-inbox style={{ borderRadius: 28, padding: 14, marginBottom: 14, background: 'radial-gradient(circle at 14% 0%, rgba(201,168,76,0.18), transparent 34%), radial-gradient(circle at 90% 8%, rgba(74,144,217,0.14), transparent 34%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.12), rgba(var(--apg2-glass-a,255,255,255),0.052))', display: 'grid', gap: 11 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <div>
+              <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '14px', fontWeight: 930, textTransform: 'uppercase', letterSpacing: 0.8 }}>Priority Inbox</div>
+              <div style={{ color: APG2_PROFILE.text, fontSize: 17, lineHeight: '22px', fontWeight: 930, marginTop: 3 }}>{notificationCenter.nextBestAction}</div>
+              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '17px', marginTop: 3 }}>Сообщения, события, акции и системные объявления собраны по важности.</div>
+            </div>
+            <div style={{ minWidth: 48, height: 48, borderRadius: 20, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 20 }}>🔔</div>
+          </div>
+          {(notificationCenter.urgent.length > 0 || notificationCenter.actionable.length > 0) && (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {[...notificationCenter.urgent.slice(0, 2), ...notificationCenter.actionable.slice(0, 1)].slice(0, 3).map(item => (
+                <button key={`smart:${item.id}`} type="button" onClick={() => openNotification(item)} style={{ border: `1px solid ${item.smartPriority === 'high' ? 'rgba(201,168,76,0.28)' : 'rgba(74,144,217,0.22)'}`, background: item.smartPriority === 'high' ? 'linear-gradient(145deg, rgba(201,168,76,0.12), rgba(var(--apg2-glass-a,255,255,255),0.055))' : 'linear-gradient(145deg, rgba(74,144,217,0.11), rgba(var(--apg2-glass-a,255,255,255),0.045))', borderRadius: 18, padding: 11, display: 'grid', gridTemplateColumns: '1fr auto', gap: 9, alignItems: 'center', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', color: APG2_PROFILE.text, fontSize: 13.5, lineHeight: '18px', fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || 'Уведомление АПГ'}</span>
+                    <span style={{ display: 'block', color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '16px', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.body || item.text || item.preview || notificationCategory(item)}</span>
+                  </span>
+                  {item.actionLabel && <span style={{ color: item.smartPriority === 'high' ? APG2_PROFILE.gold : '#6AABEC', background: item.smartPriority === 'high' ? APG2_PROFILE.goldSoft : 'rgba(74,144,217,0.12)', borderRadius: 999, padding: '6px 9px', fontSize: 11, lineHeight: '14px', fontWeight: 850, whiteSpace: 'nowrap' }}>{item.actionLabel}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </GlassCard>
         {loadError && <EmptyStateV2 icon="⚠️" title="Не удалось загрузить" text="Проверьте соединение и попробуйте снова." />}
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{[1, 2, 3].map(i => <GlassCard key={i} style={{ height: 86, animation: 'shimmer 1.5s ease-in-out infinite' }} />)}</div>
-        ) : notifications.length === 0 ? (
+        ) : notificationCenter.rows.length === 0 ? (
           <EmptyStateV2 icon="🔔" title="Пока тихо" text="Здесь появятся важные новости АПГ, акции партнеров и приглашения на события." />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-            {notifications.map((n, i) => {
+            {notificationCenter.rows.map((n, i) => {
               const unread = isUnread(n);
               return (
                 <GlassListItem
@@ -199,7 +229,7 @@ export function NotificationsPage({ variant = 'v2', onBack, notificationsEnabled
                   icon={n.emoji ?? '🔔'}
                   title={n.title ?? 'Уведомление АПГ'}
                   subtitle={n.body ?? n.text ?? n.preview ?? formatRelativeTime(n.createdAt)}
-                  meta={unread ? <GlassBadge tone="gold">new</GlassBadge> : formatRelativeTime(n.createdAt)}
+                  meta={unread ? <GlassBadge tone="gold">new</GlassBadge> : n.actionLabel || formatRelativeTime(n.createdAt)}
                   accent={unread ? APG2_PROFILE.gold : undefined}
                   onClick={() => openNotification(n)}
                   style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }}

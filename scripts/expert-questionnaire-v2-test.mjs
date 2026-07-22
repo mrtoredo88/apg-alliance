@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { analyzePublicSubmission as analyzeFastify } from '../server/src/routes/public-submit.js';
+import { buildAiImportValidation } from '../src/aiImportValidation.js';
 import { calculateExpertProfileCompletion, hasPremiumExpertAccess, normalizeExpertVideo } from '../src/expertProfileForm.js';
 import { hasPartnerAllianceAccess, hasPartnerPremiumAccess, normalizeExpertTariff, normalizePartnerTariff } from '../src/tariffConfig.js';
 import { EXPERT_CATEGORIES, getExpertCategory, getExpertTelHref, normalizeExpertPhone, normalizeExpertRecord, validateExpertCategories } from '../server-shared/expert-directory.js';
@@ -63,13 +64,22 @@ assert.equal(partnerStart.fields.inn, '');
 const partnerPremium = analyzeFastify('partner', {
   title: 'Студия АПГ', category: 'beauty', shortDescription: 'Студия красоты', description: 'Маникюр и уход.',
   phone: '+7 999 111-22-33', email: 'studio@example.ru', tariff: 'premium', bookingUrl: 'https://example.ru/book',
-  newsInfo: 'Новости', activities: 'Мастер-классы', inn: '7701234567',
+  offer: 'Скидка 10%', gift: 'Подарок за 5 ключей', newsInfo: 'Новости', activities: 'Мастер-классы', inn: '7701234567',
 }, files);
 assert.equal(partnerPremium.fields.tariff, 'premium');
+assert.equal(partnerPremium.fields.category, 'beauty');
 assert.equal(partnerPremium.fields.bookingUrl, 'https://example.ru/book');
+assert.equal(partnerPremium.fields.offer, 'Скидка 10%');
+assert.equal(partnerPremium.fields.gift, 'Подарок за 5 ключей');
 assert.equal(partnerPremium.fields.newsInfo, 'Новости');
 assert.equal(partnerPremium.fields.activities, 'Мастер-классы');
 assert.equal(partnerPremium.fields.inn, '7701234567');
+const partnerValidation = buildAiImportValidation({
+  type: 'partner',
+  request: { draft: partnerPremium, sourceFiles: files },
+  patch: { name: partnerPremium.fields.title, category: 'beauty', shortDescription: partnerPremium.fields.shortDescription, description: partnerPremium.fields.description, phone: partnerPremium.fields.phone, email: partnerPremium.fields.email, offer: partnerPremium.fields.offer, gift: partnerPremium.fields.gift, logoUrl: files[0].url },
+});
+assert.equal(partnerValidation.blockers.some(item => item.includes('Подарок')), false);
 assert.equal(normalizePartnerTariff('альянс'), 'alliance');
 assert.equal(normalizeExpertTariff('Практика'), 'practice');
 assert.equal(normalizeExpertTariff('Амбассадор'), 'ambassador');

@@ -60,7 +60,7 @@ const NAV_ITEMS = [
   { id: 'profile', label: 'Мой профиль', icon: '👤', description: 'Карточка и витрина' },
   { id: 'events', label: 'Мероприятия', icon: '🎉', description: 'Календарь и участники' },
   { id: 'booking', label: 'Встречи', icon: '📅', description: 'Календарь и записи' },
-  { id: 'dialogs', label: 'Сообщения', icon: '💬', description: 'Диалоги по объектам', badge: data => data.dialogUnreadCount || 0 },
+  { id: 'dialogs', label: 'Люди', icon: '👥', description: 'Чаты, знакомства и клиенты', badge: data => data.dialogUnreadCount || 0 },
   { id: 'content', label: 'Новости', icon: '📰', description: 'Публикации и черновики' },
   { id: 'growth', label: 'Партнёры', icon: '📢', description: 'QR, ссылки, промо' },
   { id: 'offers', label: 'Акции и предложения', icon: '🎁', description: 'Маркетинг и бонусы' },
@@ -253,7 +253,7 @@ function buildWorkspaceContext(activeSection) {
     content: { label: 'Контент', prompt: 'Что стоит опубликовать?', next: 'проверить новости, статьи и черновики' },
     events: { label: 'Мероприятия', prompt: 'Какие мероприятия требуют внимания?', next: 'проверить календарь и регистрации' },
     booking: { label: 'Встречи', prompt: 'Кого нужно принять сегодня?', next: 'проверить записи, подтверждения и свободные интервалы' },
-    dialogs: { label: 'Диалоги', prompt: 'Какие обращения ждут ответа?', next: 'разобрать вопросы по объектам' },
+    dialogs: { label: 'Люди', prompt: 'Какие переписки ждут ответа?', next: 'разобрать чаты и знакомства' },
     offers: { label: 'Акции и предложения', prompt: 'Какие акции сейчас важнее?', next: 'обновить предложения и бонусы' },
     clients: { label: 'Клиенты', prompt: 'С кем нужно поработать сегодня?', next: 'разобрать новых и вернувшихся клиентов' },
     reviews: { label: 'Отзывы', prompt: 'На какие отзывы нужно ответить?', next: 'проверить рейтинг и ответы' },
@@ -646,7 +646,7 @@ function buildWorkdaySummary({ data = {}, plan = {} }) {
   return [
     { id: 'events', label: 'События сегодня', value: eventsToday || plan.summary?.expectedEvents || 0, tone: WS.blue, target: 'events' },
     { id: 'meetings', label: 'Встречи сегодня', value: meetingsToday, tone: WS.green, target: 'booking' },
-    { id: 'messages', label: 'Новые сообщения', value: data.dialogUnreadCount || 0, tone: (data.dialogUnreadCount || 0) > 0 ? WS.gold : WS.green, target: 'dialogs' },
+    { id: 'messages', label: 'Новые в Людях', value: data.dialogUnreadCount || 0, tone: (data.dialogUnreadCount || 0) > 0 ? WS.gold : WS.green, target: 'dialogs' },
     { id: 'tasks', label: 'Задачи в плане', value: (plan.tasks || []).length, tone: plan.summary?.criticalProblems ? WS.red : WS.gold, target: 'dashboard' },
   ];
 }
@@ -1667,15 +1667,15 @@ function buildCenterConfig({ id, data, actions, intelligence, businessHubAvailab
       future: [...baseFuture, 'рабочие часы', 'исключения', 'недельное планирование', 'несколько филиалов'],
     },
     dialogs: {
-      subtitle: 'Центр контекстных коммуникаций: вопросы по партнёрам, экспертам, мероприятиям, акциям и будущим записям.',
+      subtitle: 'People Workspace: переписки, клиенты, знакомства, вопросы по партнёрам, экспертам, мероприятиям, акциям и будущим записям.',
       metrics: [['Непрочитано', data.dialogUnreadCount || 0, 'сообщения'], ['Входящие', data.dialogNotifications.length || 0, 'диалоги'], ['Контексты', 4, 'типа'], ['Push', 'on', 'доставка']],
       tasks: [
-        { icon: '💬', title: 'Ответить на новые вопросы', text: data.dialogUnreadCount ? `${data.dialogUnreadCount} сообщений ждут реакции` : 'Новых вопросов пока нет', priority: data.dialogUnreadCount ? 'Важно' : 'Спокойно', tone: data.dialogUnreadCount ? WS.red : WS.green, onClick: () => onOpenPanel?.('dialogs') },
-        { icon: '▣', title: 'Проверить обращения по объектам', text: 'Каждый диалог привязан к партнёру, эксперту, мероприятию или акции', priority: 'Контекст', tone: WS.gold, onClick: () => onOpenPanel?.('dialogs') },
+        { icon: '💬', title: 'Ответить на новые переписки', text: data.dialogUnreadCount ? `${data.dialogUnreadCount} сообщений ждут реакции` : 'Новых вопросов пока нет', priority: data.dialogUnreadCount ? 'Важно' : 'Спокойно', tone: data.dialogUnreadCount ? WS.red : WS.green, onClick: () => onOpenPanel?.('dialogs') },
+        { icon: '▣', title: 'Проверить контекст людей', text: 'Каждый чат связан с человеком, партнёром, экспертом, мероприятием или записью', priority: 'Контекст', tone: WS.gold, onClick: () => onOpenPanel?.('dialogs') },
         { icon: '✦', title: 'Подготовить ответ с Локи', text: 'Локи видит карточку объекта и помогает отвечать точнее', priority: 'AI', tone: WS.blue, onClick: actions.openLoki },
       ],
       modules: [
-        { meta: 'Диалоги', title: 'Контекстные обращения', text: 'Один объект — один диалог, без обычного свободного мессенджера.', action: 'Открыть диалоги', onClick: () => onOpenPanel?.('dialogs') },
+        { meta: 'Люди', title: 'Чаты и переписки', text: 'Личные сообщения и контекстные обращения собраны в одном professional inbox.', action: 'Открыть Люди', onClick: () => onOpenPanel?.('dialogs') },
         { meta: 'Локи', title: 'Помощь с ответом', text: 'Готовые ответы по данным карточки и истории обращения.', action: 'Открыть Локи', onClick: actions.openLoki },
         { meta: 'Push', title: 'Уведомления о сообщениях', text: 'Новые сообщения отправляются получателю через существующий push-канал.' },
       ],

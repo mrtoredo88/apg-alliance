@@ -130,8 +130,8 @@ if (!source.includes('role="dialog"') || !source.includes('aria-modal="true"') |
 if (!source.includes('role="tablist"') || !source.includes('role="tab"') || !source.includes("event.key === 'ArrowRight'") || !source.includes("event.key === 'Home'")) {
   throw new Error('Desktop Detail tabs must support shared keyboard navigation.');
 }
-if (!source.includes('onOpenMessages') || !source.includes('messageUnreadCount') || !source.includes('aria-label="Сообщения"')) {
-  throw new Error('DesktopTopOverview must expose Messages in the desktop header with unread badge support.');
+if (!source.includes('onOpenMessages') || !source.includes('messageUnreadCount') || !source.includes('aria-label="Люди"')) {
+  throw new Error('DesktopTopOverview must expose People/Messages in the desktop header with unread badge support.');
 }
 
 const desktopFirstScreenStart = homeSource.indexOf('function V2FirstScreenDesktop');

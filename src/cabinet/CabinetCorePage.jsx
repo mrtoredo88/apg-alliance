@@ -10,6 +10,7 @@ import { userAction } from '../userApi.js';
 import { normalizeExternalUrl, validateExternalUrl } from '../utils/externalUrls.js';
 import { shareLink } from '../utils/shareLink.js';
 import { ContentGrid } from '../workspace/WorkspaceComponents.jsx';
+import { WorkspaceNewsCenter } from '../workspace/WorkspaceNewsCenter.jsx';
 import { LokiIdentity } from '../loki/LokiIdentity.jsx';
 import { getCabinetRoles, getRoleModuleIds } from './CabinetRoleEngine.js';
 import { buildCabinetHistory, buildCabinetNotifications, buildCabinetSnapshot, buildCabinetTasks, getCabinetPublicUrl } from './CabinetModules.js';
@@ -290,7 +291,8 @@ function ContentModule({ snapshot, events, onEventCreated, onToast }) {
   return (
     <GlassSection title="Контент">
       <div style={{ display: 'grid', gap: 10 }}>
-        <SectionCard title="Новости" text={snapshot.metrics.news ? `${snapshot.metrics.news} публикаций связано с кабинетом.` : 'Создавайте новости, сохраняйте черновики и отправляйте материалы на модерацию.'} />
+        <SectionCard tone="gold" title="Моя лента" text="Публикуйте новости, фото, советы, кейсы и анонсы в ленте своего профиля. Для общей ленты АПГ отправляйте материал на модерацию." />
+        <WorkspaceNewsCenter role={{ id: snapshot.roleId }} profile={snapshot.profile} events={events} compact onOpenPanel={() => {}} onToast={onToast} />
         <SectionCard title={snapshot.roleId === 'expert' ? 'Предложение для АПГ' : 'Акции'} text={snapshot.profile?.offer || 'Добавьте скидку, бонус, подарок или спецусловие для пользователей АПГ.'} tone={snapshot.profile?.offer ? 'gold' : 'glass'} />
         <CabinetEventsBlock type={snapshot.roleId === 'expert' ? 'expert' : 'partner'} profile={snapshot.profile} events={events} onEventCreated={onEventCreated} onToast={onToast} />
       </div>

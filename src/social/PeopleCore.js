@@ -20,6 +20,10 @@ export const PEOPLE_TABS = [
   { id: 'friends', label: 'Друзья' },
   { id: 'requests', label: 'Заявки' },
   { id: 'dialogs', label: 'Диалоги' },
+  { id: 'recent', label: 'Недавно' },
+  { id: 'online', label: 'Онлайн' },
+  { id: 'partners', label: 'Партнёры' },
+  { id: 'experts', label: 'Эксперты' },
 ];
 
 export const PEOPLE_RELATION_STATUS = {
@@ -45,6 +49,14 @@ export function peoplePresenceLabel(person = {}) {
   if (person.onlineStatus === 'online' || person.online === true) return 'онлайн';
   if (person.onlineStatus === 'recent' || person.lastSeenAt) return 'недавно был';
   return '';
+}
+
+export function peopleKind(person = {}) {
+  if (!person || typeof person !== 'object') return 'user';
+  const haystack = lower([person.role, person.company, person.expert, person.about, person.searchText].filter(Boolean).join(' '));
+  if (haystack.includes('expert') || haystack.includes('эксперт') || haystack.includes('консульт')) return 'expert';
+  if (haystack.includes('partner') || haystack.includes('партнер') || haystack.includes('партнёр') || haystack.includes('бизнес')) return 'partner';
+  return 'user';
 }
 
 export function publicPerson(user = {}, fallbackId = '') {
@@ -105,6 +117,9 @@ export function peopleSuggestionReason(person = {}) {
   if (events === 1) return 'Вы оба были на одном мероприятии';
   if (partners > 1) return `${partners} общих партнёра`;
   if (partners === 1) return 'Работаете с одним партнёром';
+  if (peopleKind(person) === 'expert') return 'Эксперт может быть полезен по вашей теме';
+  if (peopleKind(person) === 'partner') return 'Партнёр АПГ рядом с вашей сетью';
+  if (peoplePresenceLabel(person) === 'онлайн') return 'Сейчас онлайн';
   return '';
 }
 
@@ -125,6 +140,10 @@ export function buildPeopleSections({ people = [], pinnedIds = [] } = {}) {
   const favorites = rows.filter(row => pinned.has(String(row.id)));
   const recentGroups = recentPeopleGroups(rows.filter(row => row.dialogId || row.relationStatus === PEOPLE_RELATION_STATUS.FRIEND));
   const friends = rows.filter(row => row.relationStatus === PEOPLE_RELATION_STATUS.FRIEND);
+  const online = rows.filter(row => peoplePresenceLabel(row) === 'онлайн');
+  const recent = recentPeopleGroups(rows).flatMap(group => group.rows);
+  const partners = rows.filter(row => peopleKind(row) === 'partner');
+  const experts = rows.filter(row => peopleKind(row) === 'expert');
   const suggestions = rows
     .filter(row => row.relationStatus === PEOPLE_RELATION_STATUS.STRANGER && peopleSuggestionReason(row))
     .sort((a, b) => {
@@ -133,7 +152,44 @@ export function buildPeopleSections({ people = [], pinnedIds = [] } = {}) {
       return bScore - aScore;
     })
     .slice(0, 8);
-  return { favorites, recentGroups, friends, suggestions, all: rows.filter(row => !pinned.has(String(row.id))) };
+  return { favorites, recentGroups, friends, online, recent, partners, experts, suggestions, all: rows.filter(row => !pinned.has(String(row.id))) };
+}
+
+export function buildPeoplePulse({ people = [], pinnedIds = [] } = {}) {
+  const sections = buildPeopleSections({ people, pinnedIds });
+  const rows = list(people);
+  const incoming = rows.filter(row => row.relationStatus === PEOPLE_RELATION_STATUS.INCOMING);
+  const noDialogFriends = sections.friends.filter(row => !row.dialogId);
+  const priority = [
+    ...incoming.map(row => ({ ...row, pulseReason: 'Ждёт вашего ответа', pulseTone: 'gold', pulseAction: 'accept' })),
+    ...sections.favorites.slice(0, 4).map(row => ({ ...row, pulseReason: row.dialogId ? 'Важный контакт · можно написать' : 'Важный контакт', pulseTone: 'gold', pulseAction: row.dialogId ? 'message' : 'profile' })),
+    ...sections.online.slice(0, 4).map(row => ({ ...row, pulseReason: 'Сейчас онлайн', pulseTone: 'blue', pulseAction: row.dialogId ? 'message' : 'profile' })),
+    ...sections.suggestions.slice(0, 4).map(row => ({ ...row, pulseReason: peopleSuggestionReason(row) || 'Подходит для знакомства', pulseTone: 'blue', pulseAction: 'connect' })),
+    ...noDialogFriends.slice(0, 3).map(row => ({ ...row, pulseReason: 'Друг без переписки — начните диалог', pulseTone: 'glass', pulseAction: 'message' })),
+  ];
+  const unique = [];
+  const seen = new Set();
+  priority.forEach(row => {
+    const id = String(row.id || '');
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    unique.push(row);
+  });
+  const nextBestAction = incoming.length
+    ? 'Принять новые заявки'
+    : sections.suggestions.length
+      ? 'Добавить полезные контакты'
+      : sections.friends.length
+        ? 'Написать важному человеку'
+        : 'Найти людей рядом';
+  return {
+    ...sections,
+    priority: unique.slice(0, 8),
+    incomingCount: incoming.length,
+    onlineCount: sections.online.length,
+    nextBestAction,
+    healthLabel: rows.length ? `${sections.friends.length} друзей · ${sections.online.length} онлайн · ${sections.suggestions.length} рекомендаций` : 'Сеть ещё собирается',
+  };
 }
 
 export function relationStatusForPerson(person = {}, { connections = [], requests = [], blocked = [], actorId = '' } = {}) {

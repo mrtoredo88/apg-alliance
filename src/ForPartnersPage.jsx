@@ -1,6 +1,5 @@
 import React from 'react';
 import { T, GLASS, GLASS_GOLD } from './design.js';
-import { openUrl } from './vk.js';
 
 const LAUNCH_DATE = 'Январь 2025';
 
@@ -21,7 +20,7 @@ function StatCard({ icon, value, label, color, sub }) {
   );
 }
 
-export function ForPartnersPage({ userCount = 0, partnerCount = 0, totalScans = 0, onBack }) {
+export function ForPartnersPage({ userCount = 0, partnerCount = 0, totalScans = 0, onBack, onOpenPartnership }) {
   return (
     <>
       {/* Хедер */}
@@ -122,17 +121,28 @@ export function ForPartnersPage({ userCount = 0, partnerCount = 0, totalScans = 
             Стать партнёром АПГ
           </div>
           <div style={{ fontSize: 12, color: T.textSec, lineHeight: '18px', marginBottom: 14 }}>
-            Свяжитесь с нами — расскажем об условиях и поможем настроить кабинет
+            Заполните короткую анкету — заявка попадёт в очередь модерации, а команда АПГ подготовит карточку и свяжется с вами
           </div>
           <button
-            onClick={() => openUrl('https://vk.com/apg_zelenograd')}
+            onClick={() => onOpenPartnership?.('partner')}
             style={{
-              padding: '12px 28px', borderRadius: 14, border: 'none',
+              width: '100%', padding: '12px 18px', borderRadius: 14, border: 'none',
               background: `linear-gradient(135deg, ${T.gold}, ${T.goldL})`,
               color: '#0F0F1A', fontSize: 14, fontWeight: 800, cursor: 'pointer',
             }}
           >
-            Написать нам ВКонтакте →
+            Заполнить заявку партнёра →
+          </button>
+          <button
+            onClick={() => onOpenPartnership?.('expert')}
+            style={{
+              width: '100%', marginTop: 10, padding: '12px 18px', borderRadius: 14,
+              border: `1px solid ${T.border}`,
+              background: T.chipBg,
+              color: T.textPri, fontSize: 14, fontWeight: 800, cursor: 'pointer',
+            }}
+          >
+            Я эксперт или консультант
           </button>
         </div>
 

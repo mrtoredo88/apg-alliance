@@ -23,6 +23,7 @@ const dialogs = [
   { id: 'd-partner', type: 'partner', userId: 'u1', context: { type: 'partner', objectId: 'p1', partnerId: 'p1', title: 'Студия массажа', subtitle: 'Партнер' }, lastMessage: { text: 'Можно записаться?', createdAt: '2026-07-19T10:00:00.000Z' }, unreadCount: 0 },
   { id: 'd-event', type: 'event', userId: 'u1', context: { type: 'event', objectId: 'ev1', title: 'День здоровья' }, lastMessage: { text: 'Во сколько начало?', createdAt: '2026-07-19T11:00:00.000Z' }, unreadCount: 2, workspacePrivate: { pinned: true } },
   { id: 'd-group', type: 'group', participantIds: ['u1', 'u3'], context: { type: 'group', title: 'Команда события' }, lastMessage: { text: 'План готов', createdAt: '2026-07-19T08:00:00.000Z' } },
+  { id: 'd-archived', type: 'direct', participantIds: ['u1', 'u4'], title: 'Архивный чат', lastMessage: { text: 'Вернуться позже', createdAt: '2026-07-18T08:00:00.000Z' }, workspacePrivate: { archived: true } },
   { id: 'd-admin', type: 'direct', participantIds: ['admin1'], title: 'Admin Dialog', lastMessage: { text: 'Служебное', createdAt: '2026-07-19T12:00:00.000Z' } },
 ];
 
@@ -59,6 +60,9 @@ scenario('builds universal sorted list', () => {
 scenario('filters and searches', () => {
   assert.deepEqual(buildUnifiedDialogList({ dialogs, messages, actor, filter: 'unread' }).map(item => item.id), ['d-event', 'd-direct']);
   assert.deepEqual(buildUnifiedDialogList({ dialogs, messages, actor, filter: 'groups' }).map(item => item.id), ['d-group']);
+  assert.deepEqual(buildUnifiedDialogList({ dialogs, messages, actor, filter: 'pinned' }).map(item => item.id), ['d-event']);
+  assert.deepEqual(buildUnifiedDialogList({ dialogs, messages, actor, filter: 'archive' }).map(item => item.id), ['d-archived']);
+  assert.equal(buildUnifiedDialogList({ dialogs, messages, actor }).some(item => item.id === 'd-archived'), false);
   assert.deepEqual(buildUnifiedDialogList({ dialogs, messages, actor, query: 'массаж' }).map(item => item.id), ['d-partner']);
   assert.deepEqual(buildUnifiedDialogList({ dialogs, messages, actor, query: 'мероприятие' }).map(item => item.id), ['d-event']);
 });
@@ -98,7 +102,7 @@ scenario('source does not create backend or firestore models', () => {
   });
 });
 
-const filters = ['all', 'personal', 'partners', 'events', 'groups', 'unread'];
+const filters = ['all', 'personal', 'partners', 'events', 'groups', 'unread', 'pinned', 'archive'];
 const queries = ['', 'вит', 'массаж', 'мероприятие', 'чат', 'привет', 'регистрация'];
 for (let i = passed; i < 500; i += 1) {
   scenario(`matrix messaging foundation ${i}`, () => {

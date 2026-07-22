@@ -535,6 +535,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
   const [query, setQuery] = useState('');
   const [aiAssist, setAiAssist] = useState(Boolean(user?.contextDialogAiAssist));
   const [attachment, setAttachment] = useState(null);
+  const [lastFailedMessage, setLastFailedMessage] = useState('');
   const [contextCollapsed, setContextCollapsed] = useState(false);
   const [contextExpanded, setContextExpanded] = useState(false);
   const desktopLayout = useDesktopLayout();
@@ -610,6 +611,8 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
   const lastQuestion = [...activeMessages].reverse().find(message => message.senderRole === 'user')?.text || '';
   const typingUsers = Object.entries(activeDialog?.typing || {}).filter(([id, value]) => id !== uid && value).length;
   const activeHeader = activeDialog?.header || {};
+  const activePinned = activeDialog?.pinned === true || activeDialog?.workspacePrivate?.pinned === true || activeDialog?.workspaceState?.pinned === true;
+  const activeArchived = activeDialog?.archived === true || activeDialog?.workspacePrivate?.archived === true || activeDialog?.workspaceState?.archived === true;
   const groupedMessages = useMemo(() => {
     const rows = [];
     let currentDay = '';
@@ -630,6 +633,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
     const autoAnswer = !senderRole && !isOwner ? buildDialogAutoAnswer(activeContext, body) : null;
     setPending(true);
     setError('');
+    setLastFailedMessage('');
     try {
       if (autoAnswer) {
         await userAction('dialog:message', { dialogId: activeDialog.id, text: body });
@@ -640,6 +644,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
       setText('');
       setAttachment(null);
     } catch (err) {
+      setLastFailedMessage(body);
       setError(err?.message || 'Не удалось отправить сообщение.');
     } finally {
       setPending(false);
@@ -665,6 +670,13 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
     await userAction('dialog:aiAssist', { enabled }).catch(() => {});
   };
 
+  const patchActiveDialog = async (patch = {}) => {
+    if (!activeDialog?.id) return;
+    const optimistic = { workspacePrivate: { ...(activeDialog.workspacePrivate || activeDialog.workspaceState || {}), ...patch }, workspaceState: { ...(activeDialog.workspaceState || {}), ...patch } };
+    setDialogs(prev => prev.map(item => String(item.id || item.dialogId) === String(activeDialog.id) ? { ...item, ...optimistic } : item));
+    await userAction('dialog:workspaceUpdate', { dialogId: activeDialog.id, patch }).catch(err => setError(err?.message || 'Не удалось обновить переписку.'));
+  };
+
   const handlePhoto = (file) => {
     if (!file) return;
     if (file.size > 450 * 1024) {
@@ -682,6 +694,13 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
 
   const dialogList = (
     <div data-dialog-list-panel style={{ display: 'grid', gap: 10, minWidth: 0 }}>
+      {desktopLayout && (
+        <div style={{ borderRadius: 24, padding: 14, background: 'radial-gradient(circle at 14% 0%, rgba(74,144,217,0.18), transparent 34%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.12), rgba(var(--apg2-glass-a,255,255,255),0.055))', border: APG2_PROFILE.glass.border, display: 'grid', gap: 5 }}>
+          <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '14px', fontWeight: 920, textTransform: 'uppercase', letterSpacing: 0.8 }}>People Inbox</div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 18, lineHeight: '23px', fontWeight: 940 }}>Переписки</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px' }}>Личные чаты, вопросы по объектам, записи и обсуждения — в одном списке.</div>
+        </div>
+      )}
       <div data-messaging-search-sticky style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 6px)', zIndex: 12, display: 'grid', gap: 9, padding: '2px 0 8px', background: 'linear-gradient(180deg, var(--apg2-bg, rgba(14,14,18,0.92)) 72%, transparent)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
           <input data-messaging-search value={query} onChange={event => setQuery(event.target.value)} placeholder="Поиск людей и сообщений..." style={{ width: '100%', minHeight: 44, borderRadius: 18, border: APG2_PROFILE.glass.border, background: 'rgba(var(--apg2-glass-a,255,255,255),0.09)', color: APG2_PROFILE.text, padding: '0 14px', outline: 'none', fontFamily: 'inherit', fontSize: 14, boxSizing: 'border-box' }} />
@@ -695,9 +714,36 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
             { id: 'events', label: 'Мероприятия' },
             { id: 'groups', label: 'Группы' },
             { id: 'unread', label: 'Непрочитанные' },
+            { id: 'pinned', label: 'Закреплённые' },
+            { id: 'archive', label: 'Архив' },
           ].map(item => (
             <button key={item.id} type="button" onClick={() => setFilter(item.id)} style={{ flex: '0 0 auto', border: filter === item.id ? '1px solid rgba(215,184,106,0.48)' : APG2_PROFILE.glass.border, background: filter === item.id ? APG2_PROFILE.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: filter === item.id ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, borderRadius: 999, minHeight: 34, padding: '7px 12px', fontFamily: 'inherit', fontSize: 12, fontWeight: 840, whiteSpace: 'nowrap', cursor: 'pointer' }}>{item.label}</button>
           ))}
+        </div>
+        <div data-messaging-priority-inbox style={{ borderRadius: 18, padding: 10, background: 'linear-gradient(145deg, rgba(215,184,106,0.10), rgba(var(--apg2-glass-a,255,255,255),0.045))', border: '1px solid rgba(215,184,106,0.20)', display: 'grid', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <div>
+              <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '14px', fontWeight: 920, textTransform: 'uppercase', letterSpacing: 0.7 }}>Важное сейчас</div>
+              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12, lineHeight: '16px', marginTop: 1 }}>{messagingSnapshot.nextBestAction}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <span style={{ minWidth: 26, height: 26, borderRadius: 999, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 900 }}>{messagingSnapshot.pinned || 0}</span>
+              <span style={{ minWidth: 26, height: 26, borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.textMuted, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 900 }}>{messagingSnapshot.archive || 0}</span>
+            </div>
+          </div>
+          {messagingSnapshot.priority?.length > 0 && (
+            <div style={{ display: 'grid', gap: 6 }}>
+              {messagingSnapshot.priority.slice(0, 2).map(item => (
+                <button key={`priority:${item.id}`} type="button" onClick={() => setActiveDialogId(item.id)} style={{ border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.11)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 14, padding: '8px 9px', display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', color: APG2_PROFILE.text, fontSize: 12.5, lineHeight: '16px', fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+                    <span style={{ display: 'block', color: APG2_PROFILE.textMuted, fontSize: 10.8, lineHeight: '14px', marginTop: 1 }}>{item.reason}</span>
+                  </span>
+                  {item.unreadCount > 0 && <span style={{ minWidth: 22, height: 22, borderRadius: 999, background: APG2_PROFILE.gold, color: '#17120a', display: 'grid', placeItems: 'center', fontSize: 10.5, fontWeight: 920 }}>{item.unreadCount}</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       {pending && !dialogs.length ? (
@@ -715,16 +761,24 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
   );
 
   const chatHeader = activeDialog ? (
-    <div data-messaging-chat-header style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 4px)', zIndex: 14, minHeight: 64, borderRadius: desktopLayout ? 22 : 0, background: desktopLayout ? 'rgba(var(--apg2-glass-a,255,255,255),0.075)' : 'var(--apg2-bg, rgba(14,14,18,0.96))', border: desktopLayout ? APG2_PROFILE.glass.border : 'none', padding: desktopLayout ? 10 : '8px 0 10px', display: 'grid', gridTemplateColumns: desktopLayout ? '48px minmax(0,1fr) auto' : '36px 48px minmax(0,1fr) auto', gap: 10, alignItems: 'center' }}>
+    <div data-messaging-chat-header style={{ position: 'sticky', top: 'calc(var(--safe-top, 0px) + 4px)', zIndex: 14, minHeight: 64, borderRadius: desktopLayout ? 24 : 0, background: desktopLayout ? 'linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.12), rgba(var(--apg2-glass-a,255,255,255),0.055))' : 'var(--apg2-bg, rgba(14,14,18,0.96))', border: desktopLayout ? APG2_PROFILE.glass.border : 'none', padding: desktopLayout ? 11 : '8px 0 10px', boxShadow: desktopLayout ? '0 12px 32px rgba(0,0,0,0.10)' : 'none', display: 'grid', gridTemplateColumns: desktopLayout ? '50px minmax(0,1fr) auto' : '36px 48px minmax(0,1fr) auto', gap: 10, alignItems: 'center' }}>
       {!desktopLayout && <button type="button" onClick={() => setActiveDialogId('')} aria-label="К списку диалогов" style={{ width: 36, height: 36, borderRadius: '50%', border: APG2_PROFILE.glass.border, background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 18, cursor: 'pointer' }}>‹</button>}
       <div style={{ width: 48, height: 48, borderRadius: 19, background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', fontSize: 22, overflow: 'hidden' }}>
         {activeContext?.image ? <img src={activeContext.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : contextIcon(activeContext?.type)}
       </div>
       <div style={{ minWidth: 0 }}>
-        <div style={{ color: APG2_PROFILE.text, fontSize: 16, lineHeight: '20px', fontWeight: 930, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeHeader.title || activeContext?.title || 'Диалог АПГ'}</div>
+        <div style={{ color: APG2_PROFILE.text, fontSize: 16, lineHeight: '20px', fontWeight: 930, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeHeader.title || activeContext?.title || 'Переписка АПГ'}</div>
         <div style={{ color: typingUsers ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '16px', marginTop: 2 }}>{typingUsers ? 'печатает...' : responseHint(activeContext)}</div>
       </div>
-      <ContextBadge context={activeContext} />
+      <div style={{ display: 'flex', gap: 7, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+        <ContextBadge context={activeContext} />
+        {desktopLayout && (
+          <>
+            <button type="button" onClick={() => patchActiveDialog({ pinned: !activePinned })} title={activePinned ? 'Открепить' : 'Закрепить'} style={{ width: 34, height: 34, borderRadius: '50%', border: activePinned ? '1px solid rgba(215,184,106,0.36)' : APG2_PROFILE.glass.border, background: activePinned ? APG2_PROFILE.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: activePinned ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, cursor: 'pointer' }}>📌</button>
+            <button type="button" onClick={() => patchActiveDialog({ archived: !activeArchived })} title={activeArchived ? 'Вернуть из архива' : 'Архивировать'} style={{ width: 34, height: 34, borderRadius: '50%', border: APG2_PROFILE.glass.border, background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.textSoft, cursor: 'pointer' }}>{activeArchived ? '↩' : '🗄️'}</button>
+          </>
+        )}
+      </div>
     </div>
   ) : null;
 
@@ -749,6 +803,12 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
       </div>
       <div data-message-composer style={{ position: 'sticky', bottom: 'calc(var(--safe-bottom, 0px) + 8px)', zIndex: 15, borderRadius: 24, padding: 10, background: 'rgba(var(--apg2-glass-a,255,255,255),0.10)', border: APG2_PROFILE.glass.border, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', display: 'grid', gap: 8 }}>
         <QuickReplyChips context={activeContext} onPick={value => setText(current => current.trim() ? current : value)} />
+        {lastFailedMessage && (
+          <div data-message-send-error style={{ borderRadius: 16, padding: 10, background: 'rgba(230,70,70,0.10)', border: '1px solid rgba(230,70,70,0.22)', color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', display: 'flex', gap: 9, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+            <span>Сообщение не отправилось. Можно повторить.</span>
+            <GlassButton onClick={() => sendText(lastFailedMessage)} tone="gold" style={{ minHeight: 30, borderRadius: 14, padding: '6px 9px', fontSize: 11.5 }}>Повторить</GlassButton>
+          </div>
+        )}
         {attachment && (
           <div style={{ borderRadius: 16, padding: 8, display: 'flex', alignItems: 'center', gap: 9, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)' }}>
             <img src={attachment.url} alt="" style={{ width: 38, height: 38, borderRadius: 12, objectFit: 'cover' }} />
@@ -793,8 +853,25 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
 
   return (
     <GlassPanel>
-      <ScreenHeader title="Люди" subtitle="Диалоги и личное общение АПГ" kicker="People" onBack={onBack} />
+      <ScreenHeader title="Люди" subtitle="Чаты, переписки и личное общение АПГ" kicker="People" onBack={onBack} />
       {error && <GlassCard style={{ borderRadius: 20, padding: 12, marginBottom: 12, color: '#ff8e8e' }}>{error}</GlassCard>}
+      <div data-people-messaging-hero style={{ display: 'grid', gridTemplateColumns: desktopLayout ? 'minmax(0,1.25fr) repeat(3, minmax(96px,0.34fr))' : 'minmax(0,1fr)', gap: 10, alignItems: 'stretch', marginBottom: 14 }}>
+        <div style={{ borderRadius: 30, padding: 16, background: 'radial-gradient(circle at 12% 0%, rgba(74,144,217,0.20), transparent 34%), radial-gradient(circle at 92% 0%, rgba(215,184,106,0.20), transparent 34%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.13), rgba(var(--apg2-glass-a,255,255,255),0.055))', border: APG2_PROFILE.glass.border, boxShadow: '0 16px 42px var(--apg2-elev-shadow, rgba(0,0,0,0.12))' }}>
+          <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '14px', fontWeight: 930, textTransform: 'uppercase', letterSpacing: 0.9 }}>People Hub</div>
+          <div style={{ color: APG2_PROFILE.text, fontSize: 22, lineHeight: '27px', fontWeight: 950, marginTop: 5 }}>Чаты и переписки</div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13.5, lineHeight: '20px', marginTop: 6 }}>Общение с людьми, партнёрами, экспертами и организаторами собрано в одном аккуратном рабочем пространстве.</div>
+        </div>
+        {[
+          ['Диалоги', messagingSnapshot.total || dialogs.length],
+          ['Новые', messagingSnapshot.unread || 0],
+          ['Активные', unifiedDialogs.length],
+        ].map(([label, value]) => (
+          <div key={label} style={{ borderRadius: 24, padding: 13, background: 'rgba(var(--apg2-glass-a,255,255,255),0.075)', border: APG2_PROFILE.glass.border, display: 'grid', alignContent: 'center', textAlign: desktopLayout ? 'center' : 'left' }}>
+            <div style={{ color: value ? APG2_PROFILE.gold : APG2_PROFILE.text, fontSize: 22, lineHeight: '26px', fontWeight: 950 }}>{value}</div>
+            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px', fontWeight: 820, marginTop: 3 }}>{label}</div>
+          </div>
+        ))}
+      </div>
       <div data-messaging-premium-layout data-layout={desktopLayout ? 'desktop-three-pane' : 'mobile-native'} style={{ display: 'grid', gridTemplateColumns: desktopLayout ? 'minmax(290px, 0.78fr) minmax(430px, 1.42fr) minmax(260px, 0.7fr)' : 'minmax(0,1fr)', gap: desktopLayout ? 14 : 12, alignItems: 'start' }}>
         {(desktopLayout || !activeDialog) && dialogList}
         {chatPane}

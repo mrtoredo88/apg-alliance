@@ -81,21 +81,22 @@ assert.equal(desktop.contextPresentation, 'docked');
 
 const mobileNav = getWorkspaceNavigation({ mode: WORKSPACE_MODES.mobile, role: 'user' });
 assert.equal(mobileNav.placement, 'bottom');
-assert.deepEqual(mobileNav.primary.map(item => item.id), ['home', 'offers', 'messages', 'scan', 'experts', 'profile']);
+assert.deepEqual(mobileNav.primary.map(item => item.id), ['home', 'offers', 'scan', 'experts', 'profile']);
 
 const superAdminMobileNav = getWorkspaceNavigation({ mode: WORKSPACE_MODES.mobile, role: 'super_admin' });
 assert.equal(superAdminMobileNav.role, 'super_admin');
-assert.deepEqual(superAdminMobileNav.primary.map(item => item.id), ['home', 'offers', 'messages', 'scan', 'experts', 'profile']);
-assert.deepEqual(superAdminMobileNav.primary.map(item => item.panelId), ['home', 'offers', 'dialogs', null, 'experts', 'profile']);
+assert.deepEqual(superAdminMobileNav.primary.map(item => item.id), ['home', 'offers', 'scan', 'experts', 'profile']);
+assert.deepEqual(superAdminMobileNav.primary.map(item => item.panelId), ['home', 'offers', null, 'experts', 'profile']);
 
 const unknownMobileNav = getWorkspaceNavigation({ mode: WORKSPACE_MODES.mobile, role: 'unknown-role' });
 assert.equal(unknownMobileNav.role, 'user');
 assert.deepEqual(unknownMobileNav.unknownRoles, ['unknown-role']);
-assert.deepEqual(USER_MODE_NAV_ITEMS.map(item => item.id), ['home', 'offers', 'messages', 'scan', 'experts', 'profile']);
+assert.deepEqual(USER_MODE_NAV_ITEMS.map(item => item.id), ['home', 'offers', 'scan', 'experts', 'profile']);
 
 const desktopPartnerNav = getWorkspaceNavigation({ mode: WORKSPACE_MODES.desktop, role: 'partner' });
 assert.equal(desktopPartnerNav.placement, 'sidebar');
 assert.ok(desktopPartnerNav.primary.some(item => item.id === 'business-hub'));
+assert.ok(desktopPartnerNav.primary.some(item => item.id === 'messages' && item.label === 'Люди' && item.panelId === 'dialogs'));
 
 const navIds = WORKSPACE_NAV_ITEMS.map(item => item.id);
 assert.equal(navIds.length, new Set(navIds).size);

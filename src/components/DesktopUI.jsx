@@ -429,8 +429,8 @@ export function DesktopTopOverview({
             🔔
             {unreadCount > 0 && <span style={{ position: 'absolute', top: 7, right: 7, width: 10, height: 10, borderRadius: '50%', background: '#E64646', border: '2px solid #101012' }} />}
           </button>
-          <button type="button" onClick={onOpenMessages} aria-label="Сообщения" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative' }}>
-            💬
+          <button type="button" onClick={onOpenMessages} aria-label="Люди" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative' }}>
+            👥
             {safeMessageUnread > 0 && <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 20, height: 20, borderRadius: 999, padding: '0 5px', boxSizing: 'border-box', background: '#E64646', border: '2px solid #101012', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 10.5, lineHeight: '14px', fontWeight: 900 }}>{safeMessageUnread}</span>}
           </button>
           {workspaceAction}

@@ -35,7 +35,10 @@ export function buildUnifiedDialogList({ dialogs = [], messages = [], actor = {}
   return normalized
     .filter(dialog => dialog.permissions.canRead)
     .filter(dialog => {
+      if (filter === 'archive') return dialog.archived === true;
+      if (dialog.archived === true) return false;
       if (filter === 'unread') return dialog.unreadCount > 0;
+      if (filter === 'pinned') return dialog.pinned === true;
       const category = MESSAGING_FILTERS.find(item => item.id === filter)?.category;
       return !category || dialog.category === category;
     })

@@ -26,7 +26,7 @@ async function run() {
     const headerVisible = bodyText.includes('АПГ: ЗЕЛЕНОГРАД');
     const navigationVisible = bodyText.includes('Главная') && bodyText.includes('Партнёры') && bodyText.includes('Эксперты');
     const lokiVisible = await page.locator('button[aria-label="Локи"], [data-floating-loki-button="true"]').first().isVisible().catch(() => false);
-    const messagesButton = page.getByRole('button', { name: 'Сообщения' }).first();
+    const messagesButton = page.getByRole('button', { name: 'Люди' }).first();
     const messagesVisible = await messagesButton.isVisible().catch(() => false);
 
     if (messagesVisible) {
@@ -35,7 +35,7 @@ async function run() {
     }
 
     const afterClickText = await page.locator('body').innerText({ timeout: 5000 }).catch(() => '');
-    const messagesOpened = page.url().includes('/messages') || afterClickText.includes('Диалоги') || afterClickText.includes('Сообщения');
+    const messagesOpened = page.url().includes('/messages') || afterClickText.includes('Люди') || afterClickText.includes('Чаты и переписки');
     const fatal = errors.find(error => /onOpenMessages|ReferenceError|Can't find variable/i.test(error.message));
     const result = {
       url: page.url(),
@@ -52,8 +52,8 @@ async function run() {
     if (!headerVisible) throw new Error('Desktop header did not render');
     if (!navigationVisible) throw new Error('Desktop navigation did not render');
     if (!lokiVisible) throw new Error('Desktop floating Loki button did not render');
-    if (!messagesVisible) throw new Error('Desktop Messages button did not render');
-    if (!messagesOpened) throw new Error('Desktop Messages button did not open messages');
+    if (!messagesVisible) throw new Error('Desktop People button did not render');
+    if (!messagesOpened) throw new Error('Desktop People button did not open messages');
     if (errors.length) throw new Error(`Desktop boot console/page errors: ${errors.slice(0, 3).map(error => error.message).join(' | ')}`);
   } finally {
     await browser.close();

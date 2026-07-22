@@ -15,6 +15,69 @@
 
 ---
 
+## [2026-07-22] fix: People Hub Duplicate Action Buttons
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/ProfilePanel.jsx`, `scripts/people-messaging-notifications-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** в разделе `Люди` убраны визуальные дубли действий: карточки `Пульса сети` больше не содержат внутреннюю кнопку действия, compact-карточки людей не дублируют кнопку `Профиль`, а footer `Открыть Люди`/`Мой QR` не показывается поверх пустого состояния с теми же CTA.
+**Почему:** People Hub должен оставаться спокойным и понятным: один объект — одно основное действие, без повторяющихся кнопок в соседних блоках.
+
+## [2026-07-22] feat: People, Messaging and Notification Smart Layer
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/social/PeopleCore.js`, `src/ProfilePanel.jsx`, `src/messaging/MessagingSnapshot.js`, `src/contextDialogs/ContextDialogsPage.jsx`, `src/notifications/NotificationCenter.js`, `src/NotificationsPage.jsx`, `scripts/people-messaging-notifications-test.mjs`, `package.json`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** добавлен единый smart-слой для пунктов 1-3: `Пульс сети` в People Hub, `Важное сейчас` в People Inbox и Priority Inbox в уведомлениях с фильтрами `Важное`/`Действия`, action-labels и сортировкой по приоритету.
+**Почему:** “Люди”, чаты и уведомления должны работать как одна профессиональная социальная система АПГ: быстро показывать, кому ответить, кого добавить, какой диалог открыть и какое уведомление требует действия.
+
+## [2026-07-22] feat: Smart People and Messenger Workflow Polish
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/social/PeopleCore.js`, `src/ProfilePanel.jsx`, `src/messaging/MessagingRegistry.js`, `src/messaging/MessagingContext.js`, `src/messaging/MessagingRouter.js`, `src/contextDialogs/ContextDialogsPage.jsx`, `src/workspace/WorkspaceDialogsCRM.jsx`, `scripts/social-platform-v2-test.mjs`, `scripts/messaging-foundation-test.mjs`, `scripts/messaging-ux-polish-test.mjs`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** “Люди” получили smart-фильтры `Недавно`, `Онлайн`, `Партнёры`, `Эксперты`, объяснения причин знакомства и action-oriented пустые состояния. Пользовательские переписки получили фильтры `Закреплённые`/`Архив`, desktop-кнопки закрепить/архивировать в шапке чата и retry-блок при ошибке отправки. Workspace People chat получил такой же retry UX.
+**Почему:** People Hub должен быть не только красивым, но и рабочим: помогать находить нужных людей, понимать причину знакомства, управлять переписками и не терять сообщение при сетевой ошибке.
+
+## [2026-07-22] feat: Professional People Messaging Desktop
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/contextDialogs/ContextDialogsPage.jsx`, `src/workspace/DesktopWorkspace.jsx`, `src/workspace/WorkspaceCore.js`, `src/workspace/WorkspaceDialogsCRM.jsx`, `src/components/DesktopUI.jsx`, `scripts/messaging-ux-polish-test.mjs`, `scripts/desktop-ui-framework-test.mjs`, `scripts/desktop-boot-test.mjs`, `scripts/workspace-core-test.mjs`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** переписки оформлены как professional People Hub: hero `Чаты и переписки`, desktop `People Inbox`, улучшенный sticky chat header и единый язык “Люди” вместо разрозненных “Сообщения/Диалоги”. Desktop-шапка и Workspace sidebar теперь явно открывают `Люди`, а `WorkspaceDialogsCRM` переоформлен как `People Workspace` с чатами, клиентами, встречами, заметками и CRM-контекстом.
+**Почему:** после полировки раздела “Люди” переписки должны ощущаться продолжением той же социальной системы АПГ и быть доступны в desktop-версии без скрытого технического названия.
+
+## [2026-07-22] feat: Professional People Hub Polish
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/ProfilePanel.jsx`, `scripts/social-platform-v2-test.mjs`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** раздел “Люди” визуально приведён к people-hub уровню: hero `Социальная сеть АПГ`, профессиональные KPI, smart search, карточки с аватаром/контекстом/статусом знакомства и обновлённая bottom sheet `Карточка участника` с общими связями, интересами и быстрыми действиями.
+**Почему:** “Люди” должны быть удобной городской социальной сетью АПГ для знакомств и диалогов, а не техническим списком пользователей.
+
+## [2026-07-22] feat: Living Profile Feed Editorial Block
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/components/ProfileTimelineSection.jsx`, `scripts/profile-timeline-test.mjs`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** профильная лента в карточках партнёра и эксперта оформлена как отдельный живой блок: `Новости партнёра` / `Советы эксперта`, бейдж `Новое`, тип материала, выделенная свежая публикация сверху и хронология ниже через общий Feed Framework.
+**Почему:** личная лента должна визуально восприниматься как живой канал профиля, а не как технический список событий.
+
+## [2026-07-22] fix: Profile Feed Publications Stay Public Without APG Moderation
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/UserApp.jsx`, `src/profileTimeline.js`, `scripts/profile-timeline-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** загрузка новостей теперь сохраняет не только общие APG-публикации, но и опубликованные материалы личных лент партнёров/экспертов. Профильная Timeline показывает пост, опубликованный в профиле, даже если его отдельная отправка в общую ленту АПГ находится на модерации. Общая новостная поверхность по-прежнему получает только `apgNews`.
+**Почему:** своя лента партнёра/эксперта должна публиковаться без админской модерации, а модерация должна влиять только на попадание материала в общую городскую ленту АПГ.
+
+## [2026-07-22] feat: Mobile Cabinet Profile News Feed
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/cabinet/CabinetCorePage.jsx`, `src/workspace/WorkspaceNewsCenter.jsx`, `.ai/03_DATABASE.md`, `.ai/04_API.md`, `.ai/05_FRONTEND.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** feat
+**Что изменено:** модуль “Контент” в едином мобильном кабинете партнёра/эксперта теперь открывает компактный `WorkspaceNewsCenter`: владелец профиля может с телефона создать публикацию, добавить обложку/галерею, опубликовать материал в личной ленте профиля, отправить его в общую ленту АПГ на модерацию или архивировать. Центр адаптирован под одну колонку и мобильные KPI/карточки, чтобы не распирать экран кабинета.
+**Почему:** партнёрам и экспертам нужна самостоятельная живая лента в своём кабинете, но общая лента АПГ должна оставаться управляемой через backend ownership-check и модерацию.
+
+## [2026-07-22] fix: For Partners CTA Opens Application Flow
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/ForPartnersPage.jsx`, `src/UserApp.jsx`, `src/components/PartnerQuestionnaire.jsx`, `src/AdminPanel.jsx`, `src/aiImportValidation.js`, `server/src/routes/public-submit.js`, `scripts/expert-questionnaire-v2-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** страница “О платформе” больше не уводит потенциального партнёра во VK, а открывает встроенную заявку партнёра. Добавлен второй вход для экспертов, обязательные контактные/медиа-секции анкеты раскрыты сразу, категория партнёра и подарок за ключи сохраняются в админский черновик без потери. В модерации и ИИ-импорте добавлена рабочая сводка заявки: контакт, тариф, категория, медиа, недостающие поля и следующий шаг. Очередь ИИ-импорта получила фильтры готовности, копирование контакта и статус “запрошено уточнение”.
+**Почему:** заявки должны попадать в `aiImportRequests` и очередь модерации как качественная заготовка карточки, а администратор должен быстро понимать, можно ли создавать черновик или сначала нужно уточнить данные, и разбирать очередь без ручного поиска контактов.
+
 ## [2026-07-22] feat: APG Health Runtime Status
 **Файлы:** `server/src/routes/system-status.js`, `src/ApgHealthPage.jsx`, `scripts/apg-health-status-test.mjs`, `package.json`, `.ai/04_API.md`, `.ai/08_TELEGRAM.md`, `.ai/13_DEPLOYMENT.md`, `.ai/17_CHANGELOG_AI.md`
 **Тип:** feat

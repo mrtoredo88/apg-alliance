@@ -5,6 +5,9 @@ const root = new URL('../', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
 
 const source = read('src/contextDialogs/ContextDialogsPage.jsx');
+const desktopWorkspace = read('src/workspace/DesktopWorkspace.jsx');
+const workspaceCore = read('src/workspace/WorkspaceCore.js');
+const workspaceDialogs = read('src/workspace/WorkspaceDialogsCRM.jsx');
 const pkg = JSON.parse(read('package.json'));
 let passed = 0;
 
@@ -16,6 +19,7 @@ function scenario(name, fn) {
 scenario('premium messaging layout markers exist', () => {
   [
     'data-messaging-premium-layout',
+    'data-people-messaging-hero',
     "data-layout={desktopLayout ? 'desktop-three-pane' : 'mobile-native'}",
     'data-dialog-list-panel',
     'data-chat-pane',
@@ -38,11 +42,13 @@ scenario('search and filters are modern sticky controls', () => {
   [
     'data-messaging-search-sticky',
     'data-messaging-search',
-    'Поиск сообщений...',
+    'Поиск людей и сообщений...',
     'data-messaging-filter-chips',
     'Партнёры',
     'Личные',
     'Мероприятия',
+    'Закреплённые',
+    'Архив',
   ].forEach(token => assert.ok(source.includes(token), token));
 });
 
@@ -54,6 +60,8 @@ scenario('chat has grouped message thread and modern composer', () => {
     'Сегодня',
     'Вчера',
     'data-message-composer',
+    'data-message-send-error',
+    'Повторить',
     'Напишите сообщение...',
     "borderRadius: '50%'",
   ].forEach(token => assert.ok(source.includes(token), token));
@@ -70,6 +78,27 @@ scenario('context is compact and desktop-only right column', () => {
     'Маршрут',
     'Запись',
   ].forEach(token => assert.ok(source.includes(token), token));
+});
+
+scenario('People messaging has professional product language', () => {
+  [
+    'People Hub',
+    'Чаты и переписки',
+    'People Inbox',
+    'Переписка АПГ',
+    'Чаты, переписки и личное общение АПГ',
+    "userAction('dialog:workspaceUpdate'",
+  ].forEach(token => assert.ok(source.includes(token), token));
+});
+
+scenario('desktop exposes People instead of hiding chats as messages', () => {
+  assert.ok(workspaceCore.includes("label: 'Люди'"), 'WorkspaceCore left sidebar exposes People');
+  assert.ok(desktopWorkspace.includes("{ id: 'dialogs', label: 'Люди'"), 'DesktopWorkspace nav exposes People');
+  assert.ok(desktopWorkspace.includes('People Workspace'), 'DesktopWorkspace dialog section uses People Workspace language');
+  assert.ok(workspaceDialogs.includes('data-workspace-people-desktop'), 'WorkspaceDialogsCRM has a desktop People hero');
+  assert.ok(workspaceDialogs.includes('Люди и переписки'), 'WorkspaceDialogsCRM title is People-first');
+  assert.ok(workspaceDialogs.includes('data-workspace-people-chat-pane'), 'WorkspaceDialogsCRM has a professional chat pane marker');
+  assert.ok(workspaceDialogs.includes('data-workspace-message-send-error'), 'WorkspaceDialogsCRM has retry UI for failed messages');
 });
 
 scenario('empty and loading states are soft', () => {

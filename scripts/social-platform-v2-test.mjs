@@ -64,8 +64,12 @@ const [profile, peopleCore, userActions, actionRouter, capabilityRegistry, execu
 
 assert.match(profile, /data-people-panel/, 'profile has unified People panel');
 assert.match(profile, /data-people-bottom-sheet/, 'profile opens compact people bottom sheet');
+assert.match(profile, /Социальная сеть АПГ[\s\S]*Люди рядом/, 'People panel has professional hub hero');
+assert.match(profile, /Карточка участника[\s\S]*peopleStatusChipStyle\(peopleSheet\.relationStatus\)[\s\S]*peopleSharedSummary\(peopleSheet\)/, 'People bottom sheet shows participant card status and shared context');
 assert.match(profile, /Избранные[\s\S]*Недавние[\s\S]*Возможно, вы знакомы[\s\S]*Все пользователи/, 'People first screen has final social UX sections');
-assert.match(peopleCore, /Все[\s\S]*Друзья[\s\S]*Заявки[\s\S]*Диалоги/, 'profile exposes required People tabs');
+assert.match(peopleCore, /Все[\s\S]*Друзья[\s\S]*Заявки[\s\S]*Диалоги[\s\S]*Недавно[\s\S]*Онлайн[\s\S]*Партнёры[\s\S]*Эксперты/, 'profile exposes smart People tabs');
+assert.match(profile, /peopleEmptyTitle[\s\S]*peopleEmptyText[\s\S]*data-people-empty-state/, 'People has action-oriented empty states');
+assert.match(peopleCore, /peopleKind[\s\S]*Эксперт может быть полезен[\s\S]*Партнёр АПГ рядом/, 'People explains partner/expert recommendations');
 assert.match(profile, /Кто может писать и отправлять заявки/, 'privacy settings are present in People');
 assert.doesNotMatch(profile, /Dev Panel · Connections/, 'People panel does not expose connection dev fields');
 assert.match(userActions, /connections:search/, 'backend exposes People search over users');

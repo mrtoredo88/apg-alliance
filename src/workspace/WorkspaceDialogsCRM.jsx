@@ -47,7 +47,7 @@ function card(extra = {}) {
   return {
     background: UI.card,
     border: `1px solid ${UI.line}`,
-    borderRadius: 8,
+    borderRadius: 24,
     boxShadow: UI.shadow,
     backdropFilter: 'blur(22px) saturate(1.4)',
     WebkitBackdropFilter: 'blur(22px) saturate(1.4)',
@@ -62,7 +62,7 @@ function button(tone = 'light', extra = {}) {
     border: `1px solid ${primary ? 'rgba(200,155,60,0.48)' : danger ? 'rgba(217,93,84,0.34)' : UI.line}`,
     background: primary ? 'linear-gradient(135deg,#F3D98C,#C89B3C)' : danger ? 'rgba(217,93,84,0.10)' : UI.controlSoft,
     color: primary ? '#241807' : danger ? UI.red : UI.text,
-    borderRadius: 8,
+    borderRadius: 16,
     padding: '9px 11px',
     minHeight: 38,
     fontSize: 13,
@@ -76,7 +76,7 @@ function button(tone = 'light', extra = {}) {
 function input(extra = {}) {
   return {
     minHeight: 40,
-    borderRadius: 8,
+    borderRadius: 16,
     border: `1px solid ${UI.line}`,
     background: UI.control,
     color: UI.text,
@@ -339,6 +339,7 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
   const [filter, setFilter] = useState(initialIntent.filter || 'active');
   const [text, setText] = useState('');
   const [attachment, setAttachment] = useState(null);
+  const [lastFailedMessage, setLastFailedMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
@@ -418,6 +419,7 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
     if (!activeDialog?.id || sending || (!body && !attachment)) return;
     setSending(true);
     setError('');
+    setLastFailedMessage('');
     try {
       const autoAnswer = !isOwner ? buildDialogAutoAnswer(activeDialog.context, body) : null;
       await userAction('dialog:message', { dialogId: activeDialog.id, text: body, attachments: attachment ? [attachment] : [] });
@@ -426,6 +428,7 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
       setAttachment(null);
       localStorage.removeItem(`apg.workspace.dialog.draft.${uid}.${activeDialog.id}`);
     } catch (err) {
+      setLastFailedMessage(body);
       setError(err?.message || 'Не удалось отправить сообщение.');
     } finally {
       setSending(false);
@@ -448,16 +451,16 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
     handleFile(event.dataTransfer.files?.[0]);
   };
 
-  if (!uid) return <Empty title="Нужна авторизация" text="Workspace Dialogs доступны после входа в АПГ." />;
+  if (!uid) return <Empty title="Нужна авторизация" text="People Workspace доступен после входа в АПГ." />;
 
   return (
     <div data-workspace-dialogs-crm style={{ display: 'grid', gap: 14 }}>
-      <section style={card({ padding: 18, background: 'var(--apg-workspace-panel-accent, linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82)))' })}>
+      <section data-workspace-people-desktop style={card({ padding: 18, background: 'radial-gradient(circle at 12% 0%, rgba(91,143,219,0.18), transparent 34%), radial-gradient(circle at 92% 0%, rgba(200,155,60,0.20), transparent 34%), var(--apg-workspace-panel-accent, linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,248,232,0.82)))' })}>
         <div style={{ display: 'flex', gap: 14, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ minWidth: 260 }}>
-            <div style={{ color: UI.gold, fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0 }}>Диалоги CRM</div>
-            <h1 style={{ margin: '5px 0 0', color: UI.text, fontSize: 30, lineHeight: '36px', fontWeight: 940 }}>Коммуникационный центр</h1>
-            <div style={{ color: UI.soft, fontSize: 14.5, lineHeight: '21px', marginTop: 5 }}>Вопросы, сообщения, встречи, история и внутренние заметки по клиентам в одном рабочем экране.</div>
+            <div style={{ color: UI.gold, fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.4 }}>People Workspace</div>
+            <h1 style={{ margin: '5px 0 0', color: UI.text, fontSize: 30, lineHeight: '36px', fontWeight: 940 }}>Люди и переписки</h1>
+            <div style={{ color: UI.soft, fontSize: 14.5, lineHeight: '21px', marginTop: 5 }}>Клиенты, знакомства, вопросы, встречи, история и внутренние заметки собраны в одном профессиональном рабочем экране.</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={loadBookings} style={button('light')}>Обновить связи</button>
@@ -478,23 +481,24 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
 
       {error && <div style={card({ padding: 12, color: UI.red, background: 'rgba(217,93,84,0.10)', boxShadow: 'none' })}>{error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '330px minmax(420px,1fr) 340px', gap: 14, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '340px minmax(430px,1fr) 340px', gap: 14, alignItems: 'start' }}>
         <aside style={{ display: 'grid', gap: 10 }}>
           <div style={card({ padding: 12 })}>
-            <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Имя, телефон, email, Telegram, встреча, текст" style={input({ width: '100%', marginBottom: 8 })} />
+            <div style={{ color: UI.gold, fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>People Inbox</div>
+            <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Найти человека, телефон, email, Telegram, встречу или текст" style={input({ width: '100%', marginBottom: 8 })} />
             <select value={filter} onChange={event => setFilter(event.target.value)} style={{ ...button('light'), width: '100%' }}>
               {FILTERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
             </select>
           </div>
-          {loading ? <Skeleton /> : !filtered.length ? <Empty title="Диалогов нет" text="Измените фильтр или откройте диалог из карточки объекта." /> : filtered.filter(isRecord).map(dialog => <DialogRow key={dialog.id} dialog={dialog} active={activeDialog?.id === dialog.id} onClick={() => setActiveId(dialog.id)} />)}
+          {loading ? <Skeleton /> : !filtered.length ? <Empty title="Переписок нет" text="Измените фильтр или откройте чат из карточки человека или объекта." /> : filtered.filter(isRecord).map(dialog => <DialogRow key={dialog.id} dialog={dialog} active={activeDialog?.id === dialog.id} onClick={() => setActiveId(dialog.id)} />)}
         </aside>
 
-        <main onDrop={onDropFile} onDragOver={event => event.preventDefault()} style={card({ minHeight: 640, display: 'grid', gridTemplateRows: 'auto 1fr auto', overflow: 'hidden' })}>
+        <main data-workspace-people-chat-pane onDrop={onDropFile} onDragOver={event => event.preventDefault()} style={card({ minHeight: 640, display: 'grid', gridTemplateRows: 'auto 1fr auto', overflow: 'hidden', background: 'linear-gradient(180deg, var(--apg-workspace-card-strong, rgba(255,255,255,0.94)), var(--apg-workspace-card, rgba(255,255,255,0.78)))' })}>
           {activeDialog ? (
             <>
               <div style={{ padding: 14, borderBottom: `1px solid ${UI.line}`, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ color: UI.text, fontSize: 18, lineHeight: '23px', fontWeight: 940 }}>{activeDialog.context?.title || 'Диалог АПГ'}</div>
+                  <div style={{ color: UI.text, fontSize: 18, lineHeight: '23px', fontWeight: 940 }}>{activeDialog.context?.title || 'Переписка АПГ'}</div>
                   <div style={{ color: UI.soft, fontSize: 12.5, marginTop: 3 }}>{getDialogObjectLabel(activeDialog.context)} · {activeDialog.context?.parentTitle || activeDialog.context?.subtitle || 'контекст'}{typingUsers ? ' · собеседник печатает' : ''}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -507,6 +511,7 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
                 <div ref={endRef} />
               </div>
               <div style={{ padding: 12, borderTop: `1px solid ${UI.line}`, display: 'grid', gap: 8 }}>
+                {lastFailedMessage && <div data-workspace-message-send-error style={{ borderRadius: 16, padding: 10, background: 'rgba(217,93,84,0.10)', border: '1px solid rgba(217,93,84,0.22)', color: UI.soft, fontSize: 12.5, lineHeight: '18px', display: 'flex', gap: 9, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}><span>Сообщение не отправилось. Можно повторить.</span><button onClick={() => sendMessage(lastFailedMessage)} style={button('primary', { minHeight: 30, padding: '6px 9px', fontSize: 12 })}>Повторить</button></div>}
                 {attachment && <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: UI.soft, fontSize: 12 }}><span>{attachment.name}</span><button onClick={() => setAttachment(null)} style={button('light', { minHeight: 28, padding: '4px 7px', fontSize: 12 })}>Убрать</button></div>}
                 <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 8, alignItems: 'end' }}>
                   <label style={button('light', { minWidth: 40, padding: 0, display: 'grid', placeItems: 'center' })}>＋<input type="file" accept="image/*,.pdf,.doc,.docx" onChange={event => handleFile(event.target.files?.[0])} style={{ display: 'none' }} /></label>
@@ -521,14 +526,14 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
                       }
                     }}
                     onChange={event => setText(event.target.value)}
-                    placeholder={isOwner ? 'Ответить клиенту...' : 'Задать вопрос...'}
+                    placeholder={isOwner ? 'Ответить человеку или клиенту...' : 'Написать сообщение...'}
                     style={input({ minHeight: 44, maxHeight: 120, resize: 'vertical', padding: 11, lineHeight: '19px' })}
                   />
                   <button onClick={() => sendMessage()} disabled={sending} style={button('primary', { opacity: sending ? 0.62 : 1 })}>{sending ? '...' : 'Отправить'}</button>
                 </div>
               </div>
             </>
-          ) : <Empty title="Выберите диалог" text="Коммуникационный центр покажет чат и CRM-панель по выбранному обращению." />}
+          ) : <Empty title="Выберите переписку" text="People Workspace покажет чат, контекст человека и рабочую CRM-панель." />}
         </main>
 
         <CrmPanel dialog={activeDialog} userId={uid} events={events} bookings={bookings} actions={actions} onOpenPanel={onOpenPanel} onPatch={patchDialog} onCreateMeeting={() => actions?.openBooking?.()} />

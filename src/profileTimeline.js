@@ -134,6 +134,12 @@ function isPublic(item = {}) {
   return true;
 }
 
+function isProfileFeedPublic(item = {}) {
+  const status = String(item.lifecycleStatus || item.contentStatus || item.status || '').toLowerCase();
+  if (item.deleted || item.archived || ['deleted', 'trash', 'archived', 'draft'].includes(status)) return false;
+  return Boolean(item.profilePublishedAt || item.profileOnly === true || item.distributionMode === 'profile' || item.visibility === 'profile' || item.publishScope === 'profile');
+}
+
 function sameProfile(item = {}, profile = {}, role = 'partner') {
   if (!profile?.id) return false;
   if (workspaceNewsBelongsToProfile(item, profile, role)) return true;
@@ -233,7 +239,7 @@ function normalizeNewsEntity(item = {}, index = 0) {
 
 function buildNewsItems({ news = [], profile, role }) {
   return (Array.isArray(news) ? news : [])
-    .filter(item => sameProfile(item, profile, role) && isPublic(item))
+    .filter(item => sameProfile(item, profile, role) && (isPublic(item) || isProfileFeedPublic(item)))
     .map((item, index) => {
       const entity = normalizeNewsEntity(item, index);
       return withFeedTimestamp({
@@ -437,7 +443,7 @@ export function buildProfileNowPriority({ profile = {}, role = 'partner', news =
   const offerEndsAt = profileOfferExpiration(profile);
   const eventsNow = nearestFuture(events);
   const latestNews = Array.isArray(news) ? news
-    .filter(item => sameProfile(item, profile, role) && isPublic(item))
+    .filter(item => sameProfile(item, profile, role) && (isPublic(item) || isProfileFeedPublic(item)))
     .sort((a, b) => toMillis(b.publishedAt || b.updatedAt || b.createdAt) - toMillis(a.publishedAt || a.updatedAt || a.createdAt))[0] : null;
   const latestReview = Array.isArray(reviews) ? [...reviews]
     .sort((a, b) => toMillis(b.createdAt || b.updatedAt) - toMillis(a.createdAt || a.updatedAt))[0] : null;
@@ -601,7 +607,7 @@ export function buildProfileHistory({ profile = {}, role = 'partner', news = [],
   }
 
   const sortedNews = Array.isArray(news)
-    ? news.filter(item => sameProfile(item, profile, role) && isPublic(item))
+    ? news.filter(item => sameProfile(item, profile, role) && (isPublic(item) || isProfileFeedPublic(item)))
         .sort((a, b) => toMillis(b.publishedAt || b.updatedAt || b.createdAt) - toMillis(a.publishedAt || a.updatedAt || a.createdAt))
     : [];
   if (sortedNews.length) {

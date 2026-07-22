@@ -28,6 +28,8 @@ export const MESSAGING_FILTERS = Object.freeze([
   { id: 'events', label: 'Мероприятия', category: 'EVENT' },
   { id: 'groups', label: 'Группы', category: 'GROUP' },
   { id: 'unread', label: 'Непрочитанные', category: '' },
+  { id: 'pinned', label: 'Закреплённые', category: '' },
+  { id: 'archive', label: 'Архив', category: '' },
 ]);
 
 export function normalizeMessagingType(type = '') {

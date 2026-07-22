@@ -161,6 +161,32 @@ assert.equal(timeline.some(item => item.title === 'Чужая новость'), 
 assert.equal(timeline[0].title, 'Новое меню', 'pinned publication must appear first');
 assert.equal(timeline[0].pinned, true, 'timeline item must expose pinned state');
 
+const submittedProfileTimeline = buildProfileTimeline({
+  profile,
+  role: 'partner',
+  news: [
+    {
+      id: 'profile-moderation-news',
+      partnerId: 'partner-1',
+      ownerProfileId: 'partner-1',
+      title: 'Пост уже в моей ленте',
+      status: 'moderation',
+      lifecycleStatus: 'moderation',
+      contentStatus: 'moderation',
+      active: false,
+      distributionMode: 'apg',
+      profileOnly: false,
+      apgPublication: true,
+      profilePublishedAt: '2026-07-18T10:00:00.000Z',
+      submittedAt: '2026-07-18T11:00:00.000Z',
+    },
+  ],
+  events: [],
+  reviews: [],
+  vkPosts: [],
+});
+assert.equal(submittedProfileTimeline.some(item => item.title === 'Пост уже в моей ленте'), true, 'profile-published news must remain visible in own timeline while APG publication is on moderation');
+
 const publicationItems = filterProfileTimelineItems(timeline, 'publication');
 assert.equal(publicationItems.length, 5, 'publication filter must keep only news entries');
 assert.equal(publicationItems[1].title, 'Самая новая publishDate', 'publishDate Timestamp publication must stay above older publication');
@@ -246,8 +272,18 @@ const profileMediaViewer = read('src/components/ProfileMediaViewer.jsx');
 const partnerPage = read('src/PartnerPage.jsx');
 const expertsPage = read('src/ExpertsPage.jsx');
 const newsPage = read('src/NewsPage.jsx');
+const userApp = read('src/UserApp.jsx');
+assert.match(userApp, /function isProfileFeedContent/, 'UserApp must keep profile-only/profile-published news in the shared news state for profile cards');
+assert.match(userApp, /isPublicContent\(item\) \|\| isProfileFeedContent\(item\)/, 'UserApp news loader must keep common APG news and profile feed news separately');
+assert.match(userApp, /const apgNews = useMemo\(\(\) => \(Array\.isArray\(news\) \? news\.filter\(isApgNewsPublication\) : \[\]\)/, 'common APG news surfaces must still filter out profile-only publications');
 assert.match(timelineComponent, /api\/community-feed/, 'VK must remain one timeline source through existing backend endpoint');
 assert.match(timelineComponent, /buildProfileTimeline/, 'timeline UI must use shared timeline builder');
+assert.match(timelineComponent, /Новости партнёра/, 'partner profile feed must have an editorial partner news title');
+assert.match(timelineComponent, /Советы эксперта/, 'expert profile feed must have an editorial expert advice title');
+assert.match(timelineComponent, /Живая лента/, 'profile feed must be visually framed as a live feed block');
+assert.match(timelineComponent, /Свежее в профиле/, 'profile feed must highlight the latest item before the chronology');
+assert.match(timelineComponent, /Новое/, 'fresh profile feed item must expose a new badge');
+assert.match(timelineComponent, /UniversalFeedCard/, 'profile feed must reuse the feed card for the featured live item');
 assert.match(timelineComponent, /UniversalFeed/, 'timeline UI must render the shared universal Feed Framework');
 assert.match(timelineComponent, /onOpen=\{item => openTimelineItem\(item/, 'profile feed must delegate item opening through a container callback');
 assert.match(timelineComponent, /profileReading/, 'profile feed must read regular publications inline without leaving the profile');

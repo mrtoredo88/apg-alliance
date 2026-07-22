@@ -60,6 +60,7 @@ export function normalizeMessagingDialog(dialog = {}, { messages = [], actor = {
     header,
     lastActivityMs,
     pinned: dialog.pinned === true || dialog.workspaceState?.pinned === true || dialog.workspacePrivate?.pinned === true,
+    archived: dialog.archived === true || dialog.workspaceState?.archived === true || dialog.workspacePrivate?.archived === true,
     unreadCount: header.unreadCount,
     permissions,
     searchText: buildMessagingSearchText({ ...dialog, type, category, header }, messages),

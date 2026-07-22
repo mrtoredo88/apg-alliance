@@ -42,6 +42,7 @@ const FIELD_MAPS = {
     ['description', ['description'], 'Описание'],
     ['services', ['services'], 'Услуги'],
     ['offer', ['offer'], 'Акция'],
+    ['gift', ['gift'], 'Подарок / бонус за ключи'],
     ['phone', ['phone'], 'Телефон'],
     ['email', ['email'], 'Email'],
     ['address', ['address'], 'Адрес'],

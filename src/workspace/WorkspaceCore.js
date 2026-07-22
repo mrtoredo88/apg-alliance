@@ -87,7 +87,7 @@ export const WORKSPACE_NAV_ITEMS = [
   {
     id: 'messages',
     panelId: 'dialogs',
-    label: 'Сообщения',
+    label: 'Люди',
     iconKey: 'messages',
     regions: [WORKSPACE_REGIONS.leftSidebar],
     capability: CAPABILITIES.canUseWorkspace,

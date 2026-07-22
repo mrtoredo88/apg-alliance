@@ -273,6 +273,10 @@ const [pSnap, eSnap, nSnap, ntSnap, prSnap, ctSnap, clSnap, exSnap, bnSnap] =
 
 `CabinetModules.js` строит общий snapshot: метрики, заполненность профиля, задачи, уведомления, историю и публичную ссылку. Это позволяет добавить новую роль через role definition и отдельные role-specific modules без копирования кабинета.
 
+Модуль `Контент` в мобильном кабинете подключает `WorkspaceNewsCenter` в компактном режиме. Партнёр или эксперт может вести личную ленту профиля с телефона: создавать публикации, добавлять обложку/галерею, редактировать текст, публиковать материал в профиль, отправлять его в общую ленту АПГ на модерацию и архивировать старые публикации. Общая лента АПГ по-прежнему проходит lifecycle/moderation через backend actions `workspaceNews:*`.
+
+Публичные карточки партнёра и эксперта показывают профильную ленту как отдельный живой editorial-блок: заголовки `Новости партнёра` / `Советы эксперта`, бейдж `Новое`, выделенный свежий материал сверху и обычная хронология ниже. Это делает собственные публикации профиля заметными без смешивания с общей лентой АПГ.
+
 ### Workspace Core
 
 `src/workspace/WorkspaceCore.js` — единый Layout Engine для мобильной версии, планшета, будущего Desktop Workspace, Cabinet Core, CRM, календаря, админки и Локи. Он описывает:
@@ -473,6 +477,50 @@ const ProfilePanel = lazy(() => import('./ProfilePanel'));
 
 **Ограничение:** в VK Mini App среде `import()` может работать медленно на слабых устройствах. Поэтому `HomePanel` (главный экран) подключён статически.
 
+## People Hub / «Люди»
+
+`src/ProfilePanel.jsx` содержит пользовательский раздел «Люди» как mobile-first people hub, а не технический список контактов.
+
+UX-слои:
+- hero-блок `Социальная сеть АПГ` / `Люди рядом` объясняет сценарий: найти участника, познакомиться, закрепить, открыть диалог;
+- быстрые KPI показывают друзей, диалоги и заявки;
+- поиск принимает имя, компанию, роль и город;
+- smart-секции идут в порядке: `Избранные`, `Недавние`, `Друзья`, `Возможно, вы знакомы`, затем `Все пользователи`;
+- фильтры People Center включают `Все`, `Друзья`, `Заявки`, `Диалоги`, `Недавно`, `Онлайн`, `Партнёры`, `Эксперты`;
+- рекомендации объясняют причину знакомства: общие друзья, мероприятие, партнёр, роль эксперта/партнёра или онлайн-статус;
+- карточки людей показывают аватар/инициалы, роль/компанию/город, статус знакомства и общий контекст;
+- пустые состояния action-oriented: открыть People Center, показать QR, вернуться ко всем людям или уточнить поиск;
+- compact bottom sheet `data-people-bottom-sheet` оформлена как `Карточка участника`: статус, общие друзья/мероприятия/партнёры, интересы и быстрые действия.
+
+Regression contracts:
+- `scripts/people-actions-test.mjs` защищает состояния `stranger/outgoing/incoming/friend`, optimistic UI и bottom sheet actions;
+- `scripts/people-navigation-test.mjs` защищает входы `Открыть Люди` и `Мой QR`;
+- `scripts/people-null-safety-test.mjs` защищает профиль при `user === null`;
+- `scripts/social-platform-v2-test.mjs` защищает порядок smart-секций и профессиональный hero/bottom-sheet слой.
+
+## People Messaging / чаты и переписки
+
+`src/contextDialogs/ContextDialogsPage.jsx` — пользовательский экран `Люди` для переписок. Он сохраняет существующую messaging architecture (`users/{uid}/contextDialogs`, `users/{uid}/contextDialogMessages`, `userAction('dialog:*')`), но оформлен как professional People Hub:
+- hero `People Hub` / `Чаты и переписки` показывает сводку диалогов, новых и активных переписок;
+- desktop использует three-pane layout: `People Inbox`, чат, контекстная колонка;
+- mobile остаётся native flow: список → чат → компактная карточка контекста;
+- поиск работает по людям и сообщениям;
+- фильтры разделяют партнёров, друзей, мероприятия, группы, непрочитанные, закреплённые и архив;
+- чат содержит sticky header, day separators, message bubbles, quick replies, attachment preview, composer и retry-блок при ошибке отправки;
+- desktop chat header даёт быстрые действия закрепить/открепить и архивировать/вернуть переписку через существующий `dialog:workspaceUpdate`.
+
+Desktop:
+- публичная desktop-шапка `DesktopTopOverview` открывает переписки через кнопку `aria-label="Люди"`;
+- `WorkspaceCore` показывает left-sidebar item `Люди` (`id: messages`, `panelId: dialogs`) только для workspace/desktop режима;
+- `WorkspaceDialogsCRM` оформлен как `People Workspace`: люди, клиенты, знакомства, переписки, встречи, заметки, retry отправки и CRM-контекст в одном экране;
+- mobile user bottom navigation намеренно не возвращает `messages`: доступ к перепискам остаётся через профиль/People и floating messages, чтобы не перегружать нижнюю панель.
+
+Regression contracts:
+- `scripts/messaging-ux-polish-test.mjs` защищает professional People Hub language, desktop People exposure и chat layout;
+- `scripts/desktop-ui-framework-test.mjs` защищает desktop-кнопку `Люди` с unread badge;
+- `scripts/workspace-core-test.mjs` защищает desktop sidebar `Люди` и отсутствие старого `messages` в mobile user bottom bar;
+- `scripts/pwa-user-mode-regression.mjs` защищает mobile user mode от возврата сообщений в bottom navigation.
+
 ## Partnership acquisition flow
 
 `src/PartnershipPage.jsx` — ленивый экран сценария «Стать партнёром АПГ», открывается из профиля через кнопку `ProfilePanel`.
@@ -504,6 +552,17 @@ const ProfilePanel = lazy(() => import('./ProfilePanel'));
 - кабинет партнёра/эксперта показывает компактную journey-аналитику встреч: завершения, ключи, штампы, отзывы;
 - контекстный диалог `type: booking` показывает закреплённую карточку встречи с текущим статусом, быстрыми действиями по роли и post-visit summary;
 - серверные действия `booking:create`, `booking:confirm`, `booking:cancel`, `booking:requestReschedule`, `booking:respondReschedule`, `booking:complete`, `booking:noShow`, `booking:list`, `booking:calendar` ведут жизненный цикл встречи.
+
+## Люди, чаты и уведомления
+
+Социальный слой АПГ собирается вокруг трёх пользовательских поверхностей:
+
+- `src/ProfilePanel.jsx` показывает раздел `Люди` с People Hub, smart-фильтрами и блоком `Пульс сети`: заявки, важные контакты, онлайн-участники и рекомендации поднимаются выше общего списка;
+- `src/social/PeopleCore.js` содержит чистые helpers для public-профиля человека, статусов знакомства, поиска, секций и `buildPeoplePulse`;
+- `src/contextDialogs/ContextDialogsPage.jsx` рендерит People Inbox: поиск, фильтры, закреплённые/архив, retry отправки и блок `Важное сейчас` на основе `buildMessagingSnapshot`;
+- `src/messaging/MessagingSnapshot.js` отдаёт unread/pinned/archive, priority-диалоги и `nextBestAction` для профессионального inbox UX;
+- `src/NotificationsPage.jsx` теперь работает как Priority Inbox: фильтры `Важное`/`Действия`, умная сортировка, CTA для сообщений, событий, акций, новостей и системных объявлений;
+- `src/notifications/NotificationCenter.js` содержит pure helpers `buildNotificationCenter`, `notificationPriority`, `notificationActionLabel`, чтобы уведомления можно было повторно использовать в Home/Workspace/Локи без копирования UI-логики.
 
 ## VK Platform
 

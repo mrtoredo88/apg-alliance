@@ -150,6 +150,13 @@ function isPublicContent(item) {
   return isLifecyclePublic(item);
 }
 
+function isProfileFeedContent(item = {}) {
+  if (!item || item.archived === true || item.deleted === true) return false;
+  const status = normalizeContentStatus(item);
+  if (['archived', 'deleted', 'trash', 'draft'].includes(status)) return false;
+  return Boolean(item.profilePublishedAt || item.profileOnly === true || item.distributionMode === 'profile' || item.visibility === 'profile' || item.publishScope === 'profile');
+}
+
 function normalizeDeepLinkId(value) {
   const raw = String(value ?? '').trim();
   if (!raw) return '';
@@ -1973,7 +1980,7 @@ export function UserApp() {
         newsById.set(id, merged);
       });
       const freshNews = [...newsById.values()]
-        .filter(isPublicContent)
+        .filter(item => isPublicContent(item) || isProfileFeedContent(item))
         .sort((a, b) => {
           const dp = (b.priority ?? 0) - (a.priority ?? 0);
           return dp !== 0 ? dp : getMs(b) - getMs(a);
@@ -5557,6 +5564,7 @@ export function UserApp() {
                     partnerCount={partners.length}
                     totalScans={platformStats.totalScans}
                     onBack={goBackPanel}
+                    onOpenPartnership={(type = 'partner') => { setPartnershipEntry({ type, nonce: Date.now() }); goPanel('partnership'); }}
                   />
                 </Suspense>
               </Panel>

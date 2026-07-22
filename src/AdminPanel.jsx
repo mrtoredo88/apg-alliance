@@ -134,6 +134,7 @@ const AI_IMPORT_STATUSES = [
   ['processed', 'Обработано ИИ'],
   ['review', 'Требует проверки'],
   ['missing', 'Не хватает данных'],
+  ['clarification_requested', 'Запрошено уточнение'],
   ['ready', 'Готово к публикации'],
   ['published', 'Опубликовано'],
   ['rejected', 'Отклонено'],
@@ -685,6 +686,15 @@ function detectAiImportCategory(text, type) {
   return type === 'news' ? 'society' : 'other';
 }
 
+function normalizePartnerCategory(value, fallbackText = '') {
+  const raw = String(value || '').trim();
+  const byId = CATEGORIES.find(item => item.id === raw);
+  if (byId) return byId.id;
+  const byLabel = CATEGORIES.find(item => item.label.toLowerCase() === raw.toLowerCase());
+  if (byLabel) return byLabel.id;
+  return detectAiImportCategory([raw, fallbackText].join(' '), 'partner');
+}
+
 function buildAiImportTemplate(type) {
   if (type === 'expert') return ['Тип: Эксперт', 'Тариф: Практика или Амбассадор', 'Фамилия:', 'Имя:', 'Отчество:', 'Направление:', 'Коротко о себе:', 'Подробно о себе:', 'Кому могу помочь:', 'Услуги:', 'Форматы работы:', 'Акция для пользователей АПГ:', 'Новости (только Амбассадор):', 'Мероприятия (только Амбассадор):', 'Контактное лицо:', 'Телефон:', 'Email:', 'Сайт:', 'Запись:', 'VK:', 'Telegram:', 'MAX:', 'Другие социальные сети:', 'ИНН (только Амбассадор):', 'Видео:', 'Комментарий для администрации:'].join('\n');
   if (type === 'event') return ['Название:', 'Дата:', 'Время:', 'Место:', 'Для кого:', 'Описание:', 'Программа:', 'Стоимость:', 'Как записаться:', 'Организатор:', 'Контакты:', 'Фото:'].join('\n');
@@ -802,7 +812,79 @@ function aiImportDraftPatch(type, draft, sourceFiles = []) {
   const partnerCover = sourceFiles.find(file => file.role === 'cover')?.url || mainImage;
   const partnerUsedUrls = new Set([partnerLogo, partnerCover].filter(Boolean));
   const partnerGallery = [...new Set(images.filter(url => !partnerUsedUrls.has(url)))];
-  return { name: f.title || 'Новый партнёр', category: detectAiImportCategory([f.category, f.description].join(' '), 'partner'), categoryLabel: f.category || '', description: f.description || f.shortDescription || '', shortDescription: f.shortDescription || '', services: f.services || '', phone: f.phone || '', email: f.email || '', address: f.address || '', hours: f.hours || '', websiteUrl: f.website || '', bookingUrl: hasPartnerAllianceAccess(tariff) ? f.bookingUrl || '' : '', telegramCommunityUrl: f.telegram || '', vkGroupUrl: f.vk || '', maxCommunityUrl: f.max || '', socialUrl: f.instagram || '', offer: f.offer || '', gift: f.gift || '', videos: hasPartnerAllianceAccess(tariff) && Array.isArray(f.videos) ? f.videos : [], newsInfo: hasPartnerPremiumAccess(tariff) ? f.newsInfo || '' : '', activities: hasPartnerPremiumAccess(tariff) ? f.activities || '' : '', inn: hasPartnerPremiumAccess(tariff) ? f.inn || '' : '', tier: tariff, tariff, logoUrl: partnerLogo, coverPhoto: partnerCover, gallery: partnerGallery, adminComment: f.comment || '', serviceCatalog: [], futureServiceCatalog: f.futureServiceCatalog || {}, futureScheduleProfile: f.futureScheduleProfile || {}, futureLegalProfile: f.futureLegalProfile || {}, active: false, status: 'draft', emoji: '🏪' };
+  const category = normalizePartnerCategory(f.category, f.description);
+  return { name: f.title || 'Новый партнёр', category, categoryLabel: CATEGORIES.find(item => item.id === category)?.label || f.category || '', description: f.description || f.shortDescription || '', shortDescription: f.shortDescription || '', services: f.services || '', phone: f.phone || '', email: f.email || '', address: f.address || '', hours: f.hours || '', websiteUrl: f.website || '', bookingUrl: hasPartnerAllianceAccess(tariff) ? f.bookingUrl || '' : '', telegramCommunityUrl: f.telegram || '', vkGroupUrl: f.vk || '', maxCommunityUrl: f.max || '', socialUrl: f.instagram || '', offer: f.offer || '', gift: f.gift || '', videos: hasPartnerAllianceAccess(tariff) && Array.isArray(f.videos) ? f.videos : [], newsInfo: hasPartnerPremiumAccess(tariff) ? f.newsInfo || '' : '', activities: hasPartnerPremiumAccess(tariff) ? f.activities || '' : '', inn: hasPartnerPremiumAccess(tariff) ? f.inn || '' : '', tier: tariff, tariff, logoUrl: partnerLogo, coverPhoto: partnerCover, gallery: partnerGallery, adminComment: f.comment || '', serviceCatalog: [], futureServiceCatalog: f.futureServiceCatalog || {}, futureScheduleProfile: f.futureScheduleProfile || {}, futureLegalProfile: f.futureLegalProfile || {}, active: false, status: 'draft', emoji: '🏪' };
+}
+
+function aiImportRequestContact(item = {}) {
+  const fields = item.draft?.fields || {};
+  return {
+    name: item.submitter?.name || fields.contactName || fields.name || '',
+    phone: item.submitter?.phone || fields.phone || '',
+    email: item.submitter?.email || fields.email || '',
+  };
+}
+
+function aiImportRequestMissing(item = {}) {
+  return [...new Set([...(Array.isArray(item.missingFields) ? item.missingFields : []), ...(Array.isArray(item.draft?.missingFields) ? item.draft.missingFields : [])].filter(Boolean))];
+}
+
+function aiImportRequestReadiness(item = {}) {
+  const missing = aiImportRequestMissing(item);
+  const contact = aiImportRequestContact(item);
+  const mediaCount = Array.isArray(item.sourceFiles) ? item.sourceFiles.filter(file => file?.url).length : 0;
+  const lostMedia = (item.mediaManifest?.rejected?.length || 0) + (item.mediaManifest?.failedOnClient?.length || 0);
+  if (String(item.status || '').toLowerCase() === 'published') return { label: 'Черновик создан', color: '#4ade80', next: 'Проверьте карточку в целевом разделе.' };
+  if (lostMedia > 0) return { label: 'Нужны медиа', color: '#fb7185', next: 'Запросите файлы повторно перед созданием карточки.' };
+  if (missing.length) return { label: 'Нужно уточнить', color: '#facc15', next: `Уточнить: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}.` };
+  if (!contact.phone && !contact.email) return { label: 'Нет контакта', color: '#facc15', next: 'Добавьте телефон или email, чтобы команда могла связаться с заявителем.' };
+  if (mediaCount === 0 && ['partner', 'expert'].includes(item.type)) return { label: 'Без фото', color: '#facc15', next: 'Можно создать черновик, но лучше запросить фото/логотип.' };
+  return { label: 'Готово к черновику', color: '#4ade80', next: 'Откройте проверку и создайте черновик карточки.' };
+}
+
+function AiImportRequestSummary({ item, compact = false }) {
+  const fields = item.draft?.fields || {};
+  const contact = aiImportRequestContact(item);
+  const missing = aiImportRequestMissing(item);
+  const readiness = aiImportRequestReadiness(item);
+  const mediaCount = Array.isArray(item.sourceFiles) ? item.sourceFiles.filter(file => file?.url).length : 0;
+  const tariff = item.partnershipFlow?.tariff || fields.tariff || '';
+  const category = fields.category ? CATEGORIES.find(row => row.id === fields.category)?.label || fields.category : '';
+  const chips = [
+    item.sourceLabel || (item.source === 'partnership-flow' ? 'Заявка из профиля' : ''),
+    tariff ? `Тариф: ${tariff}` : '',
+    category ? `Категория: ${category}` : '',
+    `Медиа: ${mediaCount}`,
+    `${item.confidence || item.draft?.confidence || 0}%`,
+  ].filter(Boolean);
+  return (
+    <div style={{ display: 'grid', gap: compact ? 8 : 10 }}>
+      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+        <span style={{ padding: '5px 8px', borderRadius: 999, background: `${readiness.color}18`, border: `1px solid ${readiness.color}55`, color: readiness.color, fontSize: 11, fontWeight: 900 }}>{readiness.label}</span>
+        {chips.map(chip => <span key={chip} style={{ padding: '5px 8px', borderRadius: 999, background: A.chip, border: `1px solid ${A.border}`, color: A.textSec, fontSize: 11, fontWeight: 800 }}>{chip}</span>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 8 }}>
+        {[
+          ['Контакт', contact.name || 'Не указан'],
+          ['Телефон', contact.phone || 'Не указан'],
+          ['Email', contact.email || 'Не указан'],
+        ].map(([label, value]) => (
+          <div key={label} style={{ padding: compact ? '7px 9px' : 10, borderRadius: 12, background: 'rgba(255,255,255,0.035)', border: `1px solid ${A.border}` }}>
+            <div style={{ color: A.textSec, fontSize: 10, fontWeight: 850, textTransform: 'uppercase' }}>{label}</div>
+            <div style={{ color: A.text, fontSize: 12, lineHeight: '17px', marginTop: 3, overflowWrap: 'anywhere' }}>{value}</div>
+          </div>
+        ))}
+      </div>
+      {!compact && (
+        <div style={{ padding: 10, borderRadius: 13, background: 'rgba(201,168,76,0.07)', border: `1px solid ${A.goldBrd}`, color: A.textSec, fontSize: 12, lineHeight: '18px' }}>
+          Следующий шаг: <span style={{ color: A.text, fontWeight: 850 }}>{readiness.next}</span>
+        </div>
+      )}
+      {missing.length > 0 && (
+        <div style={{ color: '#facc15', fontSize: 11.5, lineHeight: '17px' }}>Не хватает: {missing.join(', ')}</div>
+      )}
+    </div>
+  );
 }
 
 function StatTile({ label, value, icon, color = A.gold, sub }) {
@@ -1721,18 +1803,21 @@ function ModerationPanel({ news, comments, requests = [], onOpenNews, onOpenComm
           </div>
           {partnershipRequests.length ? (
             <div style={{ display: 'grid', gap: 10 }}>
-              {partnershipRequests.slice(0, 20).map(item => (
-                <div key={item.id} style={{ border: `1px solid ${A.border}`, borderRadius: 16, padding: 13, background: 'rgba(255,255,255,0.035)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ color: A.text, fontSize: 15, lineHeight: '20px', fontWeight: 900, overflowWrap: 'anywhere' }}>{item.title || 'Заявка на партнёрство'}</div>
-                      <div style={{ color: A.textSec, fontSize: 12, lineHeight: '18px', marginTop: 4 }}>{item.typeLabel || item.type || 'Тип не указан'} · {item.partnershipFlow?.tariff || item.draft?.fields?.tariff || 'тариф не указан'}</div>
-                      <div style={{ color: A.textSec, fontSize: 12, lineHeight: '18px', marginTop: 4 }}>{item.submitter?.name || 'Контакт не указан'}{item.submitter?.phone ? ` · ${item.submitter.phone}` : ''}</div>
+              {partnershipRequests.slice(0, 20).map(item => {
+                const readiness = aiImportRequestReadiness(item);
+                return (
+                  <div key={item.id} style={{ border: `1px solid ${A.border}`, borderRadius: 16, padding: 13, background: 'rgba(255,255,255,0.035)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: A.text, fontSize: 15, lineHeight: '20px', fontWeight: 900, overflowWrap: 'anywhere' }}>{item.draft?.fields?.title || item.title || 'Заявка на партнёрство'}</div>
+                        <div style={{ color: A.textSec, fontSize: 12, lineHeight: '18px', marginTop: 4 }}>{item.typeLabel || item.type || 'Тип не указан'} · {toJsDate(item.createdAt)?.toLocaleString('ru-RU') || 'без даты'}</div>
+                      </div>
+                      <div style={{ color: readiness.color, fontSize: 12, fontWeight: 900, flexShrink: 0 }}>{readiness.label}</div>
                     </div>
-                    <div style={{ color: item.status === 'missing' ? A.gold : A.green, fontSize: 12, fontWeight: 900, flexShrink: 0 }}>{item.status === 'missing' ? 'Нужно проверить' : 'Готово'}</div>
+                    <AiImportRequestSummary item={item} compact />
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div style={{ color: A.textSec, fontSize: 13, lineHeight: '19px' }}>Новых заявок на партнёрство пока нет.</div>
@@ -2909,12 +2994,29 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
   const [activePublicLinkId, setActivePublicLinkId] = useState('');
   const [generatedPublicLink, setGeneratedPublicLink] = useState(null);
   const [validationRequestId, setValidationRequestId] = useState('');
+  const [requestFilter, setRequestFilter] = useState('active');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const activeRequest = requests.find(item => item.id === activeRequestId) || null;
   const validationRequest = requests.find(item => item.id === validationRequestId) || null;
   const visiblePublicLinks = [...(publicLinks || [])].sort((a, b) => Number(toJsDate(b.createdAt || b.updatedAt) || 0) - Number(toJsDate(a.createdAt || a.updatedAt) || 0));
-  const visibleRequests = [...requests].sort((a, b) => Number(toJsDate(b.createdAt || b.processedAt) || 0) - Number(toJsDate(a.createdAt || a.processedAt) || 0));
+  const requestRows = [...requests].sort((a, b) => Number(toJsDate(b.createdAt || b.processedAt) || 0) - Number(toJsDate(a.createdAt || a.processedAt) || 0));
+  const requestFilterOptions = [
+    ['active', 'Активные', requestRows.filter(item => !['published', 'rejected'].includes(String(item.status || '').toLowerCase())).length],
+    ['ready', 'Готовые', requestRows.filter(item => aiImportRequestReadiness(item).label === 'Готово к черновику').length],
+    ['needs', 'Нужно уточнить', requestRows.filter(item => ['Нужно уточнить', 'Нужны медиа', 'Нет контакта', 'Без фото'].includes(aiImportRequestReadiness(item).label)).length],
+    ['done', 'Обработанные', requestRows.filter(item => ['published', 'rejected'].includes(String(item.status || '').toLowerCase())).length],
+    ['all', 'Все', requestRows.length],
+  ];
+  const visibleRequests = requestRows.filter(item => {
+    const status = String(item.status || '').toLowerCase();
+    const readiness = aiImportRequestReadiness(item).label;
+    if (requestFilter === 'active') return !['published', 'rejected'].includes(status);
+    if (requestFilter === 'ready') return readiness === 'Готово к черновику';
+    if (requestFilter === 'needs') return ['Нужно уточнить', 'Нужны медиа', 'Нет контакта', 'Без фото'].includes(readiness);
+    if (requestFilter === 'done') return ['published', 'rejected'].includes(status);
+    return true;
+  });
   const meta = aiImportTypeMeta(type);
   const publicTemplate = buildAiImportTemplate(type);
   const publicLinkUrl = generatedPublicLink?.url || (generatedPublicLink?.token ? `${APP_URL}/submit/${generatedPublicLink.type}/${generatedPublicLink.token}` : '');
@@ -2936,6 +3038,30 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
   const copyText = async (text, okMessage) => {
     await navigator.clipboard?.writeText(text).catch(() => {});
     setMessage(okMessage);
+  };
+
+  const copyRequestContact = async (item) => {
+    const contact = aiImportRequestContact(item);
+    const text = [
+      item.draft?.fields?.title || item.title || 'Заявка АПГ',
+      contact.name ? `Контакт: ${contact.name}` : '',
+      contact.phone ? `Телефон: ${contact.phone}` : '',
+      contact.email ? `Email: ${contact.email}` : '',
+      item.partnershipFlow?.tariff || item.draft?.fields?.tariff ? `Тариф: ${item.partnershipFlow?.tariff || item.draft?.fields?.tariff}` : '',
+    ].filter(Boolean).join('\n');
+    await copyText(text, 'Контакт заявки скопирован.');
+  };
+
+  const markClarificationRequested = async (item) => {
+    await onUpdateRequest(item.id, {
+      status: 'clarification_requested',
+      partnershipFlow: {
+        ...(item.partnershipFlow || {}),
+        clarificationRequestedAt: new Date().toISOString(),
+        clarificationReason: aiImportRequestReadiness(item).next,
+      },
+    });
+    setMessage('Отметил, что по заявке нужно уточнение.');
   };
 
   const createPublicLink = async () => {
@@ -3244,11 +3370,21 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
 
       <div style={s.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 }}>
-          <h2 style={{ ...s.h2, margin: 0 }}>Все заявки ({requests.length})</h2>
+          <div>
+            <h2 style={{ ...s.h2, margin: 0 }}>Все заявки ({visibleRequests.length} из {requests.length})</h2>
+            <div style={{ color: A.textSec, fontSize: 12, lineHeight: '18px', marginTop: 4 }}>Фильтр помогает быстро разобрать очередь без раскрытия каждой заявки.</div>
+          </div>
           <button type="button" onClick={onRefresh} style={{ ...s.btn, ...s.btnGray }}>{loading ? '...' : '↻ Обновить'}</button>
         </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          {requestFilterOptions.map(([id, label, count]) => (
+            <button key={id} type="button" onClick={() => setRequestFilter(id)} style={{ ...s.btn, ...(requestFilter === id ? s.btnGold : s.btnGray), padding: '7px 10px', fontSize: 11 }}>
+              {label}{count ? ` · ${count}` : ''}
+            </button>
+          ))}
+        </div>
         {visibleRequests.length === 0 ? (
-          <div style={{ color: A.textSec, fontSize: 13 }}>Очередь пуста. Создайте первую заявку через форму выше.</div>
+          <div style={{ color: A.textSec, fontSize: 13 }}>В этом фильтре заявок нет.</div>
         ) : (
           <div style={{ display: 'grid', gap: 10 }}>
             {visibleRequests.map(item => {
@@ -3264,8 +3400,20 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
                     </div>
                     <span style={{ color: A.gold, fontSize: 12, fontWeight: 900 }}>{itemMeta.label}</span>
                   </button>
+                  {!isActive && <div style={{ marginTop: 10 }}><AiImportRequestSummary item={item} compact /></div>}
+                  {!isActive && (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                      <button type="button" onClick={() => copyRequestContact(item)} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 11 }}>Скопировать контакт</button>
+                      {!['published', 'rejected', 'clarification_requested'].includes(String(item.status || '').toLowerCase()) && (
+                        <button type="button" onClick={() => markClarificationRequested(item)} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 11 }}>Нужно уточнить</button>
+                      )}
+                    </div>
+                  )}
                   {isActive && (
                     <div style={{ marginTop: 12 }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <AiImportRequestSummary item={item} />
+                      </div>
                       <div style={{ marginBottom: 12 }}>
                         <EntityPreviewCard type={item.type} item={aiImportDraftPatch(item.type, item.draft, item.sourceFiles)} compact />
                       </div>
@@ -3337,6 +3485,10 @@ function AdminAiImportPanel({ requests, publicLinks, loading, publicLinksLoading
                       )}
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button type="button" disabled={busy || item.status === 'published'} onClick={() => setValidationRequestId(item.id)} style={{ ...s.btn, ...s.btnPri, padding: '8px 11px', fontSize: 12, opacity: item.status === 'published' ? 0.5 : 1 }}>Проверка и публикация</button>
+                        <button type="button" onClick={() => copyRequestContact(item)} style={{ ...s.btn, ...s.btnGray, padding: '8px 11px', fontSize: 12 }}>Скопировать контакт</button>
+                        {!['published', 'rejected', 'clarification_requested'].includes(String(item.status || '').toLowerCase()) && (
+                          <button type="button" onClick={() => markClarificationRequested(item)} style={{ ...s.btn, ...s.btnGray, padding: '8px 11px', fontSize: 12 }}>Нужно уточнить</button>
+                        )}
                         <button type="button" onClick={() => onUpdateRequest(item.id, { status: 'rejected' })} style={{ ...s.btn, ...s.btnDanger, padding: '8px 11px', fontSize: 12 }}>Отклонить</button>
                       </div>
                     </div>
