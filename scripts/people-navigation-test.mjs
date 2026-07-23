@@ -12,9 +12,8 @@ assert.match(profile, /openPeopleNavigation = useCallback\(\(event\) => \{[\s\S]
 assert.match(profile, /openBusinessCardNavigation = useCallback\(\(event\) => \{[\s\S]*?event\?\.preventDefault\?\.\(\);[\s\S]*?event\?\.stopPropagation\?\.\(\);/, 'My QR action isolates click propagation');
 
 assert.match(profile, /data-my-contacts-button[\s\S]*?onClick=\{openPeopleNavigation\}/, 'Open People button is wired to the stable navigation handler');
-assert.match(profile, /data-digital-business-card[\s\S]*?onClick=\{openBusinessCardNavigation\}/, 'My QR button is wired to the stable navigation handler');
 assert.doesNotMatch(profile, /data-my-contacts-button[\s\S]{0,180}onPointerDown=\{event => event\.stopPropagation\(\)\}/, 'Open People button does not stop pointerdown before React click delivery');
-assert.doesNotMatch(profile, /data-digital-business-card[\s\S]{0,180}onPointerDown=\{event => event\.stopPropagation\(\)\}/, 'My QR button does not stop pointerdown before React click delivery');
+assert.doesNotMatch(profile, /data-people-panel[\s\S]{0,12000}data-digital-business-card/, 'People summary does not duplicate the nearby referral and QR actions');
 
 assert.match(profile, /showConnectionsModal && createPortal\([\s\S]*?title="Люди"[\s\S]*?data-people-list/, 'Open People renders the People modal portal');
 assert.match(profile, /showBusinessCard && createPortal\([\s\S]*?title="Цифровая карточка"[\s\S]*?data-business-card-modal[\s\S]*?<QRCodeSVG value=\{businessCardUrl\}/, 'My QR renders the QR business card portal');
@@ -28,7 +27,6 @@ assert.match(executionRegistry, /route\('profile', '\/profile#people'\)/, 'Loki 
 const platformTargets = ['mobile', 'desktop', 'telegram-webapp'];
 for (const platform of platformTargets) {
   assert.match(profile, /data-my-contacts-button/, `${platform}: Open People button remains discoverable`);
-  assert.match(profile, /data-digital-business-card/, `${platform}: My QR button remains discoverable`);
   assert.match(profile, /data-people-list/, `${platform}: People modal remains discoverable`);
   assert.match(profile, /data-business-card-modal/, `${platform}: QR modal remains discoverable`);
 }

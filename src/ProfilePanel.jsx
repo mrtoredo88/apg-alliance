@@ -2362,7 +2362,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             )}
             <div style={{ display: 'flex', gap: 8 }}>
               <GlassButton data-my-contacts-button onClick={openPeopleNavigation} style={{ flex: 1, minHeight: 38, borderRadius: 15, padding: '8px 11px', fontSize: 12 }}>Все люди</GlassButton>
-              <GlassButton data-digital-business-card onClick={openBusinessCardNavigation} tone="gold" style={{ minHeight: 38, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Мой QR</GlassButton>
             </div>
             <div aria-hidden="true" style={{ display: 'none' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
@@ -2543,7 +2542,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 <div style={{ color: APG2.textMuted, fontSize: 12.5, lineHeight: '18px' }}>{peopleEmptyText(peopleTab, Boolean(peopleSearch.trim()))}</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <GlassButton onClick={openPeopleNavigation} style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>Открыть People Center</GlassButton>
-                  <GlassButton onClick={openBusinessCardNavigation} tone="gold" style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>Мой QR</GlassButton>
                 </div>
               </div>
             )}
@@ -2561,7 +2559,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             {visiblePeopleRows.length > 0 && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <GlassButton data-my-contacts-button onClick={openPeopleNavigation} style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Открыть Люди</GlassButton>
-              <GlassButton data-digital-business-card onClick={openBusinessCardNavigation} tone="gold" style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Мой QR</GlassButton>
             </div>
             )}
             </div>
@@ -2703,81 +2700,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             </GlassCard>
           </GlassSection>
         )}
-
-        <GlassSection title="Социальные сообщения">
-          <GlassCard data-social-messaging-panel style={{ display: 'grid', gap: 12 }}>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-              <div style={{ width: 42, height: 42, borderRadius: 17, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', flexShrink: 0 }}>💬</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: APG2.text, fontSize: 16, lineHeight: '20px', fontWeight: 860 }}>Social Messaging</div>
-                <div style={{ color: APG2.textMuted, fontSize: 12.5, lineHeight: '18px', marginTop: 3 }}>Личные диалоги доступны только по разрешённой связи: друзья, общее событие, общий партнёр, существующий диалог или принятое приглашение.</div>
-              </div>
-            </div>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ color: APG2.textMuted, fontSize: 11, fontWeight: 820, textTransform: 'uppercase', letterSpacing: 0.6 }}>Кто может начать со мной общение?</span>
-              <select
-                value={socialPrivacy}
-                onChange={e => updateSocialPrivacyServer(e.target.value)}
-                style={{ minHeight: 42, borderRadius: 16, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2.text, padding: '0 12px', fontFamily: 'inherit', fontSize: 13, fontWeight: 760 }}
-              >
-                <option value={SOCIAL_PRIVACY.ALLOWED_RELATIONS}>Все разрешённые связи</option>
-                <option value={SOCIAL_PRIVACY.FRIENDS_ONLY}>Только друзья</option>
-                <option value={SOCIAL_PRIVACY.NOBODY}>Никто</option>
-              </select>
-            </label>
-            {socialLoading && <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '17px' }}>Синхронизируем запросы...</div>}
-            {socialError && <div style={{ color: '#E64646', fontSize: 12, lineHeight: '17px' }}>{socialError}</div>}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-              {[
-                ['Входящие', socialIncomingRequests.filter(item => item.status === 'pending').length],
-                ['Исходящие', socialOutgoingRequests.filter(item => item.status === 'pending').length],
-                ['Блокировки', socialBlockedIds.length],
-              ].map(([label, value]) => (
-                <div key={label} style={{ borderRadius: 16, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', padding: 10, textAlign: 'center' }}>
-                  <div style={{ color: APG2.text, fontSize: 18, lineHeight: '21px', fontWeight: 900 }}>{value}</div>
-                  <div style={{ color: APG2.textMuted, fontSize: 10.5, lineHeight: '14px', marginTop: 2 }}>{label}</div>
-                </div>
-              ))}
-            </div>
-            {(socialIncomingRequests.length > 0 || socialOutgoingRequests.length > 0) ? (
-              <div style={{ display: 'grid', gap: 8 }}>
-                {socialIncomingRequests.slice(0, 4).map(item => (
-                  <div key={item.id} style={{ borderRadius: 16, padding: 10, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', display: 'grid', gap: 8 }}>
-                    <div style={{ color: APG2.text, fontSize: 13, lineHeight: '17px', fontWeight: 820 }}>Запрос от {item.fromUserName || item.fromUserId || 'участника АПГ'}</div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <GlassButton onClick={() => updateSocialRequest(item.id, 'accepted')} tone="gold" style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>Принять</GlassButton>
-                      <GlassButton onClick={() => updateSocialRequest(item.id, 'declined')} style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>Отклонить</GlassButton>
-                      <GlassButton onClick={() => toggleSocialBlock(item.fromUserId)} style={{ minHeight: 32, borderRadius: 14, padding: '6px 10px', fontSize: 12 }}>Заблокировать</GlassButton>
-                    </div>
-                  </div>
-                ))}
-                {socialOutgoingRequests.slice(0, 4).map(item => (
-                  <div key={item.id} style={{ borderRadius: 16, padding: 10, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2.textMuted, fontSize: 12, lineHeight: '17px' }}>
-                    Исходящий запрос: {item.toUserName || item.toUserId || 'участник АПГ'} · {item.status || 'pending'}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ color: APG2.textMuted, fontSize: 12.5, lineHeight: '18px' }}>Запросов на общение пока нет. Когда появятся входящие или исходящие приглашения, они будут здесь.</div>
-            )}
-            <div data-social-messaging-dev-panel style={{ borderRadius: 16, border: '1px solid rgba(74,144,217,0.22)', background: 'rgba(74,144,217,0.08)', padding: 10, display: 'grid', gap: 5 }}>
-              <div style={{ color: '#4A90D9', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6 }}>Dev Panel · Social Messaging</div>
-              {[
-                ['Eligibility', String(socialDevPanel.Eligibility)],
-                ['Reason', socialDevPanel.Reason || 'none'],
-                ['Request Status', socialDevPanel.RequestStatus || 'none'],
-                ['Privacy', socialDevPanel.Privacy],
-                ['Blocked', String(socialDevPanel.Blocked)],
-                ['Relationship', socialDevPanel.Relationship],
-              ].map(([label, value]) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: APG2.textMuted, fontSize: 11.5, lineHeight: '15px' }}>
-                  <span>{label}</span>
-                  <strong style={{ color: APG2.text, fontWeight: 820 }}>{value}</strong>
-                </div>
-              ))}
-            </div>
-          </GlassCard>
-        </GlassSection>
 
         <GlassSection title="Показатели">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
@@ -4022,7 +3944,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px' }}>{peopleEmptyText(peopleTab, Boolean(peopleSearch.trim()))}</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <GlassButton onClick={() => setPeopleTab('all')} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 12 }}>Все люди</GlassButton>
-                  <GlassButton onClick={openBusinessCardNavigation} tone="gold" style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 12 }}>Показать QR</GlassButton>
                 </div>
               </div>
             )}

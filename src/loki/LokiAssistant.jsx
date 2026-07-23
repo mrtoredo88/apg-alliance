@@ -531,6 +531,21 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
         </button>
         <button
           type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            loki.setDockedToHeader(true);
+            setMenuOpen(false);
+            setBrainOpen(false);
+            setHistoryOpen(false);
+          }}
+          aria-label="Спрятать Локи в шапку"
+          data-loki-dock-button="true"
+          style={{ position: 'absolute', right: 31, top: -7, minWidth: 76, height: 30, padding: '0 10px', borderRadius: 13, border: '1px solid rgba(215,184,106,0.32)', background: 'rgba(16,14,10,0.78)', color: '#F0D88F', fontSize: 11, lineHeight: '28px', fontWeight: 820, fontFamily: 'inherit', boxShadow: '0 10px 22px rgba(0,0,0,0.26)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          Спрятать
+        </button>
+        <button
+          type="button"
           onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }}
           aria-label="Настройки Локи"
           style={{ position: 'absolute', right: -3, top: -4, width: 28, height: 28, borderRadius: 12, border: '1px solid rgba(215,184,106,0.28)', background: 'rgba(16,14,10,0.44)', color: '#F7F1E6', fontSize: 16, lineHeight: '24px', fontWeight: 800, fontFamily: 'inherit', boxShadow: '0 10px 22px rgba(0,0,0,0.24)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', cursor: 'pointer' }}

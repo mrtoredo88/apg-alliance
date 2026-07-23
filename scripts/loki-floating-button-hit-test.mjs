@@ -33,6 +33,7 @@ assert.match(stateSource, /dockedToHeader:\s*false/, 'Loki must start outside th
 assert.match(providerSource, /setDockedToHeader:/, 'Loki provider must expose the dock action.');
 assert.match(source, /if \(loki\.settings\.dockedToHeader\) return null;/, 'Floating Loki must disappear while docked.');
 assert.match(source, /Свернуть в шапку/, 'Floating Loki menu must offer the header dock action.');
+assert.match(source, /data-loki-dock-button="true"[\s\S]*Спрятать/, 'Floating Loki must expose a visible dock button outside the settings menu.');
 assert.match(homeSource, /loki\.openContextExperience\(\)/, 'Docked Loki must open from the mobile header.');
 assert.match(homeSource, /Открыть Локи/, 'Docked Loki header button must keep an accessible label.');
 assert.match(homeSource, /LokiIdentity size=\{42\}/, 'Docked Loki must replace the profile avatar artwork.');

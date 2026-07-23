@@ -78,7 +78,6 @@ for (const scenario of scenarios) {
 [
   'data-connections-panel',
   'data-connections-dev-panel',
-  'data-digital-business-card',
   'data-my-contacts-button',
   'data-business-card-modal',
   'QRCodeSVG',

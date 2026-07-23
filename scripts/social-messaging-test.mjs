@@ -159,9 +159,9 @@ scenario('source keeps social messaging frontend-only and no second messenger', 
     assert.ok(!source.includes('/api/social'), file);
   });
   const profile = readFileSync(new URL('../src/ProfilePanel.jsx', import.meta.url), 'utf8');
-  assert.ok(profile.includes('data-social-messaging-panel'));
-  assert.ok(profile.includes('data-social-messaging-dev-panel'));
-  assert.ok(profile.includes('Запросы на общение') || profile.includes('Социальные сообщения'));
+  assert.ok(!profile.includes('data-social-messaging-panel'));
+  assert.ok(!profile.includes('data-social-messaging-dev-panel'));
+  assert.ok(!profile.includes('<GlassSection title="Социальные сообщения">'));
 });
 
 const targets = [
