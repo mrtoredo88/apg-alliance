@@ -42,7 +42,7 @@ import { areNewsCommentsEnabled, getCanonicalNewsId, getNewsLegacyIds } from './
 import { isApgNewsPublication } from '../server-shared/workspace-news.js';
 import { buildInterestProfile, mergeInterestEvent } from './interestEngine.js';
 import { normalizeExpertRecord, registerCustomExpertCategories } from '../server-shared/expert-directory.js';
-import { profileOwnedByUser } from './utils/profileOwnership.js';
+import { privateArchivedProfileOwnedByUser, profileOwnedByUser } from './utils/profileOwnership.js';
 import { formatRelativeTime } from './utils/time.js';
 import { LEARNING_HINTS, nextLearningProgress, normalizeLearningProgress } from './learningSystem.js';
 import { isLifecyclePublic, normalizeContentStatus } from './contentLifecycle.js';
@@ -1945,7 +1945,11 @@ export function UserApp() {
             .then(snap => {
               if (snap.exists() && isMounted.current) {
                 const partner = { id: snap.id, ...snap.data() };
-                setOwnedPartner(isNotArchived(partner) ? partner : null);
+                setOwnedPartner(
+                  isNotArchived(partner) || privateArchivedProfileOwnedByUser(partner, userData)
+                    ? partner
+                    : null,
+                );
               }
             })
             .catch(() => setOwnedPartner(null));
@@ -2172,7 +2176,9 @@ export function UserApp() {
                     .then(snap => {
                       if (snap.exists() && isMounted.current) {
                         const partner = { id: snap.id, ...snap.data() };
-                        if (isNotArchived(partner)) setOwnedPartner(partner);
+                        if (isNotArchived(partner) || privateArchivedProfileOwnedByUser(partner, identityUser, fsEmail)) {
+                          setOwnedPartner(partner);
+                        }
                       }
                     })
                     .catch(() => {});

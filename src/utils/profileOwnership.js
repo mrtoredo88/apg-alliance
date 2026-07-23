@@ -50,6 +50,13 @@ export function profileOwnedByUser(profile, userData, fallbackEmail = '') {
     || userCabinetIds.includes(String(profile.id || ''));
 }
 
+export function privateArchivedProfileOwnedByUser(profile, userData, fallbackEmail = '') {
+  return profile?.archived === true
+    && profile?.privateDemoAccess === true
+    && profile?.demoVisibility === 'owners'
+    && profileOwnedByUser(profile, userData, fallbackEmail);
+}
+
 export function buildCabinetDiagnostics({ userData = {}, ownedPartner = null, ownedExpert = null, partners = [], role = '' } = {}) {
   const userIds = collectUserIdentityIds(userData);
   const emails = collectUserEmails(userData);
