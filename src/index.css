@@ -238,6 +238,7 @@ html, body {
   padding: 0;
   min-height: 100vh;
   min-height: 100svh;
+  min-height: 100dvh;
   overscroll-behavior: none;
   font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
 }
@@ -245,7 +246,9 @@ html, body {
 body {
   background: var(--apg2-bg, var(--c-bg, #ECEEF2));
   background-color: var(--apg2-bg-color, var(--c-bg, #ECEEF2));
-  background-attachment: fixed;
+  /* `background-attachment: fixed` leaves an unpainted strip below the
+     dynamic viewport in iOS Safari after a long scroll. */
+  background-attachment: scroll;
   overflow-x: hidden;
 }
 
@@ -333,6 +336,7 @@ html {
 #root {
   min-height: 100vh;
   min-height: 100svh;
+  min-height: 100dvh;
   background: var(--apg2-bg, var(--c-bg, #ECEEF2));
   background-color: var(--apg2-bg-color, var(--c-bg, #ECEEF2));
   overflow-x: clip;

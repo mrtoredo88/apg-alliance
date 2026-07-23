@@ -363,7 +363,9 @@ const horizontalSnapTrack = {
   scrollBehavior: 'smooth',
   overscrollBehaviorX: 'contain',
   overscrollBehaviorY: 'auto',
-  touchAction: 'pan-x',
+  // Keep horizontal swiping, but never trap a vertical page scroll that starts
+  // on a card. This is especially important in iOS Safari/PWA.
+  touchAction: 'pan-x pan-y',
   scrollbarWidth: 'none',
 };
 
@@ -1232,7 +1234,7 @@ function V2SecondScreenMobile({
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <button
-              onClick={onOpenEvents}
+              onClick={() => onOpenEvents?.(visibleEvents[0])}
               {...pressMotion}
               style={{
                 minHeight: 184, border: 'none', borderRadius: 32, padding: 0, cursor: 'pointer', textAlign: 'left',
@@ -1273,7 +1275,7 @@ function V2SecondScreenMobile({
             {visibleEvents.slice(1, 3).map((event, index) => (
             <button
               key={`${event.id ?? event.title}-${index}`}
-              onClick={onOpenEvents}
+              onClick={() => onOpenEvents?.(event)}
               {...pressMotion}
               style={{
                 border: 'none', borderRadius: 32, padding: '18px 18px 17px', cursor: 'pointer', textAlign: 'left',
@@ -1859,7 +1861,7 @@ function V2SecondScreenDesktop({
                 <div>
                   <div style={{ ...DesktopSectionHeader, fontSize: 23 }}>Афиша</div>
                 </div>
-                <button type="button" onClick={onOpenEvents} style={{ ...GlassButton, minHeight: 32, padding: '0 13px', fontSize: 11.5 }}>Все мероприятия</button>
+                <button type="button" onClick={() => onOpenEvents?.()} style={{ ...GlassButton, minHeight: 32, padding: '0 13px', fontSize: 11.5 }}>Все мероприятия</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${afishaColumns}, minmax(0, 1fr))`, gap: desktopLayout.compactGap, height: '100%', alignContent: 'start' }}>
                 {!isHydrated(HOME_HYDRATION_STAGES.EVENTS) || loading ? [0, 1, 2, 3].map(i => <div key={`event-skel-${i}`} style={{ ...DesktopTile, minHeight: afishaTileHeight, height: afishaTileHeight }}><Skel h={18} w="60%" radius={7} /></div>) : afishaEvents.length === 0 ? (
@@ -1883,7 +1885,7 @@ function V2SecondScreenDesktop({
                     <button
                       key={event.id || `event-${index}`}
                       type="button"
-                      onClick={() => { addRecentAction(event, 'event'); onOpenEvents?.(); }}
+                      onClick={() => { addRecentAction(event, 'event'); onOpenEvents?.(event); }}
                       {...pressMotion}
                       style={{ ...DesktopTile, border: 'none', minHeight: afishaTileHeight, height: afishaTileHeight, textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', cursor: 'pointer' }}
                     >
@@ -1899,7 +1901,7 @@ function V2SecondScreenDesktop({
                         <div style={{ color: V2.textMuted, fontSize: 10.4, lineHeight: '13px', marginTop: 4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{parsed.time} · {parsed.place}</div>
                         <div style={{ marginTop: 5, color: V2.gold, fontSize: 10.2, fontWeight: 780, lineHeight: '13px' }}>{formatEventPrice(event) || 'Бесплатно'} · {parsed.participants ? `${parsed.participants} мест` : 'Открытая регистрация'}</div>
                         <div
-                          onClick={() => { onOpenEvents?.(); }}
+                          onClick={(clickEvent) => { clickEvent.stopPropagation(); addRecentAction(event, 'event'); onOpenEvents?.(event); }}
                           style={{ ...GlassButton, marginTop: 6, minHeight: 28, fontSize: 10.2, padding: '0 10px', width: 'fit-content', display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
                         >
                           Записаться
