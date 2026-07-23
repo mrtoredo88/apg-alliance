@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { ActionEngine, AnalyticsEngine, LokiModuleRegistry, PlannerEngine, ScenarioRegistry, VoiceEngine, compactLokiMemory } from '../src/loki/core/v2/index.js';
 import { LOKI_SCENARIOS } from '../src/loki/core/brain/lokiScenarios.js';
+import { prepareLokiSpeechText, selectLokiVoice } from '../src/loki/lokiVoice.js';
 
 const registry = new ScenarioRegistry([{ id: 'test.one', title: 'Test', role: 'user', intent: 'test.one' }]);
 assert.equal(registry.size, 1);
@@ -29,6 +30,17 @@ voice.configure({ mode: 'both', rate: 3 });
 assert.equal(voice.rate, 1.8);
 assert.equal(voice.enqueue('Проверка'), true);
 voice.stop();
+
+const selectedVoice = selectLokiVoice([
+  { name: 'Yuri', lang: 'ru-RU' },
+  { name: 'Milena Premium', lang: 'ru-RU' },
+  { name: 'Samantha', lang: 'en-US' },
+]);
+assert.equal(selectedVoice.name, 'Milena Premium');
+assert.equal(
+  prepareLokiSpeechText('✨ **Привет!** Подробнее: https://myapg.ru'),
+  'Привет! Подробнее:',
+);
 
 const plan = PlannerEngine.handle({ context: { actor: { role: 'admin' } } });
 assert.equal(plan.intent, 'planner.event_creation');

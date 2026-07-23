@@ -5,6 +5,7 @@ import { LOKI_APP_ACTIONS, createLokiAction } from './lokiActionTypes.js';
 import { LokiIdentity } from './LokiIdentity.jsx';
 import { recordLokiMessageTrace, resetLokiMessageTrace } from './lokiMessageTrace.js';
 import { inspectLokiResponseText, isLokiUserDebugVisible } from './lokiResponseText.js';
+import { createLokiUtterance } from './lokiVoice.js';
 
 const QUICK_ACTIONS = [
   { label: '✨ Что интересного?', text: 'Что интересного сегодня?', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_OFFERS) },
@@ -29,18 +30,6 @@ const NEWS_QUICK_ACTIONS = [
 
 function getShortTitle(value) {
   return String(value || 'АПГ').trim().slice(0, 48);
-}
-
-function getLokiVoice() {
-  try {
-    const voices = window.speechSynthesis?.getVoices?.() ?? [];
-    return voices.find(voice => voice.lang === 'ru-RU' && /milena|yuri|google|microsoft|premium|natural/i.test(voice.name))
-      ?? voices.find(voice => voice.lang === 'ru-RU')
-      ?? voices.find(voice => String(voice.lang || '').startsWith('ru'))
-      ?? null;
-  } catch {
-    return null;
-  }
 }
 
 function getContextKey(context) {
@@ -153,12 +142,8 @@ export function LokiExperience({ loki }) {
   const speak = (text) => {
     if (!('speechSynthesis' in window) || !text) return;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ru-RU';
-    utterance.voice = getLokiVoice();
-    utterance.rate = 0.88;
-    utterance.pitch = 0.96;
-    utterance.volume = 0.92;
+    const utterance = createLokiUtterance(text, { emotion: 'warm' });
+    if (!utterance) return;
     utterance.onstart = () => setVoiceState('speaking');
     utterance.onend = () => setVoiceState('idle');
     utterance.onerror = () => setVoiceState('idle');

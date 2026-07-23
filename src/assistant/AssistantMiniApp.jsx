@@ -9,6 +9,7 @@ import { clearLokiUserMemory, learnFromLokiQuery, loadLokiUserMemory } from '../
 import { APG_KNOWLEDGE_BASE, findKnowledgeItems, getLatestChronicles } from '../loki/knowledge/index.js';
 import { LOKI_APP_ACTIONS } from '../loki/lokiActionTypes.js';
 import { LokiIdentity } from '../loki/LokiIdentity.jsx';
+import { createLokiUtterance } from '../loki/lokiVoice.js';
 
 const SECTIONS = [
   { id: 'loki', label: 'Локи', icon: '◌' },
@@ -113,18 +114,6 @@ function actionToUrl(action) {
   return APP_URL;
 }
 
-function getLokiVoice() {
-  try {
-    const voices = window.speechSynthesis?.getVoices?.() ?? [];
-    return voices.find(voice => voice.lang === 'ru-RU' && /milena|yuri|google|microsoft|premium|natural/i.test(voice.name))
-      ?? voices.find(voice => voice.lang === 'ru-RU')
-      ?? voices.find(voice => String(voice.lang || '').startsWith('ru'))
-      ?? null;
-  } catch {
-    return null;
-  }
-}
-
 function LokiHero({ state }) {
   const listening = state === 'listening';
   const thinking = state === 'thinking';
@@ -191,12 +180,8 @@ function LokiScreen({ tg }) {
   const speak = (text) => {
     if (!('speechSynthesis' in window) || !text) return;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ru-RU';
-    utterance.voice = getLokiVoice();
-    utterance.rate = 0.88;
-    utterance.pitch = 0.96;
-    utterance.volume = 0.92;
+    const utterance = createLokiUtterance(text, { emotion: 'warm' });
+    if (!utterance) return;
     utterance.onstart = () => setVoiceState('speaking');
     utterance.onend = () => setVoiceState('idle');
     utterance.onerror = () => setVoiceState('idle');

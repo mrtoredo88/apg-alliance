@@ -1,3 +1,5 @@
+import { createLokiUtterance } from '../../lokiVoice.js';
+
 export class VoiceEngine {
   constructor({ speechSynthesisApi = globalThis.speechSynthesis } = {}) {
     this.api = speechSynthesisApi;
@@ -23,10 +25,8 @@ export class VoiceEngine {
   playNext() {
     if (this.active || !this.queue.length || !this.api || typeof SpeechSynthesisUtterance === 'undefined') return;
     const item = this.queue.shift();
-    const utterance = new SpeechSynthesisUtterance(item.text);
-    utterance.lang = 'ru-RU';
-    utterance.rate = this.rate;
-    utterance.pitch = item.emotion === 'excited' ? 1.08 : item.emotion === 'calm' ? 0.94 : 1;
+    const utterance = createLokiUtterance(item.text, { emotion: item.emotion, rate: this.rate });
+    if (!utterance) return;
     utterance.onend = () => { this.active = false; this.playNext(); };
     utterance.onerror = () => { this.active = false; this.playNext(); };
     this.active = true;
