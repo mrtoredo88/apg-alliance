@@ -10,6 +10,7 @@ import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, buildLifecyclePatch, contentT
 import { hasRole, ROLES } from '../../../server-shared/role-engine.js';
 import { telegramUrl } from '../../../server-shared/telegram.js';
 import { buildApgNewsDistributionPatch } from '../../../server-shared/workspace-news.js';
+import { becamePublicContent, isPublicContent, notifyContentPublished } from '../lib/contentNotifications.js';
 import {
   aggregateReferralEvents,
   buildReferralFunnel,
@@ -26,6 +27,21 @@ import { buildReferralMonitoring, referralAlertsToCsv } from '../../../server-sh
 import { buildReferralRecoveryScanPlan, summarizeReferralRecoveryPlan } from '../../../server-shared/referral-state-recovery.js';
 
 const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'publicationType', 'timelineType', 'distributionMode', 'visibility', 'publishScope', 'apgPublication', 'profileOnly', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
+
+async function dispatchPublishedContentNotification(db, request, resource, id, item) {
+  try {
+    return await notifyContentPublished({ db, resource, id, item, logger: request.log });
+  } catch (error) {
+    request.log?.warn?.({
+      contentNotification: {
+        resource,
+        id,
+        error: String(error?.message || error).slice(0, 300),
+      },
+    }, 'content notification dispatch failed');
+    return { error: true, message: String(error?.message || error) };
+  }
+}
 const RESOURCE_CONFIG = {
   partners: { collection: 'partners', scope: 'partners', label: 'партнёр' },
   experts: { collection: 'experts', scope: 'experts', label: 'эксперт' },
@@ -1653,6 +1669,14 @@ async function handlePartnerOnboardingAction(db, request, actor) {
           lastPublishedAt: now.toISOString(),
         },
       }, partnerEvent(actor, 'catalog_published', 'Партнёр опубликован в каталоге', { readinessPercent: latestReadiness.percent, newPartnerUntil, welcomeNewsId: welcomeNews.id || '' }));
+      if (!isPublicContent(latest)) {
+        await dispatchPublishedContentNotification(db, request, 'partners', id, {
+          ...publishedPartner,
+          active: true,
+          status: 'published',
+          lifecycleStatus: 'published',
+        });
+      }
       return {
         ok: true,
         partnerId: id,
@@ -1796,6 +1820,7 @@ async function handleNewsAction(db, request, actor) {
       const ref = await db.collection('news').add(data);
       await writeHistory(db, actor, ref.id, 'create', null, data);
       await writeAuditLog(db, request, actor, 'create', 'news', ref.id, { label: `Создана новость: ${patch.title}` });
+      if (isPublicContent(data)) await dispatchPublishedContentNotification(db, request, 'news', ref.id, data);
       return { ok: true, id: ref.id };
     });
   }
@@ -1833,6 +1858,7 @@ async function handleNewsAction(db, request, actor) {
       await ref.update(patch);
       await writeHistory(db, actor, id, 'publish', before, patch);
       await writeAuditLog(db, request, actor, 'publish', 'news', id, { label: `Опубликована новость: ${before.title || id}` });
+      await dispatchPublishedContentNotification(db, request, 'news', id, { ...before, ...patch });
       return { ok: true, id, patch: { active: true, status: 'published' } };
     });
   }
@@ -1916,6 +1942,9 @@ async function handleEntityAction(db, request, actor) {
       const data = { ...patch, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() };
       const ref = await db.collection(config.collection).add(data);
       await writeAuditLog(db, request, actor, `${config.scope}:create`, config.collection, ref.id, { label: `Создан ${config.label}: ${patch.name || patch.title || ref.id}` });
+      if (['partners', 'experts', 'events'].includes(resource) && isPublicContent(data)) {
+        await dispatchPublishedContentNotification(db, request, resource, ref.id, data);
+      }
       return { ok: true, resource, id: ref.id, patch: data };
     });
   }
@@ -1934,17 +1963,19 @@ async function handleEntityAction(db, request, actor) {
       const increments = request.body?.increments || {};
       const patch = withServerTimestamps(cleanEntityPatch(request.body?.patch), request.body?.serverTimestampFields || []);
       assertLegalPatchAllowed(resource, patch, actor);
+      const beforeSnap = ['partners', 'experts', 'events'].includes(resource) ? await ref.get().catch(() => null) : null;
+      const before = beforeSnap?.exists ? beforeSnap.data() || {} : {};
       Object.entries(increments).forEach(([key, value]) => {
         patch[key] = FieldValue.increment(Number(value) || 0);
       });
       // включение карточки = публикация: active:true без явного статуса не должно оставлять её невидимым draft
       const LIFECYCLE_BRIDGE_RESOURCES = new Set(['partners', 'experts', 'events', 'news', 'prizes', 'customTasks', 'banners']);
       if (patch.active === true && !patch.status && !patch.lifecycleStatus && !patch.lifecycle && LIFECYCLE_BRIDGE_RESOURCES.has(resource)) {
-        const beforeSnap = await ref.get().catch(() => null);
-        const before = beforeSnap?.exists ? beforeSnap.data() : null;
-        if (before && ['draft', 'moderation', 'scheduled'].includes(normalizeContentStatus(before))) {
+        const lifecycleSnap = beforeSnap || await ref.get().catch(() => null);
+        const lifecycleBefore = lifecycleSnap?.exists ? lifecycleSnap.data() : null;
+        if (lifecycleBefore && ['draft', 'moderation', 'scheduled'].includes(normalizeContentStatus(lifecycleBefore))) {
           Object.assign(patch, buildLifecyclePatch({
-            item: before,
+            item: lifecycleBefore,
             resource: resource === 'customTasks' ? 'tasks' : resource,
             nextStatus: 'published',
             actorId: actor.userId || actor.uid || 'admin',
@@ -1955,6 +1986,9 @@ async function handleEntityAction(db, request, actor) {
       patch.updatedAt = FieldValue.serverTimestamp();
       await ref.set(patch, { merge: true });
       await writeAuditLog(db, request, actor, `${config.scope}:update`, config.collection, id, { label: `Обновлён ${config.label}: ${patch.name || patch.title || id}`, fields: Object.keys(patch) });
+      if (['partners', 'experts', 'events'].includes(resource) && becamePublicContent(before, { ...before, ...patch })) {
+        await dispatchPublishedContentNotification(db, request, resource, id, { ...before, ...patch });
+      }
       return { ok: true, resource, id, patch: cleanEntityPatch(request.body?.patch), increments };
     });
   }

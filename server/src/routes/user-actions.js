@@ -3794,6 +3794,46 @@ function withDialogPushTimeout(promise, ms = DIALOG_PUSH_TIMEOUT_MS) {
   ]);
 }
 
+async function sendDialogVkPush(userId, user, title, body, dialogId) {
+  const token = process.env.VK_SERVICE_TOKEN || process.env.VK_GROUP_TOKEN || process.env.VK_USER_TOKEN || '';
+  const candidate = user.vkUserId || user.vkId || user.linkedVk?.id || userId;
+  const vkUserId = String(candidate || '').replace(/^vk[_:-]?/i, '').trim();
+  if (!token || !/^\d+$/.test(vkUserId)) {
+    return { sent: 0, failed: 0, subscribers: 0, skipped: true, reason: token ? 'vk_user_id_missing' : 'vk_token_missing' };
+  }
+  try {
+    const params = new URLSearchParams({
+      access_token: token,
+      v: process.env.VK_API_VERSION || '5.199',
+      user_ids: vkUserId,
+      message: String([title, body].filter(Boolean).join('\n')).slice(0, 254),
+      fragment: buildDialogDeepLink(dialogId).replace(/^\//, ''),
+    });
+    const response = await withDialogPushTimeout(fetch('https://api.vk.com/method/notifications.sendMessage', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: params,
+    }), 15000);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.error) {
+      return {
+        sent: 0,
+        failed: 1,
+        subscribers: 1,
+        errors: [{ code: `vk/${payload.error?.error_code || response.status || 'error'}`, message: safeString(payload.error?.error_msg || response.statusText, 240) }],
+      };
+    }
+    return { sent: 1, failed: 0, subscribers: 1, errors: [] };
+  } catch (error) {
+    return {
+      sent: 0,
+      failed: 1,
+      subscribers: 1,
+      errors: [{ code: error?.code === 'push/timeout' ? 'vk/timeout' : 'vk/error', message: safeString(error?.message, 240) }],
+    };
+  }
+}
+
 async function sendDialogPush(db, userId, notificationId, title, body, dialogId) {
   const snap = await db.collection('users').doc(userId).get().catch(() => null);
   if (!snap?.exists) return { sent: 0, failed: 0, skipped: true, reason: 'user_not_found' };
@@ -3802,12 +3842,23 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
   if (isDialogActiveForUser(user, dialogId)) return { sent: 0, failed: 0, skipped: true, reason: 'dialog_active' };
   if (user.notificationsEnabled !== true && user.notificationConsent !== true) return { sent: 0, failed: 0, skipped: true, reason: 'notifications_disabled' };
   if (!boolNotificationPref(user.notificationPreferences || {}, 'messages')) return { sent: 0, failed: 0, skipped: true, reason: 'messages_disabled' };
+  if (user.notificationProvider === 'vk') {
+    const stats = await sendDialogVkPush(userId, user, title, body, dialogId);
+    await db.collection('notifications').doc(notificationId).set({
+      pushStatus: stats.skipped ? 'skipped' : stats.failed ? 'partial' : 'sent',
+      pushStats: stats,
+      pushSentAt: FieldValue.serverTimestamp(),
+    }, { merge: true }).catch(() => {});
+    return stats;
+  }
   const fcmTokens = Array.isArray(user.fcmTokens) ? user.fcmTokens.map(token => safeString(token, 600)).filter(Boolean) : [];
   const webSubscriptions = Array.isArray(user.webPushSubscriptions) ? user.webPushSubscriptions.map(normalizeDialogSubscription).filter(Boolean) : [];
   const url = `${APP_URL}${buildDialogDeepLink(dialogId)}`;
   let sent = 0;
   let failed = 0;
   const errors = [];
+  const deadFcmTokens = [];
+  const deadWebSubscriptions = [];
 
   if (fcmTokens.length) {
     try {
@@ -3822,7 +3873,14 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
       }));
       sent += result.successCount;
       failed += result.failureCount;
-      result.responses.filter(r => !r.success).slice(0, 6).forEach(r => errors.push({ code: r.error?.code || 'fcm/error', message: safeString(r.error?.message, 240) }));
+      result.responses.forEach((response, index) => {
+        if (response.success) return;
+        const code = response.error?.code || 'fcm/error';
+        if (['messaging/invalid-registration-token', 'messaging/registration-token-not-registered'].includes(code)) {
+          deadFcmTokens.push(fcmTokens[index]);
+        }
+        if (errors.length < 6) errors.push({ code, message: safeString(response.error?.message, 240) });
+      });
     } catch (e) {
       failed += fcmTokens.length;
       errors.push({ code: 'fcm/error', message: safeString(e?.message, 240) });
@@ -3839,12 +3897,27 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
         sent += 1;
       } catch (e) {
         failed += 1;
-        errors.push({ code: e.code === 'push/timeout' ? 'webpush/timeout' : e.statusCode ? `webpush/${e.statusCode}` : 'webpush/error', message: safeString(e?.body || e?.message, 240) });
+        const code = e.code === 'push/timeout' ? 'webpush/timeout' : e.statusCode ? `webpush/${e.statusCode}` : 'webpush/error';
+        errors.push({ code, message: safeString(e?.body || e?.message, 240) });
+        if ([400, 403, 404, 410].includes(e.statusCode)) deadWebSubscriptions.push(subscription);
       }
     }));
   }
 
-  const stats = { sent, failed, subscribers: fcmTokens.length + webSubscriptions.length, errors: errors.slice(0, 10) };
+  if (deadFcmTokens.length || deadWebSubscriptions.length) {
+    await db.collection('users').doc(userId).update({
+      ...(deadFcmTokens.length ? { fcmTokens: FieldValue.arrayRemove(...deadFcmTokens) } : {}),
+      ...(deadWebSubscriptions.length ? { webPushSubscriptions: FieldValue.arrayRemove(...deadWebSubscriptions) } : {}),
+      webPushUpdatedAt: FieldValue.serverTimestamp(),
+    }).catch(() => {});
+  }
+  const stats = {
+    sent,
+    failed,
+    subscribers: fcmTokens.length + webSubscriptions.length,
+    cleaned: deadFcmTokens.length + deadWebSubscriptions.length,
+    errors: errors.slice(0, 10),
+  };
   await db.collection('notifications').doc(notificationId).set({
     pushStatus: stats.subscribers ? (failed ? 'partial' : 'sent') : 'skipped',
     pushStats: stats,

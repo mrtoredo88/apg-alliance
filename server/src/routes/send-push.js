@@ -199,7 +199,10 @@ async function sendToWebPushSubscriptions(subscriptions, userIds, title, body, u
       failed += 1;
       const code = e.code === 'push/timeout' ? 'webpush/timeout' : e.statusCode ? `webpush/${e.statusCode}` : 'webpush/error';
       errors.push({ code, message: String(e.body || e.message || '').slice(0, 300) });
-      if (e.statusCode === 404 || e.statusCode === 410) {
+      // 400/403 are returned by push services for subscriptions created with
+      // an obsolete VAPID key as well as malformed/expired subscriptions.
+      // Keeping them guarantees that every later broadcast fails again.
+      if ([400, 403, 404, 410].includes(e.statusCode)) {
         deadByUser[userId] ??= [];
         deadByUser[userId].push(subscription);
       }
@@ -229,6 +232,216 @@ function mergeStats(nativeStats, fcmStats, subscribers) {
   };
 }
 
+function vkNotificationToken() {
+  return process.env.VK_SERVICE_TOKEN || process.env.VK_GROUP_TOKEN || process.env.VK_USER_TOKEN || '';
+}
+
+function vkRecipientId(documentId, data = {}) {
+  const candidate = data.vkUserId || data.vkId || data.linkedVk?.id || (data.notificationProvider === 'vk' ? documentId : '');
+  const value = String(candidate || '').replace(/^vk[_:-]?/i, '').trim();
+  return /^\d+$/.test(value) ? value : '';
+}
+
+async function sendToVkUsers(userIds, title, body, url) {
+  if (!userIds.length) return { sent: 0, failed: 0, errors: [] };
+  const token = vkNotificationToken();
+  if (!token) {
+    return {
+      sent: 0,
+      failed: userIds.length,
+      errors: [{ code: 'vk/token_missing', message: 'VK notification token is not configured' }],
+    };
+  }
+
+  let sent = 0;
+  let failed = 0;
+  const errors = [];
+  const message = String([title, body].filter(Boolean).join('\n')).slice(0, 254);
+  const fragment = (() => {
+    try { return new URL(url || APP_URL).pathname.replace(/^\//, ''); } catch { return ''; }
+  })();
+
+  for (let i = 0; i < userIds.length; i += 100) {
+    const batch = userIds.slice(i, i + 100);
+    try {
+      const params = new URLSearchParams({
+        access_token: token,
+        v: process.env.VK_API_VERSION || '5.199',
+        user_ids: batch.join(','),
+        message,
+        ...(fragment ? { fragment } : {}),
+      });
+      const response = await withPushTimeout(fetch('https://api.vk.com/method/notifications.sendMessage', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: params,
+      }), 15000);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.error) {
+        failed += batch.length;
+        errors.push({
+          code: `vk/${payload.error?.error_code || response.status || 'error'}`,
+          message: String(payload.error?.error_msg || response.statusText || 'VK notification failed').slice(0, 300),
+        });
+        continue;
+      }
+      const delivered = Array.isArray(payload.response)
+        ? payload.response.filter(item => item?.status !== false && item?.status !== 0).length
+        : batch.length;
+      sent += delivered;
+      failed += Math.max(batch.length - delivered, 0);
+    } catch (error) {
+      failed += batch.length;
+      errors.push({
+        code: error?.code === 'push/timeout' ? 'vk/timeout' : 'vk/error',
+        message: String(error?.message || error).slice(0, 300),
+      });
+    }
+  }
+  return { sent, failed, errors: errors.slice(0, 12) };
+}
+
+export async function sendBroadcastPush({
+  db = getDb(),
+  title,
+  body = '',
+  url,
+  tag,
+  notificationId,
+  category = 'important',
+  type = 'info',
+  priority = 'normal',
+  imageUrl,
+  actionLabel,
+  audience = {},
+  logger,
+}) {
+  if (!title) throw Object.assign(new Error('title required'), { statusCode: 400 });
+  const snap = await db.collection('users').get();
+  const tokens = [];
+  const tokenUserIds = [];
+  const subscriptions = [];
+  const subscriptionUserIds = [];
+  const vkUserIds = [];
+  const skippedReasons = {
+    noConsent: 0,
+    vkProvider: 0,
+    categoryOptOut: 0,
+    audienceMismatch: 0,
+    noSubscription: 0,
+  };
+  let reachedUsers = 0;
+
+  snap.docs.forEach(d => {
+    const data = d.data() || {};
+    const prefs = data.notificationPreferences || DEFAULT_CATEGORIES;
+    const hasConsent = data.notificationsEnabled === true || data.notificationConsent === true;
+    if (!hasConsent) { skippedReasons.noConsent += 1; return; }
+    if (!boolPref(prefs, category)) { skippedReasons.categoryOptOut += 1; return; }
+    if (!userMatchesAudience(data, audience)) { skippedReasons.audienceMismatch += 1; return; }
+    if (data.notificationProvider === 'vk') {
+      const vkUserId = vkRecipientId(d.id, data);
+      if (!vkUserId) { skippedReasons.vkProvider += 1; return; }
+      vkUserIds.push(vkUserId);
+      reachedUsers += 1;
+      return;
+    }
+    if (data.notificationProvider && data.notificationProvider !== 'webpush') { skippedReasons.noSubscription += 1; return; }
+    const fcmTokens = Array.isArray(data.fcmTokens) ? data.fcmTokens : [];
+    const webPushSubs = Array.isArray(data.webPushSubscriptions) ? data.webPushSubscriptions : [];
+    if (!fcmTokens.length && !webPushSubs.length) { skippedReasons.noSubscription += 1; return; }
+    reachedUsers += 1;
+    fcmTokens.forEach(token => {
+      tokens.push(token);
+      tokenUserIds.push(d.id);
+    });
+    webPushSubs.forEach(subscription => {
+      subscriptions.push(subscription);
+      subscriptionUserIds.push(d.id);
+    });
+  });
+
+  const audienceSummary = { totalUsers: snap.size, reachedUsers, skippedReasons };
+  let total;
+  if (!tokens.length && !subscriptions.length && !vkUserIds.length) {
+    total = {
+      skipped: true,
+      reason: 'no matching webpush subscribers',
+      subscribers: 0,
+      sent: 0,
+      failed: 0,
+      cleaned: 0,
+      ...audienceSummary,
+    };
+  } else {
+    const fcmTotal = { sent: 0, failed: 0, cleaned: 0, errors: [] };
+    for (let i = 0; i < tokens.length; i += 500) {
+      const stats = await sendToFcmTokens(
+        tokens.slice(i, i + 500),
+        tokenUserIds.slice(i, i + 500),
+        title,
+        body,
+        url,
+        tag,
+        { notificationId, category, type, priority, imageUrl, actionLabel },
+      );
+      fcmTotal.sent += stats.sent;
+      fcmTotal.failed += stats.failed;
+      fcmTotal.cleaned += stats.cleaned;
+      fcmTotal.errors = [...fcmTotal.errors, ...(stats.errors || [])].slice(0, 20);
+    }
+    const nativeTotal = await sendToWebPushSubscriptions(
+      subscriptions,
+      subscriptionUserIds,
+      title,
+      body,
+      url,
+      tag,
+      { notificationId, category, type, priority, imageUrl, actionLabel },
+    );
+    const vkTotal = await sendToVkUsers(vkUserIds, title, body, url);
+    const webTotal = mergeStats(nativeTotal, fcmTotal, subscriptions.length + tokens.length);
+    total = {
+      ...webTotal,
+      subscribers: webTotal.subscribers + vkUserIds.length,
+      sent: webTotal.sent + vkTotal.sent,
+      failed: webTotal.failed + vkTotal.failed,
+      errors: [...(webTotal.errors || []), ...(vkTotal.errors || [])].slice(0, 20),
+      vk: vkTotal,
+      ...audienceSummary,
+    };
+  }
+
+  const logEntry = {
+    title,
+    body,
+    category,
+    priority,
+    audience,
+    notificationId: notificationId || null,
+    source: 'server-notification-pipeline',
+    ...audienceSummary,
+    subscribers: total.subscribers || 0,
+    sent: total.sent || 0,
+    failed: total.failed || 0,
+    cleaned: total.cleaned || 0,
+    errors: total.errors || [],
+    skipped: total.skipped === true,
+    createdAt: FieldValue.serverTimestamp(),
+  };
+  logger?.info?.({ push: { title, category, ...audienceSummary, sent: total.sent, failed: total.failed } }, 'push broadcast result');
+  await db.collection('pushLogs').add(logEntry).catch(() => {});
+  if (notificationId) {
+    await db.collection('notifications').doc(String(notificationId)).set({
+      pushStatus: total.skipped ? 'skipped' : total.failed ? 'partial' : 'sent',
+      pushStats: total,
+      pushSentAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true }).catch(() => {});
+  }
+  return total;
+}
+
 export default async function sendPushRoutes(fastify) {
   fastify.post('/api/send-push', async (request, reply) => {
     const secret = request.headers['x-push-secret'];
@@ -252,7 +465,23 @@ export default async function sendPushRoutes(fastify) {
       if (userId && !broadcast) {
         const snap = await db.collection('users').doc(String(userId)).get();
         if (!snap.exists) return reply.code(404).send({ error: 'user not found' });
-        const { fcmTokens = [], webPushSubscriptions = [] } = snap.data();
+        const userData = snap.data() || {};
+        const { fcmTokens = [], webPushSubscriptions = [] } = userData;
+        const hasConsent = userData.notificationsEnabled === true || userData.notificationConsent === true;
+        if (!hasConsent) return { skipped: true, reason: 'notifications_disabled', subscribers: 0, sent: 0, failed: 0 };
+        if (!boolPref(userData.notificationPreferences || DEFAULT_CATEGORIES, category)) {
+          return { skipped: true, reason: 'category_disabled', subscribers: 0, sent: 0, failed: 0 };
+        }
+        if (userData.notificationProvider === 'vk') {
+          const vkUserId = vkRecipientId(snap.id, userData);
+          const stats = await sendToVkUsers(vkUserId ? [vkUserId] : [], title, body, url);
+          if (notificationId) await db.collection('notifications').doc(String(notificationId)).set({
+            pushStatus: stats.failed ? 'partial' : stats.sent ? 'sent' : 'skipped',
+            pushStats: { ...stats, subscribers: vkUserId ? 1 : 0 },
+            pushSentAt: FieldValue.serverTimestamp(),
+          }, { merge: true }).catch(() => {});
+          return { ...stats, subscribers: vkUserId ? 1 : 0 };
+        }
         if (!fcmTokens.length && !webPushSubscriptions.length) return { skipped: true, reason: 'no push subscriptions', subscribers: 0, sent: 0, failed: 0 };
 
         const nativeStats = await sendToWebPushSubscriptions(
@@ -276,102 +505,21 @@ export default async function sendPushRoutes(fastify) {
       }
 
       if (broadcast) {
-        const snap = await db.collection('users').get();
-
-        const tokens  = [];
-        const tokenUserIds = [];
-        const subscriptions = [];
-        const subscriptionUserIds = [];
-        const skippedReasons = {
-          noConsent: 0,        // уведомления не включены пользователем
-          vkProvider: 0,       // провайдер VK — web push недоступен
-          categoryOptOut: 0,   // категория отключена в настройках
-          audienceMismatch: 0, // не попал в целевую аудиторию
-          noSubscription: 0,   // согласие есть, но нет push-подписки
-        };
-        let reachedUsers = 0;
-        snap.docs.forEach(d => {
-          const data = d.data() || {};
-          const prefs = data.notificationPreferences || DEFAULT_CATEGORIES;
-          const hasConsent = data.notificationsEnabled === true || data.notificationConsent === true;
-          if (!hasConsent) { skippedReasons.noConsent += 1; return; }
-          if (data.notificationProvider && data.notificationProvider !== 'webpush') { skippedReasons.vkProvider += 1; return; }
-          if (!boolPref(prefs, category)) { skippedReasons.categoryOptOut += 1; return; }
-          if (!userMatchesAudience(data, audience)) { skippedReasons.audienceMismatch += 1; return; }
-          const fcmTokens = data.fcmTokens ?? [];
-          const webPushSubs = data.webPushSubscriptions ?? [];
-          if (!fcmTokens.length && !webPushSubs.length) { skippedReasons.noSubscription += 1; return; }
-          reachedUsers += 1;
-          fcmTokens.forEach(t => {
-            tokens.push(t);
-            tokenUserIds.push(d.id);
-          });
-          webPushSubs.forEach(s => {
-            subscriptions.push(s);
-            subscriptionUserIds.push(d.id);
-          });
+        const total = await sendBroadcastPush({
+          db,
+          title,
+          body,
+          url,
+          tag,
+          notificationId,
+          category,
+          type,
+          priority,
+          imageUrl,
+          actionLabel,
+          audience,
+          logger: request.log,
         });
-
-        const audienceSummary = {
-          totalUsers: snap.size,
-          reachedUsers,
-          skippedReasons,
-        };
-
-        const writePushLog = async (stats) => {
-          const logEntry = {
-            title,
-            body: body ?? '',
-            category,
-            priority,
-            audience,
-            notificationId: notificationId ?? null,
-            actorUid: actor?.uid || null,
-            actorName: actor?.name || (secret ? 'system-secret' : null),
-            ...audienceSummary,
-            subscribers: stats.subscribers ?? 0,
-            sent: stats.sent ?? 0,
-            failed: stats.failed ?? 0,
-            cleaned: stats.cleaned ?? 0,
-            errors: stats.errors ?? [],
-            skipped: stats.skipped === true,
-            createdAt: FieldValue.serverTimestamp(),
-          };
-          request.log.info({ push: { title, category, ...audienceSummary, sent: stats.sent, failed: stats.failed, errors: stats.errors } }, 'push broadcast result');
-          await db.collection('pushLogs').add(logEntry).catch(() => {});
-        };
-
-        if (!tokens.length && !subscriptions.length) {
-          const skipped = { skipped: true, reason: 'no matching webpush subscribers', subscribers: 0, sent: 0, failed: 0, cleaned: 0, ...audienceSummary };
-          await writePushLog(skipped);
-          if (notificationId) await db.collection('notifications').doc(String(notificationId)).set({
-            pushStatus: 'skipped',
-            pushStats: skipped,
-            pushSentAt: FieldValue.serverTimestamp(),
-          }, { merge: true }).catch(() => {});
-          return skipped;
-        }
-
-        let fcmTotal = { sent: 0, failed: 0, cleaned: 0, errors: [] };
-        for (let i = 0; i < tokens.length; i += 500) {
-          const s = await sendToFcmTokens(
-            tokens.slice(i, i + 500), tokenUserIds.slice(i, i + 500),
-            title, body, url, tag,
-            { notificationId, category, type, priority, imageUrl, actionLabel },
-          );
-          fcmTotal.sent    += s.sent;
-          fcmTotal.failed  += s.failed;
-          fcmTotal.cleaned += s.cleaned;
-          fcmTotal.errors = [...(fcmTotal.errors || []), ...(s.errors || [])].slice(0, 20);
-        }
-        const nativeTotal = await sendToWebPushSubscriptions(subscriptions, subscriptionUserIds, title, body, url, tag, { notificationId, category, type, priority, imageUrl, actionLabel });
-        const total = { ...mergeStats(nativeTotal, fcmTotal, subscriptions.length + tokens.length), ...audienceSummary };
-        await writePushLog(total);
-        if (notificationId) await db.collection('notifications').doc(String(notificationId)).set({
-          pushStatus: total.failed ? 'partial' : 'sent',
-          pushStats: total,
-          pushSentAt: FieldValue.serverTimestamp(),
-        }, { merge: true }).catch(() => {});
         if (actor) await writeAuditLog(db, request, actor, 'push:broadcast', 'notifications', 'broadcast', { label: `Broadcast push: ${title}`, subscribers: total.subscribers, sent: total.sent, failed: total.failed });
         return { broadcast: true, ...total };
       }
@@ -380,5 +528,82 @@ export default async function sendPushRoutes(fastify) {
     } catch (e) {
       return reply.code(500).send({ error: e.message });
     }
+  });
+
+  fastify.post('/api/send-push/retry-pending', async (request, reply) => {
+    const secret = request.headers['x-push-secret'];
+    const valid = (secret && secret === process.env.PUSH_SECRET) || (secret && secret === process.env.RAFFLE_SECRET);
+    if (!valid) {
+      try {
+        await requireAdminPermission(request, 'push:*');
+      } catch {
+        return reply.code(401).send({ error: 'unauthorized' });
+      }
+    }
+    const db = getDb();
+    const max = Math.min(Math.max(Number(request.body?.limit || 25), 1), 100);
+    const maxAgeHours = Math.min(Math.max(Number(request.body?.maxAgeHours || 48), 1), 168);
+    const cutoff = Date.now() - maxAgeHours * 60 * 60 * 1000;
+    const snapshot = await db.collection('notifications').limit(500).get();
+    const pending = snapshot.docs
+      .map(document => ({ id: document.id, ...(document.data() || {}) }))
+      .filter(item => ['news', 'events', 'partners', 'experts'].includes(item.category))
+      .filter(item => ['pending', 'error'].includes(item.pushStatus));
+    const timestampMs = item => item.createdAt?.toMillis?.()
+      || item.createdAt?.toDate?.().getTime()
+      || new Date(item.createdAt || 0).getTime()
+      || 0;
+    const stale = pending.filter(item => timestampMs(item) < cutoff);
+    const candidates = pending
+      .filter(item => timestampMs(item) >= cutoff)
+      .slice(0, max);
+    if (stale.length) {
+      const batch = db.batch();
+      stale.forEach(item => batch.set(db.collection('notifications').doc(item.id), {
+        pushStatus: 'skipped',
+        pushSkipReason: 'stale_pending_notification',
+        pushSkippedAt: FieldValue.serverTimestamp(),
+      }, { merge: true }));
+      await batch.commit();
+    }
+    const results = [];
+    for (const item of candidates) {
+      try {
+        const deepLink = item.deepLink || item.url || '/';
+        const targetUrl = /^https?:\/\//i.test(deepLink) ? deepLink : `${APP_URL}${deepLink.startsWith('/') ? deepLink : `/${deepLink}`}`;
+        const stats = await sendBroadcastPush({
+          db,
+          title: item.title || 'Уведомление АПГ',
+          body: item.body || item.text || '',
+          url: targetUrl,
+          tag: `apg-retry-${item.id}`,
+          notificationId: item.id,
+          category: item.category,
+          type: item.type || 'info',
+          priority: item.priority || 'normal',
+          imageUrl: item.imageUrl || '',
+          actionLabel: item.actionLabel || 'Открыть',
+          audience: item.audience || { type: 'all' },
+          logger: request.log,
+        });
+        results.push({ id: item.id, category: item.category, sent: stats.sent || 0, failed: stats.failed || 0, skipped: stats.skipped === true });
+      } catch (error) {
+        await db.collection('notifications').doc(item.id).set({
+          pushStatus: 'error',
+          pushError: String(error?.message || error).slice(0, 300),
+          pushFailedAt: FieldValue.serverTimestamp(),
+        }, { merge: true }).catch(() => {});
+        results.push({ id: item.id, category: item.category, error: String(error?.message || error) });
+      }
+    }
+    return {
+      ok: true,
+      staleSkipped: stale.length,
+      candidates: candidates.length,
+      processed: results.length,
+      sent: results.reduce((sum, item) => sum + Number(item.sent || 0), 0),
+      failed: results.reduce((sum, item) => sum + Number(item.failed || 0), 0),
+      results,
+    };
   });
 }

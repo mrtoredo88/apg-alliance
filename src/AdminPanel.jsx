@@ -4776,8 +4776,6 @@ export const AdminPanel = () => {
   const [ePriceType, setEPriceType] = useState('free');
   const [ePrice, setEPrice]         = useState('');
   const [ePriceIsFrom, setEPriceIsFrom] = useState(false);
-  const [eSendPush, setESendPush]   = useState(true);
-  const [nSendPush, setNSendPush]   = useState(true);
   const [eSaving, setESaving]       = useState(false);
   const [pushReport, setPushReport] = useState(null);
 
@@ -6512,26 +6510,14 @@ export const AdminPanel = () => {
       publishedAt: nPublishedAt ? new Date(nPublishedAt) : new Date(),
       expiresAt: nExpiresAt ? new Date(nExpiresAt) : null,
     };
-    const isNew = !editingNews;
     if (editingNews) {
       await runAdminAction('news:update', { id: editingNews.id, patch: data });
     } else {
       await runAdminAction('news:create', { patch: data });
     }
     clearAdminDraft('news');
-    const wantPush = isNew && nSendPush;
     resetNewsForm();
     fetchData();
-    if (wantPush) {
-      await publishContentPush({
-        context: `Новость «${data.title}»`,
-        title: `${data.emoji || '📰'} ${data.title}`,
-        body: data.summary || data.subtitle || data.text.slice(0, 120),
-        category: 'news',
-        deepLink: '/news',
-        imageUrl: data.coverPhoto || '',
-      });
-    }
   };
 
   const showUndo = (payload) => {
@@ -6896,7 +6882,7 @@ export const AdminPanel = () => {
     setEPartnerId('');
     setELinkLabel(''); setELinkUrl(''); setEPriority(0);
     setECategory(''); setECoverPhoto(''); setEStartAt(''); setEEndAt(''); setELocation('');
-    setEPriceType('free'); setEPrice(''); setEPriceIsFrom(false); setESendPush(true);
+    setEPriceType('free'); setEPrice(''); setEPriceIsFrom(false);
     setEditingEvent(null); setShowEventModal(false);
   };
 
@@ -6989,7 +6975,6 @@ export const AdminPanel = () => {
       currency:  '₽',
       priceIsFrom: ePriceType === 'paid' ? ePriceIsFrom : false,
     };
-    const isNew = !editingEvent;
     setESaving(true);
     try {
       if (editingEvent) {
@@ -7012,19 +6997,8 @@ export const AdminPanel = () => {
     }
     setESaving(false);
     clearAdminDraft('event');
-    const wantPush = isNew && eSendPush;
     resetEventForm();
     fetchData();
-    if (wantPush) {
-      await publishContentPush({
-        context: `Мероприятие «${data.title}»`,
-        title: `${data.emoji || '🎉'} ${data.title}`,
-        body: [data.date || (data.startAt ? new Date(eStartAt).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : ''), data.address || data.location].filter(Boolean).join(' · ') || 'Новое мероприятие АПГ',
-        category: 'events',
-        deepLink: '/events',
-        imageUrl: data.coverPhoto || '',
-      });
-    }
   };
 
   const deleteEvent = async (id) => {
@@ -9795,10 +9769,9 @@ export const AdminPanel = () => {
             <input style={s.input} placeholder="Зеленоград, корп. 1234" value={eLocation} onChange={e => setELocation(e.target.value)} />
 
                 {!editingEvent && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 13, color: eSendPush ? A.gold : A.textSec, fontWeight: 700, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={eSendPush} onChange={e => setESendPush(e.target.checked)} />
-                    📣 Отправить push-уведомление подписчикам после публикации
-                  </label>
+                  <div style={{ marginBottom: 12, fontSize: 12, lineHeight: '17px', color: A.textSec }}>
+                    📣 После публикации подписчики автоматически получат уведомление согласно своим настройкам.
+                  </div>
                 )}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button style={{ ...s.btn, ...s.btnPri, flex: 1, minWidth: 160, opacity: eSaving ? 0.6 : 1 }} disabled={eSaving} onClick={saveEvent}>
@@ -10157,10 +10130,9 @@ export const AdminPanel = () => {
             </label>
 
                 {!editingNews && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 13, color: nSendPush ? A.gold : A.textSec, fontWeight: 700, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={nSendPush} onChange={e => setNSendPush(e.target.checked)} />
-                    📣 Отправить push-уведомление подписчикам после публикации
-                  </label>
+                  <div style={{ marginBottom: 12, fontSize: 12, lineHeight: '17px', color: A.textSec }}>
+                    📣 После публикации подписчики автоматически получат уведомление согласно своим настройкам.
+                  </div>
                 )}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button style={{ ...s.btn, ...s.btnPri, flex: 1, minWidth: 160 }} onClick={saveNews}>
