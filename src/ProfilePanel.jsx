@@ -2853,6 +2853,91 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           </div>
         </GlassSection>
 
+        {showConnectionsModal && createPortal(
+          <ApgModal
+            title="Люди"
+            subtitle="Друзья, заявки и диалоги"
+            onClose={() => setShowConnectionsModal(false)}
+            maxWidth={540}
+          >
+            <div data-people-list data-connections-list style={{ display: 'grid', gap: 12 }}>
+              <GlassInput
+                data-people-search-modal
+                value={peopleSearch}
+                onChange={e => setPeopleSearch(e.target.value)}
+                placeholder="Найти человека, компанию, роль или город"
+                style={{ minHeight: 48, borderRadius: 20, fontSize: 14 }}
+              />
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+                {PEOPLE_TABS.map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setPeopleTab(tab.id)}
+                    style={{ minHeight: 38, borderRadius: 999, border: `1px solid ${peopleTab === tab.id ? 'rgba(201,168,76,0.48)' : 'rgba(var(--apg2-glass-a,255,255,255),0.13)'}`, background: peopleTab === tab.id ? 'linear-gradient(135deg, rgba(201,168,76,0.24), rgba(201,168,76,0.10))' : 'rgba(var(--apg2-glass-a,255,255,255),0.065)', color: peopleTab === tab.id ? APG2.gold : APG2.textSoft, padding: '8px 12px', fontSize: 12, fontWeight: 850, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    {tab.label} {peopleCounts[tab.id] || ''}
+                  </button>
+                ))}
+              </div>
+              {peopleSearchLoading && <div style={{ color: APG2.textMuted, fontSize: 13, textAlign: 'center', padding: 8 }}>Ищем участников...</div>}
+              {visiblePeopleRows.length ? visiblePeopleRows.map(person => (
+                <button
+                  key={person.id}
+                  type="button"
+                  onClick={() => { setPeopleSheet(person); setShowConnectionsModal(false); }}
+                  style={{ width: '100%', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', borderRadius: 20, padding: 11, display: 'grid', gridTemplateColumns: '48px minmax(0,1fr) auto', gap: 11, alignItems: 'center', color: APG2.text, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}
+                >
+                  <PeopleAvatar person={person} size={48} radius={18} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 14, lineHeight: '18px', fontWeight: 880, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person.displayName}</span>
+                    <span style={{ display: 'block', color: APG2.textMuted, fontSize: 11.5, lineHeight: '16px', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{peopleContextLine(person) || peopleStatusLabel(person.relationStatus)}</span>
+                  </span>
+                  <span style={{ color: APG2.gold, fontSize: 18 }}>›</span>
+                </button>
+              )) : (
+                <div data-people-empty-state style={{ borderRadius: 20, border: '1px dashed rgba(var(--apg2-glass-a,255,255,255),0.16)', padding: 16 }}>
+                  <div style={{ color: APG2.text, fontSize: 14, fontWeight: 880 }}>{peopleEmptyTitle(peopleTab, Boolean(peopleSearch.trim()))}</div>
+                  <div style={{ color: APG2.textMuted, fontSize: 12, lineHeight: '18px', marginTop: 5 }}>{peopleEmptyText(peopleTab, Boolean(peopleSearch.trim()))}</div>
+                </div>
+              )}
+            </div>
+          </ApgModal>,
+          document.body
+        )}
+
+        {peopleSheet && createPortal(
+          <ApgModal
+            title={peopleSheet.displayName || 'Участник АПГ'}
+            subtitle={peopleContextLine(peopleSheet) || peopleStatusLabel(peopleSheet.relationStatus)}
+            onClose={() => setPeopleSheet(null)}
+            maxWidth={480}
+          >
+            <div data-people-bottom-sheet style={{ display: 'grid', gap: 14 }}>
+              <div style={{ display: 'grid', justifyItems: 'center', gap: 9, textAlign: 'center' }}>
+                <PeopleAvatar person={peopleSheet} size={76} radius={27} />
+                <span style={peopleStatusChipStyle(peopleSheet.relationStatus)}>{peopleStatusLabel(peopleSheet.relationStatus)}</span>
+                {(peopleSheet.about || peopleSheet.city || peopleSuggestionReason(peopleSheet)) && <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>{peopleSheet.about || peopleSuggestionReason(peopleSheet) || peopleSheet.city}</div>}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <GlassButton
+                  tone="gold"
+                  disabled={peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING || peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED}
+                  onClick={() => {
+                    runPersonPrimaryAction(peopleSheet);
+                    if (peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND) setPeopleSheet(null);
+                  }}
+                  style={{ flex: 1 }}
+                >
+                  {peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Заявка отправлена' : 'Добавить'}
+                </GlassButton>
+                <GlassButton onClick={() => { setPeopleSheet(null); setShowConnectionsModal(true); }} style={{ flex: 1 }}>К списку</GlassButton>
+              </div>
+            </div>
+          </ApgModal>,
+          document.body
+        )}
+
         {showEmailAuth && createPortal(
           <ApgModal
             title="Войти по почте"

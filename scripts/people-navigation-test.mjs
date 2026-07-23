@@ -16,6 +16,11 @@ assert.doesNotMatch(profile, /data-my-contacts-button[\s\S]{0,180}onPointerDown=
 assert.doesNotMatch(profile, /data-people-panel[\s\S]{0,12000}data-digital-business-card/, 'People summary does not duplicate the nearby referral and QR actions');
 
 assert.match(profile, /showConnectionsModal && createPortal\([\s\S]*?title="Люди"[\s\S]*?data-people-list/, 'Open People renders the People modal portal');
+const v2Start = profile.indexOf("if (variant === 'v2')");
+const legacyStart = profile.indexOf("\n  return (\n    <div style={{ background: 'transparent'", v2Start);
+const v2Source = profile.slice(v2Start, legacyStart);
+assert.match(v2Source, /showConnectionsModal && createPortal\([\s\S]*?title="Люди"[\s\S]*?data-people-list/, 'Profile v2 mounts the People modal that its buttons open');
+assert.match(v2Source, /peopleSheet && createPortal\([\s\S]*?data-people-bottom-sheet/, 'Profile v2 mounts participant cards');
 assert.match(profile, /showBusinessCard && createPortal\([\s\S]*?title="Цифровая карточка"[\s\S]*?data-business-card-modal[\s\S]*?<QRCodeSVG value=\{businessCardUrl\}/, 'My QR renders the QR business card portal');
 assert.match(profile, /businessCardUrl = useMemo\(\(\) => `\$\{APP_URL\.replace\(\/\\\/\+\$\/, ''\)\}\/profile\/\$\{encodeURIComponent\(String\(user\?\.id \|\| ''\)\)\}`/, 'QR card uses the current user profile URL safely');
 
