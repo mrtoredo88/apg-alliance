@@ -1159,7 +1159,8 @@ export function ArticleView({
   };
 
   if (desktopMode) {
-    const heroImage = photos[0] || getNewsPhotoItems(item)[0]?.url || getNewsImage(item) || '';
+    const heroImage = videos.length ? '' : photos[0] || getNewsPhotoItems(item)[0]?.url || getNewsImage(item) || '';
+    const displayTitle = /^(clip|video)\s+by\b/i.test(title) ? 'Видео АПГ' : title;
     const newsDate = getNewsDate(item);
     const activeTab = desktopTab === 'content' ? 'content' : desktopTab === 'comments' ? 'comments' : desktopTab === 'related' ? 'related' : 'content';
     const heroActions = [
@@ -1170,18 +1171,14 @@ export function ArticleView({
       { id: 'loki', icon: '🤖', label: 'Loki', onClick: openLokiForArticle },
     ].filter(Boolean);
     const stickyActions = [
-      { id: 'close', icon: '✕', label: 'Закрыть', tone: 'gold', onClick: onClose },
       { id: 'question', icon: '💬', label: 'Коммент.', onClick: () => setDesktopTab('comments'), disabled: commentsDisabledByFlag },
       { id: 'prev', icon: '←', label: previousItem ? 'Назад' : 'Назад', onClick: () => previousItem && onNavigate(previousItem), disabled: !previousItem },
       { id: 'next', icon: '→', label: nextItem ? 'Далее' : 'Далее', onClick: () => nextItem && onNavigate(nextItem), disabled: !nextItem },
     ];
     const kpiItems = [
-      { id: 'category', label: 'Категория', value: getNewsCategoryLabel(item), icon: '🏷️' },
       newsDate ? { id: 'date', label: 'Дата', value: newsDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }), icon: '📅' } : null,
       { id: 'views', label: 'Просмотры', value: getNewsViews(item), icon: '👁️' },
-      { id: 'reactions', label: 'Реакции', value: getNewsReactionsTotal(item), icon: '💬' },
       { id: 'comments', label: 'Комментарии', value: stats.comments || 0, icon: '💬' },
-      item.source ? { id: 'source', label: 'Источник', value: item.source, icon: '🔗' } : null,
     ].filter(Boolean);
     const heroMetaItems = [
       { id: 'category', label: 'Категория', value: getNewsCategoryLabel(item), icon: '🏷️' },
@@ -1205,7 +1202,7 @@ export function ArticleView({
 
     const articleShell = (
       <DesktopDetailShell
-        title={title}
+        title={displayTitle}
         onBack={onClose}
         style={{
           position: 'fixed',
@@ -1222,11 +1219,6 @@ export function ArticleView({
             <DesktopSidebarCard title="Мета" subtitle="Параметры публикации">
               <DesktopMeta items={heroMetaItems} />
             </DesktopSidebarCard>
-            {photos.length > 0 && (
-              <DesktopSidebarCard title="Мини-галерея" subtitle="Фотографии новости">
-                <DesktopGallery items={photos} onOpen={setLightboxIndex} />
-              </DesktopSidebarCard>
-            )}
             <DesktopSidebarCard title="Связанные" subtitle="Еще материалы">
               {relatedItems.length ? <DesktopRelated items={relatedItems} onOpen={(itemItem) => onClose(itemItem)} /> : (
                 <DesktopEmptyState
@@ -1244,12 +1236,12 @@ export function ArticleView({
       >
         <DesktopHero
           image={heroImage}
-          title={title}
+          title={displayTitle}
           subtitle={formatNewsDate(item)}
           kicker="Новость"
           status={sourceLabel}
           badges={getSmartBadges(item).map(([emoji, label]) => ({ id: String(label).toLowerCase(), label: `${emoji} ${label}` }))}
-          description={text ? text.slice(0, 220) : 'Новость АПГ. Подробнее внутри материала.'}
+          description={text ? text.slice(0, 220) : videos.length ? 'Видео из сообщества АПГ во ВКонтакте.' : 'Новость АПГ. Подробнее внутри материала.'}
           meta={<DesktopInfoGrid items={kpiItems} columns="repeat(3, minmax(0, 1fr))" />}
           actions={<DesktopHeroActions actions={heroActions} />}
         />
@@ -1258,9 +1250,6 @@ export function ArticleView({
         {activeTab === 'content' && (
           <div style={{ display: 'grid', gap: 14 }}>
             <ArticleContentRenderer item={item} desktop />
-            <DesktopSection title="Рекомендации" subtitle="Что открыть дальше">
-              {!!related.length && <DesktopRelated items={relatedItems} onOpen={(relatedItem) => onClose(relatedItem)} />}
-            </DesktopSection>
           </div>
         )}
 
@@ -1287,9 +1276,6 @@ export function ArticleView({
             )}
           </DesktopSection>
         )}
-        <DesktopSection title="Действия с публикацией" subtitle="Оценки и сохранение">
-          <ArticleActions item={item} saved={saved} later={later} reaction={reaction} subscriptions={subscriptions} onReact={onReact} onSave={onSave} onReadLater={onReadLater} onSubscribe={onSubscribe} onShare={trackShare} onToast={onToast} />
-        </DesktopSection>
         <DesktopActionBar actions={[
           previousItem ? { id: 'prev', label: 'Предыдущая', onClick: () => previousItem && onNavigate(previousItem) } : null,
           nextItem ? { id: 'next', label: 'Следующая', onClick: () => nextItem && onNavigate(nextItem) } : null,

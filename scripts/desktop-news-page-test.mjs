@@ -46,8 +46,16 @@ if (!newsSource.includes('desktopMode = false') || !newsSource.includes('if (des
   throw new Error('NewsPage must keep desktop rendering behind the desktopMode flag.');
 }
 
-if (!newsSource.includes('<DesktopGallery items={photos} onOpen={setLightboxIndex} />')) {
-  throw new Error('NewsPage desktop detail mini-gallery must open the clicked photo index.');
+if (newsSource.includes('title="Мини-галерея"')) {
+  throw new Error('NewsPage desktop detail must not repeat the hero image in a mini-gallery.');
+}
+
+if (!newsSource.includes("const displayTitle = /^(clip|video)\\s+by\\b/i.test(title) ? 'Видео АПГ' : title;")) {
+  throw new Error('NewsPage desktop detail must replace technical clip titles with a readable title.');
+}
+
+if (!desktopUiSource.includes("const contentColumns = avatar")) {
+  throw new Error('DesktopHero must not reserve an empty avatar column when an avatar is absent.');
 }
 
 if (!newsSource.includes("desktopMode\n      ? selectedArticleView\n      : createPortal(selectedArticleView, document.body)")) {

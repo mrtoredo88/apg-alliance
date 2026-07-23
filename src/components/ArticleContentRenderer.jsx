@@ -189,24 +189,24 @@ export function ArticleContentRenderer({ item, desktop = false, showHero = true,
   const sourceLabel = item?.source === 'apg' ? 'АПГ' : item?.source === 'vk' ? 'VK' : item?.source || 'АПГ';
 
   if (desktop) {
+    const secondaryPhotos = photos.slice(1);
+    const hasAdditionalMedia = secondaryPhotos.length > 0 || videos.length > 0 || links.length > 0 || docs.length > 0;
+    const hasWrittenContent = Boolean(text || (Array.isArray(item?.contentBlocks) && item.contentBlocks.length));
     return (
       <>
-        {showHero && (
+        {showHero && hasWrittenContent && (
           <DesktopSection title="Содержание" subtitle={sourceLabel}>
-            <RichText color="var(--apg-news-article-text)" fontSize={15} lineHeight="24px">{text || 'Полный текст новости появляется здесь после публикации.'}</RichText>
+            {text && <RichText color="var(--apg-news-article-text)" fontSize={15} lineHeight="24px">{text}</RichText>}
             <ArticleContentBlocks blocks={item?.contentBlocks} />
           </DesktopSection>
         )}
-        <DesktopSection title="Медиа" subtitle="Фото и видео">
+        {hasAdditionalMedia && <DesktopSection title={videos.length && !secondaryPhotos.length ? 'Видео' : 'Медиа'} subtitle={videos.length ? 'Воспроизводится прямо в АПГ' : 'Фото и вложения'}>
           <div style={{ display: 'grid', gap: 12 }}>
-            {photos.length > 0 && <DesktopGallery items={photos} onOpen={setLightboxIndex} />}
+            {secondaryPhotos.length > 0 && <DesktopGallery items={secondaryPhotos} onOpen={index => setLightboxIndex(index + 1)} />}
             {videos.length > 0 && <VideoSection videos={videos} />}
             <ArticleAttachments links={links} docs={docs} />
-            {!photos.length && !videos.length && !links.length && !docs.length && (
-              <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13 }}>Медиа и вложений нет.</div>
-            )}
           </div>
-        </DesktopSection>
+        </DesktopSection>}
         {lightboxIndex !== null && <ArticleLightbox photos={photos} initial={lightboxIndex} onClose={() => setLightboxIndex(null)} />}
       </>
     );

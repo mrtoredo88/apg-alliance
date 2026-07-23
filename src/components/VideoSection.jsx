@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { isVK } from '../vk.js';
+import { isVK, openUrl } from '../vk.js';
 import { T } from '../design.js';
 
 const PLATFORM_LABEL = { youtube: 'YouTube', vk: 'VK Видео', rutube: 'Rutube' };
@@ -30,10 +30,11 @@ function VideoThumb({ video, isActive, onClick }) {
 
 function VideoPlayer({ video }) {
   const [playing, setPlaying] = useState(false);
+  const canEmbed = Boolean(video?.embedUrl);
 
   return (
     <div style={{ borderRadius: 14, overflow: 'hidden', background: '#0a0a1a', position: 'relative', aspectRatio: '16/9' }}>
-      {playing ? (
+      {playing && canEmbed ? (
         <iframe
           src={video.embedUrl}
           width="100%"
@@ -45,7 +46,7 @@ function VideoPlayer({ video }) {
         />
       ) : (
         <button
-          onClick={() => setPlaying(true)}
+          onClick={() => canEmbed ? setPlaying(true) : video?.url && openUrl(video.url)}
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
         >
           <img
@@ -57,10 +58,10 @@ function VideoPlayer({ video }) {
           />
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
-              <span style={{ fontSize: 22, marginLeft: 4, color: '#0a0a1a' }}>▶</span>
+              <span style={{ fontSize: 22, marginLeft: 4, color: '#0a0a1a' }}>{canEmbed ? '▶' : '↗'}</span>
             </div>
             {video.title && (
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,0.8)', textAlign: 'center', maxWidth: '80%', lineHeight: '16px' }}>{video.title}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,0.8)', textAlign: 'center', maxWidth: '80%', lineHeight: '16px' }}>{canEmbed ? 'Смотреть видео' : 'Открыть видео в VK'}</div>
             )}
           </div>
         </button>
@@ -88,6 +89,11 @@ export function VideoSection({ videos }) {
       <div style={{ fontSize: 13, color: T.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>✦ Видео</div>
 
       {current && <VideoPlayer key={safeIdx} video={current} />}
+      {current?.url && (
+        <button type="button" onClick={() => openUrl(current.url)} style={{ marginTop: 9, border: 'none', background: 'transparent', color: T.gold, fontSize: 12, fontWeight: 750, cursor: 'pointer', padding: '4px 0' }}>
+          Не открылось? Смотреть в VK ↗
+        </button>
+      )}
 
       {visible.length > 1 && (
         <div style={{ display: 'flex', gap: 8, marginTop: 8, overflowX: 'auto', paddingBottom: 2 }}>

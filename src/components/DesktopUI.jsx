@@ -143,13 +143,16 @@ export function DesktopDetailShell({ children, aside, stickyActions, onBack, tit
 
 export function DesktopHero({ image, avatar, kicker, title, subtitle, status, badges = [], description, actions, meta, style }) {
   const safeBadges = asArray(badges);
+  const contentColumns = avatar
+    ? '138px minmax(0, 1fr) minmax(280px, 0.76fr)'
+    : 'minmax(0, 1.35fr) minmax(300px, 0.65fr)';
   return (
     <GlassCard style={{ borderRadius: 34, padding: 0, overflow: 'hidden', minHeight: 276, position: 'relative', isolation: 'isolate', ...style }}>
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 18% 10%, rgba(201,168,76,0.24), transparent 38%), rgba(var(--apg2-glass-a,255,255,255),0.06)' }}>
         {image ? <img src={image} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'saturate(1.04) contrast(1.02)' }} /> : null}
       </div>
       <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(90deg, rgba(8,10,14,0.82) 0%, rgba(8,10,14,0.66) 42%, rgba(8,10,14,0.34) 66%, rgba(8,10,14,0.52) 100%), linear-gradient(180deg, rgba(8,10,14,0.12), rgba(8,10,14,0.74))' }} />
-      <div style={{ position: 'relative', zIndex: 2, minHeight: 276, padding: 24, display: 'grid', gridTemplateColumns: '138px minmax(0, 1fr) minmax(280px, 0.76fr)', gap: 22, alignItems: 'center' }}>
+      <div style={{ position: 'relative', zIndex: 2, minHeight: 276, padding: 24, display: 'grid', gridTemplateColumns: contentColumns, gap: 22, alignItems: 'center' }}>
         {avatar && <div style={{ width: 132, height: 132, borderRadius: 32, padding: 9, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.16)', border: '1px solid rgba(255,255,255,0.58)', boxShadow: '0 24px 60px rgba(0,0,0,0.34)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>{avatar}</div>}
         <div style={{ display: 'grid', gap: 9, minWidth: 0, alignContent: 'center' }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
