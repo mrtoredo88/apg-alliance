@@ -50,6 +50,14 @@ if (!newsSource.includes('<DesktopGallery items={photos} onOpen={setLightboxInde
   throw new Error('NewsPage desktop detail mini-gallery must open the clicked photo index.');
 }
 
+if (!newsSource.includes("desktopMode\n      ? selectedArticleView\n      : createPortal(selectedArticleView, document.body)")) {
+  throw new Error('Desktop news article must avoid a nested portal while mobile keeps its body portal.');
+}
+
+if (!newsSource.includes("position: 'fixed'") || !newsSource.includes('zIndex: 13000') || !newsSource.includes("height: '100svh'")) {
+  throw new Error('Desktop news detail must be a fixed visible screen above the news feed.');
+}
+
 if (!userAppSource.includes('desktopMode={desktopDevice}')) {
   throw new Error('UserApp must pass desktopMode from desktopDevice to NewsPage.');
 }

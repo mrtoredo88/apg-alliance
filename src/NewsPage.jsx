@@ -1207,6 +1207,15 @@ export function ArticleView({
       <DesktopDetailShell
         title={title}
         onBack={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 13000,
+          height: '100svh',
+          minHeight: 0,
+          overflowY: 'auto',
+          overscrollBehaviorY: 'contain',
+        }}
         stickyActions={<DesktopStickyActions actions={stickyActions} />}
         aside={
           <>
@@ -1656,7 +1665,7 @@ export function NewsPage({
     savedItems.length > 0 && { id: 'saved', label: 'Сохранённые', value: savedItems.length, icon: '★' },
     commentsCount > 0 && { id: 'comments', label: 'Комментариев', value: commentsCount, icon: '💬' },
   ].filter(Boolean);
-  const selectedArticlePortal = selected && createPortal(
+  const selectedArticleView = selected && (
     <ArticleView
       item={selected}
       related={related}
@@ -1677,8 +1686,12 @@ export function NewsPage({
       reaction={newsReactions?.[selectedId]}
       subscriptions={newsSubscriptions}
       user={user}
-    />,
-    document.body
+    />
+  );
+  const selectedArticlePortal = selectedArticleView && (
+    desktopMode
+      ? selectedArticleView
+      : createPortal(selectedArticleView, document.body)
   );
 
   if (desktopMode) {
