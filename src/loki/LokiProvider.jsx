@@ -1312,7 +1312,6 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   }, [appActions, appState, memory?.lastControlledExecutionSnapshot, recordActionEvent, recordControlledExecutionContext, user]);
 
   const askBrain = useCallback(async (text) => {
-    if (!settings.enabled) return false;
     const thinkingTimer = setTimeout(() => {
       setVisible(true);
       setDismissed(false);
@@ -1394,10 +1393,6 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   const askExperience = useCallback(async (text, options = {}) => {
     recordLokiMessageTrace('STEP 4 LokiProvider askExperience received', { enabled: settings.enabled, textLength: String(text || '').length });
     markLokiStage('conversation', { textLength: String(text || '').length, activePanel });
-    if (!settings.enabled) {
-      recordLokiMessageTrace('STOP Loki disabled', {});
-      return null;
-    }
     const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
     setBrainThinking(true);
     setEmotion('thinking');

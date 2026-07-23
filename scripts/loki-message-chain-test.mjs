@@ -31,6 +31,8 @@ assert.match(providerSource, /recordLokiRequestDiagnostics/, 'Loki Provider must
 assert.match(providerSource, /STOP Response Normalizer failed/, 'Loki Provider must identify normalizer failures.');
 assert.match(providerSource, /pipelineTimeline/, 'Loki Provider diagnostics must expose Pipeline Timeline.');
 assert.match(providerSource, /LokiProvider askLokiBrain await/, 'Loki Provider must record the exact askLokiBrain awaited return value.');
+assert.doesNotMatch(providerSource, /const askBrain = useCallback\(async \(text\) => \{\s*if \(!settings\.enabled\) return false;/, 'A direct user question must work even when proactive Loki hints are disabled.');
+assert.doesNotMatch(providerSource, /const askExperience = useCallback[\s\S]{0,500}if \(!settings\.enabled\)[\s\S]{0,120}return null;/, 'The open Loki dialog must answer in on-demand mode even when proactive hints are disabled.');
 assert.match(brainSource, /askLokiBrain REQUEST START/, 'askLokiBrain must trace request start.');
 assert.match(brainSource, /recordLokiPipelineReturn\('askLokiBrain'/, 'askLokiBrain must prove the return value from LokiCore.');
 assert.match(brainSource, /recordLokiPipelineError\('askLokiBrain'/, 'askLokiBrain must log full errors instead of silently returning null.');
