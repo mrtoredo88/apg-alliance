@@ -26,6 +26,18 @@ function inferLevel(payload) {
   return 'error';
 }
 
+export function isIgnorableErrorPayload(payload = {}) {
+  const text = `${payload.message || payload.error || ''} ${payload.source || payload.component || ''} ${payload.name || ''}`.toLowerCase();
+  return !String(payload.message || payload.error || '').trim()
+    || /script error|resizeobserver|chrome-extension|moz-extension/.test(text)
+    || /aborterror|the operation was aborted|signal is aborted|fetch is aborted|fetch.*cancelled|fetch.*canceled/.test(text)
+    || /auth_timeout|_timeout\b|timeout \d+ms|public_data_missing_/.test(text)
+    || /notification permission:\s*(denied|default)/.test(text)
+    || /действие доступно только авторизованному пользователю|требуется авторизация|неверный email или пароль/.test(text)
+    || /этот telegram уже связан с другим аккаунтом/.test(text)
+    || (/missing or insufficient permissions/.test(text) && /loaduserbookings/.test(text));
+}
+
 export function buildErrorFingerprint(payload = {}) {
   const message = safeText(payload.message || payload.error, 500);
   const source = safeText(payload.source || payload.component, 300);
@@ -40,7 +52,7 @@ export function buildErrorFingerprint(payload = {}) {
 
 export async function upsertErrorLog(db, payload = {}, context = {}, FieldValue) {
   const message = safeText(payload.message || payload.error, 500);
-  if (!message) return { ok: false, skipped: true };
+  if (!message || isIgnorableErrorPayload(payload)) return { ok: false, skipped: true };
   const source = safeText(payload.source || context.source || 'unknown', 300);
   const { fingerprint, stackHash } = buildErrorFingerprint({ ...payload, message, source });
   const ref = db.collection('errorLogs').doc(`err_${fingerprint}`);

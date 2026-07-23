@@ -28,8 +28,12 @@ function shouldIgnore(message, source, errorName = '') {
   const text = `${message} ${source} ${errorName}`.toLowerCase();
   return !message
     || /script error|resizeobserver|chrome-extension|moz-extension/.test(text)
-    || /aborterror|the operation was aborted|signal is aborted|fetch.*cancelled|fetch.*canceled/.test(text)
-    || /auth_timeout/.test(text);
+    || /aborterror|the operation was aborted|signal is aborted|fetch is aborted|fetch.*cancelled|fetch.*canceled/.test(text)
+    || /auth_timeout|_timeout\b|timeout \d+ms|public_data_missing_/.test(text)
+    || /notification permission:\s*(denied|default)/.test(text)
+    || /действие доступно только авторизованному пользователю|требуется авторизация|неверный email или пароль/.test(text)
+    || /этот telegram уже связан с другим аккаунтом/.test(text)
+    || /missing or insufficient permissions/.test(text) && /loaduserbookings/.test(text);
 }
 
 function relatedActions() {

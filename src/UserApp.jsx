@@ -1479,10 +1479,14 @@ export function UserApp() {
       return;
     }
     let alive = true;
-    getDocs(query(collection(db, 'users', uid, 'bookings'), orderBy('startAt', 'desc'), limit(30)))
-      .then(snap => {
+    userAction('booking:list')
+      .then(result => {
         if (!alive) return;
-        setUserBookings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const rows = Array.isArray(result?.bookings) ? result.bookings : [];
+        setUserBookings(rows
+          .slice()
+          .sort((a, b) => new Date(b.startAt || 0).getTime() - new Date(a.startAt || 0).getTime())
+          .slice(0, 30));
       })
       .catch(e => logError(e, 'UserApp.loadUserBookings'));
     return () => { alive = false; };
