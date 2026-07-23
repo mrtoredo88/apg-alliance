@@ -14,6 +14,7 @@ import { APG2_PROFILE } from './components/Apg2ProfileGlass.jsx';
 import { DesktopTopOverview } from './components/DesktopUI.jsx';
 import { FirstJourneyCard } from './components/onboarding/FirstJourneyCard.jsx';
 import { LokiIdentity } from './loki/LokiIdentity.jsx';
+import { useLoki } from './loki/LokiProvider.jsx';
 import { selectActualEvents } from './eventSchedule.js';
 import { haversine, formatDistance } from './utils/geo.js';
 import { countRender, markPerformanceStage } from './performance/index.js';
@@ -485,6 +486,7 @@ function V2FirstScreen({
       onOpenTasks={onOpenTasks}
       onOpenReference={onOpenReference}
       onOpenLoki={onOpenLoki}
+      onOpenProfile={onOpenProfile}
       isOffline={isOffline}
       desktopMode={desktopMode}
     />
@@ -513,9 +515,11 @@ function V2FirstScreenMobile({
   onOpenTasks,
   onOpenReference,
   onOpenLoki,
+  onOpenProfile,
   desktopMode = false,
   isOffline = false,
 }) {
+  const loki = useLoki();
   const heroPartner = partnerOfMonth ?? featuredPartner ?? null;
   const heroEvent = events.find(e => contentImageOf(e)) ?? events[0] ?? null;
   const heroImage = heroEvent ? contentImageOf(heroEvent) : profileImageOf(heroPartner);
@@ -624,9 +628,20 @@ function V2FirstScreenMobile({
                 <span style={{ position: 'absolute', top: 7, right: 7, width: 10, height: 10, borderRadius: '50%', background: '#E64646', border: '2px solid #101012' }} />
               )}
             </button>
-            <div aria-label="Профиль" style={{ width: 44, height: 44, borderRadius: 18, overflow: 'hidden', ...V2.glass, color: V2.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 850 }}>
-              {avatarUrl ? <img src={avatarUrl} alt="" loading="eager" fetchPriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
-            </div>
+            <button
+              type="button"
+              aria-label={loki.settings.dockedToHeader ? 'Открыть Локи' : 'Профиль'}
+              onClick={loki.settings.dockedToHeader ? () => loki.openContextExperience() : onOpenProfile}
+              style={{ width: 44, height: 44, padding: 0, borderRadius: 18, overflow: 'hidden', ...V2.glass, color: V2.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 850, cursor: 'pointer', position: 'relative' }}
+            >
+              {loki.settings.dockedToHeader
+                ? <LokiIdentity size={42} state="ready" showText={false} style={{ width: '100%', height: '100%', placeItems: 'center' }} />
+                : avatarUrl
+                  ? <img src={avatarUrl} alt="" loading="eager" fetchPriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+                  : initials
+              }
+              {loki.settings.dockedToHeader && <span aria-hidden="true" style={{ position: 'absolute', right: 3, bottom: 3, width: 8, height: 8, borderRadius: '50%', background: '#4BB34B', border: '2px solid #101012' }} />}
+            </button>
           </div>
         </header>
 

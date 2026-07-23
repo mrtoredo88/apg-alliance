@@ -262,6 +262,17 @@ export function LokiExperience({ loki }) {
             <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '16px', fontWeight: 680 }}>Главный проводник по АПГ</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
+            {loki.settings.dockedToHeader && (
+              <button
+                type="button"
+                onClick={() => loki.setDockedToHeader(false)}
+                aria-label="Вернуть Локи на экран"
+                title="Вернуть Локи на экран"
+                style={{ width: 42, height: 42, borderRadius: 17, border: '1px solid rgba(215,184,106,0.28)', background: 'rgba(215,184,106,0.12)', color: APG2_PROFILE.gold, fontSize: 18, fontFamily: 'inherit' }}
+              >
+                ↗
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {

@@ -13,6 +13,7 @@ export const DEFAULT_LOKI_SETTINGS = {
   enabled: true,
   hiddenPanels: [],
   bubbleEnabled: true,
+  dockedToHeader: false,
   mode: 'on_demand',
   personalityMode: 'friendly',
 };
@@ -25,6 +26,7 @@ export function normalizeLokiSettings(value) {
     ...DEFAULT_LOKI_SETTINGS,
     ...settings,
     hiddenPanels: Array.isArray(settings.hiddenPanels) ? settings.hiddenPanels.filter(Boolean) : [],
+    dockedToHeader: settings.dockedToHeader === true,
     mode: validModes.includes(settings.mode) ? settings.mode : 'on_demand',
     personalityMode: validPersonalityModes.includes(settings.personalityMode) ? settings.personalityMode : 'friendly',
   };

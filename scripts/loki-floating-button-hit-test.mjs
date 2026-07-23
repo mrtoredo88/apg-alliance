@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../src/loki/LokiAssistant.jsx', import.meta.url), 'utf8');
 const positionSource = readFileSync(new URL('../src/loki/lokiPosition.js', import.meta.url), 'utf8');
+const homeSource = readFileSync(new URL('../src/HomePanelV2.jsx', import.meta.url), 'utf8');
+const providerSource = readFileSync(new URL('../src/loki/LokiProvider.jsx', import.meta.url), 'utf8');
+const stateSource = readFileSync(new URL('../src/loki/lokiState.js', import.meta.url), 'utf8');
+const experienceSource = readFileSync(new URL('../src/loki/LokiExperience.jsx', import.meta.url), 'utf8');
 
 assert.match(source, /data-floating-loki-button="true"/, 'Floating Loki button must have a stable test marker.');
 assert.match(source, /data-loki-floating-root="active"/, 'Floating Loki root must have a stable diagnostic marker.');
@@ -25,6 +29,14 @@ assert.match(source, /import\.meta\.env\.DEV[\s\S]{0,180}apg_loki_hit_debug/, 'H
 assert.doesNotMatch(source, /zIndex:\s*100000|zIndex:\s*999999|zIndex:\s*2147483647/, 'Fix must not rely on magic z-index escalation.');
 assert.match(positionSource, /width:\s*'fit-content'/, 'Mobile Loki floating position must shrink-wrap its interactive layer.');
 assert.doesNotMatch(positionSource, /left:\s*SIDE_INSET/, 'Mobile Loki floating root must not span the viewport with left and right anchors.');
+assert.match(stateSource, /dockedToHeader:\s*false/, 'Loki must start outside the header by default.');
+assert.match(providerSource, /setDockedToHeader:/, 'Loki provider must expose the dock action.');
+assert.match(source, /if \(loki\.settings\.dockedToHeader\) return null;/, 'Floating Loki must disappear while docked.');
+assert.match(source, /Свернуть в шапку/, 'Floating Loki menu must offer the header dock action.');
+assert.match(homeSource, /loki\.openContextExperience\(\)/, 'Docked Loki must open from the mobile header.');
+assert.match(homeSource, /Открыть Локи/, 'Docked Loki header button must keep an accessible label.');
+assert.match(homeSource, /LokiIdentity size=\{42\}/, 'Docked Loki must replace the profile avatar artwork.');
+assert.match(experienceSource, /Вернуть Локи на экран/, 'Open Loki experience must allow restoring the floating character.');
 
 const lokiButtonStart = source.indexOf('data-floating-loki-button="true"');
 const lokiButtonEnd = source.indexOf('aria-label="Настройки Локи"', lokiButtonStart);

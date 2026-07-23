@@ -259,6 +259,8 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
     return createPortal(<LokiExperience loki={loki} />, document.body);
   }
 
+  if (loki.settings.dockedToHeader) return null;
+
   if (shouldShowRestore) {
     return (
       <div
@@ -424,6 +426,7 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
             <button type="button" onClick={() => { setHistoryOpen(v => !v); setMenuOpen(false); }} style={menuButtonStyle}>История Локи</button>
             <button type="button" onClick={() => { loki.handleCharacterTap(); setMenuOpen(false); }} style={menuButtonStyle}>Поздороваться</button>
             <button type="button" onClick={() => { loki.hideCurrentPanel(); setMenuOpen(false); }} style={menuButtonStyle}>Скрыть на экране</button>
+            <button type="button" onClick={() => { loki.setDockedToHeader(true); setMenuOpen(false); setBrainOpen(false); setHistoryOpen(false); }} style={menuButtonStyle}>Свернуть в шапку</button>
             <button type="button" onClick={() => { loki.setHintsEnabled(false); setMenuOpen(false); }} style={menuButtonStyle}>Выключить подсказки</button>
           </div>
         )}

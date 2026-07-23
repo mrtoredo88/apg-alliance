@@ -1795,6 +1795,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     showCurrentPanel: () => persistSettings({ ...settings, hiddenPanels: settings.hiddenPanels.filter(panel => panel !== activePanel) }),
     setHintsEnabled: (enabled) => persistSettings({ ...settings, enabled }),
     setBubbleEnabled: (bubbleEnabled) => persistSettings({ ...settings, bubbleEnabled }),
+    setDockedToHeader: (dockedToHeader) => persistSettings({ ...settings, dockedToHeader }),
     setMode: (mode) => persistSettings({ ...settings, mode }),
     setPersonalityMode: (personalityMode) => persistSettings({ ...settings, personalityMode }),
   };

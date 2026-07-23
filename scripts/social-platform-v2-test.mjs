@@ -64,7 +64,8 @@ const [profile, peopleCore, userActions, actionRouter, capabilityRegistry, execu
 
 assert.match(profile, /data-people-panel/, 'profile has unified People panel');
 assert.match(profile, /data-people-bottom-sheet/, 'profile opens compact people bottom sheet');
-assert.match(profile, /Социальная сеть АПГ[\s\S]*Люди рядом/, 'People panel has professional hub hero');
+assert.match(profile, /data-people-compact-card[\s\S]*Люди рядом[\s\S]*Друзья, заявки и диалоги/, 'Profile has a compact professional People summary');
+assert.match(profile, /data-people-compact-summary[\s\S]*data-people-compact-recent/, 'Compact People summary keeps metrics and important contacts');
 assert.match(profile, /Карточка участника[\s\S]*peopleStatusChipStyle\(peopleSheet\.relationStatus\)[\s\S]*peopleSharedSummary\(peopleSheet\)/, 'People bottom sheet shows participant card status and shared context');
 assert.match(profile, /Избранные[\s\S]*Недавние[\s\S]*Возможно, вы знакомы[\s\S]*Все пользователи/, 'People first screen has final social UX sections');
 assert.match(peopleCore, /Все[\s\S]*Друзья[\s\S]*Заявки[\s\S]*Диалоги[\s\S]*Недавно[\s\S]*Онлайн[\s\S]*Партнёры[\s\S]*Эксперты/, 'profile exposes smart People tabs');

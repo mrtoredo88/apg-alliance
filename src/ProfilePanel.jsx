@@ -2287,14 +2287,14 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         )}
 
         <GlassSection title="Люди">
-          <GlassCard data-people-panel data-connections-panel data-connections-dev-panel style={{ display: 'grid', gap: 14, borderRadius: 32, padding: 16, background: 'radial-gradient(circle at 16% 0%, rgba(74,144,217,0.18), transparent 35%), radial-gradient(circle at 92% 6%, rgba(201,168,76,0.16), transparent 34%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.17), rgba(var(--apg2-glass-a,255,255,255),0.07))' }}>
-            <div style={{ display: 'flex', gap: 13, alignItems: 'flex-start' }}>
-              <div style={{ width: 50, height: 50, borderRadius: 21, background: 'linear-gradient(145deg, rgba(74,144,217,0.24), rgba(201,168,76,0.14))', color: '#6AABEC', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 23, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.22), 0 14px 32px rgba(74,144,217,0.14)' }}>👥</div>
+          <GlassCard data-people-panel data-people-compact-card data-connections-panel data-connections-dev-panel style={{ display: 'grid', gap: 12, borderRadius: 28, padding: 14, background: 'radial-gradient(circle at 8% 0%, rgba(74,144,217,0.15), transparent 38%), radial-gradient(circle at 96% 8%, rgba(201,168,76,0.13), transparent 36%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.16), rgba(var(--apg2-glass-a,255,255,255),0.065))' }}>
+            <div style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 17, background: 'linear-gradient(145deg, rgba(74,144,217,0.24), rgba(201,168,76,0.14))', color: '#6AABEC', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 20, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.22), 0 12px 26px rgba(74,144,217,0.12)' }}>👥</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: APG2.gold, fontSize: 11, lineHeight: '14px', fontWeight: 920, textTransform: 'uppercase', letterSpacing: 0.8 }}>Социальная сеть АПГ</div>
-                <div style={{ color: APG2.text, fontSize: 21, lineHeight: '26px', fontWeight: 940, marginTop: 4 }}>Люди рядом</div>
-                <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px', marginTop: 5 }}>Находите участников, знакомьтесь после событий, закрепляйте важных людей и открывайте диалоги без лишних шагов.</div>
+                <div style={{ color: APG2.text, fontSize: 17, lineHeight: '21px', fontWeight: 930 }}>Люди рядом</div>
+                <div style={{ color: APG2.textMuted, fontSize: 11.5, lineHeight: '16px', marginTop: 2 }}>Друзья, заявки и диалоги</div>
               </div>
+              <GlassButton onClick={openPeopleNavigation} aria-label="Открыть всех людей" style={{ width: 38, minWidth: 38, minHeight: 38, borderRadius: 15, padding: 0, fontSize: 17 }}>→</GlassButton>
             </div>
             {connectionTarget?.target && (
               <div data-connection-target-card style={{ borderRadius: 18, border: '1px solid rgba(74,144,217,0.24)', background: 'rgba(74,144,217,0.08)', padding: 12, display: 'grid', gap: 10 }}>
@@ -2318,6 +2318,53 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 </div>
               </div>
             )}
+            <div data-people-compact-summary style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 7 }}>
+              {[
+                ['Друзья', peopleCounts.friends],
+                ['Диалоги', peopleCounts.dialogs],
+                ['Заявки', incomingConnectionRequests.length + outgoingConnectionRequests.length],
+              ].map(([label, value]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => {
+                    setPeopleTab(label === 'Друзья' ? 'friends' : label === 'Диалоги' ? 'dialogs' : 'requests');
+                    openPeopleNavigation();
+                  }}
+                  style={{ minWidth: 0, minHeight: 52, borderRadius: 17, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.12)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', color: APG2.text, fontFamily: 'inherit', cursor: 'pointer', padding: '8px 5px', textAlign: 'center' }}
+                >
+                  <span style={{ display: 'block', color: value ? APG2.gold : APG2.textSoft, fontSize: 17, lineHeight: '19px', fontWeight: 930 }}>{value}</span>
+                  <span style={{ display: 'block', color: APG2.textMuted, fontSize: 10, lineHeight: '13px', fontWeight: 760, marginTop: 2 }}>{label}</span>
+                </button>
+              ))}
+            </div>
+            {peopleSections.priority.length > 0 && (
+              <div data-people-compact-recent style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <div style={{ display: 'flex', flex: 1, minWidth: 0, alignItems: 'center' }}>
+                  {peopleSections.priority.slice(0, 4).map((person, index) => (
+                    <button
+                      key={`compact:${person.id}`}
+                      type="button"
+                      aria-label={`Открыть профиль: ${person.displayName}`}
+                      onClick={() => person.dialogId ? onOpenDialog?.(person.dialogId) : openPersonProfile(person)}
+                      style={{ width: 38, height: 38, padding: 0, marginLeft: index ? -8 : 0, borderRadius: 15, border: '2px solid rgba(18,18,20,0.82)', background: 'transparent', overflow: 'hidden', cursor: 'pointer', position: 'relative', zIndex: 5 - index }}
+                    >
+                      <PeopleAvatar person={person} size={34} radius={12} />
+                    </button>
+                  ))}
+                  <div style={{ minWidth: 0, marginLeft: 9 }}>
+                    <div style={{ color: APG2.text, fontSize: 12.5, lineHeight: '16px', fontWeight: 840 }}>Важные контакты</div>
+                    <div style={{ color: APG2.textMuted, fontSize: 10.5, lineHeight: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{peopleSections.nextBestAction}</div>
+                  </div>
+                </div>
+                <GlassButton onClick={openPeopleNavigation} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 11.5 }}>Открыть</GlassButton>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <GlassButton data-my-contacts-button onClick={openPeopleNavigation} style={{ flex: 1, minHeight: 38, borderRadius: 15, padding: '8px 11px', fontSize: 12 }}>Все люди</GlassButton>
+              <GlassButton data-digital-business-card onClick={openBusinessCardNavigation} tone="gold" style={{ minHeight: 38, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Мой QR</GlassButton>
+            </div>
+            <div aria-hidden="true" style={{ display: 'none' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {[
                 ['Друзья', peopleCounts.friends],
@@ -2517,6 +2564,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               <GlassButton data-digital-business-card onClick={openBusinessCardNavigation} tone="gold" style={{ minHeight: 36, borderRadius: 15, padding: '8px 12px', fontSize: 12 }}>Мой QR</GlassButton>
             </div>
             )}
+            </div>
           </GlassCard>
         </GlassSection>
 
