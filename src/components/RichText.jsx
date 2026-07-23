@@ -1,9 +1,11 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 
-const PLUGINS = [remarkGfm, remarkBreaks];
+// remark-gfm's autolink parser ships a regexp lookbehind that prevents the
+// entire bundle from being parsed by Safari 16.1. Core Markdown plus explicit
+// Markdown links cover the content used by APG without that startup risk.
+const PLUGINS = [remarkBreaks];
 
 export function RichText({ children, color, fontSize = 14, lineHeight = '22px' }) {
   if (!children) return null;

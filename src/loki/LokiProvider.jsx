@@ -198,8 +198,8 @@ function toArray(value) {
 }
 
 function splitSentences(value) {
-  return stripText(value)
-    .split(/(?<=[.!?])\s+|\n+/)
+  const text = stripText(value);
+  return (text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text])
     .map(item => item.trim())
     .filter(item => item.length > 24);
 }
