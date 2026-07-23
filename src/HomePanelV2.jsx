@@ -625,7 +625,7 @@ function V2FirstScreenMobile({
               )}
             </button>
             <div aria-label="Профиль" style={{ width: 44, height: 44, borderRadius: 18, overflow: 'hidden', ...V2.glass, color: V2.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 850 }}>
-              {avatarUrl ? <img src={avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
+              {avatarUrl ? <img src={avatarUrl} alt="" loading="eager" fetchPriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
             </div>
           </div>
         </header>
@@ -717,7 +717,7 @@ function V2FirstScreenMobile({
           <div style={{ display: 'grid', gridTemplateColumns: '58px minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
             <span style={{ width: 58, height: 58, borderRadius: '50%', padding: 3, background: `conic-gradient(${level.color || V2.gold} ${profileProgress * 3.6}deg, rgba(255,255,255,0.14) 0deg)`, color: '#211706', display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 920, boxShadow: '0 12px 30px rgba(216,184,103,0.14)' }}>
               <span style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: V2.goldMetal, display: 'grid', placeItems: 'center' }}>
-                {avatarUrl ? <img src={avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
+                {avatarUrl ? <img src={avatarUrl} alt="" loading="eager" fetchPriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
               </span>
             </span>
             <span style={{ minWidth: 0 }}>

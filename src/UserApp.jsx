@@ -118,6 +118,42 @@ const CabinetCorePage      = lazy(() => import('./cabinet/CabinetCorePage.jsx').
 const ExpertsPage          = lazy(() => import('./ExpertsPage.jsx').then(m => ({ default: m.ExpertsPage })));
 const ForPartnersPage      = lazy(() => import('./ForPartnersPage.jsx').then(m => ({ default: m.ForPartnersPage })));
 const PartnershipPage      = lazy(() => import('./PartnershipPage.jsx').then(m => ({ default: m.PartnershipPage })));
+
+function profileAvatarOf(source = {}) {
+  return [
+    source.photo_200,
+    source.photo,
+    source.avatarUrl,
+    source.avatar,
+    source.photoUrl,
+    source.linkedTelegram?.photo,
+    source.linkedTelegram?.photoUrl,
+    source.linkedTelegram?.photo_200,
+  ].map(value => String(value || '').trim()).find(Boolean) || '';
+}
+
+function profileAvatarCacheKey(userId = '') {
+  return `apg_profile_avatar_${String(userId || '').replace(/[^a-z0-9:_-]/gi, '_').slice(0, 220)}`;
+}
+
+function readCachedProfileAvatar(userId = '') {
+  if (!userId) return '';
+  try { return String(localStorage.getItem(profileAvatarCacheKey(userId)) || '').trim(); } catch { return ''; }
+}
+
+function persistProfileAvatar(userId = '', avatar = '') {
+  if (!userId || !avatar) return;
+  try {
+    localStorage.setItem(profileAvatarCacheKey(userId), avatar);
+    for (const sessionKey of ['apg_email_user', 'apg_tg_user']) {
+      const stored = localStorage.getItem(sessionKey);
+      if (!stored) continue;
+      const parsed = JSON.parse(stored);
+      if (String(parsed?.id || parsed?.canonicalUserId || '') !== String(userId)) continue;
+      localStorage.setItem(sessionKey, JSON.stringify({ ...parsed, photo: avatar, photo_200: avatar }));
+    }
+  } catch {}
+}
 const ReferencePage        = lazy(() => import('./ReferencePage.jsx').then(m => ({ default: m.ReferencePage })));
 const LokiPage             = lazy(() => import('./LokiPage.jsx').then(m => ({ default: m.LokiPage })));
 const NewsPage             = lazy(() => import('./NewsPage.jsx').then(m => ({ default: m.NewsPage })));
@@ -1765,6 +1801,10 @@ export function UserApp() {
       if (isAuthLoadAborted(runId, 'after_auth_ready')) return;
       markFirebase('auth_ready', { hasUser: Boolean(rawUserData?.id) });
       let userData = rawUserData;
+      const cachedProfileAvatar = readCachedProfileAvatar(userData?.id);
+      if (cachedProfileAvatar && !profileAvatarOf(userData)) {
+        userData = { ...userData, photo: cachedProfileAvatar, photo_200: cachedProfileAvatar };
+      }
 
       if (!isMounted.current || isAuthLoadAborted(runId, 'before_user_data_bootstrap')) return;
       setUser(userData);
@@ -1907,6 +1947,30 @@ export function UserApp() {
         } catch (error) {
           traceAuthStage('account_core_bootstrap_deferred', { userId: userData.id, error: error?.code ?? error?.message ?? String(error) });
         }
+      }
+
+      // Start the private profile request before the public catalog. The avatar
+      // should not wait for partners, events, news and experts to finish loading.
+      const profileDocPromise = !isGuest
+        ? getDoc(doc(db, 'users', String(userData.id))).catch(error => {
+          logError(error, 'UserApp.profile.prefetch');
+          return null;
+        })
+        : Promise.resolve(null);
+      if (!isGuest) {
+        void profileDocPromise.then(profileSnap => {
+          if (!profileSnap?.exists?.() || !isMounted.current || isAuthLoadAborted(runId, 'profile_avatar_prefetch')) return;
+          const profileData = profileSnap.data() || {};
+          const avatar = profileAvatarOf(profileData);
+          if (!avatar) return;
+          persistProfileAvatar(String(userData.id), avatar);
+          setUser(current => current ? {
+            ...current,
+            photo: avatar,
+            photo_200: avatar,
+            linkedTelegram: current.linkedTelegram || profileData.linkedTelegram || null,
+          } : current);
+        });
       }
 
       const emptySnap = { docs: [] };
@@ -2052,8 +2116,8 @@ export function UserApp() {
         void (async () => {
           try {
             if (isAuthLoadAborted(runId, 'before_profile_doc_load')) return;
-            const userRef = doc(db, 'users', String(userData.id));
-            const docSnap = await getDoc(userRef);
+            const docSnap = await profileDocPromise;
+            if (!docSnap) return;
             if (!isMounted.current || isAuthLoadAborted(runId, 'after_profile_doc_load')) return;
 
             const todayKey = new Date().toLocaleDateString('sv');
@@ -2082,12 +2146,11 @@ export function UserApp() {
               }
 
               // Если в localStorage фото нет, но в Firestore есть — используем Firestore и не перезаписываем его null
-              if (data.photo && !userData.photo_200) {
-                profilePatch.photo = data.photo;
-                setUser(u => ({ ...u, photo_200: data.photo }));
-                if (String(userData.id).startsWith('tg_')) {
-                  try { localStorage.setItem('apg_tg_user', JSON.stringify({ ...userData, photo_200: data.photo })); } catch {}
-                }
+              const storedAvatar = profileAvatarOf(data);
+              if (storedAvatar) {
+                profilePatch.photo = storedAvatar;
+                persistProfileAvatar(String(userData.id), storedAvatar);
+                setUser(u => u ? ({ ...u, photo: storedAvatar, photo_200: storedAvatar }) : u);
               }
               const keys = data.keys ?? 0;
               const tickets = Number(data.tickets || 0);
@@ -2102,6 +2165,7 @@ export function UserApp() {
                 ...(data.email ? { email: data.email } : {}),
                 ...(data.emailVerified !== undefined ? { emailVerified: data.emailVerified } : {}),
                 linkedTelegram: effectiveLinkedTelegram,
+                ...(storedAvatar ? { photo: storedAvatar, photo_200: storedAvatar } : {}),
                 ...(data.linkedEmail ? { linkedEmail: data.linkedEmail } : {}),
                 ...(Array.isArray(data.linkedEmails) ? { linkedEmails: data.linkedEmails } : {}),
                 ...(data.notificationPreferences ? { notificationPreferences: data.notificationPreferences } : {}),

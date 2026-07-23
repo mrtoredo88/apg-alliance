@@ -1815,6 +1815,43 @@ async function actionReviewExpert(db, req, actor) {
   return { ok: true, avgRating, reviewCount: list.length, review: { ...reviewData, id: reviewId, createdAt: new Date().toISOString() } };
 }
 
+async function actionReviewReply(db, req, actor) {
+  const profileType = safeString(req.body?.profileType, 20);
+  const profileId = safeString(req.body?.profileId, 160);
+  const reviewId = safeString(req.body?.reviewId, 200);
+  const text = safeString(req.body?.text, 2000);
+  if (!['partner', 'expert'].includes(profileType) || !profileId || !reviewId || !text) {
+    throw Object.assign(new Error('Заполните текст ответа.'), { statusCode: 400 });
+  }
+  const profile = await assertOwnedProfile(db, actor, profileType, profileId);
+  const replyData = {
+    text,
+    authorType: profileType,
+    authorName: safeString(profile.name || (profileType === 'expert' ? 'Эксперт АПГ' : 'Партнёр АПГ'), 200),
+    authorPhoto: safeString(profile.logoUrl || profile.photo || profile.coverPhoto, 1000) || null,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  if (profileType === 'partner') {
+    const reviewRef = db.collection('partners').doc(profileId).collection('reviews').doc(reviewId);
+    const reviewSnap = await reviewRef.get();
+    if (!reviewSnap.exists) throw Object.assign(new Error('Отзыв не найден.'), { statusCode: 404 });
+    const publicReviewRef = db.collection('reviews').doc(`${profileId}_${reviewId}`);
+    await Promise.all([
+      reviewRef.set({ ownerReply: replyData }, { merge: true }),
+      publicReviewRef.set({ ownerReply: replyData }, { merge: true }),
+    ]);
+  } else {
+    const reviewRef = db.collection('expertReviews').doc(reviewId);
+    const reviewSnap = await reviewRef.get();
+    if (!reviewSnap.exists || String(reviewSnap.data()?.expertId || '') !== profileId) {
+      throw Object.assign(new Error('Отзыв не найден.'), { statusCode: 404 });
+    }
+    await reviewRef.set({ ownerReply: replyData }, { merge: true });
+  }
+  await audit(db, req, actor, 'review:reply', profileType === 'expert' ? 'experts' : 'partners', profileId, 'success', { reviewId });
+  return { ok: true, reply: { ...replyData, updatedAt: new Date().toISOString() } };
+}
+
 async function actionOwnerProfileUpdate(db, req, actor, type) {
   const id = safeString(req.body?.id, 160);
   const collection = type === 'expert' ? 'experts' : 'partners';
@@ -4645,6 +4682,7 @@ async function routeAction(db, req, actor) {
   if (action === 'partner:aiDraft') return actionPartnerAiDraft(db, req, actor);
   if (action === 'review:partner') return actionReviewPartner(db, req, actor);
   if (action === 'review:expert') return actionReviewExpert(db, req, actor);
+  if (action === 'review:reply') return actionReviewReply(db, req, actor);
   if (action === 'partner:profileUpdate') return actionOwnerProfileUpdate(db, req, actor, 'partner');
   if (action === 'expert:profileUpdate') return actionOwnerProfileUpdate(db, req, actor, 'expert');
   if (action === 'booking:create') return actionBookingCreate(db, req, actor);

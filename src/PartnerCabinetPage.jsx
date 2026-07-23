@@ -5,7 +5,7 @@ import { collection, getDocs, query, orderBy, limit, doc, getDoc } from 'firebas
 import { T, GLASS, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
 import { PartnerQRSection } from './PartnerQRSection.jsx';
-import { APG2_PROFILE, ContactCard, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileHero, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import { APG2_PROFILE, ContactCard, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileHero, ReviewReplyEditor, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 import { CabinetEventsBlock } from './EventProposalTools.jsx';
 import { userAction } from './userApi.js';
 
@@ -437,6 +437,17 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
   const saving = autosave.state === 'saving';
   const saved = autosave.savedPulse;
   const saveButtonLabel = saving ? 'Сохранение...' : saved ? '✓ Сохранено' : autosave.dirty ? 'Сохранить сейчас' : 'Все сохранено';
+
+  const saveReviewReply = useCallback(async (review, text) => {
+    const result = await userAction('review:reply', {
+      profileType: 'partner',
+      profileId: partner.id,
+      reviewId: review.id,
+      text,
+    });
+    setReviews(current => current.map(item => item.id === review.id ? { ...item, ownerReply: result.reply } : item));
+    onToast?.('Ответ опубликован', 'success');
+  }, [partner?.id, onToast]);
 
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -952,6 +963,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
                         <div style={{ color: APG2_PROFILE.gold, fontSize: 12 }}><Stars rating={review.rating || 0} /></div>
                       </div>
                       <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>{review.text || 'Без текста'}</div>
+                      <ReviewReplyEditor review={review} onSave={text => saveReviewReply(review, text)} />
                     </GlassCard>
                   ))}
                 </div>

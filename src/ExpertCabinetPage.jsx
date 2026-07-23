@@ -5,7 +5,7 @@ import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from '
 import { T, GLASS, GLASS_GOLD } from './design.js';
 import { AiProfileSection, ProfileAutosaveNotice, Stars, StatCard } from './PartnerCabinetPage.jsx';
 import { ExpertQRSection } from './PartnerQRSection.jsx';
-import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileHero, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
+import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, GlassSection, ProfileHero, ReviewReplyEditor, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 import { CabinetEventsBlock } from './EventProposalTools.jsx';
 import { userAction } from './userApi.js';
 
@@ -192,6 +192,16 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
 	  }, [initialExpert?.id]);
 
 	  const selectExpertSaveData = useCallback((source = {}) => buildExpertSaveData(buildExpertForm(source), source), []);
+	  const saveReviewReply = useCallback(async (review, text) => {
+	    const result = await userAction('review:reply', {
+	      profileType: 'expert',
+	      profileId: expert.id,
+	      reviewId: review.id,
+	      text,
+	    });
+	    setReviews(current => current.map(item => item.id === review.id ? { ...item, ownerReply: result.reply } : item));
+	    onToast?.('Ответ опубликован', 'success');
+	  }, [expert?.id, onToast]);
 	  const expertSaveData = useMemo(() => buildExpertSaveData(form, expert || {}), [form, expert]);
 	  const applyExpertDraft = useCallback((draft = {}) => {
 	    const nextForm = buildExpertForm({ ...(expert || {}), ...draft });
@@ -622,6 +632,7 @@ export function ExpertCabinetPage({ nav = 'expert-cabinet', variant = 'v2', expe
                         <Stars rating={review.stars ?? review.rating ?? 0} />
                       </div>
                       <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>{review.text || 'Без текста'}</div>
+                      <ReviewReplyEditor review={review} onSave={text => saveReviewReply(review, text)} />
                     </GlassCard>
                   ))}
                 </div>

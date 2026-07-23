@@ -459,7 +459,7 @@ export function DesktopTopOverview({
           <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '88px minmax(0, 1fr) auto', gap: 14, alignItems: 'center' }}>
             <button type="button" aria-label="Открыть профиль" onClick={onOpenProfile} style={{ width: 88, height: 88, border: 0, padding: 4, borderRadius: '50%', background: `conic-gradient(${progressColor} ${safeProgress * 3.6}deg, rgba(var(--apg2-glass-a,255,255,255),0.13) 0deg)`, color: APG2_PROFILE.gold, display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 0 0 1px rgba(201,168,76,0.22), 0 18px 42px rgba(0,0,0,0.16)' }}>
               <span style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: 'linear-gradient(145deg, rgba(201,168,76,0.22), rgba(var(--apg2-glass-a,255,255,255),0.10))', display: 'grid', placeItems: 'center', color: APG2_PROFILE.gold, fontSize: 23, fontWeight: 900, border: '3px solid rgba(var(--apg2-glass-a,255,255,255),0.24)' }}>
-                {avatarUrl ? <img src={avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={event => { event.currentTarget.style.display = 'none'; }} /> : initials}
+                {avatarUrl ? <img src={avatarUrl} alt="" loading="eager" fetchPriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={event => { event.currentTarget.style.display = 'none'; }} /> : initials}
               </span>
             </button>
             <div style={{ minWidth: 0 }}>

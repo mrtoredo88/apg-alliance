@@ -487,9 +487,13 @@ export function ProfileGallery({ items = [], onOpen, emptyText = 'Фотогра
 }
 
 export function ProfileReviewCard({ review, isOwn = false, textFallback = 'Гость оценил без комментария.' }) {
+  const [expanded, setExpanded] = useState(false);
   const stars = review?.stars ?? review?.rating ?? 0;
   const date = review?.createdAt?.toDate ? review.createdAt.toDate() : review?.createdAt ? new Date(review.createdAt) : null;
   const name = review?.userName || 'Участник АПГ';
+  const text = review?.text || textFallback;
+  const canCollapse = text.length > 180;
+  const ownerReply = review?.ownerReply;
   return (
     <div style={{ ...APG2_PROFILE.glass, borderRadius: 28, padding: 15, flex: '0 0 82%', scrollSnapAlign: 'start' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 11 }}>
@@ -503,8 +507,74 @@ export function ProfileReviewCard({ review, isOwn = false, textFallback = 'Го�
         </div>
         <div style={{ color: APG2_PROFILE.gold, fontSize: 13 }}>{'★'.repeat(Math.max(0, Math.min(5, Math.round(stars))))}</div>
       </div>
-      <div style={{ color: APG2_PROFILE.textSoft, fontSize: 14, lineHeight: '21px', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-        {review?.text || textFallback}
+      <div style={{ color: APG2_PROFILE.textSoft, fontSize: 14, lineHeight: '21px', ...(expanded ? {} : { display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }) }}>
+        {text}
+      </div>
+      {canCollapse && (
+        <button type="button" onClick={() => setExpanded(value => !value)} style={{ marginTop: 7, padding: 0, border: 0, background: 'transparent', color: APG2_PROFILE.gold, font: 'inherit', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+          {expanded ? 'Свернуть' : 'Читать полностью'}
+        </button>
+      )}
+      {ownerReply?.text && (
+        <div style={{ marginTop: 12, padding: '11px 12px', borderRadius: 18, background: 'rgba(215,184,106,0.10)', border: '1px solid rgba(215,184,106,0.22)' }}>
+          <div style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, marginBottom: 5 }}>
+            {ownerReply.authorName || (ownerReply.authorType === 'expert' ? 'Ответ эксперта' : 'Ответ партнёра')}
+          </div>
+          <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', whiteSpace: 'pre-wrap' }}>{ownerReply.text}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ReviewReplyEditor({ review, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(review?.ownerReply?.text || '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const submit = async () => {
+    const value = text.trim();
+    if (!value || saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      await onSave?.(value);
+      setEditing(false);
+    } catch (saveError) {
+      setError(saveError?.message || 'Не удалось сохранить ответ.');
+    } finally {
+      setSaving(false);
+    }
+  };
+  if (!editing) {
+    return (
+      <div style={{ marginTop: 10 }}>
+        {review?.ownerReply?.text && (
+          <div style={{ padding: '10px 11px', borderRadius: 16, background: 'rgba(215,184,106,0.10)', border: '1px solid rgba(215,184,106,0.22)', color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', whiteSpace: 'pre-wrap' }}>
+            <div style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, marginBottom: 4 }}>Ваш ответ</div>
+            {review.ownerReply.text}
+          </div>
+        )}
+        <GlassButton onClick={() => setEditing(true)} style={{ minHeight: 34, marginTop: review?.ownerReply?.text ? 8 : 0, padding: '6px 11px', borderRadius: 14, fontSize: 12 }}>
+          {review?.ownerReply?.text ? 'Изменить ответ' : 'Ответить на отзыв'}
+        </GlassButton>
+      </div>
+    );
+  }
+  return (
+    <div style={{ marginTop: 10 }}>
+      <textarea
+        value={text}
+        onChange={event => setText(event.target.value.slice(0, 2000))}
+        placeholder="Напишите вежливый и полезный ответ"
+        rows={3}
+        autoFocus
+        style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', borderRadius: 16, padding: 11, border: APG2_PROFILE.glass.border, background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, font: 'inherit', fontSize: 13, lineHeight: '19px', outline: 'none' }}
+      />
+      {error && <div style={{ color: '#ff9aa8', fontSize: 12, marginTop: 6 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <GlassButton tone="gold" disabled={!text.trim() || saving} onClick={submit} style={{ minHeight: 34, padding: '6px 11px', borderRadius: 14, color: '#17120a', fontSize: 12 }}>{saving ? 'Сохраняем...' : 'Опубликовать ответ'}</GlassButton>
+        <GlassButton disabled={saving} onClick={() => { setText(review?.ownerReply?.text || ''); setEditing(false); setError(''); }} style={{ minHeight: 34, padding: '6px 11px', borderRadius: 14, fontSize: 12 }}>Отмена</GlassButton>
       </div>
     </div>
   );
