@@ -167,7 +167,7 @@ function ReviewCard({ review, isOwn }) {
 
 // ─── Главный компонент ────────────────────────────────────────────────────────
 
-export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], news = [], events = [], user, scannedPartnerIds = {}, visitCounts = {}, onPartnerUpdate, onScan, onAskQuestion, onBook, onOpenNews, onOpenEvent, reviewPrompt, reviewPromptBookingId = '', onReviewPromptHandled, desktopMode = false }) {
+export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onToggleFavorite, onOpenPartner, partners = [], news = [], events = [], user, scannedPartnerIds = {}, visitCounts = {}, onPartnerUpdate, onScan, onAskQuestion, onBook, onOpenNews, onOpenEvent, onCreatePublication, reviewPrompt, reviewPromptBookingId = '', onReviewPromptHandled, desktopMode = false }) {
   const [lightboxIdx, setLightboxIdx]     = useState(null);
   const [reviews, setReviews]             = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -738,6 +738,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                   reviews={reviews}
                   desktop
                   isOwner={isProfileOwner}
+                  onCreatePublication={onCreatePublication}
                   onOpenNews={handleOpenProfileNews}
                   onOpenEvent={onOpenEvent}
                   onOpenTab={setDesktopTab}
@@ -946,6 +947,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                 events={events}
                 reviews={reviews}
                 isOwner={isProfileOwner}
+                onCreatePublication={onCreatePublication}
                 onOpenNews={handleOpenProfileNews}
                 onOpenEvent={onOpenEvent}
                 onOpenTab={setDesktopTab}

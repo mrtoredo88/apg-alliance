@@ -18,14 +18,12 @@ function videoList(profile = {}) {
 }
 
 export const SHOWCASE_TABS = [
-  { id: 'showcase', label: 'Витрина', short: 'Витрина' },
-  { id: 'locations', label: 'Локации', short: 'Локации', roles: ['partner'] },
+  { id: 'showcase', label: 'Основная информация', short: 'Основное' },
+  { id: 'locations', label: 'Адреса и филиалы', short: 'Адреса', roles: ['partner'] },
   { id: 'media', label: 'Фото и видео', short: 'Медиа' },
   { id: 'contacts', label: 'Контакты и соцсети', short: 'Контакты' },
-  { id: 'about', label: 'О бизнесе', short: 'О себе' },
-  { id: 'content', label: 'Контент', short: 'Контент' },
-  { id: 'analytics', label: 'Аналитика', short: 'Аналитика' },
-  { id: 'client-view', label: 'Как видят клиенты', short: 'Клиенты' },
+  { id: 'about', label: 'Описание и услуги', short: 'Описание' },
+  { id: 'client-view', label: 'Как видят клиенты', short: 'Предпросмотр' },
   { id: 'loki', label: 'Локи', short: 'Локи' },
 ];
 

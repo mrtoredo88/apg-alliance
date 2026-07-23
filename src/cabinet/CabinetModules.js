@@ -43,8 +43,8 @@ export function buildCabinetSnapshot({ role, profile, events = [], reviews = [] 
     { id: 'description', label: 'Описание', done: filled(profile?.description), module: 'contacts' },
     { id: 'media', label: 'Фото или обложка', done: filled(profile?.logoUrl || profile?.photo || profile?.coverPhoto) || gallery.length > 0, module: 'media' },
     { id: 'contacts', label: 'Контакты', done: Object.values(contacts).some(filled), module: 'contacts' },
-    { id: 'offer', label: roleId === 'expert' ? 'Спецпредложение' : 'Акция', done: filled(profile?.offer), module: 'content' },
-    { id: 'events', label: 'Мероприятия', done: relatedEvents.length > 0, module: 'content' },
+    { id: 'offer', label: roleId === 'expert' ? 'Спецпредложение' : 'Акция', done: filled(profile?.offer), module: roleId === 'partner' ? 'promotions' : 'content' },
+    { id: 'events', label: 'Мероприятия', done: relatedEvents.length > 0, module: 'events' },
   ];
   if (roleId === 'expert') {
     completionChecks.push(
@@ -103,7 +103,7 @@ export function buildCabinetTasks(snapshot) {
       module: item.module,
       priority: item.id === 'contacts' || item.id === 'description' ? 'high' : 'normal',
     }));
-  if (!snapshot.videos.length) tasks.push({ id: 'video', title: 'Добавьте видео', text: 'Видео уже поддержано архитектурно и будет усиливать доверие к карточке.', module: 'media', priority: 'normal' });
+  if (!snapshot.videos.length) tasks.push({ id: 'video', title: 'Добавьте видео', text: 'Короткое видео поможет клиенту быстрее понять ваше предложение.', module: 'media', priority: 'normal' });
   if (snapshot.roleId === 'expert' && !filled(snapshot.profile?.bookingUrl)) tasks.push({ id: 'booking-extra', title: 'Добавьте ссылку на запись', text: 'Клиентам проще переходить сразу к записи, чем искать контакты вручную.', module: 'contacts', priority: 'high' });
   return tasks;
 }

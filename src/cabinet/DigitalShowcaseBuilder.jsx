@@ -381,10 +381,10 @@ function AboutTab({ draft, update, roleId }) {
 
 function ContentTab({ roleId, events, onOpenModule, onEventCreated, profile, onToast }) {
   const actions = [
-    ['Новость', 'Создать публикацию о запуске, обновлении или важной новости.', 'history'],
+    ['Новость', 'Создать публикацию о запуске, обновлении или важной новости.', 'content'],
     ['Мероприятие', 'Создать событие, мастер-класс или встречу.', 'events'],
     ['Акция', 'Оформить спецпредложение для участников АПГ.', 'promotions'],
-    ['Розыгрыш', 'Подготовить механику подарка или бонуса.', 'subscription'],
+    ['Розыгрыш', 'Подготовить механику подарка или бонуса.', 'promotions'],
   ];
   return (
     <GlassSection title="Контент">
@@ -591,13 +591,18 @@ export function DigitalShowcaseBuilder({ role, profile, relatedEvents = [], onSa
   return (
     <>
       <GlassCard style={{ borderRadius: 30, marginTop: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div>
             <GlassBadge tone="gold">Конструктор витрины</GlassBadge>
             <div style={{ color: APG2_PROFILE.text, fontSize: 22, lineHeight: '27px', fontWeight: 940, marginTop: 10 }}>Соберите страницу, которую увидит клиент</div>
             <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px', marginTop: 6 }}>Редактирование идёт по тем же данным, что используются в публичной карточке.</div>
           </div>
-          <SaveState state={saveState} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <SaveState state={saveState} />
+            <GlassButton tone={dirty ? 'gold' : 'glass'} disabled={!dirty || saveState === 'saving'} onClick={saveDraft} style={{ minHeight: 38, borderRadius: 17, padding: '8px 12px', color: dirty ? '#17120a' : APG2_PROFILE.textMuted, opacity: !dirty || saveState === 'saving' ? 0.62 : 1 }}>
+              {saveState === 'saving' ? 'Сохраняем...' : 'Сохранить'}
+            </GlassButton>
+          </div>
         </div>
       </GlassCard>
 

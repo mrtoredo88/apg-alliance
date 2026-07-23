@@ -187,8 +187,8 @@ function defaultDraft(profile, role) {
     seoTitle: '',
     seoDescription: '',
     commentsEnabled: true,
-    status: 'published',
-    active: true,
+    status: 'draft',
+    active: false,
     author: profile?.name || profile?.title || '',
     sourceName: profile?.name || profile?.title || '',
     distributionMode: 'profile',
@@ -199,19 +199,30 @@ function defaultDraft(profile, role) {
   };
 }
 
+function readLocalNewsDraft(storageKey) {
+  try {
+    const value = localStorage.getItem(storageKey);
+    return value ? JSON.parse(value) : null;
+  } catch {
+    localStorage.removeItem(storageKey);
+    return null;
+  }
+}
+
 function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, onClose, onToast }) {
   const storageKey = `apg.workspace.news.draft.${role?.id || 'partner'}.${profile?.id || 'none'}.${item?.id || 'new'}`;
   const [draft, setDraft] = useState(() => {
-    const saved = localStorage.getItem(storageKey);
-    if (saved) return { ...defaultDraft(profile, role?.id), ...JSON.parse(saved) };
+    const saved = readLocalNewsDraft(storageKey);
+    if (saved) return { ...defaultDraft(profile, role?.id), ...saved };
     return { ...defaultDraft(profile, role?.id), ...(item || {}) };
   });
   const [status, setStatus] = useState('Готово');
+  const [busy, setBusy] = useState(false);
   const dirtyRef = useRef(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    setDraft(saved ? { ...defaultDraft(profile, role?.id), ...JSON.parse(saved) } : { ...defaultDraft(profile, role?.id), ...(item || {}) });
+    const saved = readLocalNewsDraft(storageKey);
+    setDraft(saved ? { ...defaultDraft(profile, role?.id), ...saved } : { ...defaultDraft(profile, role?.id), ...(item || {}) });
     dirtyRef.current = false;
     setStatus('Готово');
   }, [item?.id, profile?.id, role?.id]);
@@ -221,35 +232,50 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
     setDraft(prev => ({ ...prev, ...value }));
   };
 
-  const save = async ({ submit = false, silent = false } = {}) => {
+  const saveLocal = () => {
+    localStorage.setItem(storageKey, JSON.stringify(draft));
+    setStatus('Черновик сохранён на устройстве');
+  };
+
+  const save = async ({ submit = false } = {}) => {
+    if (busy) return null;
     const clean = sanitizeWorkspaceNewsPatch(draft);
     if (!clean.title && !clean.text) {
       onToast?.('Добавьте заголовок или текст.', 'error');
       return null;
     }
+    setBusy(true);
     setStatus(submit ? 'Отправляем в АПГ...' : 'Публикуем в профиле...');
-    let currentId = item?.id || draft.id || '';
-    if (submit) {
-      const created = await userAction('workspaceNews:save', { id: currentId, profileId: profile.id, role: role?.id, patch: clean });
-      currentId = currentId || created.id;
-      onSaved(created.news);
+    try {
+      let currentId = item?.id || draft.id || '';
+      if (submit) {
+        const created = await userAction('workspaceNews:save', { id: currentId, profileId: profile.id, role: role?.id, patch: clean });
+        currentId = currentId || created.id;
+        onSaved(created.news);
+      }
+      const result = await userAction(submit ? 'workspaceNews:submit' : 'workspaceNews:save', submit
+        ? { id: currentId, profileId: profile.id, role: role?.id }
+        : { id: currentId, profileId: profile.id, role: role?.id, patch: clean });
+      localStorage.removeItem(storageKey);
+      dirtyRef.current = false;
+      setStatus(submit ? 'Отправлено на модерацию АПГ' : 'Опубликовано в профиле');
+      onSaved(result.news || { ...draft, ...result.patch, id: result.id || draft.id });
+      onToast?.(submit ? 'Публикация отправлена на модерацию АПГ.' : 'Публикация опубликована в профиле.', 'success');
+      return result;
+    } catch (error) {
+      localStorage.setItem(storageKey, JSON.stringify(draft));
+      setStatus(error?.message || 'Не удалось опубликовать. Черновик сохранён на устройстве');
+      onToast?.(error?.message || 'Не удалось опубликовать. Черновик сохранён.', 'error');
+      return null;
+    } finally {
+      setBusy(false);
     }
-    const result = await userAction(submit ? 'workspaceNews:submit' : 'workspaceNews:save', submit
-      ? { id: currentId, profileId: profile.id, role: role?.id }
-      : { id: currentId, profileId: profile.id, role: role?.id, patch: clean });
-    localStorage.removeItem(storageKey);
-    dirtyRef.current = false;
-    setStatus(submit ? 'Отправлено на модерацию АПГ' : 'Опубликовано в профиле');
-    onSaved(result.news || { ...draft, ...result.patch, id: result.id || draft.id });
-    if (!silent) onToast?.(submit ? 'Публикация отправлена на модерацию АПГ.' : 'Публикация обновлена в профиле.', 'success');
-    return result;
   };
 
   useEffect(() => {
     if (!dirtyRef.current) return undefined;
-    localStorage.setItem(storageKey, JSON.stringify(draft));
-    setStatus('Черновик сохранён локально');
-    const timer = setTimeout(() => save({ silent: true }).catch(error => setStatus(error?.message || 'Не удалось сохранить')), 1200);
+    setStatus('Сохраняем черновик...');
+    const timer = setTimeout(saveLocal, 700);
     return () => clearTimeout(timer);
   }, [draft]);
 
@@ -257,7 +283,7 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
     const onKey = event => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        save().catch(error => setStatus(error?.message || 'Не удалось сохранить'));
+        saveLocal();
       }
     };
     const onUnload = event => {
@@ -271,7 +297,7 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('beforeunload', onUnload);
     };
-  }, [draft, item?.id, profile?.id]);
+  }, [draft, item?.id, profile?.id, storageKey]);
 
   const lokiApply = type => {
     if (type === 'title') patch({ title: draft.title ? `${draft.title}: главное для жителей` : 'Что важно знать жителям Зеленограда' });
@@ -287,9 +313,9 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
           <div style={{ color: UI.gold, fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Редактор публикации</div>
           <div style={{ color: UI.text, fontSize: 20, lineHeight: '25px', fontWeight: 940, marginTop: 3 }}>{item?.id ? 'Редактирование публикации' : 'Новая публикация'}</div>
           <div style={{ color: UI.muted, fontSize: 12, marginTop: 3 }}>{status}</div>
-          <div style={{ color: UI.soft, fontSize: 12.5, lineHeight: '18px', marginTop: 7 }}>Сохранение публикует запись в личной ленте профиля. Для общей новостной ленты АПГ отправьте её на модерацию отдельно.</div>
+          <div style={{ color: UI.soft, fontSize: 12.5, lineHeight: '18px', marginTop: 7 }}>Черновик сохраняется только на устройстве. Запись появится в профиле или уйдёт в АПГ только после вашего подтверждения.</div>
         </div>
-        <button onClick={onClose} style={button('light', { minHeight: 32, padding: '6px 8px' })}>Закрыть</button>
+        <button onClick={() => { if (dirtyRef.current) saveLocal(); onClose?.(); }} style={button('light', { minHeight: 32, padding: '6px 8px' })}>Закрыть</button>
       </div>
 
       <PhotoUpload value={draft.coverPhoto || draft.imageUrl || ''} onChange={value => patch({ coverPhoto: value, imageUrl: value })} folder="news" label="Обложка новости" shape="cover" theme={{ chipBg: UI.controlSoft, border: UI.line, textSec: UI.soft, gold: UI.gold }} />
@@ -306,8 +332,6 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
         <input value={(draft.tags || []).join(', ')} onChange={event => patch({ tags: event.target.value.split(',').map(x => x.trim()).filter(Boolean) })} placeholder="Теги через запятую" style={input()} />
         <input value={draft.linkUrl || ''} onChange={event => patch({ linkUrl: event.target.value })} placeholder="Ссылка" style={input()} />
         <input value={draft.linkLabel || ''} onChange={event => patch({ linkLabel: event.target.value })} placeholder="Текст кнопки" style={input()} />
-        <input value={draft.publishedAt || ''} onChange={event => patch({ publishedAt: event.target.value })} placeholder="Дата публикации ISO" style={input()} />
-        <input value={draft.scheduledAt || ''} onChange={event => patch({ scheduledAt: event.target.value, status: 'scheduled' })} placeholder="Запланировать ISO" style={input()} />
       </div>
 
       <div style={card({ padding: 12, boxShadow: 'none', background: 'rgba(200,155,60,0.08)' })}>
@@ -329,8 +353,9 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-        <button onClick={() => save()} style={button('light')}>Опубликовать в профиле</button>
-        <button onClick={() => save({ submit: true })} style={button('primary')}>Опубликовать в АПГ</button>
+        <button disabled={busy} onClick={saveLocal} style={button('light', { opacity: busy ? 0.62 : 1 })}>Сохранить черновик</button>
+        <button disabled={busy} onClick={() => save()} style={button('light', { opacity: busy ? 0.62 : 1 })}>{busy ? 'Публикуем...' : 'Опубликовать в профиле'}</button>
+        <button disabled={busy} onClick={() => save({ submit: true })} style={button('primary', { opacity: busy ? 0.62 : 1 })}>{busy ? 'Отправляем...' : 'Отправить в АПГ'}</button>
       </div>
     </div>
   );
@@ -427,6 +452,19 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
     onToast?.('Публикация по мероприятию опубликована в профиле.', 'success');
   };
 
+  const editor = selected ? (
+    <NewsEditor
+      item={selected}
+      profile={profile}
+      role={role}
+      events={events.filter(event => String(event.partnerId || event.expertId || event.submittedProfileId || '') === String(profile.id || ''))}
+      onSaved={upsert}
+      onCreatedFromEvent={createFromEvent}
+      onClose={() => setSelected(null)}
+      onToast={onToast}
+    />
+  ) : null;
+
   if (!profile?.id || !['partner', 'expert'].includes(role?.id)) {
     return <div style={card({ padding: 24 })}><h2 style={{ margin: 0, color: UI.text }}>Новости</h2><p style={{ color: UI.soft }}>Контент-центр доступен партнёрам и экспертам после выбора рабочего профиля.</p></div>;
   }
@@ -459,6 +497,8 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
 
       {error && <div style={card({ padding: 12, color: UI.red, background: 'rgba(217,93,84,0.10)', boxShadow: 'none' })}>{error}</div>}
 
+      {compact && editor}
+
       <div style={{ display: 'grid', gridTemplateColumns: compact ? 'minmax(0,1fr)' : 'minmax(360px,1fr) minmax(380px,0.78fr)', gap: compact ? 10 : 14, alignItems: 'start' }}>
         <div style={{ display: 'grid', gap: 10 }}>
           <div style={card({ padding: 12 })}>
@@ -473,7 +513,7 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
           {loading ? <div style={card({ padding: 18, color: UI.soft })}>Загружаем публикации...</div> : !filtered.length ? <Empty title="Публикаций нет" text="Создайте первую новость или измените фильтры." /> : filtered.map(item => <NewsRow key={item.id} item={item} view={view} selected={selected?.id === item.id} onOpen={setSelected} onSubmit={submit} onArchive={archive} compactMode={compact} />)}
         </div>
         <div style={{ display: 'grid', gap: 10 }}>
-          <NewsEditor item={selected} profile={profile} role={role} events={events.filter(event => String(event.partnerId || event.expertId || event.submittedProfileId || '') === String(profile.id || ''))} onSaved={upsert} onCreatedFromEvent={createFromEvent} onClose={() => setSelected(null)} onToast={onToast} />
+          {!compact && editor}
           {!compact && <Preview item={selected} />}
           {!compact && (
             <WorkspaceRelatedLinks

@@ -327,7 +327,7 @@ function CrmPanel({ dialog, userId, events = [], bookings = [], actions, onOpenP
   );
 }
 
-export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions, onOpenPanel, onToast }) {
+export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions, onOpenPanel, onToast, compact = false }) {
   const initialIntent = useMemo(() => readWorkspaceLinkIntent('dialogs') || {}, []);
   const uid = actorId(user);
   const providerType = role?.id === 'expert' ? 'expert' : 'partner';
@@ -481,7 +481,7 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
 
       {error && <div style={card({ padding: 12, color: UI.red, background: 'rgba(217,93,84,0.10)', boxShadow: 'none' })}>{error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '340px minmax(430px,1fr) 340px', gap: 14, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: compact ? 'minmax(0,1fr)' : '340px minmax(430px,1fr) 340px', gap: 14, alignItems: 'start' }}>
         <aside style={{ display: 'grid', gap: 10 }}>
           <div style={card({ padding: 12 })}>
             <div style={{ color: UI.gold, fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>People Inbox</div>
@@ -493,7 +493,7 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
           {loading ? <Skeleton /> : !filtered.length ? <Empty title="Переписок нет" text="Измените фильтр или откройте чат из карточки человека или объекта." /> : filtered.filter(isRecord).map(dialog => <DialogRow key={dialog.id} dialog={dialog} active={activeDialog?.id === dialog.id} onClick={() => setActiveId(dialog.id)} />)}
         </aside>
 
-        <main data-workspace-people-chat-pane onDrop={onDropFile} onDragOver={event => event.preventDefault()} style={card({ minHeight: 640, display: 'grid', gridTemplateRows: 'auto 1fr auto', overflow: 'hidden', background: 'linear-gradient(180deg, var(--apg-workspace-card-strong, rgba(255,255,255,0.94)), var(--apg-workspace-card, rgba(255,255,255,0.78)))' })}>
+        <main data-workspace-people-chat-pane onDrop={onDropFile} onDragOver={event => event.preventDefault()} style={card({ minHeight: compact ? 520 : 640, display: 'grid', gridTemplateRows: 'auto 1fr auto', overflow: 'hidden', background: 'linear-gradient(180deg, var(--apg-workspace-card-strong, rgba(255,255,255,0.94)), var(--apg-workspace-card, rgba(255,255,255,0.78)))' })}>
           {activeDialog ? (
             <>
               <div style={{ padding: 14, borderBottom: `1px solid ${UI.line}`, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
@@ -536,7 +536,7 @@ export function WorkspaceDialogsCRM({ user, role, profile, events = [], actions,
           ) : <Empty title="Выберите переписку" text="People Workspace покажет чат, контекст человека и рабочую CRM-панель." />}
         </main>
 
-        <CrmPanel dialog={activeDialog} userId={uid} events={events} bookings={bookings} actions={actions} onOpenPanel={onOpenPanel} onPatch={patchDialog} onCreateMeeting={() => actions?.openBooking?.()} />
+        {!compact && <CrmPanel dialog={activeDialog} userId={uid} events={events} bookings={bookings} actions={actions} onOpenPanel={onOpenPanel} onPatch={patchDialog} onCreateMeeting={() => actions?.openBooking?.()} />}
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ import { userAction } from '../userApi.js';
 import { WorkspaceEventsManager } from './WorkspaceEventsManager.jsx';
 import { WorkspaceMeetingsCRM } from './WorkspaceMeetingsCRM.jsx';
 import { WorkspaceDialogsCRM } from './WorkspaceDialogsCRM.jsx';
+import { WorkspaceReviewsCenter } from './WorkspaceReviewsCenter.jsx';
 import { WorkspaceNewsCenter } from './WorkspaceNewsCenter.jsx';
 import { WorkspacePromotionsCenter } from './WorkspacePromotionsCenter.jsx';
 import { WorkspaceGiftsCenter } from './WorkspaceGiftsCenter.jsx';
@@ -56,20 +57,29 @@ const WS = {
 };
 
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Рабочий стол', icon: '🏠', description: 'Что сделать сегодня' },
-  { id: 'profile', label: 'Мой профиль', icon: '👤', description: 'Карточка и витрина' },
-  { id: 'events', label: 'Мероприятия', icon: '🎉', description: 'Календарь и участники' },
-  { id: 'booking', label: 'Встречи', icon: '📅', description: 'Календарь и записи' },
-  { id: 'dialogs', label: 'Люди', icon: '👥', description: 'Чаты, знакомства и клиенты', badge: data => data.dialogUnreadCount || 0 },
-  { id: 'content', label: 'Новости', icon: '📰', description: 'Публикации и черновики' },
-  { id: 'growth', label: 'Партнёры', icon: '📢', description: 'QR, ссылки, промо' },
-  { id: 'offers', label: 'Акции и предложения', icon: '🎁', description: 'Маркетинг и бонусы' },
-  { id: 'rewards', label: 'Подарки', icon: '🏆', description: 'Призы, бонусы, выдачи' },
-  { id: 'reviews', label: 'Отзывы', icon: '⭐', description: 'Рейтинг и ответы' },
-  { id: 'analytics', label: 'Аналитика', icon: '📊', description: 'Метрики и изменения' },
-  { id: 'finance', label: 'Финансы', icon: '💰', description: 'Тарифы и документы' },
-  { id: 'notifications', label: 'Центр уведомлений', icon: '🔔', description: 'События и заявки', badge: data => data.unreadCount || 0 },
-  { id: 'settings', label: 'Настройки', icon: '⚙️', description: 'Кабинет и команда' },
+  { id: 'dashboard', label: 'Сегодня', icon: '⌂', description: 'Приоритеты и быстрые действия' },
+  { id: 'profile', label: 'Профиль и витрина', icon: '◇', description: 'Карточка бизнеса' },
+  { id: 'events', label: 'Мероприятия', icon: '◈', description: 'Календарь и участники' },
+  { id: 'booking', label: 'Встречи', icon: '◷', description: 'Календарь и записи' },
+  { id: 'dialogs', label: 'Диалоги', icon: '◎', description: 'Обращения и клиенты', badge: data => data.dialogUnreadCount || 0 },
+  { id: 'content', label: 'Публикации', icon: '✎', description: 'Стена, новости и черновики' },
+  { id: 'growth', label: 'Привлечение', icon: '↗', description: 'QR, ссылки и продвижение' },
+  { id: 'offers', label: 'Акции', icon: '%', description: 'Предложения и бонусы' },
+  { id: 'rewards', label: 'Подарки', icon: '♢', description: 'Призы, бонусы и выдачи' },
+  { id: 'reviews', label: 'Отзывы', icon: '☆', description: 'Рейтинг и ответы' },
+  { id: 'analytics', label: 'Аналитика', icon: '▥', description: 'Метрики и изменения' },
+  { id: 'finance', label: 'Финансы', icon: '₽', description: 'Тарифы и документы' },
+  { id: 'notifications', label: 'Уведомления', icon: '○', description: 'События и заявки', badge: data => data.unreadCount || 0 },
+  { id: 'settings', label: 'Настройки', icon: '⚙', description: 'Кабинет и команда' },
+];
+
+const WORKSPACE_NAV_GROUPS = [
+  { id: 'home', label: 'Главная', icon: '⌂', sections: ['dashboard', 'notifications'] },
+  { id: 'showcase', label: 'Витрина', icon: '◇', sections: ['profile'] },
+  { id: 'clients', label: 'Клиенты', icon: '◎', sections: ['booking', 'dialogs', 'reviews'] },
+  { id: 'content', label: 'Контент', icon: '✎', sections: ['content', 'events'] },
+  { id: 'promotion', label: 'Продвижение', icon: '↗', sections: ['growth', 'offers', 'rewards', 'analytics'] },
+  { id: 'more', label: 'Ещё', icon: '•••', sections: ['finance', 'settings'] },
 ];
 
 const WORKSPACE_ROLE_VIEWS = {
@@ -78,8 +88,8 @@ const WORKSPACE_ROLE_VIEWS = {
     label: 'Партнёр',
     eyebrow: 'Кабинет партнёра',
     heroTitle: 'Что сегодня нужно сделать партнёру',
-    memberLabel: 'Партнёр с 22 мая 2024',
-    kpiLabels: ['Уровень', 'Ключей', 'Активных акций', 'Мероприятий'],
+    memberLabel: 'Партнёр АПГ',
+    kpiLabels: ['Профиль', 'Ключей', 'Активных акций', 'Мероприятий'],
   },
   expert: {
     id: 'expert',
@@ -322,8 +332,15 @@ function Panel({ title, action, children, style }) {
   );
 }
 
-function WorkspaceHeader({ query, onQueryChange, unreadCount, onModeChange, onOpenNotifications }) {
-  const links = ['Новости', 'Мероприятия', 'Партнёры', 'Эксперты', 'Акции', 'Подарки'];
+function WorkspaceHeader({ query, onQueryChange, onQuerySubmit, actions, unreadCount, onModeChange, onOpenNotifications }) {
+  const links = [
+    ['Новости', actions.openNews],
+    ['Мероприятия', actions.openEvents],
+    ['Партнёры', actions.openPartners],
+    ['Эксперты', actions.openExperts],
+    ['Акции', actions.openOffers],
+    ['Подарки', actions.openRewards],
+  ];
   return (
     <header data-workspace-v2-header style={{ position: 'sticky', top: 0, zIndex: 30, background: WS.header, backdropFilter: 'blur(28px) saturate(1.25)', WebkitBackdropFilter: 'blur(28px) saturate(1.25)', borderBottom: `1px solid ${WS.line}` }}>
       <div style={{ maxWidth: 1760, margin: '0 auto', minHeight: 72, padding: '0 24px', display: 'grid', gridTemplateColumns: '255px minmax(0,1fr) auto', gap: 18, alignItems: 'center' }}>
@@ -338,14 +355,24 @@ function WorkspaceHeader({ query, onQueryChange, unreadCount, onModeChange, onOp
           </div>
         </div>
         <nav style={{ display: 'flex', justifyContent: 'center', gap: 8, minWidth: 0, overflow: 'hidden' }}>
-          {links.map((link, index) => (
-            <button key={link} type="button" style={buttonStyle({ minHeight: 38, padding: '8px 14px', background: index === 0 ? WS.controlStrong : 'transparent', boxShadow: index === 0 ? WS.shadowSoft : 'none', whiteSpace: 'nowrap', fontSize: 13 })}>{link}</button>
+          {links.map(([label, onClick]) => (
+            <button key={label} type="button" onClick={onClick} style={buttonStyle({ minHeight: 38, padding: '8px 14px', background: 'transparent', boxShadow: 'none', whiteSpace: 'nowrap', fontSize: 13 })}>{label}</button>
           ))}
         </nav>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
           <label style={{ width: 250, minHeight: 46, borderRadius: 19, background: WS.control, border: `1px solid ${WS.line}`, display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', boxSizing: 'border-box', boxShadow: 'inset 0 1px 0 rgba(var(--apg2-glass-a,255,255,255),0.28)' }}>
             <span style={{ color: WS.muted, fontSize: 19 }}>⌕</span>
-            <input value={query} onChange={event => onQueryChange(event.target.value)} placeholder="Поиск по АПГ..." style={{ width: '100%', border: 0, outline: 'none', background: 'transparent', color: WS.text, fontFamily: 'inherit', fontSize: 14, fontWeight: 680 }} />
+            <input
+              data-workspace-search
+              value={query}
+              onChange={event => onQueryChange(event.target.value)}
+              onKeyDown={event => {
+                if (event.key === 'Enter') onQuerySubmit?.(query);
+              }}
+              placeholder="Перейти к разделу..."
+              aria-label="Поиск и переход по Workspace"
+              style={{ width: '100%', border: 0, outline: 'none', background: 'transparent', color: WS.text, fontFamily: 'inherit', fontSize: 14, fontWeight: 680 }}
+            />
           </label>
           <button type="button" onClick={onOpenNotifications} style={buttonStyle({ width: 48, minHeight: 48, padding: 0, borderRadius: 18, position: 'relative', fontSize: 21 })}>
             ♧
@@ -379,8 +406,10 @@ function WorkspaceProfileProgressCard({ completion, onClick }) {
 }
 
 function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeChange, availableViews, activeViewId, onViewChange, profileCompletion, onCompleteProfile }) {
-  const main = items.filter(item => !['finance', 'notifications', 'settings'].includes(item.id));
-  const settings = items.filter(item => ['finance', 'notifications', 'settings'].includes(item.id));
+  const groups = WORKSPACE_NAV_GROUPS
+    .map(group => ({ ...group, items: group.sections.map(id => items.find(item => item.id === id)).filter(Boolean) }))
+    .filter(group => group.items.length);
+  const activeGroup = groups.find(group => group.sections.includes(activeSection)) || groups[0];
   const initial = String(user?.firstName || user?.name || user?.displayName || 'A').slice(0, 1).toUpperCase();
   return (
     <aside data-workspace-v2-sidebar style={cardStyle({ height: 'calc(100dvh - 94px - env(safe-area-inset-bottom, 0px))', minHeight: 0, position: 'sticky', top: 80, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' })}>
@@ -402,10 +431,19 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
         )}
       </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0 0 8px', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
-      <div style={{ display: 'grid', gap: 1 }}>
-        {[main, settings].map((group, groupIndex) => (
-          <div key={groupIndex} style={{ display: 'grid', gap: 1 }}>
-            {group.map(item => {
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6, padding: '0 12px 10px' }}>
+          {groups.map(group => {
+            const active = activeGroup?.id === group.id;
+            return (
+              <button key={group.id} type="button" onClick={() => onSelect(group.items[0])} style={{ border: active ? '1px solid rgba(201,155,60,0.34)' : `1px solid ${WS.line}`, minHeight: 54, borderRadius: 15, background: active ? 'rgba(241,206,128,0.22)' : WS.controlSoft, color: active ? '#8A6422' : WS.soft, display: 'grid', gridTemplateColumns: '24px minmax(0,1fr)', alignItems: 'center', gap: 7, padding: '8px 9px', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ fontSize: 16, textAlign: 'center' }}>{group.icon}</span>
+                <span style={{ fontSize: 11.5, lineHeight: '14px', fontWeight: 880 }}>{group.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: 'grid', gap: 1 }}>
+            {activeGroup?.items.map(item => {
               const active = activeSection === item.id;
               const badge = typeof item.badge === 'function' ? item.badge(data) : item.badge;
               return (
@@ -419,10 +457,7 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
                 </button>
               );
             })}
-            {groupIndex === 0 && <div style={{ height: 4 }} />}
-          </div>
-        ))}
-      </div>
+        </div>
       </div>
       <div style={{ marginTop: 'auto', padding: 14, display: 'grid', gap: 8 }}>
         <WorkspaceProfileProgressCard completion={profileCompletion} onClick={onCompleteProfile} />
@@ -434,13 +469,6 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
               <div style={{ color: WS.soft, fontSize: 12, lineHeight: '15px', marginTop: 2 }}>{availableViews.find(view => view.id === activeViewId)?.eyebrow || 'Workspace активен'}</div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-            <span style={{ color: '#8A6422', fontSize: 12.5, fontWeight: 850 }}>Уровень 18</span>
-            <span style={{ color: WS.muted, fontSize: 12, fontWeight: 800 }}>18%</span>
-          </div>
-          <div style={{ height: 6, borderRadius: 999, background: WS.track, overflow: 'hidden', marginTop: 7 }}>
-            <div style={{ width: '18%', height: '100%', borderRadius: 999, background: 'linear-gradient(90deg,#E9C66B,#C89B3C)' }} />
-          </div>
         </div>
         <WorkspaceButton onClick={() => onModeChange?.('user')} style={{ minHeight: 42, borderRadius: 16, background: WS.controlStrong }}>☷ Режим пользователя</WorkspaceButton>
       </div>
@@ -448,46 +476,30 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
   );
 }
 
-function Sparkline({ color = WS.gold, height = 124 }) {
-  return (
-    <svg viewBox="0 0 520 180" preserveAspectRatio="none" style={{ width: '100%', height, display: 'block' }}>
-      <defs>
-        <linearGradient id="workspaceSpark" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.26" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d="M8 150 C50 136,70 92,116 112 S178 148,222 108 S274 48,320 70 S388 112,430 68 S480 30,512 18" fill="none" stroke={color} strokeWidth="7" strokeLinecap="round" />
-      <path d="M8 150 C50 136,70 92,116 112 S178 148,222 108 S274 48,320 70 S388 112,430 68 S480 30,512 18 L512 180 L8 180 Z" fill="url(#workspaceSpark)" />
-      {[1000, 750, 500, 250, 0].map((label, index) => (
-        <g key={label} opacity="0.48">
-          <line x1="0" x2="520" y1={16 + index * 36} y2={16 + index * 36} stroke="rgba(88,67,37,0.11)" strokeDasharray="5 8" />
-          <text x="0" y={12 + index * 36} fill="rgba(31,26,20,0.52)" fontSize="14" fontWeight="700">{label}</text>
-        </g>
-      ))}
-    </svg>
-  );
-}
-
 function DashboardHero({ data, profileStatus, workspaceView, actions }) {
   const labels = workspaceView.kpiLabels || WORKSPACE_ROLE_VIEWS.partner.kpiLabels;
+  const membershipLabel = data.activeProfile?.verifiedPartner || data.activeProfile?.verified
+    ? 'Проверенный профиль АПГ'
+    : workspaceView.memberLabel;
   return (
+    // The quotes belong to the embedded CSS data URL.
+    // eslint-disable-next-line no-useless-escape
     <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 26, minHeight: 272, padding: 23, color: '#fff', background: 'radial-gradient(circle at 18% 12%, rgba(239,201,113,0.34), transparent 30%), linear-gradient(90deg, rgba(10,12,18,0.86), rgba(12,17,28,0.54)), url(\"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 1200 700%27%3E%3Crect width=%271200%27 height=%27700%27 fill=%27%23101822%27/%3E%3Cg fill=%27%23243549%27 opacity=%27.9%27%3E%3Crect x=%2780%27 y=%27360%27 width=%27130%27 height=%27240%27 rx=%276%27/%3E%3Crect x=%27240%27 y=%27290%27 width=%27160%27 height=%27310%27 rx=%278%27/%3E%3Crect x=%27435%27 y=%27330%27 width=%27120%27 height=%27270%27 rx=%276%27/%3E%3Crect x=%27600%27 y=%27220%27 width=%27170%27 height=%27380%27 rx=%278%27/%3E%3Crect x=%27810%27 y=%27310%27 width=%27150%27 height=%27290%27 rx=%278%27/%3E%3Crect x=%27995%27 y=%27360%27 width=%27110%27 height=%27240%27 rx=%276%27/%3E%3C/g%3E%3Cg stroke=%27%23f0c86d%27 stroke-opacity=%27.24%27 stroke-width=%273%27 fill=%27none%27%3E%3Cpath d=%27M0 600 C220 520 380 620 610 535 S970 500 1200 410%27/%3E%3Cpath d=%27M0 640 C260 570 390 660 620 575 S980 545 1200 470%27/%3E%3C/g%3E%3C/svg%3E\") center/cover', boxShadow: '0 22px 60px rgba(28,23,15,0.22)' }}>
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 45%, rgba(0,0,0,0.40))' }} />
       <div style={{ position: 'relative', zIndex: 1, display: 'grid', height: '100%', minHeight: 226, alignContent: 'space-between', gap: 16 }}>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'flex-start' }}>
             <div style={{ color: 'rgba(255,255,255,0.74)', fontSize: 20, lineHeight: '25px', fontWeight: 650 }}>{getDayGreeting()}, {data.userName} 👋</div>
-            <div style={{ borderRadius: 17, background: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.12)', padding: '9px 13px', color: '#F5D77E', fontSize: 13.5, fontWeight: 850, backdropFilter: 'blur(18px)' }}>♕ {workspaceView.memberLabel}</div>
+            <div style={{ borderRadius: 17, background: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.12)', padding: '9px 13px', color: '#F5D77E', fontSize: 13.5, fontWeight: 850, backdropFilter: 'blur(18px)' }}>{membershipLabel}</div>
           </div>
           <h1 style={{ margin: '13px 0 0', maxWidth: 600, color: '#fff', fontSize: 32, lineHeight: '38px', fontWeight: 950, letterSpacing: 0 }}>{workspaceView.heroTitle}</h1>
           <button type="button" onClick={actions.openCabinet} style={{ marginTop: 14, border: 0, minHeight: 42, borderRadius: 18, padding: '0 18px', background: 'linear-gradient(135deg,#F6D891,#D0A14C)', color: '#24190B', fontFamily: 'inherit', fontSize: 14, fontWeight: 900, cursor: 'pointer', boxShadow: '0 14px 30px rgba(201,155,60,0.18)' }}>Продолжить работу</button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 10, padding: 10, borderRadius: 21, background: 'rgba(10,10,12,0.42)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(26px)' }}>
           {[
-            ['☆', workspaceView.id === 'admin' ? 'Admin' : '18', labels[0]],
+            ['☆', workspaceView.id === 'admin' ? 'Admin' : `${profileStatus.value}%`, labels[0]],
             ['⌘', data.userKeys || 0, labels[1]],
-            ['✿', workspaceView.id === 'admin' ? data.news.length : data.partners.filter(item => item.offer).length || 5, labels[2]],
+            ['✿', workspaceView.id === 'admin' ? data.news.length : data.partners.filter(item => item.offer).length, labels[2]],
             ['▣', data.events.length || 0, labels[3]],
           ].map(([icon, value, label]) => (
             <div key={label} style={{ display: 'grid', gridTemplateColumns: '34px minmax(0,1fr)', gap: 9, alignItems: 'center' }}>
@@ -509,25 +521,31 @@ function MetricTile({ label, value, delta }) {
     <div style={{ borderRadius: 15, background: WS.panelSoft, border: `1px solid ${WS.line}`, padding: '10px 9px', textAlign: 'center', minWidth: 0 }}>
       <div style={{ color: WS.text, fontSize: 21, lineHeight: '24px', fontWeight: 950 }}>{value}</div>
       <div style={{ color: WS.soft, fontSize: 12, lineHeight: '15px', marginTop: 4 }}>{label}</div>
-      <div style={{ color: WS.green, fontSize: 12, lineHeight: '15px', fontWeight: 880, marginTop: 5 }}>↗ {delta}</div>
+      {delta && <div style={{ color: WS.green, fontSize: 12, lineHeight: '15px', fontWeight: 880, marginTop: 5 }}>↗ {delta}</div>}
     </div>
   );
 }
 
 function MetricsPanel({ data }) {
+  const profile = data.activeProfile || {};
+  const views = Number(profile.viewCount ?? profile.views ?? 0) || 0;
+  const transitions = ['phoneClicks', 'telegramClicks', 'whatsappClicks', 'vkClicks', 'websiteClicks', 'routeClicks']
+    .reduce((sum, key) => sum + (Number(profile[key]) || 0), 0);
+  const interactions = transitions + (Number(profile.favoritesCount) || 0) + (Number(profile.reviewCount) || 0);
+  const clients = data.bookings.filter(item => !['cancelled', 'cancelled_by_user', 'cancelled_by_provider', 'archived'].includes(String(item.status || '').toLowerCase())).length;
+  const hasActivity = views || interactions || transitions || clients;
   return (
-    <Panel title="Ключевые показатели" action={<button type="button" style={buttonStyle({ minHeight: 30, padding: '5px 10px', background: 'transparent', boxShadow: 'none', color: WS.soft })}>Этот месяц⌄</button>} style={{ minHeight: 272, padding: 18 }}>
+    <Panel title="Ключевые показатели" action={<span style={{ color: WS.soft, fontSize: 12.5, fontWeight: 760 }}>Этот месяц</span>} style={{ minHeight: 272, padding: 18 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 10 }}>
-        <MetricTile label="Просмотров" value="1 248" delta="18%" />
-        <MetricTile label="Взаимодействий" value="324" delta="12%" />
-        <MetricTile label="Переходов" value="78" delta="16%" />
-        <MetricTile label="Новых клиентов" value={Math.max(data.unreadCount || 0, 24)} delta="20%" />
+        <MetricTile label="Просмотров" value={views} />
+        <MetricTile label="Взаимодействий" value={interactions} />
+        <MetricTile label="Переходов" value={transitions} />
+        <MetricTile label="Активных записей" value={clients} />
       </div>
       <div style={{ marginTop: 12 }}>
         <div style={{ color: WS.text, fontSize: 15, lineHeight: '19px', fontWeight: 900, marginBottom: 6 }}>Динамика активности</div>
-        <Sparkline color={WS.gold} height={88} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', color: WS.muted, fontSize: 12, fontWeight: 760, marginTop: 4 }}>
-          <span>1 июл</span><span style={{ textAlign: 'center' }}>4 июл</span><span style={{ textAlign: 'center' }}>10 июл</span><span style={{ textAlign: 'right' }}>13 июл</span>
+        <div style={{ minHeight: 88, borderRadius: 15, background: WS.controlSoft, border: `1px solid ${WS.line}`, display: 'grid', placeItems: 'center', padding: 14, color: WS.soft, fontSize: 13, lineHeight: '19px', textAlign: 'center' }}>
+          {hasActivity ? 'Показаны накопленные значения. График появится после подключения истории по дням.' : 'Статистика появится после первых просмотров и действий клиентов.'}
         </div>
       </div>
     </Panel>
@@ -1086,14 +1104,9 @@ function WorkspaceDashboard({ data, actions, workspaceView, intelligence, dayPla
   const profileStatus = getProfileCompletion(data.activeProfile);
   const tasks = getRoleSpecificTasks({ view: workspaceView, data, profileStatus, actions });
   const workspaceName = data.userName || data.activeProfile?.name || 'АПГ';
-  const fallbackEvents = [
-    { id: 'fallback-1', title: '9-й Большой Нетворкинг', eventDate: '2026-07-22', time: '11:00 – 16:00', place: 'Зеленоград, к1462' },
-    { id: 'fallback-2', title: 'Бизнес-завтрак с экспертами', eventDate: '2026-07-25', time: '09:30 – 11:30', place: 'Онлайн' },
-    { id: 'fallback-3', title: 'Мастер-класс по продвижению', eventDate: '2026-07-30', time: '14:00 – 17:00', place: 'Зеленоград, к1401' },
-  ];
   const visibleTasks = tasks.slice(0, 3);
-  const visibleEvents = data.events.length ? data.events.slice(0, 2) : fallbackEvents.slice(0, 2);
-  const visibleMessages = data.notifications.length ? data.notifications.slice(0, 3) : [{ id: 'm1' }, { id: 'm2' }, { id: 'm3' }];
+  const visibleEvents = data.events.slice(0, 2);
+  const visibleMessages = data.notifications.slice(0, 3);
   const dashboardSignals = intelligence?.signals?.length ? intelligence.signals.slice(0, 3) : [
     'Локи начнёт подсказывать приоритеты после накопления активности.',
     'Workspace уже собирает события через Intelligence Platform.',
@@ -1114,19 +1127,19 @@ function WorkspaceDashboard({ data, actions, workspaceView, intelligence, dayPla
         <MetricsPanel data={data} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1.05fr) minmax(0,1fr)', gap: 14, alignItems: 'stretch' }}>
-        <Panel title="Задачи и уведомления" action={<button type="button" style={buttonStyle({ minHeight: 32, padding: '6px 10px', background: 'transparent', boxShadow: 'none', color: WS.soft })}>Все задачи⌄</button>} style={{ padding: 18 }}>
+        <Panel title="Задачи и уведомления" action={<button type="button" onClick={actions.openMessages} style={buttonStyle({ minHeight: 32, padding: '6px 10px', background: 'transparent', boxShadow: 'none', color: WS.soft })}>Все уведомления</button>} style={{ padding: 18 }}>
           <div style={{ display: 'grid' }}>
             {visibleTasks.map(task => <TaskRow key={task.title} {...task} />)}
           </div>
         </Panel>
         <Panel title="Ближайшие мероприятия" action={<button type="button" onClick={actions.openEvents} style={buttonStyle({ minHeight: 32, padding: '6px 10px', background: 'transparent', boxShadow: 'none', color: WS.soft })}>Все мероприятия⌄</button>} style={{ padding: 18 }}>
           <div style={{ display: 'grid' }}>
-            {visibleEvents.map((event, index) => <EventRow key={event.id || index} event={event} index={index} onClick={actions.openEvents} />)}
+            {visibleEvents.length ? visibleEvents.map((event, index) => <EventRow key={event.id || index} event={event} index={index} onClick={actions.openEvents} />) : <EmptyWidget text="Ближайших мероприятий пока нет." />}
           </div>
         </Panel>
         <Panel title="Новые сообщения" action={<button type="button" onClick={actions.openMessages} style={buttonStyle({ minHeight: 32, padding: '6px 10px', background: 'transparent', boxShadow: 'none', color: WS.soft })}>Все сообщения⌄</button>} style={{ padding: 18 }}>
           <div style={{ display: 'grid' }}>
-            {visibleMessages.map((item, index) => <MessageRow key={item.id || index} item={item} index={index} onClick={actions.openMessages} />)}
+            {visibleMessages.length ? visibleMessages.map((item, index) => <MessageRow key={item.id || index} item={item} index={index} onClick={actions.openMessages} />) : <EmptyWidget text="Новых сообщений и уведомлений нет." />}
           </div>
         </Panel>
       </div>
@@ -1890,6 +1903,36 @@ export function DesktopWorkspace({
     openWorkspaceLink: (target, payload) => openWorkspaceLink(actions, target, payload),
   };
 
+  const handleWorkspaceSearch = value => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized) return;
+    const destinations = [
+      [['глав', 'сегодня', 'дашборд'], actions.openDashboard],
+      [['профил', 'витрин', 'карточ'], actions.openProfile],
+      [['новост', 'контент', 'публикац', 'пост'], actions.openNews],
+      [['мероприят', 'событ'], actions.openEvents],
+      [['встреч', 'запис', 'календар'], actions.openBooking],
+      [['люд', 'клиент', 'эксперт'], actions.openExperts],
+      [['диалог', 'сообщен', 'переписк'], actions.openDialogs],
+      [['партн', 'привлеч', 'qr'], actions.openPartners],
+      [['акци', 'предложен', 'скидк'], actions.openOffers],
+      [['подар', 'розыгрыш', 'наград'], actions.openRewards],
+      [['отзыв'], actions.openReviews],
+      [['аналит', 'статист', 'метрик'], actions.openAnalytics],
+      [['финанс', 'счет', 'выплат'], actions.openFinance],
+      [['уведомлен'], actions.openMessages],
+      [['настрой'], actions.openBusinessHub],
+      [['локи', 'помощник'], actions.openLoki],
+    ];
+    const match = destinations.find(([aliases]) => aliases.some(alias => normalized.includes(alias)));
+    if (match) {
+      match[1]();
+      setQuery('');
+      return;
+    }
+    onToast?.('Раздел не найден. Попробуйте: новости, встречи, клиенты или аналитика.', 'info');
+  };
+
   useEffect(() => {
     if (!availableWorkspaceViews.some(view => view.id === activeWorkspaceViewId)) {
       setActiveWorkspaceViewId(availableWorkspaceViews[0]?.id || 'partner');
@@ -1903,7 +1946,7 @@ export function DesktopWorkspace({
       if (['input', 'textarea', 'select'].includes(tag)) return;
       if ((event.metaKey || event.ctrlKey) && key === 'k') {
         event.preventDefault();
-        document.querySelector('[placeholder="Поиск по АПГ..."]')?.focus?.();
+        document.querySelector('[data-workspace-search]')?.focus?.();
       }
       if ((event.metaKey || event.ctrlKey) && key === '1') {
         event.preventDefault();
@@ -1950,6 +1993,7 @@ export function DesktopWorkspace({
     if (activeSection === 'events') return <WorkspaceEventsManager role={activeRole} profile={activeProfile} roleViews={availableWorkspaceViews} activeViewId={workspaceView.id} onRoleChange={setActiveWorkspaceViewId} events={events} actions={actions} onOpenPublicEvents={() => onOpenPanel?.('events')} onEventChanged={onEventChanged} onToast={onToast} />;
     if (activeSection === 'booking') return <WorkspaceMeetingsCRM role={activeRole} profile={activeProfile} events={events} actions={actions} onOpenDialog={onOpenDialog} onOpenPanel={onOpenPanel} onToast={onToast} />;
     if (activeSection === 'dialogs') return <WorkspaceDialogsCRM user={user} role={activeRole} profile={activeProfile} events={events} actions={actions} onOpenPanel={onOpenPanel} onToast={onToast} />;
+    if (activeSection === 'reviews') return <WorkspaceReviewsCenter role={activeRole} profile={activeProfile} actions={actions} />;
     if (activeSection === 'analytics') return <WorkspaceAnalyticsCenter role={activeRole} profile={activeProfile} actions={actions} onOpenPanel={onOpenPanel} onToast={onToast} />;
     if (activeSection === 'offers') return <WorkspacePromotionsCenter role={activeRole} profile={activeProfile} events={events} news={news} actions={actions} onOpenPanel={onOpenPanel} onToast={onToast} />;
     if (activeSection === 'rewards') return <WorkspaceGiftsCenter role={activeRole} profile={activeProfile} events={events} news={news} actions={actions} onOpenPanel={onOpenPanel} onToast={onToast} />;
@@ -1988,7 +2032,7 @@ export function DesktopWorkspace({
         '--apg2-glass-border': WS.line,
       }}
     >
-      <WorkspaceHeader query={query} onQueryChange={setQuery} unreadCount={unreadCount} onModeChange={onModeChange} onOpenNotifications={() => setActiveSection('notifications')} />
+      <WorkspaceHeader query={query} onQueryChange={setQuery} onQuerySubmit={handleWorkspaceSearch} actions={actions} unreadCount={unreadCount} onModeChange={onModeChange} onOpenNotifications={() => setActiveSection('notifications')} />
       <div style={{ maxWidth: 1760, margin: '0 auto', padding: '18px 24px 22px', display: 'grid', gridTemplateColumns: '255px minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
         <WorkspaceSidebar items={navItems} activeSection={activeSection} onSelect={handleSelectNav} user={user} data={workspaceData} onModeChange={onModeChange} availableViews={availableWorkspaceViews} activeViewId={workspaceView.id} onViewChange={setActiveWorkspaceViewId} profileCompletion={profileCompletion} onCompleteProfile={openProfileMissingFields} />
         <main data-workspace-region="content" style={{ minWidth: 0, display: 'grid', gap: 14 }}>

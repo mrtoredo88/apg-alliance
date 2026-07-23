@@ -11,6 +11,12 @@ import { normalizeExternalUrl, validateExternalUrl } from '../utils/externalUrls
 import { shareLink } from '../utils/shareLink.js';
 import { ContentGrid } from '../workspace/WorkspaceComponents.jsx';
 import { WorkspaceNewsCenter } from '../workspace/WorkspaceNewsCenter.jsx';
+import { WorkspaceEventsManager } from '../workspace/WorkspaceEventsManager.jsx';
+import { WorkspacePromotionsCenter } from '../workspace/WorkspacePromotionsCenter.jsx';
+import { WorkspaceMeetingsCRM } from '../workspace/WorkspaceMeetingsCRM.jsx';
+import { WorkspaceDialogsCRM } from '../workspace/WorkspaceDialogsCRM.jsx';
+import { WorkspaceReviewsCenter } from '../workspace/WorkspaceReviewsCenter.jsx';
+import { saveWorkspaceLinkIntent } from '../workspace/WorkspaceLinks.jsx';
 import { LokiIdentity } from '../loki/LokiIdentity.jsx';
 import { getCabinetRoles, getRoleModuleIds } from './CabinetRoleEngine.js';
 import { buildCabinetHistory, buildCabinetNotifications, buildCabinetSnapshot, buildCabinetTasks, getCabinetPublicUrl } from './CabinetModules.js';
@@ -41,6 +47,15 @@ const MODULES = [
 ];
 
 const MODULE_LABELS = Object.fromEntries(MODULES);
+
+const CABINET_NAV_GROUPS = [
+  { id: 'home', label: 'Главная', icon: '⌂', modules: ['dashboard', 'tasks', 'notifications'] },
+  { id: 'showcase', label: 'Витрина', icon: '◇', modules: ['showcase-builder'] },
+  { id: 'clients', label: 'Клиенты', icon: '◎', modules: ['booking', 'dialogs', 'reviews'] },
+  { id: 'content', label: 'Контент', icon: '✎', modules: ['content', 'events'] },
+  { id: 'promotion', label: 'Продвижение', icon: '↗', modules: ['promotions', 'qr', 'analytics'] },
+  { id: 'more', label: 'Ещё', icon: '•••', modules: ['loki', 'settings', 'history'] },
+];
 
 function dateText(value) {
   if (!value) return 'Дата не указана';
@@ -74,8 +89,8 @@ function SectionCard({ title, text, action, tone }) {
   );
 }
 
-function MetricGrid({ metrics }) {
-  const rows = [
+function MetricGrid({ metrics, compact = false }) {
+  const allRows = [
     ['просмотры', metrics.views],
     ['уникальные', metrics.uniqueVisitors || '—'],
     ['переходы', metrics.website + metrics.vk + metrics.telegram + metrics.whatsapp + metrics.calls + metrics.map],
@@ -93,6 +108,16 @@ function MetricGrid({ metrics }) {
     ['акции', metrics.offers],
     ['заполненность', `${metrics.completion}%`],
   ];
+  const rows = compact
+    ? [
+        ['просмотры', metrics.views],
+        ['переходы', metrics.website + metrics.vk + metrics.telegram + metrics.whatsapp + metrics.calls + metrics.map],
+        ['отзывы', metrics.reviews],
+        ['новости', metrics.news],
+        ['мероприятия', metrics.events],
+        ['заполненность', `${metrics.completion}%`],
+      ]
+    : allRows;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 }}>
       {rows.map(([label, value]) => <StatPill key={label} label={label} value={value} tone={label === 'заполненность' ? 'gold' : 'glass'} />)}
@@ -149,12 +174,68 @@ function LokiCard({ snapshot, onOpenModule }) {
 }
 
 function DashboardModule({ snapshot, onOpenModule }) {
+  const tasks = buildCabinetTasks(snapshot).slice(0, 4);
+  const notifications = buildCabinetNotifications(snapshot);
+  const attention = [
+    ...tasks.map(item => ({ ...item, action: item.module })),
+    ...notifications
+      .filter(item => !tasks.some(task => task.id === item.id))
+      .map(item => ({ ...item, action: item.id === 'completion' ? 'showcase-builder' : item.id })),
+  ].slice(0, 5);
+  const quickActions = [
+    ['Создать публикацию', 'content', '✎'],
+    ['Создать мероприятие', 'events', '◈'],
+    [snapshot.roleId === 'expert' ? 'Добавить предложение' : 'Создать акцию', snapshot.roleId === 'expert' ? 'content' : 'promotions', '%'],
+    ['Открыть диалоги', 'dialogs', '◎'],
+    ['Обновить витрину', 'showcase-builder', '◇'],
+  ];
   return (
-    <GlassSection title="Dashboard">
-      <MetricGrid metrics={snapshot.metrics} />
+    <div style={{ display: 'grid', gap: 12 }}>
+      <GlassCard tone="gold" style={{ borderRadius: 30 }}>
+        <div style={{ color: '#17120a', fontSize: 11, lineHeight: '14px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.8 }}>Сегодня</div>
+        <div style={{ color: '#17120a', fontSize: 23, lineHeight: '28px', fontWeight: 940, marginTop: 6 }}>
+          {attention.length ? `${attention.length} ${attention.length === 1 ? 'задача требует' : attention.length < 5 ? 'задачи требуют' : 'задач требуют'} внимания` : 'Основные задачи выполнены'}
+        </div>
+        <div style={{ color: 'rgba(23,18,10,0.64)', fontSize: 13, lineHeight: '19px', marginTop: 5 }}>
+          {attention[0]?.text || 'Новые действия появятся здесь вместе с обращениями, публикациями и изменениями профиля.'}
+        </div>
+        {attention[0] && <GlassButton onClick={() => onOpenModule(attention[0].action)} style={{ width: '100%', marginTop: 12, background: 'rgba(255,255,255,0.34)', color: '#17120a' }}>Открыть первую задачу</GlassButton>}
+      </GlassCard>
+
+      <GlassSection title="Быстрые действия">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 }}>
+          {quickActions.map(([label, module, icon], index) => (
+            <GlassButton key={`${module}-${label}`} tone={index === 0 ? 'gold' : 'glass'} onClick={() => onOpenModule(module)} style={{ minHeight: 58, borderRadius: 19, padding: '10px 9px', display: 'grid', gridTemplateColumns: '25px minmax(0,1fr)', textAlign: 'left', color: index === 0 ? '#17120a' : APG2_PROFILE.text }}>
+              <span style={{ fontSize: 17 }}>{icon}</span>
+              <span style={{ fontSize: 12.5, lineHeight: '16px', fontWeight: 850 }}>{label}</span>
+            </GlassButton>
+          ))}
+        </div>
+      </GlassSection>
+
+      <GlassSection title="Требует внимания">
+        {attention.length ? (
+          <div style={{ display: 'grid', gap: 8 }}>
+            {attention.map(item => (
+              <GlassCard key={item.id} onClick={() => onOpenModule(item.action)} style={{ borderRadius: 22, padding: 12, display: 'grid', gridTemplateColumns: '30px minmax(0,1fr) auto', gap: 10, alignItems: 'center' }}>
+                <span style={{ width: 30, height: 30, borderRadius: 12, display: 'grid', placeItems: 'center', background: item.priority === 'high' || item.level === 'warning' ? APG2_PROFILE.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.gold, fontWeight: 900 }}>!</span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', color: APG2_PROFILE.text, fontSize: 13.5, lineHeight: '17px', fontWeight: 850 }}>{item.title}</span>
+                  <span style={{ display: 'block', color: APG2_PROFILE.textSoft, fontSize: 11.5, lineHeight: '16px', marginTop: 3 }}>{item.text}</span>
+                </span>
+                <span style={{ color: APG2_PROFILE.gold, fontSize: 20 }}>›</span>
+              </GlassCard>
+            ))}
+          </div>
+        ) : <EmptyStateV2 icon="✓" title="Всё спокойно" text="Новых задач, требующих внимания, сейчас нет." />}
+      </GlassSection>
+
+      <GlassSection title="Показатели">
+        <MetricGrid metrics={snapshot.metrics} compact />
+      </GlassSection>
       <ProfileCompleteness snapshot={snapshot} onOpenModule={onOpenModule} />
       <LokiCard snapshot={snapshot} onOpenModule={onOpenModule} />
-    </GlassSection>
+    </div>
   );
 }
 
@@ -300,7 +381,7 @@ function ContentModule({ snapshot, events, onEventCreated, onToast }) {
   );
 }
 
-function ReviewsModule({ snapshot }) {
+function ReviewsModule({ snapshot, onOpenDialogs }) {
   return (
     <GlassSection title="Отзывы">
       {!snapshot.reviews.length ? (
@@ -314,6 +395,7 @@ function ReviewsModule({ snapshot }) {
                 <Stars rating={review.stars ?? review.rating ?? 0} />
               </div>
               <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '19px' }}>{review.text || 'Без текста'}</div>
+              <GlassButton onClick={onOpenDialogs} style={{ width: '100%', marginTop: 10 }}>Ответить в диалоге</GlassButton>
             </GlassCard>
           ))}
         </div>
@@ -322,23 +404,30 @@ function ReviewsModule({ snapshot }) {
   );
 }
 
-function NotificationsModule({ snapshot }) {
+function NotificationsModule({ snapshot, onOpenModule }) {
   const notifications = buildCabinetNotifications(snapshot);
   return (
     <GlassSection title="Уведомления">
       {!notifications.length ? <EmptyStateV2 icon="🔔" title="Пока тихо" text="Отзывы, публикации, модерация, события, напоминания и будущие платежи будут приходить сюда." /> : (
-        <div style={{ display: 'grid', gap: 10 }}>{notifications.map(item => <SectionCard key={item.id} title={item.title} text={item.text} tone={item.level === 'warning' ? 'gold' : 'glass'} />)}</div>
+        <div style={{ display: 'grid', gap: 10 }}>{notifications.map(item => <SectionCard key={item.id} title={item.title} text={item.text} tone={item.level === 'warning' ? 'gold' : 'glass'} action={<GlassButton onClick={() => onOpenModule(item.id === 'completion' ? 'showcase-builder' : item.id)} style={{ width: '100%', marginTop: 10 }}>Открыть</GlassButton>} />)}</div>
       )}
     </GlassSection>
   );
 }
 
 function LokiModule({ snapshot, onOpenModule }) {
+  const prompts = [
+    ['Что улучшить?', 'tasks'],
+    ['Почему меньше просмотров?', 'analytics'],
+    ['Какие услуги популярны?', 'analytics'],
+    ['Напиши новость', 'content'],
+    ['Предложи акцию', 'promotions'],
+  ];
   return (
     <GlassSection title="Локи">
       <LokiCard snapshot={snapshot} onOpenModule={onOpenModule} />
       <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
-        {['Что улучшить?', 'Почему меньше просмотров?', 'Какие услуги популярны?', 'Напиши новость', 'Предложи акцию'].map(prompt => <SectionCard key={prompt} title={prompt} text="Сценарий подключён к Cabinet Core и будет получать данные выбранной роли." />)}
+        {prompts.map(([prompt, module]) => <SectionCard key={prompt} title={prompt} text="Открою нужный рабочий раздел с данными выбранного профиля." action={<GlassButton onClick={() => onOpenModule(module)} style={{ width: '100%', marginTop: 10 }}>Продолжить</GlassButton>} />)}
       </div>
     </GlassSection>
   );
@@ -591,23 +680,48 @@ function BookingModule({ role, profile, onSaved, onToast }) {
   );
 }
 
-export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, preferredRole = 'partner', events = [], onBack, onProfileUpdate, onEventCreated, onToast, onOpenDialogs }) {
+export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, preferredRole = 'partner', initialModule = 'showcase-builder', events = [], news = [], onBack, onProfileUpdate, onEventCreated, onToast, onOpenDialogs, onOpenPanel }) {
   const roleState = useMemo(() => getCabinetRoles({ user, partner, expert, preferredRole }), [user, partner, expert, preferredRole]);
   const [activeRoleId, setActiveRoleId] = useState(roleState.activeRole?.id || preferredRole);
   const activeRole = roleState.roles.find(role => role.id === activeRoleId) || roleState.activeRole;
   const [profile, setProfile] = useState(activeRole?.profile || null);
   const [reviews, setReviews] = useState([]);
-  const [activeModule, setActiveModule] = useState('showcase-builder');
+  const [activeModule, setActiveModule] = useState(initialModule);
+  const [showcaseFocusTab, setShowcaseFocusTab] = useState(null);
   const [loading, setLoading] = useState(false);
   const moduleIds = useMemo(() => {
-    const allowed = new Set(['showcase-builder', 'dashboard', 'dialogs', 'tasks', 'analytics', 'media', 'contacts', 'content', 'reviews', 'notifications', 'loki', 'subscription', 'settings', 'history']);
-    const ordered = ['showcase-builder', 'dashboard', 'dialogs', 'tasks', ...getRoleModuleIds(roleState.roles)];
-    return [...new Set(ordered)].filter(id => allowed.has(id) || (activeRole?.modules || []).includes(id));
-  }, [roleState.roles, activeRole?.id]);
+    const allowed = new Set(['showcase-builder', 'dashboard', 'dialogs', 'tasks', 'analytics', 'media', 'contacts', 'content', 'reviews', 'notifications', 'loki', 'settings', 'history', 'booking', 'promotions', 'events', 'services', 'experience']);
+    const ordered = ['showcase-builder', 'dashboard', 'dialogs', 'tasks', ...getRoleModuleIds(activeRole ? [activeRole] : [])];
+    return [...new Set(ordered)].filter(id => allowed.has(id));
+  }, [activeRole]);
+  const visibleNavGroups = useMemo(() => CABINET_NAV_GROUPS
+    .map(group => ({ ...group, modules: group.modules.filter(id => moduleIds.includes(id) || id === 'qr') }))
+    .filter(group => group.modules.length), [moduleIds]);
+  const activeNavGroup = visibleNavGroups.find(group => group.modules.includes(activeModule)) || visibleNavGroups[0];
 
   useEffect(() => {
     setActiveRoleId(roleState.activeRole?.id || preferredRole);
   }, [roleState.activeRole?.id, preferredRole]);
+
+  useEffect(() => {
+    if (initialModule) setActiveModule(initialModule);
+  }, [initialModule]);
+
+  const openCabinetModule = (module) => {
+    const showcaseTabs = {
+      media: 'media',
+      contacts: 'contacts',
+      services: 'about',
+      experience: 'about',
+      'showcase-builder': 'showcase',
+    };
+    if (showcaseTabs[module]) {
+      setShowcaseFocusTab({ tab: showcaseTabs[module], nonce: Date.now() });
+      setActiveModule('showcase-builder');
+      return;
+    }
+    setActiveModule(module);
+  };
 
   useEffect(() => {
     if (!activeRole?.profile?.id || !activeRole.collection) {
@@ -657,30 +771,46 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
     setProfile(updated);
     onProfileUpdate?.(activeRole.id, updated);
   };
+  const cabinetActions = {
+    openProfile: () => openCabinetModule('showcase-builder'),
+    openNews: () => openCabinetModule('content'),
+    openEvents: () => openCabinetModule('events'),
+    openOffers: () => openCabinetModule('promotions'),
+    openReviews: () => openCabinetModule('reviews'),
+    openAnalytics: () => openCabinetModule('analytics'),
+    openBooking: () => openCabinetModule('booking'),
+    openDialogs: () => openCabinetModule('dialogs'),
+  };
+  const openCabinetDialog = (dialogId = '') => {
+    saveWorkspaceLinkIntent('dialogs', { dialogId });
+    openCabinetModule('dialogs');
+  };
   const renderModule = () => {
-    if (activeModule === 'dashboard') return <DashboardModule snapshot={snapshot} onOpenModule={setActiveModule} />;
-    if (activeModule === 'showcase-builder') return <DigitalShowcaseBuilder role={activeRole} profile={currentProfile} relatedEvents={snapshot.relatedEvents} onSaved={handleSaved} onOpenModule={setActiveModule} onEventCreated={onEventCreated} onToast={onToast} publicUrl={publicUrl} />;
-    if (activeModule === 'tasks') return <TasksModule snapshot={snapshot} onOpenModule={setActiveModule} />;
+    if (activeModule === 'dashboard') return <DashboardModule snapshot={snapshot} onOpenModule={openCabinetModule} />;
+    if (activeModule === 'showcase-builder') return <DigitalShowcaseBuilder role={activeRole} profile={currentProfile} relatedEvents={snapshot.relatedEvents} onSaved={handleSaved} onOpenModule={openCabinetModule} onEventCreated={onEventCreated} onToast={onToast} publicUrl={publicUrl} focusTab={showcaseFocusTab} />;
+    if (activeModule === 'tasks') return <TasksModule snapshot={snapshot} onOpenModule={openCabinetModule} />;
     if (activeModule === 'analytics') return <AnalyticsModule snapshot={snapshot} />;
     if (activeModule === 'media') return <MediaModule snapshot={snapshot} />;
     if (activeModule === 'contacts') return <ContactsModule role={activeRole} profile={currentProfile} onSaved={handleSaved} onToast={onToast} />;
     if (activeModule === 'content') return <ContentModule snapshot={snapshot} events={events} onEventCreated={onEventCreated} onToast={onToast} />;
-    if (activeModule === 'reviews') return <ReviewsModule snapshot={snapshot} />;
-    if (activeModule === 'dialogs') return <GlassSection title="Контекстные диалоги"><SectionCard title="Вопросы по объектам" text="Здесь собираются обращения по партнёру, акциям, мероприятиям и экспертному профилю. Каждый диалог привязан к конкретной карточке." action={<GlassButton onClick={onOpenDialogs} style={{ marginTop: 10 }}>Открыть диалоги</GlassButton>} /></GlassSection>;
-    if (activeModule === 'booking' && ['partner', 'expert'].includes(activeRole.id)) return <BookingModule role={activeRole} profile={currentProfile} onSaved={handleSaved} onToast={onToast} />;
-    if (activeModule === 'notifications') return <NotificationsModule snapshot={snapshot} />;
-    if (activeModule === 'loki') return <LokiModule snapshot={snapshot} onOpenModule={setActiveModule} />;
+    if (activeModule === 'reviews') return <WorkspaceReviewsCenter role={activeRole} profile={currentProfile} reviews={snapshot.reviews} actions={cabinetActions} onOpenDialogs={onOpenDialogs} compact />;
+    if (activeModule === 'dialogs') return <WorkspaceDialogsCRM user={user} role={activeRole} profile={currentProfile} events={events} actions={cabinetActions} onOpenPanel={onOpenPanel} onToast={onToast} compact />;
+    if (activeModule === 'booking' && ['partner', 'expert'].includes(activeRole.id)) return <WorkspaceMeetingsCRM role={activeRole} profile={currentProfile} events={events} actions={cabinetActions} onOpenDialog={openCabinetDialog} onOpenPanel={onOpenPanel} onToast={onToast} compact />;
+    if (activeModule === 'notifications') return <NotificationsModule snapshot={snapshot} onOpenModule={openCabinetModule} />;
+    if (activeModule === 'loki') return <LokiModule snapshot={snapshot} onOpenModule={openCabinetModule} />;
     if (activeModule === 'subscription') return <SubscriptionModule role={activeRole} snapshot={snapshot} />;
     if (activeModule === 'settings') return <SettingsModule role={activeRole} snapshot={snapshot} onSaved={handleSaved} onToast={onToast} />;
     if (activeModule === 'history') return <HistoryModule snapshot={snapshot} />;
     if (activeModule === 'qr') return <GlassSection title="QR"><GlassCard style={{ borderRadius: 32 }}>{activeRole.id === 'expert' ? <ExpertQRSection expert={currentProfile} /> : <PartnerQRSection partner={currentProfile} />}</GlassCard></GlassSection>;
+    if (activeModule === 'events') return <WorkspaceEventsManager role={activeRole} profile={currentProfile} events={events} actions={cabinetActions} onOpenPublicEvents={() => onOpenPanel?.('events')} onEventChanged={onEventCreated} onToast={onToast} />;
+    if (activeModule === 'promotions') return <WorkspacePromotionsCenter role={activeRole} profile={currentProfile} events={events} news={news} actions={cabinetActions} onOpenPanel={onOpenPanel} onToast={onToast} compact />;
     return <RoleSpecificModule id={activeModule} snapshot={snapshot} onOpenModule={setActiveModule} />;
   };
 
   return (
     <Panel id={nav}>
       <GlassPanel>
-        <ScreenHeader title="Личный кабинет 2.0" subtitle={currentProfile.name} kicker={activeRole.label} onBack={onBack} />
+        <ScreenHeader title={activeRole.id === 'expert' ? 'Кабинет эксперта' : activeRole.id === 'partner' ? 'Кабинет партнёра' : 'Рабочий кабинет'} subtitle={currentProfile.name} kicker={activeRole.label} onBack={onBack} />
         {roleState.hasMultipleRoles && (
           <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: `repeat(${roleState.roles.length}, minmax(0,1fr))`, gap: 6, marginBottom: 12 }}>
             {roleState.roles.map(role => <GlassButton key={role.id} tone={role.id === activeRole.id ? 'gold' : 'glass'} onClick={() => { setActiveRoleId(role.id); setActiveModule('showcase-builder'); }} style={{ color: role.id === activeRole.id ? '#17120a' : APG2_PROFILE.text }}>{role.label}</GlassButton>)}
@@ -695,29 +825,22 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
           avatar={<GlassBadge tone="gold">{activeRole.id === 'expert' ? 'Эксперт' : 'АПГ'}</GlassBadge>}
           badges={[activeRole.label, snapshot.metrics.rating ? `★ ${snapshot.metrics.rating.toFixed(1)}` : null, `${snapshot.metrics.views} просмотров`].filter(Boolean)}
         />
-        <ContentGrid min={72} gap={7} style={{ marginTop: 12 }}>
-          {[
-            ['showcase-builder', 'Витрина', '◇'],
-            ['dashboard', 'Дашборд', '▦'],
-            ['dialogs', 'Диалоги', '💬'],
-            ['booking', 'Запись', '📅'],
-            ['tasks', 'Задачи', '✓'],
-            ['contacts', 'Контакты', '☎'],
-            ['media', 'Медиа', '▣'],
-            ['content', 'Контент', '✎'],
-            ['analytics', 'Аналитика', '↗'],
-            ['qr', 'QR', '▤'],
-            ['loki', 'Локи', '✦'],
-          ].map(([id, label, icon]) => (
-            <button key={id} type="button" onClick={() => setActiveModule(id)} style={{ ...APG2_PROFILE.glass, borderRadius: 22, minHeight: 58, display: 'grid', placeItems: 'center', gap: 4, padding: '8px 4px', color: APG2_PROFILE.text, fontFamily: 'inherit', cursor: 'pointer', border: activeModule === id ? '1px solid rgba(215,184,106,0.58)' : APG2_PROFILE.glass.border }}>
-              <span style={{ fontSize: 18, lineHeight: 1, color: activeModule === id ? APG2_PROFILE.gold : APG2_PROFILE.textSoft }}>{icon}</span>
-              <span style={{ fontSize: 10, lineHeight: '12px', fontWeight: 760, color: APG2_PROFILE.textSoft }}>{label}</span>
+        <ContentGrid min={94} gap={7} style={{ marginTop: 12 }}>
+          {visibleNavGroups.map(group => {
+            const active = activeNavGroup?.id === group.id;
+            return (
+            <button key={group.id} type="button" onClick={() => openCabinetModule(group.modules[0])} style={{ ...APG2_PROFILE.glass, borderRadius: 20, minHeight: 62, display: 'grid', placeItems: 'center', gap: 5, padding: '9px 6px', color: APG2_PROFILE.text, fontFamily: 'inherit', cursor: 'pointer', border: active ? '1px solid rgba(215,184,106,0.58)' : APG2_PROFILE.glass.border, background: active ? APG2_PROFILE.goldSoft : APG2_PROFILE.glass.background }}>
+              <span style={{ fontSize: 18, lineHeight: 1, color: active ? APG2_PROFILE.gold : APG2_PROFILE.textSoft }}>{group.icon}</span>
+              <span style={{ fontSize: 10.5, lineHeight: '13px', fontWeight: 800, color: active ? APG2_PROFILE.text : APG2_PROFILE.textSoft }}>{group.label}</span>
             </button>
-          ))}
+            );
+          })}
         </ContentGrid>
-        <GlassCard style={{ borderRadius: 28, padding: 6, display: 'flex', gap: 6, overflowX: 'auto', marginTop: 12 }}>
-          {moduleIds.map(id => <GlassButton key={id} tone={activeModule === id ? 'gold' : 'glass'} onClick={() => setActiveModule(id)} style={{ minHeight: 38, borderRadius: 18, padding: '8px 11px', whiteSpace: 'nowrap', color: activeModule === id ? '#17120a' : APG2_PROFILE.text }}>{MODULE_LABELS[id] || id}</GlassButton>)}
-        </GlassCard>
+        {activeNavGroup?.modules.length > 1 && (
+          <GlassCard style={{ borderRadius: 22, padding: 6, display: 'flex', gap: 6, overflowX: 'auto', marginTop: 8, scrollbarWidth: 'none' }}>
+            {activeNavGroup.modules.map(id => <GlassButton key={id} tone={activeModule === id ? 'gold' : 'glass'} onClick={() => openCabinetModule(id)} style={{ minHeight: 36, borderRadius: 16, padding: '7px 10px', whiteSpace: 'nowrap', color: activeModule === id ? '#17120a' : APG2_PROFILE.text }}>{MODULE_LABELS[id] || id}</GlassButton>)}
+          </GlassCard>
+        )}
         <GlassCard style={{ borderRadius: 26, marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <GlassButton onClick={() => publicUrl && window.open(publicUrl, '_blank')}>Открыть карточку</GlassButton>
           <GlassButton tone="gold" onClick={() => window.open(shareLink(activeRole.id === 'expert' ? 'expert' : 'partner', currentProfile.id), '_blank')} style={{ color: '#17120a' }}>Поделиться</GlassButton>

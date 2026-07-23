@@ -3,7 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 
 import { T, GLASS } from './design.js';
 import vkBridge from './vk.js';
-import { buildReferralInviteText, buildReferralLink } from './referralInvite.js';
+import { buildPersonalQrLink, buildReferralInviteText, buildReferralLink } from './referralInvite.js';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, GlassSection, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
 const MILESTONES = [
@@ -24,6 +24,7 @@ export function ReferralPage({ variant = 'v2', user, referralCount = 0, complete
   useEffect(() => () => clearTimeout(copyTimerRef.current), []);
 
   const refLink = buildReferralLink(user);
+  const personalQrLink = buildPersonalQrLink(user);
   const inviteText = buildReferralInviteText(refLink);
 
   const handleCopy = async () => {
@@ -78,12 +79,12 @@ export function ReferralPage({ variant = 'v2', user, referralCount = 0, complete
           <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13 }}>Ваш персональный QR</div>
           {user?.id ? (
             <div style={{ background: '#fff', borderRadius: 24, padding: 15, boxShadow: '0 22px 50px rgba(0,0,0,0.28)' }}>
-              <QRCodeSVG value={refLink} size={184} bgColor="#ffffff" fgColor="#101114" level="M" />
+              <QRCodeSVG value={personalQrLink} size={184} bgColor="#ffffff" fgColor="#101114" level="M" />
             </div>
           ) : (
             <div style={{ width: 214, height: 214, borderRadius: 28, background: APG2_PROFILE.goldSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48 }}>🔗</div>
           )}
-          <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12 }}>ID: {user?.id ?? '—'}</div>
+          <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, textAlign: 'center' }}>Открывается обычной камерой телефона</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, width: '100%' }}>
             <GlassButton onClick={handleShare} tone="gold" style={{ color: '#17120a' }}>Поделиться</GlassButton>
             <GlassButton onClick={handleCopy}>{copied ? 'Скопировано' : 'Ссылка'}</GlassButton>
@@ -160,7 +161,7 @@ export function ReferralPage({ variant = 'v2', user, referralCount = 0, complete
             {user?.id ? (
               <div style={{ background: '#fff', borderRadius: 20, padding: 14, boxShadow: `0 4px 24px rgba(0,0,0,0.35), 0 0 0 1px rgba(201,168,76,0.2)` }}>
                 <QRCodeSVG
-                  value={refLink}
+                  value={personalQrLink}
                   size={180}
                   bgColor="#ffffff"
                   fgColor="#0F0F1A"
@@ -173,9 +174,7 @@ export function ReferralPage({ variant = 'v2', user, referralCount = 0, complete
               </div>
             )}
 
-            <div style={{ fontSize: 11, color: T.textSec, textAlign: 'center' }}>
-              твой ID: {user?.id ?? '—'}
-            </div>
+            <div style={{ fontSize: 11, color: T.textSec, textAlign: 'center' }}>Открывается обычной камерой телефона</div>
           </div>
 
           {/* Кнопки */}

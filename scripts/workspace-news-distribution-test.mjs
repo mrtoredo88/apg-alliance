@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {
   buildApgNewsDistributionPatch,
   buildProfileOnlyNewsPatch,
@@ -77,5 +78,13 @@ const eventPublication = buildWorkspaceNewsFromEvent(
 );
 assert.equal(isProfileOnlyNews(eventPublication), true, 'publication created from event must start in profile timeline only');
 assert.equal(isApgNewsPublication(eventPublication), false, 'publication created from event must not enter common APG feed automatically');
+
+const editorSource = fs.readFileSync(new URL('../src/workspace/WorkspaceNewsCenter.jsx', import.meta.url), 'utf8');
+const autosaveEffect = editorSource.slice(
+  editorSource.indexOf("setStatus('Сохраняем черновик...')"),
+  editorSource.indexOf('useEffect(() => {', editorSource.indexOf("setStatus('Сохраняем черновик...')") + 1),
+);
+assert.match(autosaveEffect, /setTimeout\(saveLocal,\s*700\)/, 'editor autosave must persist only the local draft');
+assert.doesNotMatch(autosaveEffect, /workspaceNews:save|save\(\{/, 'editor autosave must never publish through the API');
 
 console.log('workspace-news-distribution-test: ok');

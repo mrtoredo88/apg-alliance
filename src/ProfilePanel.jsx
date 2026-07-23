@@ -18,7 +18,7 @@ import { DesktopTopOverview } from './components/DesktopUI.jsx';
 import { formatNewsDate, getNewsLegacyIds, getNewsTitle } from './newsUtils.js';
 import { buildCabinetDiagnostics } from './utils/profileOwnership.js';
 import { CAPABILITIES, hasCapability } from './roleEngine.js';
-import { buildReferralInviteText, buildReferralLink } from './referralInvite.js';
+import { buildPersonalQrLink, buildReferralInviteText, buildReferralLink } from './referralInvite.js';
 import { ensureServerReferralSession, getReferralContext, readPendingReferral } from './referralDiagnostics.js';
 import { groupBookingsForProfile, normalizeBooking } from '../server-shared/booking.js';
 import { SOCIAL_PRIVACY, normalizeSocialPrivacy } from './messaging/ConversationEligibility.js';
@@ -1653,6 +1653,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const incomingConnectionRequests = useMemo(() => connectionRequests.filter(item => item.connection === true && item.direction === 'incoming' && item.status === 'pending'), [connectionRequests]);
   const outgoingConnectionRequests = useMemo(() => connectionRequests.filter(item => item.connection === true && item.direction === 'outgoing' && item.status === 'pending'), [connectionRequests]);
   const businessCardUrl = useMemo(() => `${APP_URL.replace(/\/+$/, '')}/profile/${encodeURIComponent(String(user?.id || ''))}`, [user?.id]);
+  const businessCardDisplayName = safeUser.displayName || [safeUser.first_name, safeUser.last_name].filter(Boolean).join(' ') || 'Участник АПГ';
   const filteredConnections = useMemo(() => {
     const q = connectionSearch.trim().toLowerCase();
     return connections.filter(item => {
@@ -3406,7 +3407,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               </div>
               <div style={{ background: '#fff', borderRadius: 16, padding: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
                 <QRCodeSVG
-                  value={buildReferralLink(user)}
+                  value={buildPersonalQrLink(user)}
                   size={160}
                   bgColor="#ffffff"
                   fgColor="#0F0F1A"
@@ -3414,7 +3415,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 />
               </div>
               <div style={{ fontSize: 11, color: APG2.textSoft, textAlign: 'center' }}>
-                твой личный код · ID {user.id}
+                Личный QR · открывается обычной камерой телефона
               </div>
             </div>
           )}
@@ -4067,10 +4068,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             <div style={{ ...APG2.glass, borderRadius: 24, padding: 16, textAlign: 'center', display: 'grid', gap: 10, justifyItems: 'center' }}>
               {profileAvatarUrl
                 ? <img src={profileAvatarUrl} alt="" referrerPolicy="no-referrer" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: 74, height: 74, borderRadius: 26, objectFit: 'cover', border: '2px solid rgba(201,168,76,0.36)' }} />
-                : <div style={{ width: 74, height: 74, borderRadius: 26, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontSize: 28, fontWeight: 900 }}>{displayName[0] || 'А'}</div>
+                : <div style={{ width: 74, height: 74, borderRadius: 26, background: APG2.goldSoft, color: APG2.gold, display: 'grid', placeItems: 'center', fontSize: 28, fontWeight: 900 }}>{businessCardDisplayName[0] || 'А'}</div>
               }
               <div>
-                <div style={{ color: APG2.text, fontSize: 20, lineHeight: '25px', fontWeight: 920 }}>{displayName}</div>
+                <div style={{ color: APG2.text, fontSize: 20, lineHeight: '25px', fontWeight: 920 }}>{businessCardDisplayName}</div>
                 <div style={{ color: APG2.textMuted, fontSize: 12.5, lineHeight: '18px', marginTop: 4 }}>{user?.role || user?.city || 'Участник АПГ'}</div>
               </div>
               {(user?.about || user?.bio || user?.company || ownedPartner?.name || ownedExpert?.name) && (
@@ -4086,7 +4087,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             <GlassButton
               tone="gold"
               onClick={async () => {
-                const text = `${displayName} в АПГ: ${businessCardUrl}`;
+                const text = `${businessCardDisplayName} в АПГ: ${businessCardUrl}`;
                 if (navigator.share) {
                   try { await navigator.share({ title: 'Цифровая карточка АПГ', text, url: businessCardUrl }); return; } catch (err) { if (err.name === 'AbortError') return; }
                 }

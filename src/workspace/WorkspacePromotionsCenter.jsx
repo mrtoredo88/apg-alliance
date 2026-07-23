@@ -296,7 +296,7 @@ function PromotionEditor({ item, profile, role, events, news, onSaved, onToast }
   );
 }
 
-export function WorkspacePromotionsCenter({ role, profile, events = [], news = [], actions, onOpenPanel, onToast }) {
+export function WorkspacePromotionsCenter({ role, profile, events = [], news = [], actions, onOpenPanel, onToast, compact = false }) {
   const initialIntent = useMemo(() => readWorkspaceLinkIntent('offers') || {}, []);
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(initialIntent.promotionId || '');
@@ -307,6 +307,7 @@ export function WorkspacePromotionsCenter({ role, profile, events = [], news = [
   const [category, setCategory] = useState('all');
   const [period, setPeriod] = useState('all');
   const [view, setView] = useState('cards');
+  const [newMode, setNewMode] = useState(false);
 
   const load = async () => {
     if (!profile?.id && role?.id !== 'admin') return;
@@ -330,7 +331,7 @@ export function WorkspacePromotionsCenter({ role, profile, events = [], news = [
   const categories = useMemo(() => Array.from(new Set(items.map(item => item.category).filter(Boolean))), [items]);
   const filtered = useMemo(() => filterWorkspacePromotions(items, { query, status, category, period, view }), [items, query, status, category, period, view]);
   const kpis = useMemo(() => buildWorkspacePromotionKpis(items), [items]);
-  const selected = items.find(item => item.id === selectedId) || items[0] || null;
+  const selected = newMode ? null : items.find(item => item.id === selectedId) || items[0] || null;
   const editorProfile = profile?.id ? profile : selected ? { id: selected.profileId, name: selected.profileName } : profile;
   const editorRole = role?.id === 'admin' && selected?.profileType ? { id: selected.profileType } : role;
   const conversion = kpis.views ? `${Math.round((kpis.used / kpis.views) * 1000) / 10}%` : '0%';
@@ -341,6 +342,7 @@ export function WorkspacePromotionsCenter({ role, profile, events = [], news = [
       return exists ? prev.map(row => row.id === item.id ? item : row) : [item, ...prev];
     });
     setSelectedId(item.id);
+    setNewMode(false);
   };
 
   const submit = async item => {
@@ -365,11 +367,11 @@ export function WorkspacePromotionsCenter({ role, profile, events = [], news = [
             <div style={{ color: UI.soft, fontSize: 13, lineHeight: '19px', marginTop: 5, maxWidth: 720 }}>Создавайте предложения, отправляйте их на модерацию, следите за откликами и конверсией без отдельной системы акций.</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={() => setSelectedId(selected?.id || '')} style={button('primary')}>Создать акцию</button>
+            <button onClick={() => { setNewMode(true); setSelectedId(''); }} style={button('primary')}>Создать акцию</button>
             <button onClick={() => onOpenPanel?.('offers')} style={button('light')}>Публичный каталог</button>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, minmax(96px,1fr))', gap: 10, marginTop: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: compact ? 'repeat(2, minmax(0,1fr))' : 'repeat(8, minmax(96px,1fr))', gap: 10, marginTop: 14 }}>
           <Kpi label="Всего" value={kpis.total} />
           <Kpi label="Активные" value={kpis.published} color={UI.green} />
           <Kpi label="Черновики" value={kpis.draft} color={UI.blue} />
@@ -381,7 +383,7 @@ export function WorkspacePromotionsCenter({ role, profile, events = [], news = [
         </div>
       </div>
 
-      <div style={card({ padding: 12, display: 'grid', gridTemplateColumns: 'minmax(220px,1fr) repeat(4, max-content)', gap: 8, alignItems: 'center' })}>
+      <div style={card({ padding: 12, display: 'grid', gridTemplateColumns: compact ? 'minmax(0,1fr)' : 'minmax(220px,1fr) repeat(4, max-content)', gap: 8, alignItems: 'center' })}>
         <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Поиск по названию, условиям, тегам" style={input()} />
         <select value={status} onChange={e => setStatus(e.target.value)} style={input()}>
           {STATUS_FILTERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
@@ -406,10 +408,10 @@ export function WorkspacePromotionsCenter({ role, profile, events = [], news = [
           <button onClick={load} style={button('primary')}>Повторить</button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(360px,0.46fr)', gap: 14, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: compact ? 'minmax(0,1fr)' : 'minmax(0,1fr) minmax(360px,0.46fr)', gap: 14, alignItems: 'start' }}>
           <div style={{ display: 'grid', gap: 10 }}>
             {filtered.length ? filtered.map(item => (
-              <PromotionRow key={item.id} item={item} view={view} selected={selected?.id === item.id} onOpen={row => setSelectedId(row.id)} onSubmit={submit} onArchive={archive} />
+              <PromotionRow key={item.id} item={item} view={view} selected={!newMode && selected?.id === item.id} onOpen={row => { setNewMode(false); setSelectedId(row.id); }} onSubmit={submit} onArchive={archive} />
             )) : (
               <div style={card({ padding: 22, textAlign: 'center', boxShadow: '0 12px 32px rgba(82,60,30,0.06)' })}>
                 <div style={{ color: UI.text, fontSize: 17, fontWeight: 900 }}>Акций по фильтру нет</div>

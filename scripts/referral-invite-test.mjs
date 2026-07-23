@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
-import { buildReferralInviteText, buildReferralLink } from '../src/referralInvite.js';
+import { buildPersonalQrLink, buildReferralInviteText, buildReferralLink } from '../src/referralInvite.js';
 import { APP_URL } from '../src/constants.js';
 
 const link = buildReferralLink({ id: 'user 42' });
 assert.equal(link, `${APP_URL}/?ref=user%2042`);
+const qrLink = buildPersonalQrLink({ id: 'user 42' });
+assert.equal(qrLink, `${APP_URL}/?ref=user+42&source=personal_qr&qr=v2`);
+assert.match(qrLink, /^https:\/\//, 'personal QR must always contain a scannable HTTPS link');
 
 const text = buildReferralInviteText(link);
 assert.equal(text, `Присоединяйся к Альянсу Партнёров Зеленограда 👇\n${link}`);

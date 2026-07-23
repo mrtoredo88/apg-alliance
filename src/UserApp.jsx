@@ -1003,6 +1003,7 @@ export function UserApp() {
   const initialPanel                            = useMemo(() => getInitialPanelFromDeepLink(initialDeepLink), [initialDeepLink]);
   const [workspaceWidth, setWorkspaceWidth]     = useState(() => typeof window === 'undefined' ? 0 : window.innerWidth);
   const [appMode, setAppMode]                   = useState(readInitialAppMode);
+  const [partnerCabinetEntryModule, setPartnerCabinetEntryModule] = useState('showcase-builder');
   const [desktopWorkspaceFlag]                  = useState(() => getDesktopWorkspaceFlag());
   const appStartTime                            = useRef(Date.now());
   const isScanningRef                           = useRef(false);
@@ -1329,8 +1330,8 @@ export function UserApp() {
   }, [navigatePanel]);
 
   const handleOpenPartners = useCallback(() => {
-    goPanel(isCurrentDesktopDevice(workspaceWidth) ? 'partners' : 'offers');
-  }, [goPanel, workspaceWidth]);
+    goPanel('partners');
+  }, [goPanel]);
 
   const openContextDialog = useCallback((type, item, source = 'ui') => {
     if (!type || !item) return;
@@ -3834,7 +3835,7 @@ export function UserApp() {
       });
       logError(error, 'UserApp.handleLogout');
       const isInProgress = isFirebaseStartupOnlyError(error) || error?.code === 'auth/network-request-failed';
-      if (isInProgress && isMountedRef.current) {
+      if (isInProgress && mountedRef.current) {
         showToast('Не удалось выйти из аккаунта. Закрываем сессию локально.');
       }
     } finally {
@@ -5218,6 +5219,10 @@ export function UserApp() {
                       if (event?.id) setPendingLokiEventTarget({ id: String(event.id), nonce: Date.now() });
                       goPanel('events');
                     }}
+                    onCreatePublication={() => {
+                      setPartnerCabinetEntryModule('content');
+                      goPanel('partner-cabinet');
+                    }}
                     reviewPrompt={activePartner ? reviewPromptPartnerId === activePartner.id : false}
                     reviewPromptBookingId={reviewPromptBookingId}
                     onReviewPromptHandled={() => { setReviewPromptPartnerId(null); setReviewPromptBookingId(''); }}
@@ -5287,7 +5292,10 @@ export function UserApp() {
                     onRaffleEnter={handleRaffleEnter}
                     lastBonusDate={lastBonusDate}
                     ownedPartner={ownedPartner}
-                    onOpenPartnerCabinet={() => goPanel('partner-cabinet')}
+                    onOpenPartnerCabinet={() => {
+                      setPartnerCabinetEntryModule('showcase-builder');
+                      goPanel('partner-cabinet');
+                    }}
                     ownedExpert={ownedExpert}
                     onOpenExpertCabinet={() => goPanel('expert-cabinet')}
                     onUserUpdate={(patch) => setUser(u => ({ ...u, ...patch }))}
@@ -5427,13 +5435,21 @@ export function UserApp() {
                     nav="partner-cabinet"
                     user={user}
                     preferredRole="partner"
+                    initialModule={partnerCabinetEntryModule}
                     partner={ownedPartner}
                     expert={ownedExpert}
                     events={events}
+                    news={news}
                     onBack={goBackPanel}
                     onOpenDialogs={() => navigatePanel('dialogs')}
+                    onOpenPanel={goPanel}
                     onToast={showToast}
-                    onEventCreated={(event) => setEvents(prev => [{ ...event, createdAt: new Date().toISOString(), submittedAt: new Date().toISOString() }, ...prev])}
+                    onEventCreated={(event) => setEvents(prev => {
+                      const normalized = { ...event, createdAt: event.createdAt || new Date().toISOString(), submittedAt: event.submittedAt || new Date().toISOString() };
+                      return prev.some(item => item.id === event.id)
+                        ? prev.map(item => item.id === event.id ? { ...item, ...normalized } : item)
+                        : [normalized, ...prev];
+                    })}
                     onProfileUpdate={(role, updated) => {
                       if (role === 'partner') {
                         setPartners(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
@@ -5457,10 +5473,17 @@ export function UserApp() {
                     partner={ownedPartner}
                     expert={ownedExpert}
                     events={events}
+                    news={news}
                     onBack={goBackPanel}
                     onOpenDialogs={() => navigatePanel('dialogs')}
+                    onOpenPanel={goPanel}
                     onToast={showToast}
-                    onEventCreated={(event) => setEvents(prev => [{ ...event, createdAt: new Date().toISOString(), submittedAt: new Date().toISOString() }, ...prev])}
+                    onEventCreated={(event) => setEvents(prev => {
+                      const normalized = { ...event, createdAt: event.createdAt || new Date().toISOString(), submittedAt: event.submittedAt || new Date().toISOString() };
+                      return prev.some(item => item.id === event.id)
+                        ? prev.map(item => item.id === event.id ? { ...item, ...normalized } : item)
+                        : [normalized, ...prev];
+                    })}
                     onProfileUpdate={(role, updated) => {
                       if (role === 'partner') {
                         setPartners(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p));
