@@ -534,7 +534,6 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [aiAssist, setAiAssist] = useState(Boolean(user?.contextDialogAiAssist));
-  const [attachment, setAttachment] = useState(null);
   const [lastFailedMessage, setLastFailedMessage] = useState('');
   const [contextCollapsed, setContextCollapsed] = useState(false);
   const [contextExpanded, setContextExpanded] = useState(false);
@@ -571,6 +570,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
 
   useEffect(() => {
     if (!activeDialogId) return;
+    setError('');
     userAction('dialog:read', { dialogId: activeDialogId }).catch(() => {});
     const timer = setInterval(() => {
       userAction('dialog:read', { dialogId: activeDialogId }).catch(() => {});
@@ -629,7 +629,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
 
   const sendText = async (overrideText = '', senderRole = '') => {
     const body = String(overrideText || text || '').trim();
-    if ((!body && !attachment) || !activeDialog || pending) return;
+    if (!body || !activeDialog || pending) return;
     const autoAnswer = !senderRole && !isOwner ? buildDialogAutoAnswer(activeContext, body) : null;
     setPending(true);
     setError('');
@@ -639,10 +639,9 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
         await userAction('dialog:message', { dialogId: activeDialog.id, text: body });
         await userAction('dialog:message', { dialogId: activeDialog.id, text: autoAnswer, senderRole: 'loki' });
       } else {
-        await userAction('dialog:message', { dialogId: activeDialog.id, text: body, senderRole: senderRole || undefined, attachments: attachment ? [attachment] : [] });
+        await userAction('dialog:message', { dialogId: activeDialog.id, text: body, senderRole: senderRole || undefined });
       }
       setText('');
-      setAttachment(null);
     } catch (err) {
       setLastFailedMessage(body);
       setError(err?.message || 'Не удалось отправить сообщение.');
@@ -675,17 +674,6 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
     const optimistic = { workspacePrivate: { ...(activeDialog.workspacePrivate || activeDialog.workspaceState || {}), ...patch }, workspaceState: { ...(activeDialog.workspaceState || {}), ...patch } };
     setDialogs(prev => prev.map(item => String(item.id || item.dialogId) === String(activeDialog.id) ? { ...item, ...optimistic } : item));
     await userAction('dialog:workspaceUpdate', { dialogId: activeDialog.id, patch }).catch(err => setError(err?.message || 'Не удалось обновить переписку.'));
-  };
-
-  const handlePhoto = (file) => {
-    if (!file) return;
-    if (file.size > 450 * 1024) {
-      setError('Фото должно быть меньше 450 КБ.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => setAttachment({ type: 'image', url: String(reader.result || ''), name: file.name || 'photo.jpg' });
-    reader.readAsDataURL(file);
   };
 
   if (!uid) {
@@ -809,18 +797,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
             <GlassButton onClick={() => sendText(lastFailedMessage)} tone="gold" style={{ minHeight: 30, borderRadius: 14, padding: '6px 9px', fontSize: 11.5 }}>Повторить</GlassButton>
           </div>
         )}
-        {attachment && (
-          <div style={{ borderRadius: 16, padding: 8, display: 'flex', alignItems: 'center', gap: 9, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)' }}>
-            <img src={attachment.url} alt="" style={{ width: 38, height: 38, borderRadius: 12, objectFit: 'cover' }} />
-            <div style={{ flex: 1, minWidth: 0, color: APG2_PROFILE.textSoft, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachment.name}</div>
-            <button onClick={() => setAttachment(null)} style={{ border: 0, background: 'transparent', color: APG2_PROFILE.textSoft, fontSize: 18, cursor: 'pointer' }}>×</button>
-          </div>
-        )}
-        <div style={{ display: 'grid', gridTemplateColumns: '44px minmax(0,1fr) 44px', gap: 8, alignItems: 'end' }}>
-          <label style={{ width: 44, height: 44, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, cursor: 'pointer' }}>
-            📷
-            <input type="file" accept="image/*" onChange={e => handlePhoto(e.target.files?.[0])} style={{ display: 'none' }} />
-          </label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 44px', gap: 8, alignItems: 'end' }}>
           <textarea
             value={text}
             onFocus={() => activeDialog && userAction('dialog:typing', { dialogId: activeDialog.id, typing: true }).catch(() => {})}
@@ -829,7 +806,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
             placeholder="Напишите сообщение..."
             style={{ minHeight: 44, maxHeight: 112, resize: 'vertical', border: 0, outline: 0, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', borderRadius: 20, color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontFamily: 'inherit', padding: '12px 14px', boxSizing: 'border-box' }}
           />
-          <button type="button" onClick={() => sendText()} disabled={pending || (!text.trim() && !attachment)} style={{ width: 44, height: 44, borderRadius: '50%', border: '1px solid rgba(215,184,106,0.34)', background: APG2_PROFILE.gold, color: '#17120a', display: 'grid', placeItems: 'center', fontSize: 17, fontWeight: 920, cursor: pending ? 'default' : 'pointer', opacity: pending || (!text.trim() && !attachment) ? 0.54 : 1, transition: 'opacity 160ms ease, transform 160ms ease' }}>↑</button>
+          <button type="button" onClick={() => sendText()} disabled={pending || !text.trim()} style={{ width: 44, height: 44, borderRadius: '50%', border: '1px solid rgba(215,184,106,0.34)', background: APG2_PROFILE.gold, color: '#17120a', display: 'grid', placeItems: 'center', fontSize: 17, fontWeight: 920, cursor: pending ? 'default' : 'pointer', opacity: pending || !text.trim() ? 0.54 : 1, transition: 'opacity 160ms ease, transform 160ms ease' }}>↑</button>
         </div>
       </div>
     </div>
