@@ -62,7 +62,7 @@ function eventDetail(event) {
   };
 }
 
-export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnreadCount = 0 }) {
+export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnreadCount = 0, hideMessagesButton = false }) {
   const loki = useLoki();
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -104,7 +104,7 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
             ? 190
             : 92;
   const safeMessageUnread = Math.max(0, Math.min(99, Number(messageUnreadCount || 0) || 0));
-  const showMessageFab = !desktopMode && typeof onOpenMessages === 'function';
+  const showMessageFab = !desktopMode && !hideMessagesButton && typeof onOpenMessages === 'function';
   const hasLokiSignal = Boolean(loki.card || (loki.message && loki.canTalk));
   const hitDebug = import.meta.env.DEV && (() => {
     try {

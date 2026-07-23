@@ -86,14 +86,25 @@ scenario('People messaging has professional product language', () => {
     'Чаты и переписки',
     'People Inbox',
     'Переписка АПГ',
-    'Чаты, переписки и личное общение АПГ',
+    'Сообщения АПГ',
     "userAction('dialog:workspaceUpdate'",
+  ].forEach(token => assert.ok(source.includes(token), token));
+});
+
+scenario('mobile chat keeps the composer visible and removes redundant chrome', () => {
+  [
+    "height: '100dvh'",
+    "gridTemplateRows: 'auto minmax(0,1fr) auto'",
+    "overflowY: 'auto'",
+    "position: desktopLayout ? 'sticky' : 'relative'",
+    '{desktopLayout && <div data-people-messaging-hero',
+    '{desktopLayout && <div data-messaging-priority-inbox',
   ].forEach(token => assert.ok(source.includes(token), token));
 });
 
 scenario('desktop exposes People instead of hiding chats as messages', () => {
   assert.ok(workspaceCore.includes("label: 'Люди'"), 'WorkspaceCore left sidebar exposes People');
-  assert.ok(desktopWorkspace.includes("{ id: 'dialogs', label: 'Люди'"), 'DesktopWorkspace nav exposes People');
+  assert.ok(desktopWorkspace.includes("{ id: 'dialogs', label: 'Диалоги'"), 'DesktopWorkspace nav exposes dialogs');
   assert.ok(desktopWorkspace.includes('People Workspace'), 'DesktopWorkspace dialog section uses People Workspace language');
   assert.ok(workspaceDialogs.includes('data-workspace-people-desktop'), 'WorkspaceDialogsCRM has a desktop People hero');
   assert.ok(workspaceDialogs.includes('Люди и переписки'), 'WorkspaceDialogsCRM title is People-first');

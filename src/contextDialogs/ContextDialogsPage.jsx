@@ -720,7 +720,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
             <button key={item.id} type="button" onClick={() => setFilter(item.id)} style={{ flex: '0 0 auto', border: filter === item.id ? '1px solid rgba(215,184,106,0.48)' : APG2_PROFILE.glass.border, background: filter === item.id ? APG2_PROFILE.goldSoft : 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: filter === item.id ? APG2_PROFILE.gold : APG2_PROFILE.textSoft, borderRadius: 999, minHeight: 34, padding: '7px 12px', fontFamily: 'inherit', fontSize: 12, fontWeight: 840, whiteSpace: 'nowrap', cursor: 'pointer' }}>{item.label}</button>
           ))}
         </div>
-        <div data-messaging-priority-inbox style={{ borderRadius: 18, padding: 10, background: 'linear-gradient(145deg, rgba(215,184,106,0.10), rgba(var(--apg2-glass-a,255,255,255),0.045))', border: '1px solid rgba(215,184,106,0.20)', display: 'grid', gap: 8 }}>
+        {desktopLayout && <div data-messaging-priority-inbox style={{ borderRadius: 18, padding: 10, background: 'linear-gradient(145deg, rgba(215,184,106,0.10), rgba(var(--apg2-glass-a,255,255,255),0.045))', border: '1px solid rgba(215,184,106,0.20)', display: 'grid', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <div>
               <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '14px', fontWeight: 920, textTransform: 'uppercase', letterSpacing: 0.7 }}>Важное сейчас</div>
@@ -744,7 +744,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
               ))}
             </div>
           )}
-        </div>
+        </div>}
       </div>
       {pending && !dialogs.length ? (
         <div data-messaging-skeleton style={{ display: 'grid', gap: 9 }}>
@@ -783,9 +783,9 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
   ) : null;
 
   const chatPane = activeDialog ? (
-    <div data-chat-pane style={{ display: 'grid', gridTemplateRows: 'auto minmax(260px,1fr) auto', gap: 12, minHeight: desktopLayout ? 'calc(100svh - 154px)' : 'calc(100svh - 128px)', minWidth: 0 }}>
+    <div data-chat-pane style={{ display: 'grid', gridTemplateRows: 'auto minmax(0,1fr) auto', gap: desktopLayout ? 12 : 8, height: desktopLayout ? 'auto' : '100%', minHeight: desktopLayout ? 'calc(100svh - 154px)' : 0, minWidth: 0, overflow: 'hidden' }}>
       {chatHeader}
-      <div data-message-thread style={{ display: 'grid', alignContent: 'end', gap: 7, minHeight: 260, padding: desktopLayout ? '2px 2px 8px' : '0 0 8px' }}>
+      <div data-message-thread style={{ display: 'grid', alignContent: 'end', gap: 7, minHeight: 0, overflowY: 'auto', overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch', padding: desktopLayout ? '2px 2px 8px' : '0 2px 8px' }}>
         {!desktopLayout && <CompactContextCard context={activeContext} isOwner={isOwner} collapsed={!contextExpanded} onToggle={() => setContextExpanded(value => !value)} onOpenObject={onOpenObject} onAction={runBookingAction} />}
         {groupedMessages.length ? groupedMessages.map(item => item.kind === 'day'
           ? <MessageDayGroup key={item.id} label={item.label} />
@@ -801,7 +801,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
         {typingUsers > 0 && <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, paddingLeft: 4 }}>Собеседник печатает...</div>}
         <div ref={messagesEndRef} />
       </div>
-      <div data-message-composer style={{ position: 'sticky', bottom: 'calc(var(--safe-bottom, 0px) + 8px)', zIndex: 15, borderRadius: 24, padding: 10, background: 'rgba(var(--apg2-glass-a,255,255,255),0.10)', border: APG2_PROFILE.glass.border, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', display: 'grid', gap: 8 }}>
+      <div data-message-composer style={{ position: desktopLayout ? 'sticky' : 'relative', bottom: desktopLayout ? 'calc(var(--safe-bottom, 0px) + 8px)' : 'auto', zIndex: 15, borderRadius: 24, padding: desktopLayout ? 10 : '9px 9px calc(9px + env(safe-area-inset-bottom, 0px))', background: 'rgba(var(--apg2-glass-a,255,255,255),0.10)', border: APG2_PROFILE.glass.border, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', display: 'grid', gap: 8 }}>
         <QuickReplyChips context={activeContext} onPick={value => setText(current => current.trim() ? current : value)} />
         {lastFailedMessage && (
           <div data-message-send-error style={{ borderRadius: 16, padding: 10, background: 'rgba(230,70,70,0.10)', border: '1px solid rgba(230,70,70,0.22)', color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', display: 'flex', gap: 9, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
@@ -852,10 +852,10 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
   ) : null;
 
   return (
-    <GlassPanel>
-      <ScreenHeader title="Люди" subtitle="Чаты, переписки и личное общение АПГ" kicker="People" onBack={onBack} />
+    <GlassPanel style={!desktopLayout && activeDialog ? { position: 'fixed', inset: 0, zIndex: 12500, width: '100%', height: '100dvh', minHeight: 0, padding: 'calc(6px + env(safe-area-inset-top, 0px)) 10px 0', overflow: 'hidden' } : undefined}>
+      {(desktopLayout || !activeDialog) && <ScreenHeader title="Диалоги" subtitle="Сообщения АПГ" onBack={onBack} />}
       {error && <GlassCard style={{ borderRadius: 20, padding: 12, marginBottom: 12, color: '#ff8e8e' }}>{error}</GlassCard>}
-      <div data-people-messaging-hero style={{ display: 'grid', gridTemplateColumns: desktopLayout ? 'minmax(0,1.25fr) repeat(3, minmax(96px,0.34fr))' : 'minmax(0,1fr)', gap: 10, alignItems: 'stretch', marginBottom: 14 }}>
+      {desktopLayout && <div data-people-messaging-hero style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.25fr) repeat(3, minmax(96px,0.34fr))', gap: 10, alignItems: 'stretch', marginBottom: 14 }}>
         <div style={{ borderRadius: 30, padding: 16, background: 'radial-gradient(circle at 12% 0%, rgba(74,144,217,0.20), transparent 34%), radial-gradient(circle at 92% 0%, rgba(215,184,106,0.20), transparent 34%), linear-gradient(145deg, rgba(var(--apg2-glass-a,255,255,255),0.13), rgba(var(--apg2-glass-a,255,255,255),0.055))', border: APG2_PROFILE.glass.border, boxShadow: '0 16px 42px var(--apg2-elev-shadow, rgba(0,0,0,0.12))' }}>
           <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '14px', fontWeight: 930, textTransform: 'uppercase', letterSpacing: 0.9 }}>People Hub</div>
           <div style={{ color: APG2_PROFILE.text, fontSize: 22, lineHeight: '27px', fontWeight: 950, marginTop: 5 }}>Чаты и переписки</div>
@@ -871,8 +871,8 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
             <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px', fontWeight: 820, marginTop: 3 }}>{label}</div>
           </div>
         ))}
-      </div>
-      <div data-messaging-premium-layout data-layout={desktopLayout ? 'desktop-three-pane' : 'mobile-native'} style={{ display: 'grid', gridTemplateColumns: desktopLayout ? 'minmax(290px, 0.78fr) minmax(430px, 1.42fr) minmax(260px, 0.7fr)' : 'minmax(0,1fr)', gap: desktopLayout ? 14 : 12, alignItems: 'start' }}>
+      </div>}
+      <div data-messaging-premium-layout data-layout={desktopLayout ? 'desktop-three-pane' : 'mobile-native'} style={{ display: 'grid', gridTemplateColumns: desktopLayout ? 'minmax(290px, 0.78fr) minmax(430px, 1.42fr) minmax(260px, 0.7fr)' : 'minmax(0,1fr)', gap: desktopLayout ? 14 : 12, alignItems: activeDialog && !desktopLayout ? 'stretch' : 'start', height: activeDialog && !desktopLayout ? '100%' : 'auto', minHeight: 0 }}>
         {(desktopLayout || !activeDialog) && dialogList}
         {chatPane}
         {contextPane}

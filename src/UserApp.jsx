@@ -5938,7 +5938,7 @@ export function UserApp() {
           />
           {splashDone && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && (
             <Suspense fallback={null}>
-              <LokiAssistant desktopMode={desktopDevice} onOpenMessages={handleOpenMessages} messageUnreadCount={unreadCount} />
+              <LokiAssistant desktopMode={desktopDevice} onOpenMessages={handleOpenMessages} messageUnreadCount={unreadCount} hideMessagesButton={activePanel === 'dialogs'} />
             </Suspense>
           )}
           </LokiProvider>
