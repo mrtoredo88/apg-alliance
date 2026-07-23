@@ -259,7 +259,25 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
     return createPortal(<LokiExperience loki={loki} />, document.body);
   }
 
-  if (loki.settings.dockedToHeader) return null;
+  if (loki.settings.dockedToHeader) {
+    return messageFab ? createPortal(
+      <div
+        data-floating-messages-root="independent"
+        style={{
+          position: 'fixed',
+          right: 'max(14px, env(safe-area-inset-right, 0px))',
+          bottom: 'calc(112px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))',
+          zIndex: 10040,
+          display: 'grid',
+          justifyItems: 'end',
+          pointerEvents: 'auto',
+        }}
+      >
+        {messageFab}
+      </div>,
+      document.body
+    ) : null;
+  }
 
   if (shouldShowRestore) {
     return (
@@ -528,21 +546,6 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
               )}
             </span>
           </span>
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            loki.setDockedToHeader(true);
-            setMenuOpen(false);
-            setBrainOpen(false);
-            setHistoryOpen(false);
-          }}
-          aria-label="Спрятать Локи в шапку"
-          data-loki-dock-button="true"
-          style={{ position: 'absolute', right: 31, top: -7, minWidth: 76, height: 30, padding: '0 10px', borderRadius: 13, border: '1px solid rgba(215,184,106,0.32)', background: 'rgba(16,14,10,0.78)', color: '#F0D88F', fontSize: 11, lineHeight: '28px', fontWeight: 820, fontFamily: 'inherit', boxShadow: '0 10px 22px rgba(0,0,0,0.26)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', cursor: 'pointer', whiteSpace: 'nowrap' }}
-        >
-          Спрятать
         </button>
         <button
           type="button"

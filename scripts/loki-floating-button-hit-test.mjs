@@ -31,9 +31,10 @@ assert.match(positionSource, /width:\s*'fit-content'/, 'Mobile Loki floating pos
 assert.doesNotMatch(positionSource, /left:\s*SIDE_INSET/, 'Mobile Loki floating root must not span the viewport with left and right anchors.');
 assert.match(stateSource, /dockedToHeader:\s*false/, 'Loki must start outside the header by default.');
 assert.match(providerSource, /setDockedToHeader:/, 'Loki provider must expose the dock action.');
-assert.match(source, /if \(loki\.settings\.dockedToHeader\) return null;/, 'Floating Loki must disappear while docked.');
+assert.match(source, /if \(loki\.settings\.dockedToHeader\)[\s\S]*data-floating-messages-root="independent"/, 'Docked Loki must leave the independent Messages button mounted.');
 assert.match(source, /Свернуть в шапку/, 'Floating Loki menu must offer the header dock action.');
-assert.match(source, /data-loki-dock-button="true"[\s\S]*Спрятать/, 'Floating Loki must expose a visible dock button outside the settings menu.');
+assert.doesNotMatch(source, /data-loki-dock-button="true"/, 'Floating Loki must not show a separate hide button over the character.');
+assert.match(source, /data-floating-messages-root="independent"[\s\S]*\{messageFab\}/, 'Messages keep a standalone floating root while Loki is docked.');
 assert.match(homeSource, /loki\.openContextExperience\(\)/, 'Docked Loki must open from the mobile header.');
 assert.match(homeSource, /Открыть Локи/, 'Docked Loki header button must keep an accessible label.');
 assert.match(homeSource, /LokiIdentity size=\{42\}/, 'Docked Loki must replace the profile avatar artwork.');
