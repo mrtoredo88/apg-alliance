@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import { chmodSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const envPath = resolve(process.argv[2] || 'server/.env');
+const envPath = realpathSync(resolve(process.argv[2] || 'server/.env'));
 const keys = [
   'APG_SESSION_SECRET',
   'PUSH_SECRET',
