@@ -2291,7 +2291,6 @@ export function UserApp() {
               if (existingRefId) refLog('profile sync started', { stage: 'existing_profile_sync', referrerId: existingRefId, userId: userData.id });
               const existingReferralContext = getReferralContext({ ref: existingRefId || activePendingRefId || '', source: 'UserApp.profileSync.existing' });
               const syncExistingPayload = {
-                userId: String(userData.id),
                 profile: { ...userData, ...profilePatch },
                 ...(existingRefId ? { referrerId: existingRefId } : {}),
                 referralFlowId: existingReferralContext.referralFlowId,

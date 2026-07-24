@@ -14,5 +14,10 @@ assert.ok(client.includes('`network|${String(message).slice(0, 120)}`'));
 assert.ok(client.includes("transientNetworkError ? 'warning'"));
 assert.match(userApp, /PUBLIC_BOOTSTRAP_RETRIES = 1/);
 assert.ok(userApp.includes('setTimeout(resolve, 350)'));
+const existingSyncPayload = userApp.slice(
+  userApp.indexOf('const syncExistingPayload = {'),
+  userApp.indexOf('if (isAuthLoadAborted(runId,', userApp.indexOf('const syncExistingPayload = {')),
+);
+assert.equal(existingSyncPayload.includes('userId:'), false, 'background profile sync must use the authenticated actor');
 
 console.log('ERROR_OBSERVABILITY_REGRESSION_OK');
