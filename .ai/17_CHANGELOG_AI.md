@@ -4638,3 +4638,11 @@
 - Владелец АПГ и связанные профили Татьяны Гордеевой сохраняют доступ к демонстрационному кабинету, остальные пользователи архивную карточку не получают.
 - Seed-скрипт больше не возвращает демо-партнёра в публичный каталог при повторном запуске.
 - Добавлены безопасный production-скрипт архивации и регрессионная проверка owner-only доступа.
+# 2026-07-24 — APG Android Edition v1 foundation
+
+- Добавлены Capacitor 8.4.2 и отдельный Android Studio/Gradle project без изменения React UI, маршрутов, backend, API, Identity, бизнес-логики и PWA.
+- Android-приложение настроено как `ru.myapg.app` / `АПГ`, min SDK 29 (Android 10), compile/target SDK 36, HTTPS-only, без mixed content и опасных runtime permissions.
+- Добавлены воспроизводимые `android:sync`, `android:debug` и `android:release` команды.
+- Получены и проверены debug APK, unsigned release APK и unsigned release AAB; debug APK установлен и запущен на Android 15 emulator.
+- Подготовлен Compatibility, Production Readiness, Architecture, Firebase и performance report в `docs/android/APG_ANDROID_V1_REPORT.md`.
+- Нативные Push, Biometrics, Secure Storage, Camera, QR, Share и App Links не добавлялись.

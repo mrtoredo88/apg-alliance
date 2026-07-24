@@ -3,6 +3,10 @@
 .env*
 node_modules/
 dist/
+.android-sdk/
+.android-avd/
+.gradle-user/
+.jdk/
 .local-https/
 .release-backups/
 .backup/

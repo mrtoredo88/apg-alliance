@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">АПГ</string>
+    <string name="title_activity_main">АПГ</string>
+    <string name="package_name">ru.myapg.app</string>
+    <string name="custom_url_scheme">ru.myapg.app</string>
+</resources>
