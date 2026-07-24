@@ -6,6 +6,7 @@ import { LokiIdentity } from './LokiIdentity.jsx';
 import { recordLokiMessageTrace, resetLokiMessageTrace } from './lokiMessageTrace.js';
 import { inspectLokiResponseText, isLokiUserDebugVisible } from './lokiResponseText.js';
 import { createLokiUtterance } from './lokiVoice.js';
+import { isNativeSpeechAvailable, recognizeNativeSpeech } from '../platform/nativeSpeech.js';
 
 const QUICK_ACTIONS = [
   { label: '✨ Что интересного?', text: 'Что интересного сегодня?', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_OFFERS) },
@@ -208,7 +209,28 @@ export function LokiExperience({ loki }) {
     ask(pending.text, null, { source: 'first_journey' });
   }, [loki.pendingFirstJourneyQuestion?.id]);
 
-  const startVoiceMode = () => {
+  const startVoiceMode = async () => {
+    if (isNativeSpeechAvailable()) {
+      try {
+        setVoiceState('listening');
+        const transcript = await recognizeNativeSpeech();
+        if (!transcript) throw new Error('EMPTY_TRANSCRIPT');
+        setVoiceState('thinking');
+        await ask(transcript, null, { speak: true });
+      } catch (error) {
+        setVoiceState('idle');
+        const denied = String(error?.message || error).includes('MICROPHONE_PERMISSION_DENIED');
+        setConversation(prev => [...prev, {
+          id: `voice-native-error-${Date.now()}`,
+          from: 'loki',
+          text: denied
+            ? 'Разреши доступ к микрофону в настройках приложения АПГ и попробуй ещё раз.'
+            : 'Я не расслышал. Попробуем ещё раз или напиши текстом.',
+          cards: [],
+        }]);
+      }
+      return;
+    }
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setConversation(prev => [...prev, { id: `voice-${Date.now()}`, from: 'loki', text: 'Голосовой режим пока недоступен в этом браузере. Напиши мне текстом.', cards: [] }]);

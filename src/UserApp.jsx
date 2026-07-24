@@ -4122,6 +4122,10 @@ export function UserApp() {
   }, [navigatePanel]);
 
   const requestWebPushPermission = useCallback(async ({ silent = false } = {}) => {
+    if (isNativeApp()) {
+      if (!silent) showToast('🔔 Фоновые push-уведомления для APK пока не подключены. Сообщения доступны внутри приложения.', 'info');
+      return;
+    }
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       if (!silent) showToast('❌ Push не поддерживается в этом браузере', 'error');
       return;

@@ -21,7 +21,7 @@ const landing = readFileSync('public/android', 'utf8');
 const deploy = readFileSync('deploy-frontend.sh', 'utf8');
 const userApp = readFileSync('src/UserApp.jsx', 'utf8');
 
-assert.match(properties, /VERSION_CODE=10200/);
+assert.match(properties, /VERSION_CODE=10202/);
 assert.match(properties, /VERSION_NAME=1\.2\.0/);
 assert.match(gradle, /versionCode apgVersionCode/);
 assert.match(gradle, /versionName apgVersionName/);

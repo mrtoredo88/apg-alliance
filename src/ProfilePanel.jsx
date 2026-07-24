@@ -2666,17 +2666,23 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               <div style={{ fontSize: 28, flexShrink: 0, marginTop: 2 }}>🔔</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: APG2.text, fontSize: 15, fontWeight: 820, marginBottom: 6 }}>
-                  {('Notification' in window && Notification.permission === 'denied')
+                  {isNativeApp()
+                    ? 'Push для APK готовится'
+                    : ('Notification' in window && Notification.permission === 'denied')
                     ? 'Уведомления заблокированы'
                     : 'Уведомления отключены'}
                 </div>
                 <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px', marginBottom: 12 }}>
-                  {('Notification' in window && Notification.permission === 'denied')
+                  {isNativeApp()
+                    ? 'Сообщения доступны внутри приложения. Фоновые Android-уведомления будут подключены отдельным обновлением без Firebase.'
+                    : ('Notification' in window && Notification.permission === 'denied')
                     ? 'Разрешение заблокировано в настройках браузера. Откройте настройки сайта и разрешите уведомления.'
                     : 'Включите уведомления, чтобы получать новости, события, призы и важные сообщения.'}
                 </div>
                 <GlassButton onClick={onEnableNotifications} tone="gold" style={{ width: '100%', minHeight: 44 }}>
-                  {('Notification' in window && Notification.permission === 'denied')
+                  {isNativeApp()
+                    ? 'Понятно'
+                    : ('Notification' in window && Notification.permission === 'denied')
                     ? '⚙️ Открыть настройки'
                     : '🔔 Включить уведомления'}
                 </GlassButton>

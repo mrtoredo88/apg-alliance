@@ -10,6 +10,7 @@ import { APG_KNOWLEDGE_BASE, findKnowledgeItems, getLatestChronicles } from '../
 import { LOKI_APP_ACTIONS } from '../loki/lokiActionTypes.js';
 import { LokiIdentity } from '../loki/LokiIdentity.jsx';
 import { createLokiUtterance } from '../loki/lokiVoice.js';
+import { isNativeSpeechAvailable, recognizeNativeSpeech } from '../platform/nativeSpeech.js';
 
 const SECTIONS = [
   { id: 'loki', label: 'Локи', icon: '◌' },
@@ -210,7 +211,27 @@ function LokiScreen({ tg }) {
     if (options.speak) speak(result.text);
   };
 
-  const startVoice = () => {
+  const startVoice = async () => {
+    if (isNativeSpeechAvailable()) {
+      try {
+        setVoiceState('listening');
+        const transcript = await recognizeNativeSpeech();
+        if (!transcript) throw new Error('EMPTY_TRANSCRIPT');
+        await ask(transcript, { speak: true });
+      } catch (error) {
+        setVoiceState('idle');
+        const denied = String(error?.message || error).includes('MICROPHONE_PERMISSION_DENIED');
+        setMessages(prev => [...prev, {
+          id: `vn-${Date.now()}`,
+          from: 'loki',
+          text: denied
+            ? 'Разреши доступ к микрофону в настройках приложения АПГ и попробуй ещё раз.'
+            : 'Я не расслышал. Попробуем ещё раз или напиши текстом.',
+          cards: [],
+        }]);
+      }
+      return;
+    }
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setMessages(prev => [...prev, { id: `vf-${Date.now()}`, from: 'loki', text: 'Голосовой режим пока недоступен в этом Telegram WebView. Напиши мне текстом.', cards: [] }]);
