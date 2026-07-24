@@ -87,12 +87,15 @@ function planDocuments(snapshot, sourceId, canonicalId) {
   const byPath = new Map((snapshot.documents || []).map(row => [row.path, row]));
   const operations = [];
   const conflicts = [];
+  const sourceUserPath = `users/${sourceId}`;
+  const canonicalUserPath = `users/${canonicalId}`;
+  const mergesUserRoot = byPath.has(sourceUserPath) && byPath.has(canonicalUserPath);
 
   for (const row of snapshot.documents || []) {
     const nextData = replaceExact(row.data, sourceId, canonicalId);
     let nextPath = row.path;
-    if (row.path === `users/${sourceId}`) {
-      const canonical = byPath.get(`users/${canonicalId}`);
+    if (row.path === sourceUserPath) {
+      const canonical = byPath.get(canonicalUserPath);
       if (!canonical) {
         conflicts.push({ code: 'CANONICAL_USER_DOCUMENT_MISSING', sourcePath: row.path, targetPath: `users/${canonicalId}` });
         continue;
@@ -112,6 +115,10 @@ function planDocuments(snapshot, sourceId, canonicalId) {
       });
       continue;
     }
+    // The root merge already applies replaceExact to the canonical document.
+    // Emitting a second update with the original before-image would make a
+    // transactional executor correctly report drift after the merge.
+    if (mergesUserRoot && row.path === canonicalUserPath) continue;
     if (row.path.startsWith(`users/${sourceId}/`)) {
       nextPath = `users/${canonicalId}/${row.path.slice(`users/${sourceId}/`.length)}`;
       const collision = byPath.get(nextPath);

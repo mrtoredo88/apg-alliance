@@ -11,5 +11,6 @@ assert.match(source, /Execution adapter is intentionally disabled/, 'cannot muta
 assert.match(source, /restore-exact-before-images-in-reverse-operation-order/, 'creates an exact rollback strategy');
 assert.match(source, /expectedKeys: 67/, 'preserves the confirmed key balance');
 assert.match(source, /sourceDisposition: 'alias-tombstone'/, 'does not hard-delete the source alias');
+assert.match(source, /mergesUserRoot && row\.path === canonicalUserPath/, 'does not emit a stale second write for the merged canonical root');
 
 console.log('identity-merge-canary-test: ok');
