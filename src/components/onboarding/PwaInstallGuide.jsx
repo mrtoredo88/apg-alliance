@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { APG2_PROFILE, GlassButton, GlassCard } from '../Apg2ProfileGlass.jsx';
+import { isNativeApp } from '../../platform/runtime.js';
 
 export const PWA_INSTALL_GUIDE_HIDDEN_KEY = 'apg_mobile_pwa_onboarding_hidden';
 export const PWA_INSTALL_GUIDE_SESSION_KEY = 'apg_mobile_pwa_onboarding_session_closed';
@@ -40,7 +41,7 @@ function safeSet(storage, key, value) {
 
 export function shouldShowPwaInstallGuide({ user, isVk = false } = {}) {
   if (typeof window === 'undefined') return false;
-  if (isVk || !isMobileViewport() || isStandaloneMode()) return false;
+  if (isNativeApp() || isVk || !isMobileViewport() || isStandaloneMode()) return false;
   if (safeGet(localStorage, PWA_INSTALL_GUIDE_HIDDEN_KEY) === '1') return false;
   if (safeGet(sessionStorage, PWA_INSTALL_GUIDE_SESSION_KEY) === '1') return false;
   const userId = String(user?.id || '');
@@ -49,7 +50,7 @@ export function shouldShowPwaInstallGuide({ user, isVk = false } = {}) {
 
 export function shouldShowPwaEmailHint({ user, isVk = false } = {}) {
   if (typeof window === 'undefined') return false;
-  if (isVk || !isMobileViewport() || !isStandaloneMode()) return false;
+  if (isNativeApp() || isVk || !isMobileViewport() || !isStandaloneMode()) return false;
   if (safeGet(localStorage, PWA_EMAIL_HINT_HIDDEN_KEY) === '1') return false;
   const userId = String(user?.id || '');
   return !userId || userId.startsWith('guest_');
@@ -90,6 +91,7 @@ export function PwaInstallGuide({ open, onClose }) {
   const canUseInstallPrompt = platform === 'android' && installPrompt;
 
   useEffect(() => {
+    if (isNativeApp()) return undefined;
     const handleBeforeInstallPrompt = event => {
       event.preventDefault();
       setInstallPrompt(event);

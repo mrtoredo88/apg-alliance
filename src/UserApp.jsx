@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense, useRef, useMemo } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
 import { APP_URL, API_BASE_URL, WEB_PUSH_VAPID_PUBLIC_KEY } from './constants.js';
 import { createPortal } from 'react-dom';
 import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
@@ -79,6 +80,7 @@ import { buildAIContext } from './intelligence/AIContextService.js';
 import { buildPersonalHomeContext } from './intelligence/PersonalHomeContext.js';
 import { buildPostVisitMomentState } from '../server-shared/booking.js';
 import { getLocationById, locationToProvider } from '../server-shared/locations.js';
+import { getNativePlatform, isNativeApp } from './platform/runtime.js';
 import {
   APG_EVENT_TYPES,
   getAIMemorySnapshot,
@@ -826,6 +828,7 @@ function buildFrontendEmailVersion() {
 
 function buildFrontendAppMode() {
   if (typeof window === 'undefined') return 'browser';
+  if (isNativeApp()) return getNativePlatform();
   if (window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true) return 'pwa';
   if (window.Telegram?.WebApp) return 'telegram';
   if (/VKAndroidApp|VKiOSApp/.test(navigator.userAgent || '')) return 'vk';
@@ -1363,6 +1366,26 @@ export function UserApp() {
     setActivePanel(target);
     return true;
   }, [activePanel, getFallbackBackPanel, isScannerOpen]);
+
+  useEffect(() => {
+    if (!isNativeApp()) return undefined;
+
+    let listener;
+    void CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      if (goBackPanel()) return;
+      if (canGoBack) {
+        window.history.back();
+        return;
+      }
+      void CapacitorApp.exitApp();
+    }).then((handle) => {
+      listener = handle;
+    });
+
+    return () => {
+      void listener?.remove();
+    };
+  }, [goBackPanel]);
 
   const goPanel = useCallback((id) => {
     navigatePanel(id);

@@ -24,6 +24,7 @@ import { groupBookingsForProfile, normalizeBooking } from '../server-shared/book
 import { SOCIAL_PRIVACY, normalizeSocialPrivacy } from './messaging/ConversationEligibility.js';
 import { buildSocialMessagingDevPanel } from './messaging/SocialMessagingSnapshot.js';
 import { PEOPLE_RELATION_STATUS, PEOPLE_TABS, buildPeoplePulse, buildPeopleRows, peopleKind, peoplePresenceLabel, peopleStatusLabel, peopleSuggestionReason, personInterestTags, searchPeopleGroups } from './social/PeopleCore.js';
+import { isNativeApp } from './platform/runtime.js';
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
 
@@ -1399,9 +1400,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const showInstallBtn = !isStandalone && (installPrompt || isIos);
+  const showInstallBtn = !isNativeApp() && !isStandalone && (installPrompt || isIos);
 
   useEffect(() => {
+    if (isNativeApp()) return undefined;
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);

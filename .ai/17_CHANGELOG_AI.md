@@ -4646,3 +4646,12 @@
 - Получены и проверены debug APK, unsigned release APK и unsigned release AAB; debug APK установлен и запущен на Android 15 emulator.
 - Подготовлен Compatibility, Production Readiness, Architecture, Firebase и performance report в `docs/android/APG_ANDROID_V1_REPORT.md`.
 - Нативные Push, Biometrics, Secure Storage, Camera, QR, Share и App Links не добавлялись.
+
+# 2026-07-24 — APG Android Edition v1.1 runtime compatibility
+
+- Добавлен единый Capacitor runtime helper: Android-контейнер больше не определяется как обычный мобильный браузер.
+- PWA install prompt, кнопка установки и Service Worker отключены только внутри Android; web/PWA flow не изменён.
+- Диагностика существующей авторизации теперь явно различает `android` и `web`.
+- Подключён официальный `@capacitor/app` 8.1.1: системная кнопка Android Back использует существующую историю панелей и не закрывает приложение из внутреннего раздела.
+- Добавлен регрессионный `test:android-runtime` и отчёт `docs/android/APG_ANDROID_V1_1_COMPATIBILITY_REPORT.md`.
+- Backend, API, Identity, маршруты, UI/UX, бизнес-логика, нативные QR/Camera/Share/Push/App Links не менялись.

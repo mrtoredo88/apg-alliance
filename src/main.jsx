@@ -8,6 +8,7 @@ import { installPerformanceObservatory, markPerformanceStage } from './performan
 import { BOOTSTRAP_PRIORITIES, registerBootstrapTask, startBootstrapScheduler } from './bootstrap/index.js';
 import { API_BASE_URL } from './constants.js';
 import { ensureServerReferralSession } from './referralDiagnostics.js';
+import { isNativeApp } from './platform/runtime.js';
 import './fonts.css';
 import './index.css';
 
@@ -38,7 +39,7 @@ if (_vkHash.includes('access_token=') && window.opener) {
   installNetworkDiagnostics();
   window.__APG_BOOT_MARK?.('network_diagnostics_installed');
   markPerformanceStage('main_module_ready', {}, 'boot');
-  const noServiceWorker = new URLSearchParams(window.location.search).get('no-sw') === '1';
+  const noServiceWorker = isNativeApp() || new URLSearchParams(window.location.search).get('no-sw') === '1';
   const renderApp = () => {
     if (window.__APG_PWA_RELOAD_REQUESTED === true) {
       window.__APG_BOOT_MARK?.('react_render_skipped_for_pwa_reload');
