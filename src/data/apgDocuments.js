@@ -31,7 +31,7 @@ async function read(payload) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(apgSession.token ? { Authorization: `Bearer ${apgSession.token}` } : {}),
+      ...(apgSession.token ? { 'X-APG-Auth': apgSession.token } : {}),
     },
     body: JSON.stringify(payload),
   });

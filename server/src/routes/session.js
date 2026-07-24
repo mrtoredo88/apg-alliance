@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { createApgAccessToken, verifyApgAccessToken } from '../lib/apgTokens.js';
 
 function bearer(request) {
+  const direct = String(request.headers['x-apg-auth'] || '');
+  if (direct) return direct.replace(/^Bearer\s+/i, '');
   const match = String(request.headers.authorization || '').match(/^Bearer\s+(.+)$/i);
   return match?.[1] || '';
 }

@@ -38,7 +38,7 @@ export class NativeApgProvider extends IdentityProvider {
     if (!current) return '';
     const response = await fetch(`${API_BASE_URL}/api/session/refresh`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apgSession.token}` },
+      headers: { 'X-APG-Auth': apgSession.token },
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.token) throw new Error(data.error || 'Не удалось обновить сессию.');
