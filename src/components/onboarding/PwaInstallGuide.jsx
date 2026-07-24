@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { APG2_PROFILE, GlassButton, GlassCard } from '../Apg2ProfileGlass.jsx';
 import { isNativeApp } from '../../platform/runtime.js';
+import { ANDROID_DOWNLOAD_URL } from '../../constants.js';
 
 export const PWA_INSTALL_GUIDE_HIDDEN_KEY = 'apg_mobile_pwa_onboarding_hidden';
 export const PWA_INSTALL_GUIDE_SESSION_KEY = 'apg_mobile_pwa_onboarding_session_closed';
@@ -146,6 +147,17 @@ export function PwaInstallGuide({ open, onClose }) {
           )}
 
           <div style={{ display: 'grid', gap: 10 }}>
+            {platform === 'android' && (
+              <GlassButton
+                data-android-download-cta
+                tone={ANDROID_DOWNLOAD_URL ? 'gold' : undefined}
+                disabled={!ANDROID_DOWNLOAD_URL}
+                onClick={() => { if (ANDROID_DOWNLOAD_URL) window.location.assign(ANDROID_DOWNLOAD_URL); }}
+                style={{ minHeight: 54, borderRadius: 22, color: ANDROID_DOWNLOAD_URL ? '#17120a' : APG2_PROFILE.textMuted, fontSize: 15.5, fontWeight: 880 }}
+              >
+                🤖 {ANDROID_DOWNLOAD_URL ? 'Скачать АПГ для Android' : 'Android-приложение — скоро'}
+              </GlassButton>
+            )}
             <GlassButton tone="gold" onClick={startInstall} style={{ minHeight: 54, borderRadius: 22, color: '#17120a', fontSize: 15.5, fontWeight: 880 }}>
               📲 {canUseInstallPrompt ? 'Установить приложение' : platform === 'ios' ? 'Показать инструкцию установки' : 'Как установить приложение'}
             </GlassButton>

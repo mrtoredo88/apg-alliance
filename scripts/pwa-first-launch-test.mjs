@@ -13,6 +13,8 @@ const userApp = readFileSync('src/UserApp.jsx', 'utf8');
 const profile = readFileSync('src/ProfilePanel.jsx', 'utf8');
 
 assert(guide.includes('export function shouldShowPwaInstallGuide'), 'install guide exposes deterministic visibility guard');
+assert(guide.includes('data-android-download-cta'), 'Android visitors get a dedicated download CTA');
+assert(guide.includes('ANDROID_DOWNLOAD_URL ?'), 'Android CTA stays safe until a signed download URL is configured');
 assert(guide.includes('export function shouldShowPwaEmailHint'), 'email hint exposes deterministic visibility guard');
 assert(guide.includes("matchMedia?.('(display-mode: standalone)')"), 'standalone display-mode is checked');
 assert(guide.includes('navigator?.standalone === true'), 'iOS standalone mode is checked');

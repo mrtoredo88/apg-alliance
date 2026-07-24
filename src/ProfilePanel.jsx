@@ -8,7 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 import { collection, onSnapshot } from 'firebase/firestore';
 
-import { APP_URL, API_BASE_URL } from './constants.js';
+import { ANDROID_DOWNLOAD_URL, APP_URL, API_BASE_URL } from './constants.js';
 import { auth, db } from './firebase.js';
 import { apgIdentity } from './apg/index.js';
 import { logError } from './errorLogger.js';
@@ -1400,6 +1400,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroidBrowser = !isNativeApp() && /android/i.test(navigator.userAgent);
   const showInstallBtn = !isNativeApp() && !isStandalone && (installPrompt || isIos);
 
   useEffect(() => {
@@ -3678,6 +3679,31 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           >
             🩺 APG Health
           </button>
+        </div>
+      )}
+
+      {/* ── Android-приложение ── */}
+      {isAndroidBrowser && (
+        <div data-android-download-cta style={{ padding: '16px 16px 0' }}>
+          <div style={{ padding: 16, borderRadius: 18, border: '1px solid rgba(201,168,76,0.27)', background: 'linear-gradient(145deg, rgba(201,168,76,0.12), rgba(255,255,255,0.05))' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span aria-hidden="true" style={{ width: 42, height: 42, borderRadius: 14, display: 'grid', placeItems: 'center', background: APG2.goldGradient, color: '#17120a', fontSize: 21 }}>🤖</span>
+              <span>
+                <strong style={{ display: 'block', color: APG2.text, fontSize: 15 }}>АПГ для Android</strong>
+                <span style={{ display: 'block', marginTop: 3, color: APG2.textSoft, fontSize: 12.5, lineHeight: '17px' }}>
+                  {ANDROID_DOWNLOAD_URL ? 'Отдельное приложение для вашего телефона.' : 'Готовим безопасную подписанную версию.'}
+                </span>
+              </span>
+            </div>
+            <button
+              type="button"
+              disabled={!ANDROID_DOWNLOAD_URL}
+              onClick={() => { if (ANDROID_DOWNLOAD_URL) window.location.assign(ANDROID_DOWNLOAD_URL); }}
+              style={{ width: '100%', marginTop: 12, padding: '13px 0', borderRadius: 14, border: '1px solid rgba(201,168,76,0.30)', background: ANDROID_DOWNLOAD_URL ? APG2.goldGradient : 'rgba(255,255,255,0.07)', color: ANDROID_DOWNLOAD_URL ? '#17120a' : APG2.textMuted, fontSize: 14, fontWeight: 800, cursor: ANDROID_DOWNLOAD_URL ? 'pointer' : 'default' }}
+            >
+              {ANDROID_DOWNLOAD_URL ? 'Скачать для Android' : 'Android-приложение — скоро'}
+            </button>
+          </div>
         </div>
       )}
 
