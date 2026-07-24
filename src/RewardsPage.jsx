@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from './firebase';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy } from './data/apgDocuments.js';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { RichText } from './components/RichText.jsx';

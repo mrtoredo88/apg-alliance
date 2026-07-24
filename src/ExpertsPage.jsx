@@ -5,7 +5,7 @@ import { EXPERT_CATEGORIES } from './constants.js';
 import { db } from './firebase';
 import {
   collection, getDocs, query, where,
-} from 'firebase/firestore';
+} from './data/apgDocuments.js';
 import { userAction } from './userApi.js';
 import { APG_EVENT_TYPES, trackAppEvent } from './intelligence/index.js';
 import { releaseMobileInputFocus } from './utils/mobileInput.js';

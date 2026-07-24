@@ -22,15 +22,12 @@ COPY scripts/account-verify.mjs ./scripts/account-verify.mjs
 COPY scripts/account-rollback.mjs ./scripts/account-rollback.mjs
 COPY scripts/account-observe.mjs ./scripts/account-observe.mjs
 COPY server/src/apg/account/schema/account-core.sql ./server/src/apg/account/schema/account-core.sql
-COPY server/src/lib/firebase.js ./server/src/lib/firebase.js
-COPY server/firebase-service-account.json ./firebase-service-account.json
 COPY docs/migration/rollback-readiness.md ./docs/migration/rollback-readiness.md
 COPY docs/migration/monitoring-readiness.md ./docs/migration/monitoring-readiness.md
 COPY server/src/routes/system-status.js ./server/src/routes/system-status.js
 COPY ops/migration-operator/server.mjs ./ops/migration-operator/server.mjs
 
 ENV NODE_ENV=production
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
 ENV APG_YANDEX_CA_PATH=/app/certs/YandexInternalRootCA.crt
 EXPOSE 8080
 

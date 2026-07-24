@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Panel } from '@vkontakte/vkui';
-import { db, auth } from './firebase';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { db } from './firebase';
+import { auth } from './auth/apgAuthCompat.js';
+import { collection, getDocs, query, orderBy, limit } from './data/apgDocuments.js';
 import { API_BASE_URL } from './constants.js';
 import { runServiceChecks, getDeviceInfo } from './diagnostics.js';
 import { cleanupCurrentPushSubscriptions, collectPushDiagnostics, getPushRegistrationLog, registerCurrentPushDevice, sendCurrentDeviceTestPush } from './pushDiagnostics.js';

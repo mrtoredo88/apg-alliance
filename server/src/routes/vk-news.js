@@ -1,4 +1,4 @@
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from '../lib/documentValues.js';
 import { getDb } from '../lib/firebase.js';
 import { getVkCommunityScreenName, normalizeVkCommunityUrl } from '../../../server-shared/vk-community.js';
 

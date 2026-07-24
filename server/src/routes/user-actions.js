@@ -1,8 +1,7 @@
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from '../lib/documentValues.js';
 import { getDb, getDbAuth } from '../lib/firebase.js';
 import { serverFoundation } from '../apg/index.js';
 import { APP_URL } from '../lib/config.js';
-import { getDbMessaging } from '../lib/firebase.js';
 import webpush from 'web-push';
 import { ECONOMY_CONFIG, ECONOMY_VERSION, calculateTicketExchange, economyMigrationPatch, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
 import { upsertErrorLog } from '../../../server-shared/error-log.js';
@@ -3851,41 +3850,12 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
     }, { merge: true }).catch(() => {});
     return stats;
   }
-  const fcmTokens = Array.isArray(user.fcmTokens) ? user.fcmTokens.map(token => safeString(token, 600)).filter(Boolean) : [];
   const webSubscriptions = Array.isArray(user.webPushSubscriptions) ? user.webPushSubscriptions.map(normalizeDialogSubscription).filter(Boolean) : [];
   const url = `${APP_URL}${buildDialogDeepLink(dialogId)}`;
   let sent = 0;
   let failed = 0;
   const errors = [];
-  const deadFcmTokens = [];
   const deadWebSubscriptions = [];
-
-  if (fcmTokens.length) {
-    try {
-      const result = await withDialogPushTimeout(getDbMessaging().sendEachForMulticast({
-        tokens: fcmTokens,
-        notification: { title, body },
-        data: { title, body, url, tag: `dialog-${dialogId}`, notificationId, category: 'messages', type: 'contextDialogMessage', priority: 'normal' },
-        webpush: {
-          notification: { icon: `${APP_URL}/192.png`, badge: `${APP_URL}/32.png`, tag: `dialog-${dialogId}`, renotify: true },
-          fcmOptions: { link: url },
-        },
-      }));
-      sent += result.successCount;
-      failed += result.failureCount;
-      result.responses.forEach((response, index) => {
-        if (response.success) return;
-        const code = response.error?.code || 'fcm/error';
-        if (['messaging/invalid-registration-token', 'messaging/registration-token-not-registered'].includes(code)) {
-          deadFcmTokens.push(fcmTokens[index]);
-        }
-        if (errors.length < 6) errors.push({ code, message: safeString(response.error?.message, 240) });
-      });
-    } catch (e) {
-      failed += fcmTokens.length;
-      errors.push({ code: 'fcm/error', message: safeString(e?.message, 240) });
-    }
-  }
 
   if (webSubscriptions.length && initDialogWebPush()) {
     await Promise.all(webSubscriptions.map(async subscription => {
@@ -3904,9 +3874,8 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
     }));
   }
 
-  if (deadFcmTokens.length || deadWebSubscriptions.length) {
+  if (deadWebSubscriptions.length) {
     await db.collection('users').doc(userId).update({
-      ...(deadFcmTokens.length ? { fcmTokens: FieldValue.arrayRemove(...deadFcmTokens) } : {}),
       ...(deadWebSubscriptions.length ? { webPushSubscriptions: FieldValue.arrayRemove(...deadWebSubscriptions) } : {}),
       webPushUpdatedAt: FieldValue.serverTimestamp(),
     }).catch(() => {});
@@ -3914,8 +3883,8 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
   const stats = {
     sent,
     failed,
-    subscribers: fcmTokens.length + webSubscriptions.length,
-    cleaned: deadFcmTokens.length + deadWebSubscriptions.length,
+    subscribers: webSubscriptions.length,
+    cleaned: deadWebSubscriptions.length,
     errors: errors.slice(0, 10),
   };
   await db.collection('notifications').doc(notificationId).set({

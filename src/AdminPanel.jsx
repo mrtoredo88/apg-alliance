@@ -10,8 +10,9 @@ import vkBridge from './vk.js';
 import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { geocodeAddress } from './utils/geo.js';
 import { EXPERT_CATEGORIES, APP_URL, API_BASE_URL } from './constants.js';
-import { db, auth, FIREBASE_CLIENT_DIAGNOSTICS } from './firebase';
-import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
+import { db, FIREBASE_CLIENT_DIAGNOSTICS } from './firebase';
+import { auth } from './auth/apgAuthCompat.js';
+import { collection, getDocs, query, orderBy, where, limit } from './data/apgDocuments.js';
 import { apgIdentity } from './apg/index.js';
 import { runServiceChecks } from './diagnostics.js';
 import { logError } from './errorLogger.js';
@@ -4384,7 +4385,7 @@ function RotationTab({ experts, A, s }) {
 
   useEffect(() => {
     if (!Object.keys(byCategory).length) return;
-    import('firebase/firestore').then(({ collection: c, getDocs: gd }) => {
+    import('./data/apgDocuments.js').then(({ collection: c, getDocs: gd }) => {
       gd(c(db, 'expertRotation')).then(snap => {
         const map = {};
         snap.docs.forEach(d => { map[d.id] = d.data(); });
@@ -4394,7 +4395,7 @@ function RotationTab({ experts, A, s }) {
   }, [ambassadors.length]);
 
   const loadRotation = () => {
-    import('firebase/firestore').then(({ collection: c, getDocs: gd }) => {
+    import('./data/apgDocuments.js').then(({ collection: c, getDocs: gd }) => {
       gd(c(db, 'expertRotation')).then(snap => {
         const map = {};
         snap.docs.forEach(d => { map[d.id] = d.data(); });

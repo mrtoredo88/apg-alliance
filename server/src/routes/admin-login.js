@@ -1,4 +1,4 @@
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from '../lib/documentValues.js';
 import { getDb, getDbAuth } from '../lib/firebase.js';
 import { verifyPasswordRecord } from '../../../server-shared/admin-password.js';
 import { CAPABILITIES, getPrimaryRole, hasCapability, hasRole, ROLES } from '../../../server-shared/role-engine.js';

@@ -1,5 +1,5 @@
 import { getDb } from '../lib/firebase.js';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from '../lib/documentValues.js';
 
 function getISOWeekKey(date = new Date()) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));

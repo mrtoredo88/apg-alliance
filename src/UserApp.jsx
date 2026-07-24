@@ -13,13 +13,13 @@ import { confirmQrScan } from './rewardApi.js';
 import { getReputationStatus } from './economyEngine.js';
 import { userAction } from './userApi.js';
 import { fetchAccountBootstrap, shouldUseAccountCoreCanary } from './accountApi.js';
-import { db, auth } from './firebase';
+import { db } from './firebase';
 import {
   doc, getDoc,
   collection, getDocs, query, orderBy,
   where, getCountFromServer, limit,
-} from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+} from './data/apgDocuments.js';
+import { auth, onAuthStateChanged } from './auth/apgAuthCompat.js';
 import { apgIdentity } from './apg/index.js';
 import { HomePanelV2 }       from './HomePanelV2.jsx';
 import { EmailAuth } from './EmailAuth.jsx';

@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto';
 import { getDb } from '../lib/firebase.js';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from '../lib/documentValues.js';
 import { telegramUrl } from '../../../server-shared/telegram.js';
 import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
 import { createOrRestoreReferralSession } from '../lib/referralSessions.js';

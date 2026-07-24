@@ -2,7 +2,7 @@ import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import crypto from 'node:crypto';
 import { APP_URL } from '../lib/config.js';
 import { getDb } from '../lib/firebase.js';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from '../lib/documentValues.js';
 import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
 import { recordReferralClientEventsAsync, recordReferralEventAsync, referralContextFromBody } from '../lib/referralEvents.js';
 import { resolveReferralSessionReferrer } from '../lib/referralSessions.js';

@@ -23,6 +23,7 @@ export const APG_REPOSITORY_DEFINITIONS = {
 };
 
 export function createDataAdapter(name = getFoundationFlag('DATA_PROVIDER')) {
+  if (name === 'postgres-api') return new FirestoreAdapter();
   if (name === 'postgres') return new PostgresAdapter();
   if (name === 'ydb') return new YdbAdapter();
   if (name === 'memory') return new MemoryAdapter();

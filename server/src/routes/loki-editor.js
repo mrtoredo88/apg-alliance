@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from '../lib/documentValues.js';
 import { getDb } from '../lib/firebase.js';
 import { requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 

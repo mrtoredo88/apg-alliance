@@ -48,6 +48,11 @@ function versionPlugin() {
 }
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      'firebase/firestore': resolve(__dirname, 'src/data/apgDocuments.js'),
+    },
+  },
   define: {
     __APG_BUILD_VERSION__: JSON.stringify(resolveBuildVersion()),
     __APG_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
@@ -69,9 +74,6 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('/node_modules/react') || id.includes('/node_modules/react-dom') || id.includes('/node_modules/react-router-dom') || id.includes('/node_modules/scheduler')) {
             return 'vendor-react';
-          }
-          if (id.includes('/node_modules/firebase') || id.includes('/node_modules/@firebase')) {
-            return 'vendor-firebase';
           }
         },
       },

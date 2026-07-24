@@ -1,7 +1,6 @@
 import { FirestoreAdminAdapter } from './data/FirestoreAdminAdapter.js';
 import { ServerRepository } from './data/ServerRepository.js';
 import { createIdentityV2 } from './createIdentityV2.js';
-import { FirebaseAdminIdentityProvider } from './identity/providers/FirebaseAdminIdentityProvider.js';
 import { NativeApgServerIdentityProvider } from './identity/providers/NativeApgServerIdentityProvider.js';
 import { YandexServerIdentityProvider } from './identity/providers/YandexServerIdentityProvider.js';
 import { createAccountCore } from './account/index.js';
@@ -22,7 +21,7 @@ export const SERVER_REPOSITORY_DEFINITIONS = {
   AnalyticsRepository: 'diagnostics',
 };
 
-export function createServerFoundation({ dataAdapter = new FirestoreAdminAdapter(), identityProvider = new FirebaseAdminIdentityProvider() } = {}) {
+export function createServerFoundation({ dataAdapter = new FirestoreAdminAdapter(), identityProvider = new NativeApgServerIdentityProvider() } = {}) {
   const identityV2 = createIdentityV2({ tokenProvider: identityProvider });
   const account = createAccountCore();
   return {
@@ -39,7 +38,6 @@ export function createServerFoundation({ dataAdapter = new FirestoreAdminAdapter
       ),
     },
     providers: {
-      firebase: identityProvider,
       yandex: new YandexServerIdentityProvider(),
       nativeApg: new NativeApgServerIdentityProvider(),
     },
@@ -49,7 +47,6 @@ export function createServerFoundation({ dataAdapter = new FirestoreAdminAdapter
 export const serverFoundation = createServerFoundation();
 
 export { ServerIdentityProvider } from './identity/ServerIdentityProvider.js';
-export { FirebaseAdminIdentityProvider } from './identity/providers/FirebaseAdminIdentityProvider.js';
 export { YandexServerIdentityProvider } from './identity/providers/YandexServerIdentityProvider.js';
 export { NativeApgServerIdentityProvider } from './identity/providers/NativeApgServerIdentityProvider.js';
 export { ApgIdentityV2Service } from './identity/ApgIdentityV2Service.js';

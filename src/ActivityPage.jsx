@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit } from './data/apgDocuments.js';
 
 import { T, GLASS } from './design.js';
 import { logError } from './errorLogger.js';

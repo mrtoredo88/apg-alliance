@@ -8,7 +8,7 @@ function serialize(doc) {
 
 export class FirestoreAdminAdapter extends ServerDataAdapter {
   constructor(dbFactory = getDb) {
-    super('firestore-admin');
+    super('apg-postgres-documents');
     this.dbFactory = dbFactory;
   }
 

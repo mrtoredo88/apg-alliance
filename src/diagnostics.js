@@ -1,6 +1,6 @@
 import { db } from './firebase.js';
 import { API_BASE_URL } from './constants.js';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from './data/apgDocuments.js';
 import { userAction } from './userApi.js';
 import { getPwaVersion } from './pwa/PwaUpdateManager.js';
 import { apgIdentity } from './apg/index.js';

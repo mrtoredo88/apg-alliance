@@ -1,6 +1,6 @@
 import { APP_URL } from '../lib/config.js';
-import { getDb, getDbMessaging } from '../lib/firebase.js';
-import { FieldValue } from 'firebase-admin/firestore';
+import { getDb } from '../lib/firebase.js';
+import { FieldValue } from '../lib/documentValues.js';
 import webpush from 'web-push';
 import { requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 
@@ -70,75 +70,7 @@ export function withPushTimeout(promise, ms = WEB_PUSH_SEND_TIMEOUT_MS) {
 }
 
 async function sendToFcmTokens(tokens, userIds, title, body, url, tag, options = {}) {
-  if (!tokens.length) return { sent: 0, failed: 0, cleaned: 0 };
-
-  const webpushNotification = {
-    icon:  `${APP_URL}/192.png`,
-    badge: `${APP_URL}/32.png`,
-    tag:   tag ?? 'apg-push',
-    renotify: true,
-    requireInteraction: options.priority === 'critical',
-  };
-  if (options.imageUrl) webpushNotification.image = options.imageUrl;
-  if (options.actionLabel) webpushNotification.actions = [{ action: 'open', title: options.actionLabel }];
-
-  const message = {
-    tokens,
-    notification: { title, body: body ?? '' },
-    data: {
-      title,
-      body: body ?? '',
-      url: url ?? APP_URL,
-      tag: tag ?? 'apg-push',
-      notificationId: options.notificationId ?? '',
-      category: options.category ?? 'important',
-      type: options.type ?? 'info',
-      priority: options.priority ?? 'normal',
-    },
-    webpush: {
-      notification: webpushNotification,
-      fcmOptions: { link: url ?? APP_URL },
-    },
-  };
-
-  let result;
-  try {
-    result = await withPushTimeout(getDbMessaging().sendEachForMulticast(message), 15000);
-  } catch (e) {
-    return { sent: 0, failed: tokens.length, cleaned: 0, errors: [{ code: e.code === 'push/timeout' ? 'fcm/timeout' : 'fcm/error', message: String(e.message || '').slice(0, 300) }] };
-  }
-
-  const DEAD_CODES = new Set([
-    'messaging/invalid-registration-token',
-    'messaging/registration-token-not-registered',
-  ]);
-
-  const deadByUser = {};
-  result.responses.forEach((r, i) => {
-    if (!r.success && DEAD_CODES.has(r.error?.code)) {
-      const uid = userIds[i];
-      if (uid) {
-        deadByUser[uid] ??= [];
-        deadByUser[uid].push(tokens[i]);
-      }
-    }
-  });
-
-  await Promise.all(
-    Object.entries(deadByUser).map(([uid, dead]) =>
-      getDb().collection('users').doc(uid).update({
-        fcmTokens: FieldValue.arrayRemove(...dead),
-      }).catch(() => {})
-    )
-  );
-  const cleaned = Object.values(deadByUser).flat().length;
-
-  const errors = result.responses
-    .filter(r => !r.success)
-    .slice(0, 12)
-    .map(r => ({ code: r.error?.code || 'unknown', message: r.error?.message || '' }));
-
-  return { sent: result.successCount, failed: result.failureCount, cleaned, errors };
+  return { sent: 0, failed: 0, cleaned: 0, skipped: tokens.length, errors: [] };
 }
 
 function buildPayload(title, body, url, tag, options = {}) {
@@ -347,7 +279,7 @@ export async function sendBroadcastPush({
       return;
     }
     if (data.notificationProvider && data.notificationProvider !== 'webpush') { skippedReasons.noSubscription += 1; return; }
-    const fcmTokens = Array.isArray(data.fcmTokens) ? data.fcmTokens : [];
+    const fcmTokens = [];
     const webPushSubs = Array.isArray(data.webPushSubscriptions) ? data.webPushSubscriptions : [];
     if (!fcmTokens.length && !webPushSubs.length) { skippedReasons.noSubscription += 1; return; }
     reachedUsers += 1;
@@ -466,7 +398,8 @@ export default async function sendPushRoutes(fastify) {
         const snap = await db.collection('users').doc(String(userId)).get();
         if (!snap.exists) return reply.code(404).send({ error: 'user not found' });
         const userData = snap.data() || {};
-        const { fcmTokens = [], webPushSubscriptions = [] } = userData;
+        const { webPushSubscriptions = [] } = userData;
+        const fcmTokens = [];
         const hasConsent = userData.notificationsEnabled === true || userData.notificationConsent === true;
         if (!hasConsent) return { skipped: true, reason: 'notifications_disabled', subscribers: 0, sent: 0, failed: 0 };
         if (!boolPref(userData.notificationPreferences || DEFAULT_CATEGORIES, category)) {

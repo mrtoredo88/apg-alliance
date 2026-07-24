@@ -1,5 +1,5 @@
 import { auth } from './firebase.js';
-import { signInAnonymously } from 'firebase/auth';
+import { signInAnonymously } from './auth/apgAuthCompat.js';
 import { userAction } from './userApi.js';
 import { getPwaVersion } from './pwa/PwaUpdateManager.js';
 

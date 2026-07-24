@@ -32,6 +32,8 @@ import publicSubmitRoutes     from './routes/public-submit.js';
 import partnershipApplicationRoutes from './routes/partnership-application.js';
 import identityV2AdminRoutes from './routes/identity-v2-admin.js';
 import accountRoutes from './routes/account.js';
+import sessionRoutes from './routes/session.js';
+import documentRoutes from './routes/documents.js';
 
 const fastify = Fastify({ logger: true, bodyLimit: 8_388_608 });
 
@@ -89,6 +91,8 @@ fastify.register(publicSubmitRoutes);
 fastify.register(partnershipApplicationRoutes);
 fastify.register(identityV2AdminRoutes);
 fastify.register(accountRoutes);
+fastify.register(sessionRoutes);
+fastify.register(documentRoutes);
 
 fastify.get('/version', async () => ({
   git: process.env.GIT_SHA || process.env.APP_VERSION || '',

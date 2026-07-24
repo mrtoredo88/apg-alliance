@@ -4,12 +4,12 @@ import { EmailAuth } from './EmailAuth.jsx';
 import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin, openUrl } from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { auth, onAuthStateChanged } from './auth/apgAuthCompat.js';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot } from './data/apgDocuments.js';
 
 import { ANDROID_DOWNLOAD_URL, APP_URL, API_BASE_URL } from './constants.js';
-import { auth, db } from './firebase.js';
+import { db } from './firebase.js';
 import { apgIdentity } from './apg/index.js';
 import { logError } from './errorLogger.js';
 import { userAction } from './userApi.js';

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, getDocs, limit, orderBy, query, where } from '../data/apgDocuments.js';
 import { db } from '../firebase.js';
 import { saveWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 

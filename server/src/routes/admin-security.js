@@ -1,4 +1,4 @@
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from '../lib/documentValues.js';
 import { getDb, getDbAuth } from '../lib/firebase.js';
 import { ROLE_PERMISSIONS, adminReplyError, requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 import { createPasswordRecord, requireStrongAdminPassword } from '../../../server-shared/admin-password.js';

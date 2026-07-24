@@ -1,6 +1,6 @@
 import { APP_URL } from '../lib/config.js';
-import { getDb, getDbMessaging } from '../lib/firebase.js';
-import { FieldValue } from 'firebase-admin/firestore';
+import { getDb } from '../lib/firebase.js';
+import { FieldValue } from '../lib/documentValues.js';
 import { requireAdminPermission } from '../lib/adminSecurity.js';
 
 function weightedRandom(entries) {
@@ -58,22 +58,6 @@ async function drawPrize(db, prizeId) {
       prizeId,
       createdAt: FieldValue.serverTimestamp(),
     }).catch(() => {}),
-    (async () => {
-      try {
-        const userSnap = await db.collection('users').doc(uid).get();
-        const { fcmTokens = [], notificationProvider } = userSnap.data() ?? {};
-        if (notificationProvider !== 'webpush' || !fcmTokens.length) return;
-        await getDbMessaging().sendEachForMulticast({
-          tokens: fcmTokens,
-          notification: { title: pushTitle, body: pushBody },
-          webpush: {
-            notification: { icon: `${APP_URL}/192.png`, badge: `${APP_URL}/32.png` },
-            fcmOptions:   { link: APP_URL },
-            data: { url: APP_URL, tag: 'raffle-win' },
-          },
-        });
-      } catch {}
-    })(),
   ]);
 
   return { winner: { userId: winner.userId, userName: winner.userName } };

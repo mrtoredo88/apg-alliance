@@ -1,27 +1,12 @@
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getMessaging } from 'firebase-admin/messaging';
-import { getAuth } from 'firebase-admin/auth';
-import { readFileSync } from 'node:fs';
+import { apgTokenAuth } from './apgTokens.js';
+import { postgresDocumentDb } from './postgresDocuments.js';
 
-function getAdminApp() {
-  const existing = getApps();
-  if (existing.length) return existing[0];
-
-  // Приоритет 1: GOOGLE_APPLICATION_CREDENTIALS — путь к файлу внутри контейнера
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    const serviceAccount = JSON.parse(readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8'));
-    return initializeApp({ credential: cert(serviceAccount) });
-  }
-
-  // Приоритет 2: FIREBASE_SERVICE_ACCOUNT — JSON-строка (локальная разработка)
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    return initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
-  }
-
-  throw new Error('Firebase не настроен: нужна GOOGLE_APPLICATION_CREDENTIALS или FIREBASE_SERVICE_ACCOUNT');
+// Transitional import path retained so existing server modules keep working.
+// The implementation contains no Firebase SDK and always uses APG PostgreSQL.
+export function getDb() { return postgresDocumentDb; }
+export function getDbAuth() { return apgTokenAuth; }
+export function getDbMessaging() {
+  throw Object.assign(new Error('Firebase Cloud Messaging is disabled; use APG Web Push.'), {
+    code: 'APG_FCM_DISABLED',
+  });
 }
-
-export function getDb()          { return getFirestore(getAdminApp()); }
-export function getDbMessaging() { return getMessaging(getAdminApp()); }
-export function getDbAuth()      { return getAuth(getAdminApp()); }

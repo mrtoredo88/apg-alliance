@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { db } from './firebase';
-import { collection, getDocs, query, orderBy, limit, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, doc, getDoc } from './data/apgDocuments.js';
 import { T, GLASS, GLASS_GOLD } from './design.js';
 import { APP_URL } from './constants.js';
 import { PartnerQRSection } from './PartnerQRSection.jsx';

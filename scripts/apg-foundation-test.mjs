@@ -11,7 +11,6 @@ const requiredFiles = [
   'src/apg/core/FeatureFlags.js',
   'src/apg/identity/IdentityProvider.js',
   'src/apg/identity/ApgIdentityLayer.js',
-  'src/apg/identity/providers/FirebaseIdentityProvider.js',
   'src/apg/identity/providers/YandexIdentityProvider.js',
   'src/apg/identity/providers/NativeApgProvider.js',
   'src/apg/data/ApgDataLayer.js',
@@ -24,7 +23,6 @@ const requiredFiles = [
   'src/apg/domain/index.js',
   'server/src/apg/index.js',
   'server/src/apg/identity/ServerIdentityProvider.js',
-  'server/src/apg/identity/providers/FirebaseAdminIdentityProvider.js',
   'server/src/apg/identity/providers/YandexServerIdentityProvider.js',
   'server/src/apg/identity/providers/NativeApgServerIdentityProvider.js',
   'server/src/apg/data/ServerDataAdapter.js',
@@ -58,12 +56,12 @@ for (const method of [
   console.log(`OK IdentityProvider ${method}`);
 }
 
-const firebaseProvider = read('src/apg/identity/providers/FirebaseIdentityProvider.js');
-assert.ok(firebaseProvider.includes("provider === 'anonymous'"), 'Firebase provider supports anonymous auth');
-assert.ok(firebaseProvider.includes("provider === 'firebaseCustomToken'"), 'Firebase provider supports custom token auth');
-assert.ok(firebaseProvider.includes('getSessionToken'), 'Firebase provider owns token retrieval');
-assert.ok(firebaseProvider.includes('waitForIdentity'), 'Firebase provider owns auth-state waiting');
-console.log('OK FirebaseIdentityProvider wraps Firebase Auth');
+const nativeProvider = read('src/apg/identity/providers/NativeApgProvider.js');
+assert.ok(nativeProvider.includes("provider === 'anonymous'"), 'APG provider supports anonymous auth');
+assert.ok(nativeProvider.includes("provider === 'apgToken'"), 'APG provider supports APG token auth');
+assert.ok(nativeProvider.includes('getSessionToken'), 'APG provider owns token retrieval');
+assert.ok(nativeProvider.includes('waitForIdentity'), 'APG provider owns auth-state waiting');
+console.log('OK NativeApgProvider wraps APG sessions');
 
 const flags = read('src/apg/core/FeatureFlags.js');
 for (const flag of ['IDENTITY_PROVIDER', 'DATA_PROVIDER', 'MESSAGE_PROVIDER', 'SEARCH_PROVIDER', 'STORAGE_PROVIDER']) {
@@ -125,15 +123,15 @@ console.log('OK diagnostics auth path uses APG Identity');
 
 const serverFoundation = read('server/src/apg/index.js');
 assert.ok(serverFoundation.includes('createServerFoundation'), 'server foundation factory exists');
-assert.ok(serverFoundation.includes('FirebaseAdminIdentityProvider'), 'server Firebase Admin provider registered');
+assert.ok(!serverFoundation.includes('FirebaseAdminIdentityProvider'), 'server Firebase Admin provider removed');
 assert.ok(serverFoundation.includes('YandexServerIdentityProvider'), 'server Yandex provider stub registered');
 assert.ok(serverFoundation.includes('NativeApgServerIdentityProvider'), 'server Native APG provider stub registered');
 console.log('OK server foundation registered');
 
-const firebaseAdminProvider = read('server/src/apg/identity/providers/FirebaseAdminIdentityProvider.js');
-assert.ok(firebaseAdminProvider.includes('createCustomToken'), 'server Firebase provider owns custom token creation');
-assert.ok(firebaseAdminProvider.includes('verifyIdToken'), 'server Firebase provider owns token verification');
-console.log('OK FirebaseAdminIdentityProvider wraps Firebase Admin Auth');
+const apgTokens = read('server/src/lib/apgTokens.js');
+assert.ok(apgTokens.includes('createApgAccessToken'), 'server APG token creation exists');
+assert.ok(apgTokens.includes('verifyApgAccessToken'), 'server APG token verification exists');
+console.log('OK APG token service replaces Firebase Admin Auth');
 
 const emailAuth = read('server/src/routes/email-auth.js');
 assert.ok(emailAuth.includes("import { serverFoundation } from '../apg/index.js';"), 'email-auth imports server foundation');

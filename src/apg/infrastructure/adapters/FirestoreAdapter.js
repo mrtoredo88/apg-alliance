@@ -11,7 +11,7 @@ import {
   setDoc,
   updateDoc,
   where,
-} from 'firebase/firestore';
+} from '../../../data/apgDocuments.js';
 import { db } from '../../../firebase.js';
 import { BaseDataAdapter } from './BaseDataAdapter.js';
 
@@ -30,7 +30,7 @@ function applyQuery(ref, spec = {}) {
 
 export class FirestoreAdapter extends BaseDataAdapter {
   constructor(firestoreDb = db) {
-    super('firestore');
+    super('apg-postgres-api');
     this.db = firestoreDb;
   }
 

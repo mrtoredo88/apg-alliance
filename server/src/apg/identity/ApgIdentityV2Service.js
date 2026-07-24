@@ -3,7 +3,7 @@ import { normalizeEmail, safeString } from './repositories/IdentityRepositoryUti
 
 function defaultFlags(flags = {}) {
   return {
-    identityProvider: process.env.IDENTITY_PROVIDER || flags.IDENTITY_PROVIDER || flags.identityProvider || 'firebase',
+    identityProvider: process.env.IDENTITY_PROVIDER || flags.IDENTITY_PROVIDER || flags.identityProvider || 'native-apg',
     identityStorage: process.env.IDENTITY_STORAGE || flags.IDENTITY_STORAGE || flags.identityStorage || 'postgres',
   };
 }

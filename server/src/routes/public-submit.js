@@ -1,4 +1,4 @@
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from '../lib/documentValues.js';
 import { getDb } from '../lib/firebase.js';
 import { EXPERT_CATEGORIES, normalizeExpertCategory, normalizeExpertPhone, registerCustomExpertCategories, validateExpertCategories } from '../../../server-shared/expert-directory.js';
 import { TELEGRAM_HOST, normalizeTelegramUrl } from '../../../server-shared/telegram.js';

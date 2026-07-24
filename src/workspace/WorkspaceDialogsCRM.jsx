@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot } from '../data/apgDocuments.js';
 import { db } from '../firebase.js';
 import { userAction } from '../userApi.js';
 import { buildDialogAutoAnswer, getDialogObjectLabel } from '../../server-shared/context-dialogs.js';

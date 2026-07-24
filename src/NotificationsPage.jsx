@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 
 
 import { db } from './firebase';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy } from './data/apgDocuments.js';
 
 import { T, GLASS } from './design.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';

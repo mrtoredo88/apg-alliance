@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from '../data/apgDocuments.js';
 import { db } from '../firebase.js';
 import { userAction } from '../userApi.js';
 import {

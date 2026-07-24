@@ -1,5 +1,5 @@
 import { PostgresIdentityAdapter } from './infrastructure/adapters/PostgresIdentityAdapter.js';
-import { FirebaseAdminIdentityProvider } from './identity/providers/FirebaseAdminIdentityProvider.js';
+import { NativeApgServerIdentityProvider } from './identity/providers/NativeApgServerIdentityProvider.js';
 import { ApgIdentityV2Service } from './identity/ApgIdentityV2Service.js';
 import {
   EmailIndexRepository,
@@ -12,7 +12,7 @@ import {
 
 export function createIdentityV2({
   postgresAdapter = new PostgresIdentityAdapter(),
-  tokenProvider = new FirebaseAdminIdentityProvider(),
+  tokenProvider = new NativeApgServerIdentityProvider(),
   flags = {},
 } = {}) {
   const users = new UserRepository(postgresAdapter);
