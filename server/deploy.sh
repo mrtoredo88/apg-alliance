@@ -103,8 +103,8 @@ yc serverless container revision deploy \
   --environment APG_IDENTITY_DATABASE_URL="$(get_env APG_IDENTITY_DATABASE_URL)" \
   --environment APG_DATA_DATABASE_URL="$(get_env APG_DATA_DATABASE_URL)" \
   --environment APG_SESSION_SECRET="$APG_SESSION_SECRET_VALUE" \
-  --environment APG_DATA_POOL_SIZE="${APG_DATA_POOL_SIZE_OVERRIDE:-${APG_DATA_POOL_SIZE:-4}}" \
-  --environment APG_IDENTITY_POOL_SIZE="${APG_IDENTITY_POOL_SIZE_OVERRIDE:-${APG_IDENTITY_POOL_SIZE:-2}}" \
+  --environment APG_DATA_POOL_SIZE="${APG_DATA_POOL_SIZE_OVERRIDE:-${APG_DATA_POOL_SIZE:-1}}" \
+  --environment APG_IDENTITY_POOL_SIZE="${APG_IDENTITY_POOL_SIZE_OVERRIDE:-${APG_IDENTITY_POOL_SIZE:-1}}" \
   --environment IDENTITY_PROVIDER="native-apg" \
   --environment IDENTITY_STORAGE="$(get_env IDENTITY_STORAGE)" \
   --environment APP_VERSION="$GIT_SHA_SHORT" \
