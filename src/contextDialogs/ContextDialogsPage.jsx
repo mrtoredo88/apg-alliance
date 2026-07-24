@@ -6,6 +6,7 @@ import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPa
 import { buildDialogAutoAnswer, buildDialogContext, getDialogObjectLabel } from '../../server-shared/context-dialogs.js';
 import { BOOKING_STATUSES } from '../../server-shared/booking.js';
 import { buildMessagingSnapshot, buildUnifiedDialogList } from '../messaging/index.js';
+import { releaseMobileInputFocus } from '../utils/mobileInput.js';
 
 function tsMs(value) {
   if (!value) return 0;
@@ -539,6 +540,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
   const [contextExpanded, setContextExpanded] = useState(false);
   const desktopLayout = useDesktopLayout();
   const messagesEndRef = useRef(null);
+  const messageInputRef = useRef(null);
   const lastRequestRef = useRef(0);
 
   useEffect(() => setAiAssist(Boolean(user?.contextDialogAiAssist)), [user?.contextDialogAiAssist]);
@@ -642,6 +644,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
         await userAction('dialog:message', { dialogId: activeDialog.id, text: body, senderRole: senderRole || undefined });
       }
       setText('');
+      releaseMobileInputFocus();
     } catch (err) {
       setLastFailedMessage(body);
       setError(err?.message || 'Не удалось отправить сообщение.');
@@ -799,12 +802,13 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 44px', gap: 8, alignItems: 'end' }}>
           <textarea
+            ref={messageInputRef}
             value={text}
             onFocus={() => activeDialog && userAction('dialog:typing', { dialogId: activeDialog.id, typing: true }).catch(() => {})}
             onBlur={() => activeDialog && userAction('dialog:typing', { dialogId: activeDialog.id, typing: false }).catch(() => {})}
             onChange={e => setText(e.target.value)}
             placeholder="Напишите сообщение..."
-            style={{ minHeight: 44, maxHeight: 112, resize: 'vertical', border: 0, outline: 0, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', borderRadius: 20, color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontFamily: 'inherit', padding: '12px 14px', boxSizing: 'border-box' }}
+            style={{ minHeight: 44, maxHeight: 112, resize: 'vertical', border: 0, outline: 0, background: 'rgba(var(--apg2-glass-a,255,255,255),0.07)', borderRadius: 20, color: APG2_PROFILE.text, fontSize: 16, lineHeight: '20px', fontFamily: 'inherit', padding: '12px 14px', boxSizing: 'border-box' }}
           />
           <button type="button" onClick={() => sendText()} disabled={pending || !text.trim()} style={{ width: 44, height: 44, borderRadius: '50%', border: '1px solid rgba(215,184,106,0.34)', background: APG2_PROFILE.gold, color: '#17120a', display: 'grid', placeItems: 'center', fontSize: 17, fontWeight: 920, cursor: pending ? 'default' : 'pointer', opacity: pending || !text.trim() ? 0.54 : 1, transition: 'opacity 160ms ease, transform 160ms ease' }}>↑</button>
         </div>

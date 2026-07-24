@@ -445,6 +445,16 @@ input::placeholder {
   color: var(--apg-input-placeholder, rgba(240, 240, 240, 0.55));
 }
 
+/* iOS Safari automatically zooms focused controls whose text is below 16px. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select,
+  [contenteditable="true"] {
+    font-size: 16px !important;
+  }
+}
+
 /* Onboarding slide transitions */
 @keyframes slideInRight {
   from { opacity: 0; transform: translateX(48px) scale(0.97); }

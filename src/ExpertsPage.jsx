@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import { userAction } from './userApi.js';
 import { APG_EVENT_TYPES, trackAppEvent } from './intelligence/index.js';
+import { releaseMobileInputFocus } from './utils/mobileInput.js';
 
 function getISOWeekKey(date = new Date()) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -387,6 +388,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
         setSubmitDone(true);
         setMyRating(0);
         setMyText('');
+        releaseMobileInputFocus();
       }
     } catch (e) { logError(e, 'ExpertsPage.submitReview'); }
     finally { if (mountedRef.current) setSubmitting(false); }

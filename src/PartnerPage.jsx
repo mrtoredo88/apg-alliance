@@ -24,6 +24,7 @@ import { qrLog, sanitizeQrPartnerSnapshot } from './qrDiagnostics.js';
 import { userAction } from './userApi.js';
 import { APG_EVENT_TYPES, trackAppEvent } from './intelligence/index.js';
 import { openNormalizedUrl } from './utils/externalUrls.js';
+import { releaseMobileInputFocus } from './utils/mobileInput.js';
 import { shareLink } from './utils/shareLink.js';
 import { formatRelativeTime, toDate } from './utils/time.js';
 import { RichText } from './components/RichText.jsx';
@@ -363,6 +364,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       setReviewError('');
       setSubmitDone(true);
       setShowForm(false);
+      releaseMobileInputFocus();
 
       // Предлагаем поделиться в ВК
       const stars = '⭐'.repeat(formStars);
