@@ -51,6 +51,7 @@ fi
 echo "Uploading static files..."
 aws s3 sync dist/ "s3://$BUCKET/" $S3 \
   --exclude "assets/*" \
+  --exclude "downloads/*" \
   --exclude "index.html" \
   --exclude "sw.js" \
   --exclude "manifest.json" \

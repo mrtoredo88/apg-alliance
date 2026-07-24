@@ -4662,3 +4662,5 @@
 - До появления подписанного дистрибутива кнопка показывает безопасный статус «Android-приложение — скоро» и не ведёт на unsigned APK.
 - После задания `VITE_ANDROID_DOWNLOAD_URL` тот же интерфейс автоматически превращается в активную кнопку скачивания.
 - CTA скрыт от desktop, iOS и самого Capacitor-приложения; существующая PWA-установка остаётся доступной.
+- Создан постоянный release-keystore вне Git; Gradle получает путь, alias и пароли только через environment variables.
+- Кнопка подключена к `https://myapg.ru/downloads/apg-android.apk`, а frontend deploy сохраняет содержимое `downloads/`.
