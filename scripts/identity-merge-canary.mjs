@@ -5,6 +5,7 @@ import path from 'node:path';
 const ROOT = process.cwd();
 const FORBIDDEN_ROLES = new Set(['owner', 'super_admin']);
 const MAX_SNAPSHOT_AGE_MS = 15 * 60 * 1000;
+const APPROVED_CLUSTERS = new Set(['daria', 'natalie', 'tatyana', 'owner-email', 'owner-telegram']);
 
 function arg(name, fallback = '') {
   const index = process.argv.indexOf(`--${name}`);
@@ -104,7 +105,14 @@ function planDocuments(snapshot, sourceId, canonicalId) {
       merged.userId = canonicalId;
       merged.canonicalUserId = canonicalId;
       merged.keys = Math.max(Number(row.data?.keys || 0), Number(canonical.data?.keys || 0));
-      merged.roles = unique([...(Array.isArray(row.data?.roles) ? row.data.roles : []), ...(Array.isArray(canonical.data?.roles) ? canonical.data.roles : [])]);
+      merged.roles = unique([
+        ...(Array.isArray(row.data?.roles) ? row.data.roles : []),
+        ...(Array.isArray(canonical.data?.roles) ? canonical.data.roles : []),
+        row.data?.role,
+        row.data?.userRole,
+        canonical.data?.role,
+        canonical.data?.userRole,
+      ].filter(Boolean));
       operations.push({
         kind: 'document-merge',
         sourcePath: row.path,
@@ -126,12 +134,13 @@ function planDocuments(snapshot, sourceId, canonicalId) {
         if (sha256(collision.data) === sha256(nextData)) {
           operations.push({ kind: 'document-deduplicate', sourcePath: row.path, targetPath: nextPath, identical: true });
         } else {
-          conflicts.push({
-            code: 'NESTED_DOCUMENT_COLLISION',
+          operations.push({
+            kind: 'document-retain-alias',
             sourcePath: row.path,
             targetPath: nextPath,
             sourceHash: sha256(nextData),
             targetHash: sha256(collision.data),
+            reason: 'Both divergent versions are retained; canonical copy remains active and alias copy remains recoverable.',
           });
         }
         continue;
@@ -224,10 +233,17 @@ function assertSafe(snapshotFile, payload, plan, execute) {
   const ids = [plan.canonicalUserId, ...plan.sourceUserIds];
   const roles = userRoles(payload.snapshot || {}, ids);
   const forbidden = roles.filter(role => FORBIDDEN_ROLES.has(role));
-  if (forbidden.length) throw new Error(`Protected role cluster is forbidden: ${forbidden.join(', ')}`);
-  if (plan.cluster !== 'daria') throw new Error(`Only the approved non-admin canary cluster is supported, got: ${plan.cluster}`);
+  if (!APPROVED_CLUSTERS.has(plan.cluster)) throw new Error(`Merge cluster is not approved: ${plan.cluster}`);
+  if (forbidden.length) {
+    const required = `PROTECTED:${plan.cluster}:${plan.canonicalUserId}`;
+    if (arg('protected-approval') !== required) {
+      throw new Error(`Protected role cluster requires explicit approval: ${required}`);
+    }
+  }
   if (plan.sourceUserIds.length !== 1) throw new Error('Canary requires exactly one source alias.');
-  if (plan.conflicts.length) throw new Error(`Dry-run has ${plan.conflicts.length} unresolved conflicts.`);
+  if (plan.conflicts.length) {
+    throw new Error(`Dry-run has ${plan.conflicts.length} unresolved conflicts: ${JSON.stringify(plan.conflicts.slice(0, 20))}`);
+  }
   if (execute) {
     const age = Date.now() - timestamp(payload.generatedAt);
     if (age < 0 || age > MAX_SNAPSHOT_AGE_MS) throw new Error(`Snapshot is stale for execution (${Math.round(age / 60000)} minutes).`);
@@ -268,16 +284,29 @@ const plan = {
     documentMoves: operations.filter(row => row.kind === 'document-move').length,
     documentUpdates: operations.filter(row => row.kind === 'document-update').length,
     documentDeduplications: operations.filter(row => row.kind === 'document-deduplicate').length,
+    documentsRetainedUnderAlias: operations.filter(row => row.kind === 'document-retain-alias').length,
     tableUpdates: operations.filter(row => row.kind === 'table-update').length,
     accountProfileMerges: operations.filter(row => row.kind === 'account-profile-merge').length,
     conflicts: documentPlan.conflicts.length,
   },
   invariants: {
     expectedCanonicalUserId: canonicalUserId,
-    expectedEmail: 'daria_samarina@mail.ru',
-    expectedTelegramId: '1424650385',
-    expectedUsername: 'dariasamarina83',
-    expectedKeys: 67,
+    expectedEmail: (payload.snapshot?.emailIndex || []).find(row =>
+      [canonicalUserId, ...sourceUserIds].includes(row.user_id)
+      || [canonicalUserId, ...sourceUserIds].includes(row.canonical_user_id))?.email || '',
+    expectedTelegramId: String(
+      (payload.snapshot?.identityLinks || []).find(row => row.provider === 'telegram')?.provider_user_id
+      || (payload.snapshot?.telegramLinks || []).find(row =>
+        [canonicalUserId, ...sourceUserIds].includes(row.user_id)
+        || [canonicalUserId, ...sourceUserIds].includes(row.canonical_user_id))?.telegram_id
+      || '',
+    ).replace(/^tg_/, ''),
+    expectedUsername: (payload.snapshot?.documents || []).find(row => row.path === `users/${canonicalUserId}`)?.data?.username
+      || (payload.snapshot?.documents || []).find(row => sourceUserIds.includes(row.document_id))?.data?.username || '',
+    expectedKeys: Math.max(0, ...(payload.snapshot?.documents || [])
+      .filter(row => row.collection_path === 'users' && [canonicalUserId, ...sourceUserIds].includes(row.document_id))
+      .map(row => Number(row.data?.keys || 0))),
+    expectedRoles: userRoles(payload.snapshot || {}, [canonicalUserId, ...sourceUserIds]).filter(role => role !== 'user'),
     protectedRolesAbsent: true,
     sourceOnlyReferencesAfterMerge: 0,
     uniqueDocumentCountMustNotDecrease: true,
