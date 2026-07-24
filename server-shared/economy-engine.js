@@ -1,4 +1,4 @@
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from './document-values.js';
 
 export const ECONOMY_VERSION = '1.0';
 

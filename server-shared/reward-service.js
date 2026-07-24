@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from './document-values.js';
 import { ECONOMY_VERSION, getEconomyReward } from './economy-engine.js';
 
 const TOKEN_PREFIX = 'apg:visit:v1:';
