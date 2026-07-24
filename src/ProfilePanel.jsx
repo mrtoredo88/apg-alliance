@@ -63,42 +63,6 @@ function createTraceId(prefix = 'tg') {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 10)}`;
 }
 
-function EmailVerifyBanner({ userId }) {
-  const [sent, setSent]       = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const resend = async () => {
-    if (loading || sent) return;
-    setLoading(true);
-    try {
-      await fetch(`${API_BASE_URL}/api/email-auth`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'resend-verification', userId }),
-      });
-      setSent(true);
-    } catch {}
-    setLoading(false);
-  };
-
-  return (
-    <div style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: 12, padding: '10px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span style={{ fontSize: 16, flexShrink: 0 }}>📬</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, color: APG2.gold, fontWeight: 600, lineHeight: '16px' }}>Подтвердите адрес почты</div>
-        <div style={{ fontSize: 11, color: APG2.textSoft, lineHeight: '15px' }}>Письмо уже отправлено при входе</div>
-      </div>
-      <button
-        onClick={resend}
-        disabled={loading || sent}
-        style={{ flexShrink: 0, padding: '5px 10px', borderRadius: 8, border: `1px solid rgba(201,168,76,0.35)`, background: 'none', color: sent ? APG2.textSoft : APG2.gold, fontSize: 11, fontWeight: 700, cursor: sent ? 'default' : 'pointer', whiteSpace: 'nowrap' }}
-      >
-        {sent ? '✓ Отправлено' : loading ? '...' : 'Отправить ещё раз'}
-      </button>
-    </div>
-  );
-}
-
 async function getAuthHeaders() {
   const token = await apgIdentity.getSessionToken?.();
   return {
@@ -2627,7 +2591,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               {isEmailUser && (
                 <>
                   <AccountMethodRow icon="✉️" title="Email" subtitle={userEmail} status="подключён" accent={APG2.gold} />
-                  {user?.emailVerified === false && <EmailVerifyBanner userId={String(user.id)} />}
                   {linkedTelegram ? (
                     <AccountMethodRow icon={<TelegramIcon />} title="Telegram" subtitle={linkedTelegramName} status="привязан" accent="#26A8EA" />
                   ) : tgStep === 'linked' ? (
@@ -3097,12 +3060,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       {!isVK() && user && String(user.id).startsWith('email:') && (
         <div style={{ margin: '14px 16px 0', borderRadius: 18, border: '1px solid rgba(38,168,234,0.25)', background: 'rgba(38,168,234,0.06)', padding: '14px 16px', overflow: 'hidden' }}>
           <div style={{ fontSize: 12, color: APG2.textSoft, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>Способы входа</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: user.emailVerified === false ? 8 : 10, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, minWidth: 0 }}>
             <span style={{ fontSize: 13, color: APG2.text, flexShrink: 0 }}>✉️ Email</span>
             <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: APG2.textSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email ?? String(user.id).replace('email:', '')}</span>
             <span style={{ marginLeft: 'auto', fontSize: 11, color: '#4BB34B', fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>✓ подключён</span>
           </div>
-          {user.emailVerified === false && <EmailVerifyBanner userId={String(user.id)} />}
           {user.linkedTelegram
             ? <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 13, color: APG2.text }}>✈️ Telegram</span>

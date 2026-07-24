@@ -1051,6 +1051,16 @@ export default async function emailAuthRoutes(fastify) {
         trace.apgUserIdHash = hashValue(identity.userId || '');
         const userId = identity.userId;
         const ud = identity.user ?? {};
+        // A valid one-time code proves control of the email address. Persist
+        // that fact in Identity V2 and in the compatibility document so the
+        // profile never asks the signed-in user to verify the same email again.
+        await withEmailLoginStage(trace, 'mark_email_verified', async () => {
+          await serverFoundation.identityV2.markEmailVerified(userId);
+          if (shouldWriteLegacyIdentitySideEffects()) {
+            await db.collection('users').doc(userId).set({ emailVerified: true }, { merge: true });
+          }
+        }, 7000);
+        ud.emailVerified = true;
         if (ref || referralContext.referralFlowId) {
           recordReferralEventAsync(db, {
             ...referralContext,
