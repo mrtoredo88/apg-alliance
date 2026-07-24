@@ -21,6 +21,8 @@ COPY scripts/account-dry-run.mjs ./scripts/account-dry-run.mjs
 COPY scripts/account-verify.mjs ./scripts/account-verify.mjs
 COPY scripts/account-rollback.mjs ./scripts/account-rollback.mjs
 COPY scripts/account-observe.mjs ./scripts/account-observe.mjs
+COPY scripts/import-apg-documents.mjs ./scripts/import-apg-documents.mjs
+COPY scripts/verify-apg-documents.mjs ./scripts/verify-apg-documents.mjs
 COPY server/src/apg/account/schema/account-core.sql ./server/src/apg/account/schema/account-core.sql
 COPY docs/migration/rollback-readiness.md ./docs/migration/rollback-readiness.md
 COPY docs/migration/monitoring-readiness.md ./docs/migration/monitoring-readiness.md

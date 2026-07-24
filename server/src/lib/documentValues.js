@@ -32,12 +32,20 @@ export function reviveDocumentValue(value) {
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, reviveDocumentValue(item)]));
 }
 
+export function cloneDocumentValue(value) {
+  if (value instanceof Timestamp) return Timestamp.fromMillis(value.toMillis());
+  if (value instanceof Date) return new Date(value.getTime());
+  if (Array.isArray(value)) return value.map(cloneDocumentValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cloneDocumentValue(item)]));
+}
+
 function equalValue(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
 export function applyDocumentPatch(current = {}, patch = {}, merge = true) {
-  const next = merge ? structuredClone(current || {}) : {};
+  const next = merge ? cloneDocumentValue(current || {}) : {};
   for (const [key, raw] of Object.entries(patch || {})) {
     const op = raw?.[OP];
     if (!op) {

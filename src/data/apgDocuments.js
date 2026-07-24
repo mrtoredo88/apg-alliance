@@ -14,6 +14,14 @@ function revive(value) {
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, revive(item)]));
 }
 
+function clone(value) {
+  if (value instanceof ApgTimestamp) return new ApgTimestamp(value.value);
+  if (value instanceof Date) return new Date(value.getTime());
+  if (Array.isArray(value)) return value.map(clone);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, clone(item)]));
+}
+
 function pathOf(parts) {
   return parts.flatMap(part => String(part || '').split('/')).filter(Boolean).join('/');
 }
@@ -35,7 +43,7 @@ async function read(payload) {
 class DocumentSnapshot {
   constructor(ref, exists, data) { this.ref = ref; this.id = ref.id; this._exists = exists; this._data = revive(data); }
   exists() { return this._exists; }
-  data() { return this._exists ? structuredClone(this._data) : undefined; }
+  data() { return this._exists ? clone(this._data) : undefined; }
   get(field) { return String(field).split('.').reduce((value, key) => value?.[key], this._data); }
 }
 

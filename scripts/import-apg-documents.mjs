@@ -3,7 +3,23 @@ import { Pool } from 'pg';
 import { createHash } from 'node:crypto';
 
 const [inputPath] = process.argv.slice(2);
-const databaseUrl = process.env.APG_DATA_DATABASE_URL || process.env.POSTGRES_DATABASE_URL || process.env.DATABASE_URL;
+function envFileValue(key) {
+  try {
+    const line = fs.readFileSync(process.env.APG_ENV_FILE || 'server/.env', 'utf8')
+      .split(/\r?\n/)
+      .find(item => item.startsWith(`${key}=`));
+    return line ? line.slice(key.length + 1).trim() : '';
+  } catch {
+    return '';
+  }
+}
+
+const databaseUrl = process.env.APG_DATA_DATABASE_URL
+  || process.env.APG_IDENTITY_DATABASE_URL
+  || process.env.POSTGRES_DATABASE_URL
+  || process.env.DATABASE_URL
+  || envFileValue('APG_DATA_DATABASE_URL')
+  || envFileValue('APG_IDENTITY_DATABASE_URL');
 if (!inputPath || !databaseUrl) {
   console.error('Usage: APG_DATA_DATABASE_URL=... node scripts/import-apg-documents.mjs <export.json>');
   process.exit(2);
@@ -14,10 +30,21 @@ const payload = JSON.parse(raw);
 const documents = Array.isArray(payload) ? payload : payload.documents;
 if (!Array.isArray(documents)) throw new Error('Export must be an array or { documents: [] }.');
 
+function normalizedDatabaseUrl(value) {
+  const url = new URL(value);
+  url.searchParams.delete('sslmode');
+  return url.toString();
+}
+function sslConfig() {
+  const caPath = process.env.APG_YANDEX_CA_PATH;
+  if (caPath && fs.existsSync(caPath)) return { ca: fs.readFileSync(caPath, 'utf8'), rejectUnauthorized: true };
+  return { rejectUnauthorized: false };
+}
+
 const pool = new Pool({
-  connectionString: databaseUrl,
+  connectionString: normalizedDatabaseUrl(databaseUrl),
   max: 4,
-  ssl: process.env.APG_DATA_PG_SSL === '0' ? false : { rejectUnauthorized: false },
+  ssl: process.env.APG_DATA_PG_SSL === '0' ? false : sslConfig(),
 });
 
 const client = await pool.connect();

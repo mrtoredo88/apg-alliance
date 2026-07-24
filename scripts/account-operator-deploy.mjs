@@ -12,12 +12,6 @@ const INVOKE_ENV_PATH = 'backups/account-core/remote-preflight/operator-invoke.e
 const REQUIRED_PLATFORM = { os: 'linux', architecture: 'amd64' };
 const REQUIRED_ENV = [
   'APG_IDENTITY_DATABASE_URL',
-  'GOOGLE_APPLICATION_CREDENTIALS',
-  'IDENTITY_PROVIDER',
-  'IDENTITY_STORAGE',
-  'IDENTITY_DUAL_READ',
-  'IDENTITY_DUAL_WRITE',
-  'IDENTITY_FALLBACK',
 ];
 
 function run(cmd, args, options = {}) {
@@ -167,7 +161,7 @@ function main() {
     '--image', image,
     '--cores', '1',
     '--memory', '512MB',
-    '--execution-timeout', '30s',
+    '--execution-timeout', '600s',
     '--concurrency', '1',
     '--min-instances', '0',
     '--network-id', NETWORK_ID,

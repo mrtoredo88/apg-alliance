@@ -1,6 +1,12 @@
 FROM node:20-alpine
 WORKDIR /app
 
+RUN apk add --no-cache ca-certificates wget \
+  && mkdir -p /app/certs \
+  && wget -q -O /app/certs/YandexInternalRootCA.crt https://storage.yandexcloud.net/cloud-certs/CA.pem \
+  && test -s /app/certs/YandexInternalRootCA.crt
+ENV APG_YANDEX_CA_PATH=/app/certs/YandexInternalRootCA.crt
+
 ARG APP_VERSION=unknown
 ARG GIT_SHA=unknown
 ARG BUILD_TIME=unknown

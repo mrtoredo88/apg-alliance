@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
-import { applyDocumentPatch, reviveDocumentValue } from './documentValues.js';
+import fs from 'node:fs';
+import { applyDocumentPatch, cloneDocumentValue, reviveDocumentValue } from './documentValues.js';
 
 function connectionString() {
   return process.env.APG_DATA_DATABASE_URL
@@ -8,6 +9,21 @@ function connectionString() {
     || process.env.POSTGRES_DATABASE_URL
     || process.env.DATABASE_URL
     || '';
+}
+
+function normalizedConnectionString() {
+  const raw = connectionString();
+  if (!raw) return '';
+  const url = new URL(raw);
+  url.searchParams.delete('sslmode');
+  return url.toString();
+}
+
+function sslConfig() {
+  if (process.env.APG_DATA_PG_SSL === '0') return false;
+  const caPath = process.env.APG_YANDEX_CA_PATH;
+  if (caPath && fs.existsSync(caPath)) return { ca: fs.readFileSync(caPath, 'utf8'), rejectUnauthorized: true };
+  return { rejectUnauthorized: false };
 }
 
 function normalizePath(parts) {
@@ -47,7 +63,7 @@ class DocumentSnapshot {
     this.updateTime = row?.updated_at ? new Date(row.updated_at) : null;
   }
   get exists() { return this._data !== null; }
-  data() { return this._data === null ? undefined : structuredClone(this._data); }
+  data() { return this._data === null ? undefined : cloneDocumentValue(this._data); }
   get(field) { return fieldValue(this._data, field); }
 }
 
@@ -159,11 +175,11 @@ export class PostgresDocumentDb {
   get client() {
     if (!this.available) throw Object.assign(new Error('APG PostgreSQL document store is not configured.'), { code: 'APG_POSTGRES_NOT_CONFIGURED' });
     if (!this.pool) this.pool = new Pool({
-      connectionString: connectionString(),
+      connectionString: normalizedConnectionString(),
       max: Number(process.env.APG_DATA_POOL_SIZE || 8),
       idleTimeoutMillis: 20_000,
       connectionTimeoutMillis: 5_000,
-      ssl: process.env.APG_DATA_PG_SSL === '0' ? false : { rejectUnauthorized: false },
+      ssl: sslConfig(),
     });
     return this.pool;
   }
