@@ -46,26 +46,26 @@ export default async function adminLoginRoutes(fastify) {
       }
       const persistedUser = userDoc?.exists ? userDoc.data() || {} : {};
       const combinedUser = { ...persistedUser, ...user };
-      const role = getPrimaryRole(user);
-      const status = String(user.adminStatus || user.status || 'active').toLowerCase();
-      if (!hasCapability(user, CAPABILITIES.canOpenAdminPanel) || status !== 'active') {
+      const role = getPrimaryRole(combinedUser);
+      const status = String(combinedUser.adminStatus || combinedUser.status || 'active').toLowerCase();
+      if (!hasCapability(combinedUser, CAPABILITIES.canOpenAdminPanel) || status !== 'active') {
         await log('error', { code: 'FORBIDDEN_ROLE', role, status });
         return reply.code(403).send({ ok: false, code: 'FORBIDDEN_ROLE', error: 'Доступ администратора отключён.' });
       }
-      const uid = String(combinedUser.firebaseUid || combinedUser.authUid || userId || userDoc?.id || email);
+      const uid = String(userId || userDoc?.id || combinedUser.firebaseUid || combinedUser.authUid || email);
       const credentialSnap = await db.collection('adminCredentials').doc(uid).get().catch(() => null);
-      const credential = credentialSnap.exists ? credentialSnap.data() || {} : {};
+      const credential = credentialSnap?.exists ? credentialSnap.data() || {} : {};
       if (!verifyPasswordRecord(password, credential.password)) {
         await log('error', { code: 'INVALID_CREDENTIALS', role });
         return reply.code(401).send({ ok: false, code: 'INVALID_CREDENTIALS', error: 'Неверный email или пароль администратора.' });
       }
       await auth.updateUser(uid, { email, emailVerified: true, disabled: false }).catch(() => {});
-      const owner = hasRole(user, ROLES.owner);
+      const owner = hasRole(combinedUser, ROLES.owner);
       await auth.setCustomUserClaims(uid, { role, owner, admin: true }).catch(() => {});
       const customToken = await auth.createCustomToken(uid, { role, owner, admin: true });
       if (userDoc?.ref) await userDoc.ref.set({ lastLoginAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       await log('success', { role, uid });
-      return reply.send({ ok: true, customToken, actor: { uid, email, role, mustChangePassword: Boolean(user.mustChangePassword) } });
+      return reply.send({ ok: true, customToken, actor: { uid, email, role, mustChangePassword: Boolean(combinedUser.mustChangePassword) } });
     } catch (error) {
       await log('error', { code: error?.code || 'SERVER_ERROR' });
       return reply.code(500).send({ ok: false, code: 'SERVER_ERROR', error: 'Вход администратора временно недоступен.' });

@@ -70,6 +70,9 @@ export const apgTokenAuth = {
   updateUser(uid, patch = {}) {
     return Promise.resolve({ uid: String(uid), ...patch });
   },
+  setCustomUserClaims() {
+    return Promise.resolve();
+  },
   createUser(input = {}) {
     const uid = String(input.uid || `email:${String(input.email || '').trim().toLowerCase()}`);
     return Promise.resolve({ uid, ...input });
