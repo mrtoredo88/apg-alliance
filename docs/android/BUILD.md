@@ -21,6 +21,17 @@ permissions in `~/Documents/APG-Android-Signing/signing.env`.
 Change `VERSION_CODE` and `VERSION_NAME` in `android/release.properties`.
 `VERSION_CODE` must strictly increase for every distributed build.
 
+АПГ использует Semantic Versioning `MAJOR.MINOR.PATCH`:
+
+- `MAJOR` — несовместимое изменение аккаунта, API или архитектуры;
+- `MINOR` — новая пользовательская возможность;
+- `PATCH` — исправление без новой функции.
+
+`VERSION_CODE = MAJOR * 1_000_000 + MINOR * 10_000 + PATCH * 100 + BUILD`.
+Публичная версия `1.2.0` имеет базовый code `10200`; повторная служебная сборка
+той же версии получает `10201`, затем `10202`. Уже распространённый code
+никогда не используется повторно.
+
 After building the signed APK, generate the public metadata:
 
 ```sh
@@ -41,6 +52,7 @@ over the previously published version.
 
 ```bash
 npm install
+npm run android:assets
 npm run android:sync
 npm run android:debug
 npm run android:release

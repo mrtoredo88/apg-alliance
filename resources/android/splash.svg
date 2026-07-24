@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="bg" cx=".5" cy=".4" r=".7">
+      <stop offset="0" stop-color="#25104B"/>
+      <stop offset=".62" stop-color="#100622"/>
+      <stop offset="1" stop-color="#05020B"/>
+    </radialGradient>
+    <linearGradient id="gold" x1=".2" y1=".1" x2=".8" y2=".9">
+      <stop offset="0" stop-color="#F4D98C"/>
+      <stop offset=".48" stop-color="#C9A84C"/>
+      <stop offset="1" stop-color="#8F6B20"/>
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="1920" fill="url(#bg)"/>
+  <circle cx="540" cy="855" r="230" fill="none" stroke="#7D46D8" stroke-opacity=".22" stroke-width="4"/>
+  <text x="540" y="945" text-anchor="middle"
+        font-family="Arial Black, Arial, sans-serif" font-size="230"
+        font-weight="900" letter-spacing="4" fill="url(#gold)">АПГ</text>
+  <text x="540" y="1045" text-anchor="middle"
+        font-family="Arial, sans-serif" font-size="30" font-weight="600"
+        letter-spacing="8" fill="#FFFFFF" fill-opacity=".56">АЛЬЯНС ПАРТНЁРОВ ГОРОДА</text>
+</svg>

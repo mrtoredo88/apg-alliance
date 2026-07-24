@@ -1,5 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import QrScanner from 'qr-scanner';
+import { Capacitor } from '@capacitor/core';
+import {
+  CapacitorBarcodeScanner,
+  CapacitorBarcodeScannerAndroidScanningLibrary,
+  CapacitorBarcodeScannerCameraDirection,
+  CapacitorBarcodeScannerTypeHint,
+} from '@capacitor/barcode-scanner';
 import { motionTransition } from './motion.js';
 import { sendDiagReport } from './diagnostics.js';
 import { CAMERA_WATCHDOG_MS, buildCameraAttemptDiag, getCameraRecoveryReason, isCameraFrameReady, shouldAutoRecoverCamera } from './scannerReliability.js';
@@ -46,6 +53,7 @@ const stopVideoTracks = (video) => {
 };
 
 export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = null }) {
+  const nativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
   const videoRef       = useRef(null);
   const scannerRef     = useRef(null);
   const doneRef        = useRef(false);
@@ -100,6 +108,7 @@ export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = n
   }, [logCameraDiag]);
 
   useEffect(() => {
+    if (nativeAndroid) return undefined;
     if (!isOpen) {
       doneRef.current = false;
       setErr(null);
@@ -256,7 +265,34 @@ export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = n
       videoEvents.forEach(name => videoRef.current?.removeEventListener(name, handleVideoEvent));
       stopScanner();
     };
-  }, [isOpen, restartNonce, stopScanner, logCameraDiag]);
+  }, [isOpen, restartNonce, stopScanner, logCameraDiag, nativeAndroid]);
+
+  useEffect(() => {
+    if (!nativeAndroid || !isOpen) return undefined;
+    let active = true;
+    doneRef.current = false;
+    CapacitorBarcodeScanner.scanBarcode({
+      hint: CapacitorBarcodeScannerTypeHint.QR_CODE,
+      scanInstructions: 'Наведите камеру на QR-код АПГ',
+      scanButton: false,
+      cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
+      cancelButtonAccessibilityLabel: 'Закрыть сканер',
+      torchButtonOnAccessibilityLabel: 'Выключить фонарик',
+      torchButtonOffAccessibilityLabel: 'Включить фонарик',
+      android: { scanningLibrary: CapacitorBarcodeScannerAndroidScanningLibrary.ZXING },
+    }).then((result) => {
+      if (!active || !result?.ScanResult) return;
+      doneRef.current = true;
+      onConfirmRef.current?.(result.ScanResult);
+    }).catch((error) => {
+      if (!active) return;
+      logCameraDiag('native_scan_error', { error: error?.message || String(error) });
+      setErr('Сканирование отменено или камера недоступна.');
+    }).finally(() => {
+      if (active && !doneRef.current) onClose?.();
+    });
+    return () => { active = false; };
+  }, [isOpen, nativeAndroid, logCameraDiag, onClose]);
 
   const handleClose = useCallback(() => {
     stopScanner();

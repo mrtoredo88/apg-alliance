@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 import { SplashScreen } from './SplashScreen.jsx';
 import { markPerformanceStage } from './performance/index.js';
+import { NativeSecurityGate } from './components/NativeSecurityGate.jsx';
 
 const AdminPanel = lazy(() => import('./AdminPanel.jsx').then(m => ({ default: m.AdminPanel })));
 const AssistantMiniApp = lazy(() => import('./assistant/AssistantMiniApp.jsx').then(m => ({ default: m.AssistantMiniApp })));
@@ -22,6 +23,7 @@ export function App() {
   }, []);
   return (
     <ErrorBoundary>
+      <NativeSecurityGate>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={
@@ -107,6 +109,7 @@ export function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+      </NativeSecurityGate>
     </ErrorBoundary>
   );
 }

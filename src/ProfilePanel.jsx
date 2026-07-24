@@ -25,6 +25,7 @@ import { SOCIAL_PRIVACY, normalizeSocialPrivacy } from './messaging/Conversation
 import { buildSocialMessagingDevPanel } from './messaging/SocialMessagingSnapshot.js';
 import { PEOPLE_RELATION_STATUS, PEOPLE_TABS, buildPeoplePulse, buildPeopleRows, peopleKind, peoplePresenceLabel, peopleStatusLabel, peopleSuggestionReason, personInterestTags, searchPeopleGroups } from './social/PeopleCore.js';
 import { isNativeApp } from './platform/runtime.js';
+import { getNativeSecurityStatus, setNativeAppLock } from './platform/nativeSecurity.js';
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
 
@@ -708,6 +709,19 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 
 
 export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingDialog, onOpenBookingReview, initialConnectionTargetId = '', initialPeopleAction = null, desktopOverview = null, desktopMode = false, onBack }) {
+  const [nativeSecurity, setNativeSecurity] = useState(null);
+  useEffect(() => {
+    let active = true;
+    getNativeSecurityStatus().then(status => { if (active) setNativeSecurity(status); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+  const toggleNativeSecurity = useCallback(async () => {
+    if (!nativeSecurity?.available) return;
+    try {
+      const enabled = await setNativeAppLock(!nativeSecurity.enabled);
+      setNativeSecurity(current => current ? ({ ...current, enabled }) : current);
+    } catch {}
+  }, [nativeSecurity]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showWorkspaceDiagnostics, setShowWorkspaceDiagnostics] = useState(false);
@@ -3563,6 +3577,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             { icon: '🎓', label: 'Повторить обучение', action: onRestartLearning,      right: '1 мин' },
             { icon: '📋', label: 'История активности', action: onOpenActivity,         right: null },
             { icon: '🔔', label: 'Уведомления',        action: onEnableNotifications,  right: notificationsEnabled ? 'вкл' : null },
+            nativeSecurity?.supported && { icon: '🔐', label: 'Защита приложения', action: toggleNativeSecurity, right: nativeSecurity.enabled ? 'вкл' : (nativeSecurity.available ? 'выкл' : 'недоступно') },
             { icon: '🧭', label: 'Диагностика профиля', action: () => setShowDiagnostics(true), right: null },
             showIdentityDiagnosticButton && { icon: '🪪', label: 'Диагностика Identity', action: openIdentityDiagnostics, right: user?.canonicalUserId ? 'core' : null },
             showWorkspaceDiagnosticButton && { icon: '🖥', label: 'Диагностика Workspace', action: () => setShowWorkspaceDiagnostics(true), right: workspaceDiagnostics?.currentMode },
