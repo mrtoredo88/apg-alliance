@@ -174,13 +174,22 @@ export class PostgresDocumentDb {
   get available() { return Boolean(connectionString()); }
   get client() {
     if (!this.available) throw Object.assign(new Error('APG PostgreSQL document store is not configured.'), { code: 'APG_POSTGRES_NOT_CONFIGURED' });
-    if (!this.pool) this.pool = new Pool({
-      connectionString: normalizedConnectionString(),
-      max: Number(process.env.APG_DATA_POOL_SIZE || 8),
-      idleTimeoutMillis: 20_000,
-      connectionTimeoutMillis: 5_000,
-      ssl: sslConfig(),
-    });
+    if (!this.pool) {
+      this.pool = new Pool({
+        connectionString: normalizedConnectionString(),
+        max: Number(process.env.APG_DATA_POOL_SIZE || 8),
+        idleTimeoutMillis: 20_000,
+        connectionTimeoutMillis: 5_000,
+        ssl: sslConfig(),
+      });
+      this.pool.on('error', error => {
+        this.lastPoolError = {
+          code: error?.code || '',
+          message: String(error?.message || error).slice(0, 220),
+          at: new Date().toISOString(),
+        };
+      });
+    }
     return this.pool;
   }
   async ensureSchema(client = this.client) {
