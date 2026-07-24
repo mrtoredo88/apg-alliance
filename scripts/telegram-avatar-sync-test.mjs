@@ -77,6 +77,7 @@ assertContains(objectStorage, 'https://${HOST}/${BUCKET}/${key}', 'object storag
 assertContains(userActions, "action === 'telegramAvatar:refresh'", 'authenticated avatar refresh action is routed');
 assertContains(userActions, 'photo_200: photo', 'avatar refresh persists desktop-compatible photo field');
 assertContains(profilePanel, "userAction('telegramAvatar:refresh'", 'profile automatically repairs a missing Telegram avatar');
+assertContains(profilePanel, 'onUserUpdateRef.current?.({ linkedTelegram: null })', 'stale Telegram metadata is reconciled without repeated refresh errors');
 assertContains(profilePanel, "!value.includes('api.telegram.org/file/bot')", 'profile refuses legacy URLs that expose bot credentials');
 
 console.log('TELEGRAM_AVATAR_SYNC_REGRESSION_OK');

@@ -96,6 +96,8 @@ for (const scenario of scenarios) {
 
 assert.ok(rules.includes('match /connections/{connectionId}'), 'connections owner mirror rule is missing');
 assert.ok(rules.includes("['socialMessagingRequests', 'blockedUsers', 'connections']"), 'connections must be excluded from generic writable subcollections');
+assert.ok(rules.includes('.data.userId == userId'), 'owner rule must support identity-core userId mappings');
+assert.ok(rules.includes('.data.canonicalUserId == userId'), 'owner rule must support canonical identity mappings');
 assert.equal(pkg.scripts['test:connections'], 'node scripts/connections-test.mjs');
 
 [

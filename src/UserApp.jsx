@@ -606,6 +606,7 @@ async function fetchVkNewsPosts() {
 }
 
 let publicBootstrapPromise = null;
+const PUBLIC_BOOTSTRAP_RETRIES = 1;
 
 async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 5200) {
   const controller = new AbortController();
@@ -623,11 +624,14 @@ const publicDataDiag = { source: 'pending', fallbacks: [], errors: 0, at: null }
 
 async function fetchPublicBootstrap() {
   if (!publicBootstrapPromise) {
-    publicBootstrapPromise = fetchJsonWithTimeout(`${API_BASE_URL}/api/public-data`, {
-      headers: { 'X-APG-Version': 'hotfix-public-data' },
-      cache: 'no-store',
-    })
-      .then(({ response, payload }) => {
+    publicBootstrapPromise = (async () => {
+      let lastError;
+      for (let attempt = 0; attempt <= PUBLIC_BOOTSTRAP_RETRIES; attempt += 1) {
+        try {
+          const { response, payload } = await fetchJsonWithTimeout(`${API_BASE_URL}/api/public-data`, {
+            headers: { 'X-APG-Version': 'hotfix-public-data' },
+            cache: 'no-store',
+          });
         const data = payload?.data || {};
         if (!response.ok || (!Object.keys(data).length && payload?.ok === false)) throw new Error(payload?.error || 'public_data_failed');
         if (Array.isArray(data.expertCategories) && data.expertCategories.length) registerCustomExpertCategories(data.expertCategories);
@@ -635,7 +639,13 @@ async function fetchPublicBootstrap() {
         publicDataDiag.errors = Array.isArray(payload?.errors) ? payload.errors.length : 0;
         publicDataDiag.at = new Date().toISOString();
         return data;
-      })
+        } catch (error) {
+          lastError = error;
+          if (attempt < PUBLIC_BOOTSTRAP_RETRIES) await new Promise(resolve => setTimeout(resolve, 350));
+        }
+      }
+      throw lastError;
+    })()
       .catch(error => {
         publicBootstrapPromise = null;
         publicDataDiag.source = 'backend_failed';

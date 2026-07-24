@@ -1474,6 +1474,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       })
       .catch(error => {
         telegramAvatarRefreshRef.current = '';
+        if (/telegram не привязан к профилю/i.test(String(error?.message || error))) {
+          onUserUpdateRef.current?.({ linkedTelegram: null });
+          return;
+        }
         logError(error, 'ProfilePanel.telegramAvatar.refresh');
       });
     return () => { cancelled = true; };

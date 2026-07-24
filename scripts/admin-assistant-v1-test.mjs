@@ -18,7 +18,11 @@ const context = buildAdminContext({
     news: [{ id: 'n1', title: 'Черновик', status: 'draft' }],
     users: [{ id: 'u1', registrationCompleted: false }],
     comments: [{ id: 'c1', status: 'pending' }],
-    errors: [{ id: 'r1', message: 'Auth token failed', severity: 'critical' }],
+    errors: [
+      { id: 'r1', message: 'Auth token failed', severity: 'critical' },
+      { id: 'r2', message: 'Failed to fetch', severity: 'warning' },
+      { id: 'r3', message: 'Regular handled error', severity: 'error' },
+    ],
   },
 });
 
@@ -28,6 +32,8 @@ const insights = buildAdminInsights(context, now);
 assert.equal(insights.current.find(row => row.id === 'partners.no_logo').count, 1);
 assert.equal(insights.all.find(row => row.id === 'events.overlap').count, 1);
 assert.equal(insights.all.find(row => row.id === 'errors.auth').count, 1);
+assert.equal(insights.all.find(row => row.id === 'errors.active').count, 3);
+assert.equal(insights.all.find(row => row.id === 'errors.critical').count, 1);
 assert.equal(insights.summary.find(row => row.id === 'summary.users').count, 0);
 
 const partnerCommand = answerAdminCommand('Покажи партнёров без логотипов', context, insights);

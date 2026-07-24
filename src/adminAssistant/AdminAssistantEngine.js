@@ -33,7 +33,7 @@ function unresolved(error) {
 
 function severity(error) {
   const value = text(error?.severity || error?.level || error?.type).toLowerCase();
-  return ['critical', 'fatal', 'error'].includes(value) || /fatal|critical|uncaught/i.test(text(error?.message || error?.error));
+  return ['critical', 'fatal'].includes(value) || /fatal|critical|uncaught/i.test(text(error?.message || error?.error));
 }
 
 function eventStart(event) {

@@ -33,6 +33,7 @@ function shouldIgnore(message, source, errorName = '') {
     || /notification permission:\s*(denied|default)/.test(text)
     || /действие доступно только авторизованному пользователю|требуется авторизация|неверный email или пароль/.test(text)
     || /этот telegram уже связан с другим аккаунтом/.test(text)
+    || /telegram не привязан к профилю/.test(text)
     || /missing or insufficient permissions/.test(text) && /loaduserbookings/.test(text);
 }
 
@@ -52,7 +53,10 @@ async function log(message, stack, source, errorName = '') {
   if (_count >= MAX) return;
   if (shouldIgnore(message, source, errorName)) return;
 
-  const key = String(message).slice(0, 120) + '|' + String(source).slice(0, 80);
+  const transientNetworkError = /failed to fetch|networkerror|load failed/i.test(String(message));
+  const key = transientNetworkError
+    ? `network|${String(message).slice(0, 120)}`
+    : String(message).slice(0, 120) + '|' + String(source).slice(0, 80);
   if (_seen.has(key)) return;
   _seen.add(key);
   _count++;
@@ -80,7 +84,7 @@ async function log(message, stack, source, errorName = '') {
         relatedActions: relatedActions(),
         version: _version,
         build: _version,
-        level: String(source || '').startsWith('ErrorBoundary:') ? 'critical' : 'error',
+        level: String(source || '').startsWith('ErrorBoundary:') ? 'critical' : transientNetworkError ? 'warning' : 'error',
         resolved: false,
       },
     });

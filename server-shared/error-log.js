@@ -22,7 +22,7 @@ function inferLevel(payload) {
   if (['info', 'warning', 'error', 'critical'].includes(explicit)) return explicit;
   const text = `${payload.message || ''} ${payload.source || ''}`.toLowerCase();
   if (/security|permission|auth|fatal|crash|boundary|data loss|потер/.test(text)) return 'critical';
-  if (/timeout|network|offline|warning|предупреж/.test(text)) return 'warning';
+  if (/timeout|network|offline|failed to fetch|load failed|warning|предупреж/.test(text)) return 'warning';
   return 'error';
 }
 
@@ -35,6 +35,7 @@ export function isIgnorableErrorPayload(payload = {}) {
     || /notification permission:\s*(denied|default)/.test(text)
     || /действие доступно только авторизованному пользователю|требуется авторизация|неверный email или пароль/.test(text)
     || /этот telegram уже связан с другим аккаунтом/.test(text)
+    || /telegram не привязан к профилю/.test(text)
     || (/missing or insufficient permissions/.test(text) && /loaduserbookings/.test(text));
 }
 

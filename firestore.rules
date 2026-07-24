@@ -143,7 +143,11 @@ service cloud.firestore {
 
     function isOwner(userId) {
       return exists(/databases/$(database)/documents/auth_map/$(request.auth.uid))
-          && get(/databases/$(database)/documents/auth_map/$(request.auth.uid)).data.vkId == userId;
+          && (
+            get(/databases/$(database)/documents/auth_map/$(request.auth.uid)).data.vkId == userId
+            || get(/databases/$(database)/documents/auth_map/$(request.auth.uid)).data.userId == userId
+            || get(/databases/$(database)/documents/auth_map/$(request.auth.uid)).data.canonicalUserId == userId
+          );
     }
   }
 }
