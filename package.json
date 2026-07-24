@@ -117,6 +117,7 @@
     "test:email-login-forensic": "node scripts/email-login-forensic-test.mjs",
     "test:apg-foundation": "node scripts/apg-foundation-test.mjs",
     "test:identity-v2": "node scripts/identity-v2-test.mjs",
+    "test:identity-merge-canary": "node scripts/identity-merge-canary-test.mjs",
     "test:identity-v2-guard": "node scripts/identity-v2-architecture-guard.mjs",
     "test:architecture-guard": "node scripts/architecture-guard.mjs",
     "test:migration-center": "node scripts/migration-center-test.mjs",
