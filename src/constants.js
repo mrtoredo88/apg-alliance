@@ -7,6 +7,12 @@ export const API_BASE_URL = (VITE_ENV.VITE_API_BASE_URL || 'https://bbangqkf2d4p
 export const ANDROID_DOWNLOAD_URL = String(
   VITE_ENV.VITE_ANDROID_DOWNLOAD_URL || 'https://myapg.ru/downloads/apg-android.apk',
 ).trim();
+export const ANDROID_RELEASE_MANIFEST_URL = String(
+  VITE_ENV.VITE_ANDROID_RELEASE_MANIFEST_URL || 'https://myapg.ru/downloads/android-release.json',
+).trim();
+export const ANDROID_LANDING_URL = String(
+  VITE_ENV.VITE_ANDROID_LANDING_URL || 'https://myapg.ru/android',
+).trim();
 
 export const WEB_PUSH_VAPID_PUBLIC_KEY = 'BNzifwh-L302BzWUiw3hv3g9tlPBb5CJ8lGu1lfRpGdJZhyq0yzHqV0K9EkDAokVBv6OrInWqev-Vihw-2gBpYU';
 

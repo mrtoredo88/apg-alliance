@@ -24,7 +24,9 @@ assert(main.includes('const noServiceWorker = isNativeApp() ||'), 'native shell 
 assert(userApp.includes('if (isNativeApp()) return getNativePlatform();'), 'auth diagnostics identify the native platform');
 assert(userApp.includes("CapacitorApp.addListener('backButton'"), 'Android Back delegates to the existing panel history');
 assert(userApp.includes('if (goBackPanel()) return;'), 'Android Back closes an internal view before exiting');
+assert(userApp.includes("CapacitorApp.addListener('appUrlOpen'"), 'verified APG links are forwarded to the existing deep-link parser');
 assert(manifest.includes('android:usesCleartextTraffic="false"'), 'Android keeps cleartext traffic disabled');
-assert(!manifest.includes('android.intent.action.VIEW'), 'App Links remain outside this compatibility stage');
+assert(manifest.includes('android:autoVerify="true"'), 'App Links require Android domain verification');
+assert(manifest.includes('android:host="myapg.ru"'), 'App Links are restricted to the APG production host');
 
 console.log('Android runtime compatibility checks passed.');

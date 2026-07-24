@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+def releaseProperties = new Properties()
+def releasePropertiesFile = rootProject.file("release.properties")
+if (releasePropertiesFile.exists()) {
+    releasePropertiesFile.withInputStream { releaseProperties.load(it) }
+}
+def apgVersionCode = (releaseProperties.getProperty("VERSION_CODE") ?: "1").toInteger()
+def apgVersionName = releaseProperties.getProperty("VERSION_NAME") ?: "1.0.0"
+
 def releaseKeystorePath = System.getenv("APG_ANDROID_KEYSTORE")
 def releaseKeyAlias = System.getenv("APG_ANDROID_KEY_ALIAS")
 def releaseStorePassword = System.getenv("APG_ANDROID_STORE_PASSWORD")
@@ -18,8 +26,8 @@ android {
         applicationId "ru.myapg.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode apgVersionCode
+        versionName apgVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

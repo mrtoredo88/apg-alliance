@@ -16,6 +16,20 @@ continues to work.
 For the local APG owner environment, credentials are stored with owner-only
 permissions in `~/Documents/APG-Android-Signing/signing.env`.
 
+## Versioning
+
+Change `VERSION_CODE` and `VERSION_NAME` in `android/release.properties`.
+`VERSION_CODE` must strictly increase for every distributed build.
+
+After building the signed APK, generate the public metadata:
+
+```sh
+npm run android:release:manifest
+```
+
+Never upload an APK without verifying its signature and testing installation
+over the previously published version.
+
 ## Требования
 
 - Node.js, совместимый с проектом.

@@ -47,6 +47,12 @@ if [ -f dist/network-diagnostics-lite ]; then
     --cache-control "no-cache, no-store, must-revalidate"
 fi
 
+if [ -f dist/android ]; then
+  aws s3 cp dist/android "s3://$BUCKET/android" $S3 \
+    --content-type "text/html; charset=utf-8" \
+    --cache-control "public, max-age=300"
+fi
+
 # Other static files (images, fonts, etc.) — 1 day cache
 echo "Uploading static files..."
 aws s3 sync dist/ "s3://$BUCKET/" $S3 \
@@ -57,6 +63,7 @@ aws s3 sync dist/ "s3://$BUCKET/" $S3 \
   --exclude "manifest.json" \
   --exclude "version.json" \
   --exclude "network-diagnostics-lite" \
+  --exclude "android" \
   --cache-control "public, max-age=86400" \
   --delete
 

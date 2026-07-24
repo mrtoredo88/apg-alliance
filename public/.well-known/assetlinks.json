@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ru.myapg.app",
+      "sha256_cert_fingerprints": [
+        "2F:89:74:9C:31:AA:34:78:D6:C4:13:2B:C8:FE:99:06:86:0D:90:C1:49:0C:E6:5E:BD:16:3D:42:82:33:B7:17"
+      ]
+    }
+  }
+]

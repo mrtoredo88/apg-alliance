@@ -4664,3 +4664,12 @@
 - CTA скрыт от desktop, iOS и самого Capacitor-приложения; существующая PWA-установка остаётся доступной.
 - Создан постоянный release-keystore вне Git; Gradle получает путь, alias и пароли только через environment variables.
 - Кнопка подключена к `https://myapg.ru/downloads/apg-android.apk`, а frontend deploy сохраняет содержимое `downloads/`.
+
+# 2026-07-24 — APG Android v1.2 distribution and updates
+
+- Android release переведён на `versionName 1.1.0` / `versionCode 10100` через единый `android/release.properties`.
+- Добавлены официальная страница `/android`, машиночитаемый release manifest, SHA-256 и процедура управляемой публикации.
+- Capacitor-приложение проверяет новые версии без Service Worker и показывает dismissible/required update banner.
+- Страница обновления открывается официальным Capacitor Browser; URL guard разрешает только HTTPS, `tel:` и `mailto:`.
+- Добавлены verified App Links для `myapg.ru` и `assetlinks.json`, привязанный к release-сертификату APG Team.
+- Подготовлены v1.2 compatibility/security report и черновик карточки RuStore; отправка в магазин не выполнялась.

@@ -81,6 +81,7 @@ import { buildPersonalHomeContext } from './intelligence/PersonalHomeContext.js'
 import { buildPostVisitMomentState } from '../server-shared/booking.js';
 import { getLocationById, locationToProvider } from '../server-shared/locations.js';
 import { getNativePlatform, isNativeApp } from './platform/runtime.js';
+import { AndroidUpdateBanner } from './components/AndroidUpdateBanner.jsx';
 import {
   APG_EVENT_TYPES,
   getAIMemorySnapshot,
@@ -1386,6 +1387,27 @@ export function UserApp() {
       void listener?.remove();
     };
   }, [goBackPanel]);
+
+  useEffect(() => {
+    if (!isNativeApp()) return undefined;
+
+    let listener;
+    void CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+      try {
+        const target = new URL(url);
+        if (target.protocol !== 'https:' || target.hostname !== 'myapg.ru') return;
+        const nextRoute = `${target.pathname}${target.search}${target.hash}`;
+        window.history.replaceState({}, '', nextRoute);
+        window.location.reload();
+      } catch {}
+    }).then((handle) => {
+      listener = handle;
+    });
+
+    return () => {
+      void listener?.remove();
+    };
+  }, []);
 
   const goPanel = useCallback((id) => {
     navigatePanel(id);
@@ -5977,6 +5999,7 @@ export function UserApp() {
               setToast(null);
             }}
           />
+          <AndroidUpdateBanner />
           {splashDone && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && (
             <Suspense fallback={null}>
               <LokiAssistant desktopMode={desktopDevice} onOpenMessages={handleOpenMessages} messageUnreadCount={unreadCount} hideMessagesButton={activePanel === 'dialogs'} />
