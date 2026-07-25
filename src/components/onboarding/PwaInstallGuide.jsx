@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { APG2_PROFILE, GlassButton, GlassCard } from '../Apg2ProfileGlass.jsx';
 import { ANDROID_INSTALL_SOURCE } from '../../constants.js';
 
-export const PWA_INSTALL_GUIDE_HIDDEN_KEY = 'apg_mobile_pwa_onboarding_hidden';
-export const PWA_INSTALL_GUIDE_SESSION_KEY = 'apg_mobile_pwa_onboarding_session_closed';
+export const PWA_INSTALL_GUIDE_HIDDEN_KEY = 'apg_mobile_pwa_onboarding_hidden_v2';
+export const PWA_INSTALL_GUIDE_SESSION_KEY = 'apg_mobile_pwa_onboarding_session_closed_v2';
 export const PWA_EMAIL_HINT_HIDDEN_KEY = 'apg_pwa_email_hint_done';
 
 function getPlatform() {
@@ -44,6 +44,7 @@ export function shouldShowPwaInstallGuide({ user, isVk = false } = {}) {
   if (isVk || !isMobileViewport() || isStandaloneMode()) return false;
   if (safeGet(localStorage, PWA_INSTALL_GUIDE_HIDDEN_KEY) === '1') return false;
   if (safeGet(sessionStorage, PWA_INSTALL_GUIDE_SESSION_KEY) === '1') return false;
+  if (getPlatform() === 'android') return true;
   const userId = String(user?.id || '');
   return !userId || userId.startsWith('guest_');
 }
