@@ -9,6 +9,7 @@ function assert(condition, message) {
 }
 
 const guide = readFileSync('src/components/onboarding/PwaInstallGuide.jsx', 'utf8');
+const constants = readFileSync('src/constants.js', 'utf8');
 const userApp = readFileSync('src/UserApp.jsx', 'utf8');
 const profile = readFileSync('src/ProfilePanel.jsx', 'utf8');
 
@@ -26,6 +27,14 @@ assert(guide.includes('Добро пожаловать в АПГ'), 'welcome cop
 assert(guide.includes('После установки'), 'post-install email guidance is highlighted');
 assert(guide.includes('Войдите по электронной почте'), 'standalone PWA email prompt is present');
 assert(guide.includes('Нажмите «Поделиться»'), 'iOS Safari install instructions are present');
+assert(guide.includes("platform === 'android'"), 'APK option is limited to Android');
+assert(guide.includes("platform !== 'android' || canUseInstallPrompt"), 'Android PWA option requires beforeinstallprompt');
+assert(guide.includes('data-android-install-option'), 'Android install option has a stable smoke-test selector');
+assert(guide.includes('Работает быстрее, поддерживает уведомления и всегда под рукой.'), 'Android install benefit copy is present');
+assert(guide.includes('ANDROID_INSTALL_SOURCE.buttonLabel'), 'Android CTA is driven by the centralized install source');
+assert(constants.includes("VITE_ANDROID_INSTALL_PROVIDER || 'apk'"), 'Android provider defaults to APK');
+assert(constants.includes("VITE_ANDROID_INSTALL_URL || VITE_ENV.VITE_ANDROID_DOWNLOAD_URL"), 'Android install URL supports centralized override');
+assert(constants.includes("'Установить из RuStore' : '⬇ Скачать APK'"), 'RuStore switch does not require modal changes');
 
 assert(userApp.includes("import { EmailAuth } from './EmailAuth.jsx';"), 'UserApp reuses existing EmailAuth');
 assert(userApp.includes('PwaInstallGuide'), 'UserApp renders mobile browser install guide');

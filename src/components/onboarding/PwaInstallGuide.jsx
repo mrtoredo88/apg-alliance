@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { APG2_PROFILE, GlassButton, GlassCard } from '../Apg2ProfileGlass.jsx';
+import { ANDROID_INSTALL_SOURCE } from '../../constants.js';
 
 export const PWA_INSTALL_GUIDE_HIDDEN_KEY = 'apg_mobile_pwa_onboarding_hidden';
 export const PWA_INSTALL_GUIDE_SESSION_KEY = 'apg_mobile_pwa_onboarding_session_closed';
@@ -144,9 +145,24 @@ export function PwaInstallGuide({ open, onClose }) {
           )}
 
           <div style={{ display: 'grid', gap: 10 }}>
-            <GlassButton tone="gold" onClick={startInstall} style={{ minHeight: 54, borderRadius: 22, color: '#17120a', fontSize: 15.5, fontWeight: 880 }}>
-              📲 {canUseInstallPrompt ? 'Установить приложение' : platform === 'ios' ? 'Показать инструкцию установки' : 'Как установить приложение'}
-            </GlassButton>
+            {platform === 'android' && (
+              <div data-android-install-option style={{ display: 'grid', gap: 8, borderRadius: 24, padding: 13, background: 'linear-gradient(145deg, rgba(215,184,106,0.18), rgba(255,255,255,0.065))', border: '1px solid rgba(215,184,106,0.30)' }}>
+                <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontWeight: 860 }}>Скачать приложение</div>
+                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '18px', fontWeight: 620 }}>Работает быстрее, поддерживает уведомления и всегда под рукой.</div>
+                <GlassButton
+                  tone="gold"
+                  onClick={() => window.location.assign(ANDROID_INSTALL_SOURCE.url)}
+                  style={{ minHeight: 54, marginTop: 2, borderRadius: 22, color: '#17120a', fontSize: 15.5, fontWeight: 880 }}
+                >
+                  {ANDROID_INSTALL_SOURCE.buttonLabel}
+                </GlassButton>
+              </div>
+            )}
+            {(platform !== 'android' || canUseInstallPrompt) && (
+              <GlassButton tone="gold" onClick={startInstall} style={{ minHeight: 54, borderRadius: 22, color: '#17120a', fontSize: 15.5, fontWeight: 880 }}>
+                📲 {canUseInstallPrompt ? 'Установить PWA' : platform === 'ios' ? 'Показать инструкцию установки' : 'Как установить приложение'}
+              </GlassButton>
+            )}
             <GlassButton onClick={() => close()} style={{ minHeight: 50, borderRadius: 20, color: APG2_PROFILE.textSoft }}>
               Продолжить в браузере
             </GlassButton>
