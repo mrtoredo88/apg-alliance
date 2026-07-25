@@ -4659,3 +4659,4 @@
 - Android сохраняет PWA-вариант только при наличии `beforeinstallprompt`; iOS и desktop продолжают использовать прежние сценарии.
 - Источник установки централизован в `ANDROID_INSTALL_SOURCE`: переключение с APK на RuStore выполняется через provider и URL без изменения компонента.
 - После появления APK Android-окно использует новую версию ключей показа и один раз открывается также у зарегистрированных пользователей, которых ранее скрывало старое состояние onboarding.
+- Определение Android учитывает User-Agent Client Hints и Linux ARM/AArch platform, поэтому APK показывается также в Android Emulator и при сокращённом либо desktop-mode User-Agent.

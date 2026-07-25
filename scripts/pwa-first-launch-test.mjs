@@ -23,6 +23,8 @@ assert(guide.includes('PWA_INSTALL_GUIDE_SESSION_KEY'), 'session install-guide d
 assert(guide.includes('apg_mobile_pwa_onboarding_hidden_v2'), 'APK release resets legacy permanent dismissal');
 assert(guide.includes('apg_mobile_pwa_onboarding_session_closed_v2'), 'APK release resets legacy session dismissal');
 assert(guide.includes("if (getPlatform() === 'android') return true"), 'Android install guide is available to signed-in users');
+assert(guide.includes('navigator.userAgentData?.platform'), 'Android detection supports reduced and desktop-mode user agents');
+assert(guide.includes('/Linux (?:arm|aarch)/i.test(navigatorPlatform)'), 'Android emulator platform fallback is present');
 assert(guide.includes('PWA_EMAIL_HINT_HIDDEN_KEY'), 'PWA email hint dismissal key exists');
 assert(guide.includes('data-pwa-install-guide'), 'install guide has a stable smoke-test selector');
 assert(guide.includes('data-pwa-email-hint'), 'email hint has a stable smoke-test selector');

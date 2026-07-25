@@ -9,8 +9,10 @@ export const PWA_EMAIL_HINT_HIDDEN_KEY = 'apg_pwa_email_hint_done';
 function getPlatform() {
   if (typeof navigator === 'undefined') return 'other';
   const ua = navigator.userAgent || '';
+  const uaDataPlatform = navigator.userAgentData?.platform || '';
+  const navigatorPlatform = navigator.platform || '';
   if (/iPad|iPhone|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'ios';
-  if (/Android/i.test(ua)) return 'android';
+  if (/Android/i.test(ua) || /Android/i.test(uaDataPlatform) || /Linux (?:arm|aarch)/i.test(navigatorPlatform)) return 'android';
   return 'other';
 }
 
