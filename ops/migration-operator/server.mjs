@@ -11,6 +11,10 @@ const VERIFY_REPORT_PATH = 'backups/account-core/verify/verify-report-redacted.j
 const IMPORT_COMMAND = ['npm', ['run', 'account:import', '--', '--execute']];
 const IMPORT_RESUME_COMMAND = ['npm', ['run', 'account:import', '--', '--execute', '--resume']];
 const VERIFY_COMMAND = ['npm', ['run', 'account:verify']];
+const IDENTITY_MERGE_COMMAND = ['node', ['scripts/identity-merge-execute.mjs', '--execute']];
+const ADMIN_PASSWORD_REPAIR_COMMAND = ['node', ['scripts/admin-pg-password-repair.mjs']];
+const TATYANA_PG_AUDIT_COMMAND = ['node', ['scripts/tatyana-pg-account-repair.mjs']];
+const TATYANA_PG_REPAIR_COMMAND = ['node', ['scripts/tatyana-pg-account-repair.mjs', '--execute']];
 
 let running = false;
 let completed = false;
@@ -42,6 +46,7 @@ function readReport(file = REPORT_PATH) {
 function sanitizeOutput(value) {
   return String(value || '')
     .replace(/postgres:\/\/[^@\s]+@[^\s]+/gi, 'postgres://REDACTED')
+    .replace(/RealMadrid2025!?/gi, 'REDACTED_PASSWORD')
     .replace(/getaddrinfo ENOTFOUND [^\s]+/gi, 'getaddrinfo ENOTFOUND REDACTED_HOST')
     .slice(-4000);
 }
@@ -85,7 +90,7 @@ function writeArtifacts(payload = {}) {
   }
 }
 
-function runCommand(command, reportPath, extraEnv = {}) {
+function runCommand(command, reportPath, extraEnv = {}, options = {}) {
   return new Promise((resolve) => {
     const [cmd, args] = command;
     const child = spawn(cmd, args, {
@@ -113,7 +118,7 @@ function runCommand(command, reportPath, extraEnv = {}) {
         checkpoint,
         stdoutTail: sanitizeOutput(stdout),
         stderrTail: sanitizeOutput(stderr),
-        productionChanged: false,
+        productionChanged: Boolean(options.productionChanged),
         snapshotStarted: false,
         importStarted: command === IMPORT_COMMAND || command === IMPORT_RESUME_COMMAND,
         verifyStarted: command === VERIFY_COMMAND,
@@ -146,7 +151,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const allowed = ['/run', '/import', '/import-resume', '/verify'];
+  const allowed = ['/run', '/import', '/import-resume', '/verify', '/identity-merge', '/admin-password-repair', '/tatyana-pg-audit', '/tatyana-pg-repair'];
   if (!allowed.includes(req.url) || req.method !== 'POST') {
     json(res, 404, { ok: false, error: 'NOT_FOUND' });
     return;
@@ -176,6 +181,45 @@ const server = http.createServer(async (req, res) => {
     if (req.url === '/import') lastResult = await runCommand(IMPORT_COMMAND, IMPORT_REPORT_PATH);
     if (req.url === '/import-resume') lastResult = await runCommand(IMPORT_RESUME_COMMAND, IMPORT_REPORT_PATH);
     if (req.url === '/verify') lastResult = await runCommand(VERIFY_COMMAND, VERIFY_REPORT_PATH);
+    if (req.url === '/admin-password-repair') {
+      const adminPassword = String(payload.adminPassword || '');
+      if (!adminPassword) {
+        running = false;
+        json(res, 400, { ok: false, error: 'ADMIN_PASSWORD_REQUIRED', productionChanged: false });
+        return;
+      }
+      lastResult = await runCommand(
+        ADMIN_PASSWORD_REPAIR_COMMAND,
+        '',
+        { APG_ADMIN_REPAIR_PASSWORD: adminPassword },
+        { productionChanged: true },
+      );
+    }
+    if (req.url === '/identity-merge') {
+      const approval = String(payload.identityMergeApproval || '');
+      if (!approval) {
+        running = false;
+        json(res, 400, { ok: false, error: 'IDENTITY_MERGE_APPROVAL_REQUIRED', productionChanged: false });
+        return;
+      }
+      lastResult = await runCommand(
+        IDENTITY_MERGE_COMMAND,
+        'backups/audits/merge-tatyana/merge-exec-report-latest.json',
+        { IDENTITY_MERGE_APPROVAL: approval },
+        { productionChanged: true },
+      );
+    }
+    if (req.url === '/tatyana-pg-audit') {
+      lastResult = await runCommand(TATYANA_PG_AUDIT_COMMAND, '', {}, { productionChanged: false });
+    }
+    if (req.url === '/tatyana-pg-repair') {
+      if (String(payload.confirm || '') !== 'REPAIR_TATYANA_PG') {
+        running = false;
+        json(res, 400, { ok: false, error: 'TATYANA_PG_REPAIR_CONFIRMATION_REQUIRED', productionChanged: false });
+        return;
+      }
+      lastResult = await runCommand(TATYANA_PG_REPAIR_COMMAND, '', {}, { productionChanged: true });
+    }
   }
   running = false;
   completed = req.url === '/run';
@@ -191,6 +235,10 @@ server.listen(PORT, () => {
     allowedCommand: 'npm run account:remote-preflight -- --execute',
     allowedImportCommand: 'npm run account:import -- --execute',
     allowedVerifyCommand: 'npm run account:verify',
+    allowedIdentityMergeCommand: 'node scripts/identity-merge-execute.mjs --execute',
+    allowedAdminPasswordRepairCommand: 'node scripts/admin-pg-password-repair.mjs',
+    allowedTatyanaPgAuditCommand: 'node scripts/tatyana-pg-account-repair.mjs',
+    allowedTatyanaPgRepairCommand: 'node scripts/tatyana-pg-account-repair.mjs --execute',
     productionChanged: false,
   }));
 });
