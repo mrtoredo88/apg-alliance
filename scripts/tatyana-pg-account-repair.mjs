@@ -39,7 +39,10 @@ function parseJson(value, fallback) {
 }
 
 function uniq(values = []) {
-  return [...new Set(values.map(value => String(value || '').trim()).filter(Boolean))];
+  return [...new Set(values
+    .filter(value => value == null || ['string', 'number', 'bigint'].includes(typeof value))
+    .map(value => String(value || '').trim())
+    .filter(value => value && value !== '[object Object]'))];
 }
 
 function bestText(...values) {
