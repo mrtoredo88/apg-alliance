@@ -113,6 +113,13 @@ function updateOperation(operation, patch = {}) {
 function applyIdentityFlagOverride(patch = {}) {
   const service = serverFoundation.identityV2;
   service.flags = { ...(service.flags || {}), ...patch };
+  if (service.metrics) {
+    service.metrics.provider = service.flags.identityProvider || service.flags.IDENTITY_PROVIDER || service.metrics.provider;
+    service.metrics.storage = service.flags.identityStorage || service.flags.IDENTITY_STORAGE || service.metrics.storage;
+    service.metrics.fallbackEnabled = String(service.flags.identityFallback || '').toLowerCase() === 'firestore' || String(service.flags.identityFallback || '').toLowerCase() === 'true';
+    service.metrics.dualRead = String(service.flags.identityDualRead || '').toLowerCase() === 'true';
+    service.metrics.dualWrite = String(service.flags.identityDualWrite || '').toLowerCase() === 'true';
+  }
   MIGRATION_CENTER_STATE.flagsOverride = { ...MIGRATION_CENTER_STATE.flagsOverride, ...patch };
   return service.snapshot();
 }
@@ -789,11 +796,22 @@ export default async function identityV2AdminRoutes(fastify) {
         });
       } else if (action === 'enable-postgres') {
         result = {
-          identity: applyIdentityFlagOverride({ identityStorage: 'postgres', identityDualRead: 'true', identityDualWrite: 'true' }),
+          identity: applyIdentityFlagOverride({
+            identityProvider: 'firebase',
+            identityStorage: 'postgres',
+            identityDualRead: 'true',
+            identityDualWrite: 'true',
+          }),
           migration: await migrationStatus(),
         };
       } else if (action === 'cutover-postgres') {
-        const identity = applyIdentityFlagOverride({ identityStorage: 'postgres', identityDualRead: 'true', identityDualWrite: 'false', identityFallback: 'firestore' });
+        const identity = applyIdentityFlagOverride({
+          identityProvider: 'firebase',
+          identityStorage: 'postgres',
+          identityDualRead: 'true',
+          identityDualWrite: 'false',
+          identityFallback: 'firestore',
+        });
         result = {
           identity,
           migration: await cutoverStatus(),

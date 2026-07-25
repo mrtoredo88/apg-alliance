@@ -75,6 +75,15 @@ CREATE TABLE IF NOT EXISTS apg_account_metrics (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS apg_admin_credentials (
+  user_id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  password JSONB NOT NULL,
+  updated_by TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS apg_account_schema_versions (
   version TEXT PRIMARY KEY,
   applied_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -92,3 +101,4 @@ CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_telegram_id ON apg_account_p
 CREATE INDEX IF NOT EXISTS idx_apg_account_cabinets_user ON apg_account_cabinets(user_id);
 CREATE INDEX IF NOT EXISTS idx_apg_account_cabinets_entity ON apg_account_cabinets(entity_id);
 CREATE INDEX IF NOT EXISTS idx_apg_account_sessions_user ON apg_account_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_apg_admin_credentials_email ON apg_admin_credentials(email);

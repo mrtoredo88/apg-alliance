@@ -3,6 +3,7 @@ import { getDb, getDbAuth } from '../lib/firebase.js';
 import { verifyPasswordRecord } from '../../../server-shared/admin-password.js';
 import { CAPABILITIES, getPrimaryRole, hasCapability, hasRole, ROLES } from '../../../server-shared/role-engine.js';
 import { serverFoundation } from '../apg/index.js';
+import { getPgAdminCredential } from '../lib/adminCredentialStore.js';
 
 function getDeviceInfo(request) {
   return {
@@ -53,8 +54,9 @@ export default async function adminLoginRoutes(fastify) {
         return reply.code(403).send({ ok: false, code: 'FORBIDDEN_ROLE', error: 'Доступ администратора отключён.' });
       }
       const uid = String(combinedUser.firebaseUid || combinedUser.authUid || userId || userDoc?.id || email);
-      const credentialSnap = await db.collection('adminCredentials').doc(uid).get().catch(() => null);
-      const credential = credentialSnap.exists ? credentialSnap.data() || {} : {};
+      const pgCredential = await getPgAdminCredential(serverFoundation.account, uid).catch(() => null);
+      const credentialSnap = pgCredential ? null : await db.collection('adminCredentials').doc(uid).get().catch(() => null);
+      const credential = pgCredential || (credentialSnap?.exists ? credentialSnap.data() || {} : {});
       if (!verifyPasswordRecord(password, credential.password)) {
         await log('error', { code: 'INVALID_CREDENTIALS', role });
         return reply.code(401).send({ ok: false, code: 'INVALID_CREDENTIALS', error: 'Неверный email или пароль администратора.' });

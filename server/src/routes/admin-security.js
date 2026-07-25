@@ -3,6 +3,8 @@ import { getDb, getDbAuth } from '../lib/firebase.js';
 import { ROLE_PERMISSIONS, adminReplyError, requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 import { createPasswordRecord, requireStrongAdminPassword } from '../../../server-shared/admin-password.js';
 import { CAPABILITIES, getPrimaryRole, getUserRoles, hasCapability, hasRole, normalizeRole as normalizeSharedRole, ROLES } from '../../../server-shared/role-engine.js';
+import { serverFoundation } from '../apg/index.js';
+import { setPgAdminCredential } from '../lib/adminCredentialStore.js';
 
 function normalizeRole(value) {
   return normalizeSharedRole(value) || 'user';
@@ -170,11 +172,18 @@ export default async function adminSecurityRoutes(fastify) {
 
       if (action === 'admin:selfChangePassword') {
         const password = requireStrongPassword(request.body?.password);
+        const passwordRecord = createPasswordRecord(password);
         await getDbAuth().updateUser(actor.uid, { password }).catch(() => {});
         const { ref, snap } = await findAdminUserRef(db, actor.userId || actor.uid);
+        await setPgAdminCredential(serverFoundation.account, {
+          userId: actor.uid,
+          email: String(snap.data()?.email || '').trim().toLowerCase(),
+          password: passwordRecord,
+          updatedBy: actor.userId,
+        });
         await db.collection('adminCredentials').doc(actor.uid).set({
           email: String(snap.data()?.email || '').trim().toLowerCase(),
-          password: createPasswordRecord(password),
+          password: passwordRecord,
           updatedBy: actor.userId,
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
@@ -234,9 +243,16 @@ export default async function adminSecurityRoutes(fastify) {
           disabled: false,
         });
         await auth.setCustomUserClaims(record.uid, { role: nextAdmin.role, owner: nextAdmin.role === ROLES.owner, admin: hasCapability({ role: nextAdmin.role }, CAPABILITIES.canOpenAdminPanel) });
+        const passwordRecord = createPasswordRecord(password);
+        await setPgAdminCredential(serverFoundation.account, {
+          userId: record.uid,
+          email: nextAdmin.email,
+          password: passwordRecord,
+          updatedBy: actor.userId,
+        });
         await db.collection('adminCredentials').doc(record.uid).set({
           email: nextAdmin.email,
-          password: createPasswordRecord(password),
+          password: passwordRecord,
           updatedBy: actor.userId,
           updatedAt: FieldValue.serverTimestamp(),
           createdAt: FieldValue.serverTimestamp(),
@@ -314,10 +330,17 @@ export default async function adminSecurityRoutes(fastify) {
         await assertCanManage(actor, currentData);
         const uid = String(currentData.firebaseUid || currentData.authUid || snap.id);
         const password = requireStrongPassword(request.body?.password);
+        const passwordRecord = createPasswordRecord(password);
         await getDbAuth().updateUser(uid, { password }).catch(() => {});
+        await setPgAdminCredential(serverFoundation.account, {
+          userId: uid,
+          email: String(currentData.email || '').trim().toLowerCase(),
+          password: passwordRecord,
+          updatedBy: actor.userId,
+        });
         await db.collection('adminCredentials').doc(uid).set({
           email: String(currentData.email || '').trim().toLowerCase(),
-          password: createPasswordRecord(password),
+          password: passwordRecord,
           updatedBy: actor.userId,
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
