@@ -36,6 +36,7 @@ assert.match(profile, /setConnectionTarget\(prev => \{[\s\S]*target: merge\(prev
 assert.match(profile, /userAction\('dialog:open'[\s\S]*type: 'direct'[\s\S]*targetUserId: id/, 'write action opens or creates direct dialog through existing backend action');
 assert.match(profile, /if \(person\.relationStatus === PEOPLE_RELATION_STATUS\.FRIEND\) \{[\s\S]*if \(person\.dialogId\) onOpenDialog\?\.\(person\.dialogId\);[\s\S]*else openPersonDialog\(person\);/, 'friend without dialog is not a dead action');
 assert.match(profile, /if \(person\.relationStatus === PEOPLE_RELATION_STATUS\.INCOMING && person\.request\?\.id\)[\s\S]*updateConnectionRequest\(person\.request\.id, 'accepted'\)/, 'incoming request primary action accepts request');
+assert.match(profile, /if \(person\.relationStatus === PEOPLE_RELATION_STATUS\.OUTGOING && person\.request\?\.id\)[\s\S]*updateConnectionRequest\(person\.request\.id, 'cancelled'\)/, 'outgoing request primary action cancels request');
 assert.match(profile, /if \(person\.relationStatus === PEOPLE_RELATION_STATUS\.STRANGER\)[\s\S]*requestConnection\(person\.id, 'people'\)/, 'stranger primary action sends connection request');
 assert.match(profile, /setConnectionRequests\(prev => \[request, \.\.\.prev\.filter/, 'new request is inserted optimistically into request state');
 assert.match(profile, /patchPeoplePerson\(id, patch\)/, 'request action patches person state after backend response');
@@ -43,7 +44,8 @@ assert.match(profile, /status === 'accepted' && data\.connection[\s\S]*setConnec
 assert.match(profile, /patchPeoplePerson\(targetId,[\s\S]*PEOPLE_RELATION_STATUS\.FRIEND/, 'accepted request marks person as friend immediately');
 assert.doesNotMatch(profile, /PEOPLE_RELATION_STATUS\.FRIEND && !person\.dialogId/, 'friend without dialog must not disable write button');
 assert.match(profile, /role="button" tabIndex=\{0\} onClick=\{\(\) => openPersonProfile\(person\)\}/, 'suggestion card is clickable without nesting a button inside a button');
-assert.match(profile, /disabled=\{peopleSheet\.relationStatus === PEOPLE_RELATION_STATUS\.OUTGOING \|\| peopleSheet\.relationStatus === PEOPLE_RELATION_STATUS\.BLOCKED\}/, 'bottom sheet prevents duplicate outgoing requests');
+assert.match(profile, /status === 'cancelled' \? null : data\.request \|\| currentRequest \|\| null/, 'cancelled outgoing request clears local request state');
+assert.match(profile, /peopleSheet\.relationStatus === PEOPLE_RELATION_STATUS\.OUTGOING \? 'Отозвать заявку'/, 'bottom sheet allows outgoing request recall');
 assert.match(profile, /data-people-card/, 'people cards remain available');
 assert.match(profile, /data-people-bottom-sheet/, 'people bottom sheet remains available');
 

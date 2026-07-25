@@ -706,7 +706,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingDialog, onOpenBookingReview, initialConnectionTargetId = '', initialPeopleAction = null, desktopOverview = null, desktopMode = false, onBack }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, onOpenRewards = () => {}, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingDialog, onOpenBookingReview, initialConnectionTargetId = '', initialPeopleAction = null, desktopOverview = null, desktopMode = false, onBack }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showWorkspaceDiagnostics, setShowWorkspaceDiagnostics] = useState(false);
@@ -1647,11 +1647,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const quickActions = useMemo(() => [
     { id: 'activity', label: 'Активность', icon: '◷', onClick: onOpenActivity },
     { id: 'referral', label: 'Рефералы', icon: '↗', onClick: onOpenReferral },
+    { id: 'rewards', label: 'Подарки', icon: '🎁', onClick: onOpenRewards },
     { id: 'notifications', label: notificationsEnabled ? 'Уведомления вкл' : 'Уведомления', icon: notificationsEnabled ? '✓' : '🔔', onClick: onEnableNotifications },
     { id: 'theme', label: isDark ? 'Светлая тема' : 'Тёмная тема', icon: isDark ? '☀' : '☾', onClick: onToggleTheme },
     ownedPartner && { id: 'partner', label: 'Кабинет партнёра', icon: '◆', onClick: onOpenPartnerCabinet },
     ownedExpert && { id: 'expert', label: 'Кабинет эксперта', icon: '✦', onClick: onOpenExpertCabinet },
-  ].filter(Boolean), [isDark, notificationsEnabled, onEnableNotifications, onOpenActivity, onOpenReferral, onOpenPartnerCabinet, onOpenExpertCabinet, ownedPartner, ownedExpert]);
+  ].filter(Boolean), [isDark, notificationsEnabled, onEnableNotifications, onOpenActivity, onOpenReferral, onOpenPartnerCabinet, onOpenExpertCabinet, onOpenRewards, ownedPartner, ownedExpert]);
   const socialIncomingRequests = useMemo(() => socialRequests.filter(item => String(item.toUserId || '') === String(user?.id || '')), [socialRequests, user?.id]);
   const socialOutgoingRequests = useMemo(() => socialRequests.filter(item => String(item.fromUserId || '') === String(user?.id || '')), [socialRequests, user?.id]);
   const incomingConnectionRequests = useMemo(() => connectionRequests.filter(item => item.connection === true && item.direction === 'incoming' && item.status === 'pending'), [connectionRequests]);
@@ -1811,7 +1812,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       .catch(e => setConnectionError(e?.message || 'Не удалось отправить запрос на знакомство.'));
   }, [connectionTarget?.target?.id, onOpenDialog, patchPeoplePerson]);
   const updateConnectionRequest = useCallback((requestId, status) => {
-    const action = status === 'accepted' ? 'connections:accept' : 'connections:decline';
+    const action = status === 'accepted' ? 'connections:accept' : status === 'cancelled' ? 'connections:cancel' : 'connections:decline';
     const currentRequest = connectionRequests.find(item => String(item.id) === String(requestId));
     const targetId = String(currentRequest?.senderId || '') === String(user?.id || '') ? currentRequest?.recipientId : currentRequest?.senderId;
     setConnectionError('');
@@ -1827,7 +1828,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             relationStatus: nextStatus,
             status: nextStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'connected' : 'stranger',
             direction: '',
-            request: data.request || currentRequest || null,
+            request: status === 'cancelled' ? null : data.request || currentRequest || null,
             dialogId: data.dialogId || data.connection?.dialogId || data.request?.dialogId || '',
             shared: data.connection?.shared || data.request?.shared || currentRequest?.shared || null,
           });
@@ -1892,6 +1893,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     }
     if (person.relationStatus === PEOPLE_RELATION_STATUS.INCOMING && person.request?.id) {
       updateConnectionRequest(person.request.id, 'accepted');
+      return;
+    }
+    if (person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING && person.request?.id) {
+      updateConnectionRequest(person.request.id, 'cancelled');
       return;
     }
     if (person.relationStatus === PEOPLE_RELATION_STATUS.STRANGER) {
@@ -2163,7 +2168,20 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 <DesktopSection title="Быстрые действия" icon="⚡">
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 9 }}>
                     {quickActions.map(action => (
-                      <button key={action.id} type="button" onClick={action.onClick} style={dpButton('light', { minHeight: 58, flexDirection: 'column', gap: 5, padding: 8, fontSize: 12 })}>
+                      <button key={action.id} type="button" onClick={action.onClick} style={dpButton('light', {
+                        minHeight: 58,
+                        flexDirection: 'column',
+                        gap: 5,
+                        padding: 8,
+                        fontSize: 12,
+                        ...(action.id === 'rewards' ? {
+                          borderColor: 'rgba(201,168,76,0.42)',
+                          background: 'linear-gradient(120deg, rgba(201,168,76,0.20) 0%, rgba(255,255,255,0.46) 42%, rgba(201,168,76,0.18) 62%, rgba(255,255,255,0.18) 100%)',
+                          backgroundSize: '250% 100%',
+                          animation: 'shimmer 1.7s ease-in-out infinite',
+                          boxShadow: '0 14px 30px rgba(201,168,76,0.14)',
+                        } : {}),
+                      })}>
                         <span style={{ color: DP.gold, fontSize: 18 }}>{action.icon}</span>
                         <span>{action.label}</span>
                       </button>
@@ -2508,8 +2526,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             {visiblePeopleRows.length > 0 ? (
               <div style={{ display: 'grid', gap: 10 }}>
                 {visiblePeopleRows.slice(0, 4).map(person => {
-                  const primaryLabel = person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : person.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отправлено' : person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED ? 'Недоступно' : 'Добавить';
-                  const primaryDisabled = person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING || person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED;
+                  const primaryLabel = person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : person.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отозвать' : person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED ? 'Недоступно' : 'Добавить';
+                  const primaryDisabled = person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED;
                   const sharedSummary = peopleSharedSummary(person);
                   const suggestionReason = peopleSuggestionReason(person);
                   return (
@@ -2926,14 +2944,14 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               <div style={{ display: 'flex', gap: 8 }}>
                 <GlassButton
                   tone="gold"
-                  disabled={peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING || peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED}
+                  disabled={peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED}
                   onClick={() => {
                     runPersonPrimaryAction(peopleSheet);
                     if (peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND) setPeopleSheet(null);
                   }}
                   style={{ flex: 1 }}
                 >
-                  {peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Заявка отправлена' : 'Добавить'}
+                  {peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отозвать заявку' : 'Добавить'}
                 </GlassButton>
                 <GlassButton onClick={() => { setPeopleSheet(null); setShowConnectionsModal(true); }} style={{ flex: 1 }}>К списку</GlassButton>
               </div>
@@ -3560,6 +3578,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             { icon: '🎓', label: 'Повторить обучение', action: onRestartLearning,      right: '1 мин' },
             { icon: '📋', label: 'История активности', action: onOpenActivity,         right: null },
             { icon: '🔔', label: 'Уведомления',        action: onEnableNotifications,  right: notificationsEnabled ? 'вкл' : null },
+            { icon: '🎁', label: 'Подарки',           action: onOpenRewards,          right: null },
             { icon: '🧭', label: 'Диагностика профиля', action: () => setShowDiagnostics(true), right: null },
             showIdentityDiagnosticButton && { icon: '🪪', label: 'Диагностика Identity', action: openIdentityDiagnostics, right: user?.canonicalUserId ? 'core' : null },
             showWorkspaceDiagnosticButton && { icon: '🖥', label: 'Диагностика Workspace', action: () => setShowWorkspaceDiagnostics(true), right: workspaceDiagnostics?.currentMode },
@@ -4003,8 +4022,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             </div>
             {peopleSearchLoading && <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px', textAlign: 'center', padding: 8 }}>Ищем участников...</div>}
             {visiblePeopleRows.length ? visiblePeopleRows.map(person => {
-              const primaryLabel = person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : person.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отправлено' : person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED ? 'Недоступно' : 'Добавить в друзья';
-              const primaryDisabled = person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING || person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED;
+              const primaryLabel = person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : person.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отозвать' : person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED ? 'Недоступно' : 'Добавить в друзья';
+              const primaryDisabled = person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED;
               const sharedSummary = peopleSharedSummary(person);
               const suggestionReason = peopleSuggestionReason(person);
               return (
@@ -4098,11 +4117,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <GlassButton
                 onClick={() => { runPersonPrimaryAction(peopleSheet); if (peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && peopleSheet.dialogId) setPeopleSheet(null); }}
-                disabled={peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING || peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED}
+                disabled={peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED}
                 tone="gold"
                 style={{ flex: 1, minHeight: 44, borderRadius: 16, fontSize: 13 }}
               >
-                {peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Заявка отправлена' : 'Добавить'}
+                {peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отозвать заявку' : 'Добавить'}
               </GlassButton>
               <GlassButton onClick={() => { setPeopleSheet(null); setShowConnectionsModal(true); }} style={{ flex: 1, minHeight: 44, borderRadius: 16, fontSize: 13 }}>К списку людей</GlassButton>
             </div>

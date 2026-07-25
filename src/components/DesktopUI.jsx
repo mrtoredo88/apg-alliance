@@ -321,6 +321,7 @@ export function DesktopTopOverview({
   onSearchClear,
   unreadCount = 0,
   onOpenNotifications,
+  onOpenRewards,
   onOpenMessages,
   messageUnreadCount = 0,
   onOpenLoki,
@@ -430,9 +431,8 @@ export function DesktopTopOverview({
               <button type="button" aria-label="Запустить поиск" onClick={runSearch} style={{ width: 20, height: 20, borderRadius: 10, border: '1px solid rgba(201,168,76,0.22)', background: 'rgba(201,168,76,0.10)', color: APG2_PROFILE.gold, cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 11, padding: 0 }}>↵</button>
             )}
           </div>
-          <button type="button" onClick={onOpenNotifications} aria-label="Уведомления" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative' }}>
-            🔔
-            {unreadCount > 0 && <span style={{ position: 'absolute', top: 7, right: 7, width: 10, height: 10, borderRadius: '50%', background: '#E64646', border: '2px solid #101012' }} />}
+          <button type="button" onClick={onOpenRewards || onOpenNotifications} aria-label="Подарки" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(201,168,76,0.34)', background: 'linear-gradient(120deg, rgba(201,168,76,0.24) 0%, rgba(255,255,255,0.52) 42%, rgba(201,168,76,0.22) 62%, rgba(255,255,255,0.28) 100%)', color: APG2_PROFILE.text, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative', overflow: 'hidden', backgroundSize: '250% 100%', animation: 'shimmer 1.7s ease-in-out infinite' }}>
+            <span style={{ position: 'relative', zIndex: 1 }}>🎁</span>
           </button>
           <button type="button" onClick={onOpenMessages} aria-label="Люди" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative' }}>
             👥

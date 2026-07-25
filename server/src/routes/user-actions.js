@@ -3403,27 +3403,249 @@ function isDialogActiveForUser(user = {}, dialogId = '') {
   return Number.isFinite(ms) && Date.now() - ms < 45000;
 }
 
-async function getSocialUser(db, userId) {
-  const id = cleanSocialId(userId);
-  if (!id) return null;
-  const snap = await db.collection('users').doc(id).get().catch(() => null);
-  if (!snap?.exists) return null;
-  return { id, ref: snap.ref, data: snap.data() || {} };
+function addSocialAlias(set, value = '') {
+  const id = cleanSocialId(value);
+  if (id) set.add(id);
+}
+
+function addSocialEmailAlias(set, value = '') {
+  const raw = safeString(value, 260).toLowerCase();
+  if (!raw) return;
+  if (raw.startsWith('email:')) {
+    addSocialAlias(set, raw);
+  } else if (raw.includes('@')) {
+    addSocialAlias(set, `email:${raw}`);
+  }
+}
+
+function addSocialTelegramAlias(set, value = '') {
+  const raw = safeString(value, 260).replace(/^@/, '');
+  if (!raw) return;
+  addSocialAlias(set, raw.startsWith('tg_') ? raw : /^\d+$/.test(raw) ? `tg_${raw}` : raw);
+}
+
+function collectSocialAliasesFromRecord(set, record = null) {
+  if (!record || typeof record !== 'object') return;
+  addSocialAlias(set, record.id);
+  addSocialAlias(set, record.userId);
+  addSocialAlias(set, record.uid);
+  addSocialAlias(set, record.authUid);
+  addSocialAlias(set, record.firebaseUid);
+  addSocialAlias(set, record.canonicalUserId);
+  addSocialAlias(set, record.canonical_user_id);
+  addSocialAlias(set, record.vkId);
+  addSocialAlias(set, record.vk_id);
+  addSocialAlias(set, record.telegramId);
+  addSocialAlias(set, record.tgId);
+  addSocialEmailAlias(set, record.email);
+  addSocialEmailAlias(set, record.linkedEmail);
+  addSocialTelegramAlias(set, record.linkedTelegram?.tgId);
+  addSocialTelegramAlias(set, record.linkedTelegram?.id);
+  addSocialTelegramAlias(set, record.telegram?.tgId);
+  addSocialAlias(set, record.user?.canonicalUserId);
+  if (Array.isArray(record.identityAliases)) {
+    record.identityAliases.forEach(alias => addSocialAlias(set, alias));
+  }
+  if (Array.isArray(record.linkedAccounts)) {
+    record.linkedAccounts.forEach(item => {
+      if (!item || typeof item !== 'object') return;
+      addSocialAlias(set, item.id || item.uid || item.userId || item.providerUserId);
+      addSocialEmailAlias(set, item.email);
+      addSocialTelegramAlias(set, item.tgId || item.telegramId);
+      addSocialAlias(set, item.vkId);
+    });
+  }
+}
+
+function addToQueueIfNew(queue = [], seen = new Set(), candidate = '') {
+  const id = cleanSocialId(candidate);
+  if (!id || seen.has(id)) return;
+  seen.add(id);
+  queue.push(id);
+}
+
+function collectAliasesToQueue(ids = new Set(), queue = [], records = []) {
+  const beforeSize = ids.size;
+  for (const record of Array.from(records)) {
+    collectSocialAliasesFromRecord(ids, record);
+  }
+  const added = Array.from(ids).slice(beforeSize);
+  for (const id of added) addToQueueIfNew(queue, ids, id);
+}
+
+async function resolveSocialIdentitySet(db, userId = '', userHint = null) {
+  const ids = new Set();
+  const queue = [];
+  addToQueueIfNew(queue, ids, userId);
+  collectAliasesToQueue(ids, queue, [userHint, userHint?.user]);
+  const canonicalCandidates = new Set();
+  if (userHint?.canonicalUserId) addSocialAlias(canonicalCandidates, userHint.canonicalUserId);
+  if (userHint?.user?.canonicalUserId) addSocialAlias(canonicalCandidates, userHint.user.canonicalUserId);
+
+  while (queue.length) {
+    const current = queue.shift();
+    const [identity, snap] = await Promise.all([
+      serverFoundation.identityV2.getUser(current).catch(() => null),
+      db.collection('users').doc(current).get().catch(() => null),
+    ]);
+    const identityRecord = identity?.user || identity || null;
+    if (identityRecord?.canonicalUserId) addSocialAlias(canonicalCandidates, identityRecord.canonicalUserId);
+    if (identityRecord?.userId) addSocialAlias(canonicalCandidates, identityRecord.userId);
+    collectAliasesToQueue(ids, queue, [
+      identityRecord,
+      identityRecord?.user,
+      snap?.data?.() || null,
+      identity?.user,
+      identity,
+    ]);
+    if (snap?.exists) {
+      const snapData = snap.data() || {};
+      addSocialAlias(canonicalCandidates, snapData.canonicalUserId);
+      addSocialAlias(canonicalCandidates, snapData.canonical_user_id);
+    }
+  }
+  const allCandidates = Array.from(ids);
+  const orderedCanonicalCandidates = allCandidates.filter(item => canonicalCandidates.has(item));
+  const canonicalId = orderedCanonicalCandidates[0]
+    || allCandidates.find(item => item.startsWith('email:') || item.startsWith('tg_'))
+    || allCandidates[0]
+    || '';
+  return { ids: allCandidates, canonicalId };
+}
+
+function buildSocialRequestCandidates(leftIds = [], rightIds = []) {
+  const left = Array.from(new Set(leftIds.map(cleanSocialId).filter(Boolean)));
+  const right = Array.from(new Set(rightIds.map(cleanSocialId).filter(Boolean)));
+  const out = new Set();
+  for (const leftId of left) {
+    for (const rightId of right) {
+      out.add(socialRequestId(leftId, rightId));
+    }
+  }
+  return Array.from(out).filter(Boolean);
+}
+
+function buildSocialDialogCandidates(leftIds = [], rightIds = []) {
+  const left = Array.from(new Set(leftIds.map(cleanSocialId).filter(Boolean)));
+  const right = Array.from(new Set(rightIds.map(cleanSocialId).filter(Boolean)));
+  const out = new Set();
+  for (const leftId of left) {
+    for (const rightId of right) {
+      out.add(socialDirectDialogId(leftId, rightId));
+    }
+  }
+  return Array.from(out).filter(Boolean);
+}
+
+async function collectSocialRequestsForPair(db, leftIds = [], rightIds = []) {
+  const seen = new Set();
+  const found = new Map();
+  const leftSet = new Set(leftIds.map(cleanSocialId).filter(Boolean));
+  const rightSet = new Set(rightIds.map(cleanSocialId).filter(Boolean));
+  if (!leftSet.size || !rightSet.size) return [];
+
+  const directIds = buildSocialRequestCandidates(Array.from(leftSet), Array.from(rightSet));
+  for (const directId of directIds) {
+    const snap = await db.collection('conversationRequests').doc(directId).get().catch(() => null);
+    if (!snap?.exists) continue;
+    const data = { id: snap.id, ...(snap.data() || {}) };
+    const sender = cleanSocialId(data.senderId);
+    const recipient = cleanSocialId(data.recipientId);
+    if (!sender || !recipient) continue;
+    if ((leftSet.has(sender) && rightSet.has(recipient)) || (leftSet.has(recipient) && rightSet.has(sender))) {
+      const status = normalizeSocialRequestStatus(data.status, Date.now(), data.expiresAt);
+      found.set(data.id, { ...data, status });
+      seen.add(data.id);
+    }
+  }
+
+  const queryIds = [...new Set([...leftSet, ...rightSet])];
+  for (const userId of queryIds) {
+    const snap = await db.collection('conversationRequests')
+      .where('participants', 'array-contains', userId)
+      .limit(160)
+      .get()
+      .catch(() => null);
+    if (!snap?.docs?.length) continue;
+    for (const doc of snap.docs) {
+      if (seen.has(doc.id)) continue;
+      seen.add(doc.id);
+      const data = { id: doc.id, ...(doc.data() || {}) };
+      const sender = cleanSocialId(data.senderId);
+      const recipient = cleanSocialId(data.recipientId);
+      if (!sender || !recipient) continue;
+      if ((leftSet.has(sender) && rightSet.has(recipient)) || (leftSet.has(recipient) && rightSet.has(sender))) {
+        const status = normalizeSocialRequestStatus(data.status, Date.now(), data.expiresAt);
+        found.set(data.id, { ...data, status });
+      }
+    }
+  }
+  return Array.from(found.values()).sort((left, right) => new Date(right.updatedAt || right.createdAt || 0).getTime() - new Date(left.updatedAt || left.createdAt || 0).getTime());
+}
+
+async function getSocialIdentityContext(db, userId, userHint = null) {
+  const resolved = await resolveSocialIdentitySet(db, userId, userHint);
+  const orderedCandidates = resolved.canonicalId
+    ? [resolved.canonicalId, ...resolved.ids.filter(id => id && id !== resolved.canonicalId)]
+    : [...resolved.ids];
+  for (const id of orderedCandidates) {
+    const snap = await db.collection('users').doc(id).get().catch(() => null);
+    if (snap?.exists) {
+      return {
+        id,
+        canonicalId: resolved.canonicalId || id,
+        candidates: resolved.ids,
+        userId: id,
+        ref: snap.ref,
+        data: snap.data() || {},
+      };
+    }
+  }
+  return orderedCandidates[0]
+    ? {
+      id: orderedCandidates[0],
+      canonicalId: resolved.canonicalId || orderedCandidates[0],
+      candidates: resolved.ids,
+      userId: orderedCandidates[0],
+      ref: null,
+      data: null,
+    }
+    : { id: '', canonicalId: '', candidates: [], userId: '', ref: null, data: null };
+}
+
+async function getSocialUser(db, userId, userHint = null) {
+  const context = await getSocialIdentityContext(db, userId, userHint);
+  return context?.id ? { id: context.id, ref: context.ref, data: context.data || {} } : null;
 }
 
 async function hasSocialBlock(db, a = '', b = '') {
-  const left = cleanSocialId(a);
-  const right = cleanSocialId(b);
-  if (!left || !right) return true;
-  const [leftDoc, rightDoc, leftUser, rightUser] = await Promise.all([
-    db.collection('users').doc(left).collection('blockedUsers').doc(right).get().catch(() => null),
-    db.collection('users').doc(right).collection('blockedUsers').doc(left).get().catch(() => null),
-    db.collection('users').doc(left).get().catch(() => null),
-    db.collection('users').doc(right).get().catch(() => null),
+  const [leftContext, rightContext] = await Promise.all([
+    getSocialIdentityContext(db, a, null),
+    getSocialIdentityContext(db, b, null),
   ]);
-  const leftData = leftUser?.data?.() || {};
-  const rightData = rightUser?.data?.() || {};
-  return leftDoc?.exists || rightDoc?.exists || hasBlockedDialog(leftData, right) || hasBlockedDialog(rightData, left);
+  const leftIds = leftContext.candidates || [];
+  const rightIds = rightContext.candidates || [];
+  if (!leftIds.length || !rightIds.length) return false;
+  const checks = [];
+  for (const left of leftIds) {
+    for (const right of rightIds) {
+      checks.push(db.collection('users').doc(left).collection('blockedUsers').doc(right).get().catch(() => null));
+    }
+  }
+  const blockedDocs = (await Promise.all(checks)).filter(item => item?.exists);
+  if (blockedDocs.length) return true;
+  const leftSnaps = await Promise.all(leftIds.map(id => db.collection('users').doc(id).get().catch(() => null)));
+  const rightSnaps = await Promise.all(rightIds.map(id => db.collection('users').doc(id).get().catch(() => null)));
+  const leftUsers = leftSnaps.filter(Boolean).map(item => item.data?.() || {});
+  const rightUsers = rightSnaps.filter(Boolean).map(item => item.data?.() || {});
+  const rightSet = new Set(rightIds);
+  const leftSet = new Set(leftIds);
+  return leftUsers.some(user => Array.from(rightSet).some(id => hasBlockedDialog(user, id)))
+    || rightUsers.some(user => Array.from(leftSet).some(id => hasBlockedDialog(user, id)))
+    || leftUsers.some(user => user?.blockedUsers?.some && user.blockedUsers.some(id => rightSet.has(id)))
+    || rightUsers.some(user => user?.blockedUsers?.some && user.blockedUsers.some(id => leftSet.has(id)))
+    || leftUsers.some(user => user?.blockedUserIds?.some && user.blockedUserIds.some(id => rightSet.has(id)))
+    || rightUsers.some(user => user?.blockedUserIds?.some && user.blockedUserIds.some(id => leftSet.has(id)));
 }
 
 function socialFriends(a = {}, b = {}, aId = '', bId = '') {
@@ -3451,20 +3673,36 @@ function socialSharedEvent(a = {}, b = {}) {
 }
 
 async function findExistingDirectDialog(db, a = '', b = '') {
-  const id = socialDirectDialogId(a, b);
-  if (!id) return null;
-  const snap = await db.collection('contextDialogs').doc(id).get().catch(() => null);
-  return snap?.exists ? { id: snap.id, ...(snap.data() || {}) } : null;
+  const [leftContext, rightContext] = await Promise.all([
+    getSocialIdentityContext(db, a),
+    getSocialIdentityContext(db, b),
+  ]);
+  const leftIds = leftContext.candidates || [];
+  const rightIds = rightContext.candidates || [];
+  if (!leftIds.length || !rightIds.length) return null;
+  const candidates = buildSocialDialogCandidates(leftIds, rightIds).sort();
+  const existing = [];
+  for (const id of candidates) {
+    const snap = await db.collection('contextDialogs').doc(id).get().catch(() => null);
+    if (snap?.exists) existing.push({ id: snap.id, ...(snap.data() || {}) });
+  }
+  if (!existing.length) return null;
+  return existing.sort((left, right) => {
+    const leftMs = new Date(left.updatedAt || left.createdAt || 0).getTime();
+    const rightMs = new Date(right.updatedAt || right.createdAt || 0).getTime();
+    return rightMs - leftMs;
+  })[0];
 }
 
 async function findAcceptedSocialPermission(db, a = '', b = '') {
-  const requestId = socialRequestId(a, b);
-  if (!requestId) return null;
-  const snap = await db.collection('conversationRequests').doc(requestId).get().catch(() => null);
-  if (!snap?.exists) return null;
-  const data = snap.data() || {};
-  const status = normalizeSocialRequestStatus(data.status, Date.now(), data.expiresAt);
-  return status === SOCIAL_REQUEST_STATUS.ACCEPTED ? { id: snap.id, ...data, status } : null;
+  const [leftContext, rightContext] = await Promise.all([
+    getSocialIdentityContext(db, a),
+    getSocialIdentityContext(db, b),
+  ]);
+  const leftIds = leftContext.candidates || [];
+  const rightIds = rightContext.candidates || [];
+  const requests = await collectSocialRequestsForPair(db, leftIds, rightIds);
+  return requests.find(item => normalizeSocialRequestStatus(item.status, Date.now(), item.expiresAt) === SOCIAL_REQUEST_STATUS.ACCEPTED) || null;
 }
 
 async function evaluateServerSocialEligibility(db, actor, recipientId) {
@@ -3472,26 +3710,65 @@ async function evaluateServerSocialEligibility(db, actor, recipientId) {
   const targetId = cleanSocialId(recipientId);
   if (!senderId || !targetId) return { ok: false, reason: 'missing_user' };
   if (senderId === targetId) return { ok: false, reason: 'self' };
-  const [sender, recipient, existingDialog, acceptedPermission, blocked] = await Promise.all([
-    getSocialUser(db, senderId),
-    getSocialUser(db, targetId),
-    findExistingDirectDialog(db, senderId, targetId),
-    findAcceptedSocialPermission(db, senderId, targetId),
+  const [senderContext, recipientContext, blocked] = await Promise.all([
+    getSocialIdentityContext(db, senderId, actor),
+    getSocialIdentityContext(db, targetId),
     hasSocialBlock(db, senderId, targetId),
+  ]);
+  const sender = senderContext.id ? { id: senderContext.id, ref: senderContext.ref, data: senderContext.data || {} } : null;
+  const recipient = recipientContext.id ? { id: recipientContext.id, ref: recipientContext.ref, data: recipientContext.data || {} } : null;
+  const normalizedSenderId = senderContext.canonicalId || senderContext.id || senderId;
+  const normalizedTargetId = recipientContext.canonicalId || recipientContext.id || targetId;
+  const [existingDialog, acceptedPermission] = await Promise.all([
+    findExistingDirectDialog(db, normalizedSenderId, normalizedTargetId),
+    findAcceptedSocialPermission(db, normalizedSenderId, normalizedTargetId),
   ]);
   if (!recipient) return { ok: false, reason: 'recipient_not_found' };
   if (blocked) return { ok: false, reason: 'blocked', sender, recipient };
-  if (existingDialog) return { ok: true, reason: 'existing_conversation', sender, recipient, dialogId: existingDialog.id };
-  if (acceptedPermission) return { ok: true, reason: 'manual_permission', sender, recipient, request: acceptedPermission, dialogId: acceptedPermission.dialogId || '' };
+  if (existingDialog) return {
+    ok: true,
+    reason: 'existing_conversation',
+    sender,
+    recipient,
+    senderCanonicalId: normalizedSenderId,
+    recipientCanonicalId: normalizedTargetId,
+    dialogId: existingDialog.id,
+  };
+  if (acceptedPermission) return {
+    ok: true,
+    reason: 'manual_permission',
+    sender,
+    recipient,
+    senderCanonicalId: normalizedSenderId,
+    recipientCanonicalId: normalizedTargetId,
+    request: acceptedPermission,
+    dialogId: acceptedPermission.dialogId || '',
+  };
   const privacy = normalizeSocialPrivacy(recipient.data.messagingPrivacy || recipient.data.socialMessagingPrivacy);
   if (privacy === SOCIAL_PRIVACY.NOBODY) return { ok: false, reason: 'privacy', privacy, sender, recipient };
-  if (socialFriends(sender?.data || {}, recipient.data, senderId, targetId)) return { ok: true, reason: 'friends', privacy, sender, recipient };
+  if (socialFriends(sender?.data || {}, recipient.data, normalizedSenderId, normalizedTargetId)) return {
+    ok: true,
+    reason: 'friends',
+    privacy,
+    sender,
+    recipient,
+    senderCanonicalId: normalizedSenderId,
+    recipientCanonicalId: normalizedTargetId,
+  };
   if (privacy === SOCIAL_PRIVACY.FRIENDS_ONLY) return { ok: false, reason: 'privacy', privacy, sender, recipient };
   const eventId = socialSharedEvent(sender?.data || {}, recipient.data);
-  if (eventId) return { ok: true, reason: 'shared_event', eventId, privacy, sender, recipient };
+  if (eventId) return { ok: true, reason: 'shared_event', eventId, privacy, sender, recipient, senderCanonicalId: normalizedSenderId, recipientCanonicalId: normalizedTargetId };
   const partnerId = socialSharedPartner(sender?.data || {}, recipient.data);
-  if (partnerId) return { ok: true, reason: 'shared_partner', partnerId, privacy, sender, recipient };
-  return { ok: false, reason: 'manual_request_available', privacy, sender, recipient };
+  if (partnerId) return { ok: true, reason: 'shared_partner', partnerId, privacy, sender, recipient, senderCanonicalId: normalizedSenderId, recipientCanonicalId: normalizedTargetId };
+  return {
+    ok: false,
+    reason: 'manual_request_available',
+    privacy,
+    sender,
+    recipient,
+    senderCanonicalId: normalizedSenderId,
+    recipientCanonicalId: normalizedTargetId,
+  };
 }
 
 function socialRequestMirror(data = {}, viewerId = '') {
@@ -4113,11 +4390,23 @@ async function getSocialRequest(db, requestId = '') {
 async function querySocialRequestsForUser(db, userId = '') {
   const uid = cleanSocialId(userId);
   if (!uid) return [];
-  const snap = await db.collection('conversationRequests').where('participants', 'array-contains', uid).limit(100).get();
-  return snap.docs.map(doc => {
-    const data = { id: doc.id, ...doc.data() };
-    return { ...data, status: normalizeSocialRequestStatus(data.status, Date.now(), data.expiresAt) };
-  }).sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
+  const context = await getSocialIdentityContext(db, uid);
+  const candidates = Array.from(new Set((context?.candidates || []).map(cleanSocialId).filter(Boolean)));
+  if (!candidates.length) return [];
+  const queries = candidates.map(candidate => db.collection('conversationRequests').where('participants', 'array-contains', candidate).limit(160).get().catch(() => null));
+  const snapshots = await Promise.all(queries);
+  const merged = new Map();
+  for (const snap of snapshots) {
+    if (!snap?.docs?.length) continue;
+    for (const doc of snap.docs) {
+      if (merged.has(doc.id)) continue;
+      const data = { id: doc.id, ...(doc.data() || {}) };
+      merged.set(doc.id, { ...data, status: normalizeSocialRequestStatus(data.status, Date.now(), data.expiresAt) });
+    }
+  }
+  return Array.from(merged.values()).sort((a, b) => {
+    return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
+  });
 }
 
 async function actionSocialListRequests(db, req, actor) {
@@ -4151,25 +4440,24 @@ async function actionSocialRequest(db, req, actor) {
   if (eligibility.reason === 'privacy') throw Object.assign(new Error('Запрос недоступен.'), { statusCode: 403, code: 'SOCIAL_PRIVACY_DENIED' });
   if (eligibility.ok) return { ok: true, eligible: true, reason: eligibility.reason, dialogId: eligibility.dialogId || '' };
 
-  const requestId = socialRequestId(senderId, recipientId);
+  const normalizedSenderId = cleanSocialId(eligibility.senderCanonicalId || senderId);
+  const normalizedRecipientId = cleanSocialId(eligibility.recipientCanonicalId || recipientId);
+  const existing = (await collectSocialRequestsForPair(db, [normalizedSenderId], [normalizedRecipientId]))[0] || null;
+  const requestId = socialRequestId(normalizedSenderId, normalizedRecipientId);
   const ref = db.collection('conversationRequests').doc(requestId);
-  const recent = await db.collection('conversationRequests').where('senderId', '==', senderId).limit(50).get().catch(() => null);
+  const recent = await db.collection('conversationRequests').where('senderId', '==', normalizedSenderId).limit(50).get().catch(() => null);
   const recentRequests = recent?.docs?.map(doc => doc.data() || {}) || [];
   const recentCount = recentRequests.filter(item => isRecentSocialRequest(item)).length;
   if (recentCount >= SOCIAL_REQUEST_LIMIT) {
-    await audit(db, req, actor, SOCIAL_EVENTS.REQUEST_RATE_LIMITED, 'users', recipientId, 'blocked', { window: '24h', limit: SOCIAL_REQUEST_LIMIT });
+    await audit(db, req, actor, SOCIAL_EVENTS.REQUEST_RATE_LIMITED, 'users', normalizedRecipientId, 'blocked', { window: '24h', limit: SOCIAL_REQUEST_LIMIT });
     throw Object.assign(new Error('Лимит запросов на сегодня исчерпан.'), { statusCode: 429, code: 'SOCIAL_RATE_LIMITED' });
   }
-  const existing = await ref.get();
-  if (existing.exists) {
-    const data = { id: existing.id, ...(existing.data() || {}) };
-    const status = normalizeSocialRequestStatus(data.status, Date.now(), data.expiresAt);
-    if (status === SOCIAL_REQUEST_STATUS.PENDING) return { ok: true, request: socialRequestMirror({ ...data, status }, senderId), status };
-    if (isDeclineCooldownActive({ ...data, status })) throw Object.assign(new Error('Повторный запрос пока недоступен.'), { statusCode: 429, code: 'SOCIAL_DECLINE_COOLDOWN' });
-  }
+  if (existing?.status === SOCIAL_REQUEST_STATUS.PENDING) return { ok: true, request: socialRequestMirror(existing, senderId), status: existing.status };
+  if (isDeclineCooldownActive(existing || {})) throw Object.assign(new Error('Повторный запрос пока недоступен.'), { statusCode: 429, code: 'SOCIAL_DECLINE_COOLDOWN' });
+
   const record = createSocialRequestRecord({
-    senderId,
-    recipientId,
+    senderId: normalizedSenderId,
+    recipientId: normalizedRecipientId,
     sender: eligibility.sender?.data || actor.user || {},
     recipient: eligibility.recipient.data,
     relationshipReason: 'manual_permission',
@@ -4178,22 +4466,42 @@ async function actionSocialRequest(db, req, actor) {
   await ref.set({ ...record, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }, { merge: true });
   const saved = { ...record, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   await mirrorSocialRequest(db, saved);
-  await writeSocialNotification(db, recipientId, {
+  await writeSocialNotification(db, normalizedRecipientId, {
     type: 'socialMessageRequest',
     title: `${actorName(actor)} хочет начать с вами общение`,
     body: 'Откройте профиль, чтобы принять или отклонить запрос.',
     requestId,
   }).catch(() => {});
-  await audit(db, req, actor, SOCIAL_EVENTS.REQUEST_CREATED, 'conversationRequests', requestId, 'success', { recipientId, relationshipReason: 'manual_permission' });
+  await audit(db, req, actor, SOCIAL_EVENTS.REQUEST_CREATED, 'conversationRequests', requestId, 'success', { recipientId: normalizedRecipientId, relationshipReason: 'manual_permission' });
   return { ok: true, request: socialRequestMirror(saved, senderId), status: SOCIAL_REQUEST_STATUS.PENDING };
 }
 
 async function actionSocialResolveRequest(db, req, actor, status) {
   const requestId = safeString(req.body?.requestId, 260);
-  const request = await getSocialRequest(db, requestId);
+  let request = await getSocialRequest(db, requestId);
+  if (!request) {
+    const targetId = cleanSocialId(req.body?.targetUserId || req.body?.recipientId || req.body?.userId);
+    if (targetId) {
+      const [actorContext, targetContext] = await Promise.all([
+        getSocialIdentityContext(db, actor.userId, actor),
+        getSocialIdentityContext(db, targetId),
+      ]);
+      const candidates = await collectSocialRequestsForPair(
+        db,
+        actorContext?.candidates || [actor.userId],
+        targetContext?.candidates || [targetId],
+      );
+      request = candidates[0] || null;
+    }
+  }
   if (!request) throw Object.assign(new Error('Запрос не найден.'), { statusCode: 404, code: 'REQUEST_NOT_FOUND' });
-  if (status === SOCIAL_REQUEST_STATUS.CANCELLED && request.senderId !== actor.userId) throw Object.assign(new Error('Нельзя отменить чужой запрос.'), { statusCode: 403, code: 'REQUEST_FORBIDDEN' });
-  if ([SOCIAL_REQUEST_STATUS.ACCEPTED, SOCIAL_REQUEST_STATUS.DECLINED].includes(status) && request.recipientId !== actor.userId) throw Object.assign(new Error('Нельзя отвечать на чужой запрос.'), { statusCode: 403, code: 'REQUEST_FORBIDDEN' });
+  const actorCandidates = new Set((await getSocialIdentityContext(db, actor.userId, actor)).candidates || [actor.userId]);
+  if (status === SOCIAL_REQUEST_STATUS.CANCELLED && !actorCandidates.has(request.senderId)) {
+    throw Object.assign(new Error('Нельзя отменить чужой запрос.'), { statusCode: 403, code: 'REQUEST_FORBIDDEN' });
+  }
+  if ([SOCIAL_REQUEST_STATUS.ACCEPTED, SOCIAL_REQUEST_STATUS.DECLINED].includes(status) && !actorCandidates.has(request.recipientId)) {
+    throw Object.assign(new Error('Нельзя отвечать на чужой запрос.'), { statusCode: 403, code: 'REQUEST_FORBIDDEN' });
+  }
   if (request.status === status && status !== SOCIAL_REQUEST_STATUS.ACCEPTED) return { ok: true, request: socialRequestMirror(request, actor.userId), status, dialogId: request.dialogId || '' };
   if (request.status !== SOCIAL_REQUEST_STATUS.PENDING && !(request.status === SOCIAL_REQUEST_STATUS.ACCEPTED && status === SOCIAL_REQUEST_STATUS.ACCEPTED)) {
     throw Object.assign(new Error('Запрос уже обработан.'), { statusCode: 409, code: 'REQUEST_ALREADY_RESOLVED' });
@@ -4262,20 +4570,22 @@ async function actionSocialResolveRequest(db, req, actor, status) {
 async function actionSocialBlock(db, req, actor, block = true) {
   const targetId = cleanSocialId(req.body?.targetUserId || req.body?.recipientId || req.body?.userId);
   if (!targetId || targetId === actor.userId) throw Object.assign(new Error('Некорректный пользователь.'), { statusCode: 400, code: 'INVALID_TARGET' });
-  const ref = db.collection('users').doc(actor.userId).collection('blockedUsers').doc(targetId);
+  const targetContext = await getSocialIdentityContext(db, targetId);
+  const canonicalTargetId = cleanSocialId(targetContext?.canonicalId || targetContext?.id || targetId);
+  const ref = db.collection('users').doc(actor.userId).collection('blockedUsers').doc(canonicalTargetId);
   if (block) {
     await Promise.all([
-      ref.set({ id: targetId, blockedUserId: targetId, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
-      db.collection('users').doc(actor.userId).set({ blockedUserIds: FieldValue.arrayUnion(targetId), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+      ref.set({ id: canonicalTargetId, blockedUserId: canonicalTargetId, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+      db.collection('users').doc(actor.userId).set({ blockedUserIds: FieldValue.arrayUnion(canonicalTargetId), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
     ]);
-    await audit(db, req, actor, SOCIAL_EVENTS.REQUEST_BLOCKED, 'users', targetId, 'success', {});
+    await audit(db, req, actor, SOCIAL_EVENTS.REQUEST_BLOCKED, 'users', canonicalTargetId, 'success', {});
   } else {
     await Promise.all([
       ref.delete().catch(() => {}),
-      db.collection('users').doc(actor.userId).set({ blockedUserIds: FieldValue.arrayRemove(targetId), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+      db.collection('users').doc(actor.userId).set({ blockedUserIds: FieldValue.arrayRemove(canonicalTargetId), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
     ]);
   }
-  return { ok: true, blocked: block, targetUserId: targetId };
+  return { ok: true, blocked: block, targetUserId: canonicalTargetId };
 }
 
 async function actionSocialUpdatePrivacy(db, req, actor) {
@@ -4288,7 +4598,11 @@ async function actionSocialUpdatePrivacy(db, req, actor) {
 async function actionConnectionsCheck(db, req, actor) {
   const targetUserId = cleanSocialId(req.body?.targetUserId || req.body?.recipientId || req.body?.userId);
   const result = await evaluateServerSocialEligibility(db, actor, targetUserId);
-  const request = targetUserId ? await getSocialRequest(db, socialRequestId(actor.userId, targetUserId)) : null;
+  const senderCanonicalId = cleanSocialId(result.senderCanonicalId || actor.userId);
+  const recipientCanonicalId = cleanSocialId(result.recipientCanonicalId || targetUserId);
+  const request = targetUserId
+    ? (await collectSocialRequestsForPair(db, [senderCanonicalId], [recipientCanonicalId]))[0]
+    : null;
   const target = result.recipient || await getSocialUser(db, targetUserId);
   const shared = buildConnectionSharedContext(actor.user || {}, target?.data || {});
   const connectionStatus = request?.connection === true
@@ -4366,6 +4680,56 @@ function publicUserSearchText(user = {}, id = '') {
   ].map(value => safeString(value, 240).toLowerCase().replace(/ё/g, 'е')).filter(Boolean).join(' ');
 }
 
+function socialSearchProfileScore(row = {}, id = '', canonicalId = '') {
+  const displayName = safeString(row.displayName || row.name || [row.firstName || row.first_name, row.lastName || row.last_name].filter(Boolean).join(' '), 180);
+  const emailLocal = safeString(row.email || row.linkedEmail || id.replace(/^email:/, '').split('@')[0], 180).split('@')[0];
+  let score = 0;
+  if (id && canonicalId && id === canonicalId) score += 30;
+  if (row.photo || row.photo_200 || row.avatar || row.avatarUrl) score += 80;
+  if (displayName && displayName.toLowerCase() !== emailLocal.toLowerCase()) score += 45;
+  if (safeString(row.firstName || row.first_name, 80)) score += 12;
+  if (safeString(row.lastName || row.last_name, 80)) score += 12;
+  if (Array.isArray(row.roles) && row.roles.length) score += Math.min(row.roles.length, 4) * 5;
+  if (row.role === 'super_admin' || (Array.isArray(row.roles) && row.roles.includes('super_admin'))) score += 18;
+  if (row.partnerId || (Array.isArray(row.partnerCabinetIds) && row.partnerCabinetIds.length)) score += 12;
+  if (row.updatedAt || row.lastSeen || row.lastSeenAt) score += 5;
+  if (row.identityStatus === 'legacy_linked' || row.mergedInto || row.dataMigratedInto) score -= 120;
+  return score;
+}
+
+async function dedupeSocialSearchRows(db, rows = []) {
+  const enriched = await Promise.all(rows.map(async row => {
+    const context = await getSocialIdentityContext(db, row.id, row).catch(() => null);
+    const canonicalId = cleanSocialId(context?.canonicalId || row.canonicalUserId || row.id);
+    const aliases = Array.from(new Set([
+      row.id,
+      canonicalId,
+      ...(context?.candidates || []),
+      ...(Array.isArray(row.identityAliases) ? row.identityAliases : []),
+    ].map(cleanSocialId).filter(Boolean)));
+    return {
+      row,
+      canonicalId: canonicalId || row.id,
+      aliases,
+      score: socialSearchProfileScore(row, row.id, canonicalId || row.id),
+    };
+  }));
+  const byCanonical = new Map();
+  for (const item of enriched) {
+    const key = item.canonicalId || item.row.id;
+    const current = byCanonical.get(key);
+    if (!current || item.score > current.score) {
+      byCanonical.set(key, {
+        ...item,
+        aliases: Array.from(new Set([...(current?.aliases || []), ...item.aliases])),
+      });
+    } else {
+      current.aliases = Array.from(new Set([...current.aliases, ...item.aliases]));
+    }
+  }
+  return Array.from(byCanonical.values()).sort((left, right) => right.score - left.score);
+}
+
 async function actionConnectionsSearch(db, req, actor) {
   const query = safeString(req.body?.query, 120).toLowerCase().replace(/ё/g, 'е');
   if (query.length < 2) return { ok: true, people: [] };
@@ -4387,27 +4751,31 @@ async function actionConnectionsSearch(db, req, actor) {
     .forEach(item => {
       [item.senderId, item.recipientId].map(String).filter(id => id && id !== String(actor.userId)).forEach(id => pendingByUser.set(id, item));
     });
-  const people = usersSnap.docs
+  const matchedRows = usersSnap.docs
     .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
     .filter(row => row.id !== actor.userId && !blocked.has(String(row.id)) && !isArchivedUser(row))
     .filter(row => publicUserSearchText(row, row.id).includes(query))
-    .slice(0, 40)
-    .map(row => {
-      const pending = pendingByUser.get(String(row.id));
-      const status = connected.has(String(row.id))
+    .slice(0, 80);
+  const dedupedRows = await dedupeSocialSearchRows(db, matchedRows);
+  const people = dedupedRows.slice(0, 40).map(({ row, canonicalId, aliases }) => {
+      const aliasSet = new Set(aliases.map(String));
+      const pending = aliases.map(id => pendingByUser.get(String(id))).find(Boolean);
+      const contact = contacts.find(item => aliasSet.has(String(item.contactUserId || item.id || '')));
+      const status = aliases.some(id => connected.has(String(id)))
         ? CONNECTION_STATUS.CONNECTED
         : pending
           ? SOCIAL_REQUEST_STATUS.PENDING
           : 'stranger';
       return {
-        ...socialPublicUser(row, row.id),
+        ...socialPublicUser(row, canonicalId || row.id),
+        identityAliases: aliases,
         username: safeString(row.username, 80),
         company: safeString(row.company || row.companyName || row.organization || row.partnerName || row.expertName, 160),
         city: safeString(row.city || row.town, 120),
         about: safeString(row.about || row.bio || row.description, 240),
         status,
         direction: pending ? socialRequestMirror(pending, actor.userId).direction : '',
-        dialogId: contacts.find(item => String(item.contactUserId || item.id) === String(row.id))?.dialogId || '',
+        dialogId: contact?.dialogId || '',
         shared: buildConnectionSharedContext(actor.user || {}, row),
       };
     });
@@ -4433,26 +4801,24 @@ async function actionConnectionsRequest(db, req, actor) {
     };
   }
 
-  const requestId = socialRequestId(senderId, recipientId);
+  const normalizedSenderId = cleanSocialId(eligibility.senderCanonicalId || senderId);
+  const normalizedRecipientId = cleanSocialId(eligibility.recipientCanonicalId || recipientId);
+  const existing = (await collectSocialRequestsForPair(db, [normalizedSenderId], [normalizedRecipientId]))[0] || null;
+  const requestId = socialRequestId(normalizedSenderId, normalizedRecipientId);
   const ref = db.collection('conversationRequests').doc(requestId);
-  const recent = await db.collection('conversationRequests').where('senderId', '==', senderId).limit(50).get().catch(() => null);
+  const recent = await db.collection('conversationRequests').where('senderId', '==', normalizedSenderId).limit(50).get().catch(() => null);
   const recentCount = (recent?.docs?.map(doc => doc.data() || {}) || []).filter(item => isRecentSocialRequest(item)).length;
   if (recentCount >= SOCIAL_REQUEST_LIMIT) throw Object.assign(new Error('Лимит запросов на сегодня исчерпан.'), { statusCode: 429, code: 'CONNECTION_RATE_LIMITED' });
-  const existing = await ref.get();
-  if (existing.exists) {
-    const data = { id: existing.id, ...(existing.data() || {}) };
-    const status = normalizeSocialRequestStatus(data.status, Date.now(), data.expiresAt);
-    if (status === SOCIAL_REQUEST_STATUS.PENDING) return { ok: true, status: CONNECTION_STATUS.PENDING, request: socialRequestMirror({ ...data, status, connection: true }, senderId) };
-    if (status === SOCIAL_REQUEST_STATUS.ACCEPTED) return { ok: true, status: CONNECTION_STATUS.CONNECTED, dialogId: data.dialogId || '', request: socialRequestMirror({ ...data, status }, senderId) };
-    if (isDeclineCooldownActive({ ...data, status })) throw Object.assign(new Error('Повторное знакомство пока недоступно.'), { statusCode: 429, code: 'CONNECTION_DECLINE_COOLDOWN' });
-  }
+  if (existing?.status === SOCIAL_REQUEST_STATUS.PENDING) return { ok: true, status: CONNECTION_STATUS.PENDING, request: socialRequestMirror({ ...existing, connection: true }, senderId) };
+  if (existing?.status === SOCIAL_REQUEST_STATUS.ACCEPTED) return { ok: true, status: CONNECTION_STATUS.CONNECTED, dialogId: existing.dialogId || '', request: socialRequestMirror(existing, senderId) };
+  if (isDeclineCooldownActive(existing || {})) throw Object.assign(new Error('Повторное знакомство пока недоступно.'), { statusCode: 429, code: 'CONNECTION_DECLINE_COOLDOWN' });
 
   const context = connectionSourceFromRequest(req);
   const shared = buildConnectionSharedContext(eligibility.sender?.data || actor.user || {}, eligibility.recipient.data);
   const record = {
     ...createSocialRequestRecord({
-      senderId,
-      recipientId,
+      senderId: normalizedSenderId,
+      recipientId: normalizedRecipientId,
       sender: eligibility.sender?.data || actor.user || {},
       recipient: eligibility.recipient.data,
       relationshipReason: 'digital_handshake',
@@ -4471,13 +4837,13 @@ async function actionConnectionsRequest(db, req, actor) {
   await ref.set({ ...record, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }, { merge: true });
   const saved = { ...record, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   await mirrorSocialRequest(db, saved);
-  await writeSocialNotification(db, recipientId, {
+  await writeSocialNotification(db, normalizedRecipientId, {
     type: 'connectionRequest',
     title: `${actorName(actor)} хочет познакомиться`,
     body: context.sourceTitle ? `Источник: ${context.sourceTitle}` : 'Откройте профиль, чтобы принять или отклонить знакомство.',
     requestId,
   }).catch(() => {});
-  await audit(db, req, actor, 'connections:request', 'conversationRequests', requestId, 'success', { recipientId, source: context.source });
+  await audit(db, req, actor, 'connections:request', 'conversationRequests', requestId, 'success', { recipientId: normalizedRecipientId, source: context.source });
   return { ok: true, status: CONNECTION_STATUS.PENDING, request: socialRequestMirror(saved, senderId), connection: connectionSnapshot(saved, senderId) };
 }
 
@@ -4494,8 +4860,15 @@ async function actionConnectionsResolve(db, req, actor, status) {
 async function actionConnectionsBlock(db, req, actor) {
   const result = await actionSocialBlock(db, req, actor, true);
   const targetId = cleanSocialId(req.body?.targetUserId || req.body?.recipientId || req.body?.userId);
-  const requestId = socialRequestId(actor.userId, targetId);
-  const request = await getSocialRequest(db, requestId);
+  const [actorContext, targetContext] = await Promise.all([
+    getSocialIdentityContext(db, actor.userId, actor),
+    getSocialIdentityContext(db, targetId),
+  ]);
+  const request = (await collectSocialRequestsForPair(
+    db,
+    actorContext?.candidates || [actor.userId],
+    targetContext?.candidates || [targetId],
+  ))[0] || null;
   if (request) {
     const patch = {
       connection: request.connection === true,
@@ -4788,6 +5161,7 @@ async function routeAction(db, req, actor) {
   if (action === 'connections:request') return actionConnectionsRequest(db, req, actor);
   if (action === 'connections:accept') return actionConnectionsResolve(db, req, actor, SOCIAL_REQUEST_STATUS.ACCEPTED);
   if (action === 'connections:decline') return actionConnectionsResolve(db, req, actor, SOCIAL_REQUEST_STATUS.DECLINED);
+  if (action === 'connections:cancel') return actionConnectionsResolve(db, req, actor, SOCIAL_REQUEST_STATUS.CANCELLED);
   if (action === 'connections:block') return actionConnectionsBlock(db, req, actor);
   if (action === 'dialog:open') return actionDialogOpen(db, req, actor);
   if (action === 'dialog:message') return actionDialogMessage(db, req, actor);

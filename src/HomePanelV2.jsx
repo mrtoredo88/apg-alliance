@@ -614,19 +614,19 @@ function V2FirstScreenMobile({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
             <button
-              onClick={onOpenNotifications}
-              aria-label="Уведомления"
+              onClick={onOpenRewards}
+              aria-label="Подарки"
               style={{
                 width: 44, height: 44, flexShrink: 0, borderRadius: 18, cursor: 'pointer',
                 ...V2.glass,
                 color: V2.text, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                position: 'relative',
+                position: 'relative', overflow: 'hidden',
+                background: 'linear-gradient(115deg, rgba(201,168,76,0.24) 0%, rgba(255,255,255,0.54) 42%, rgba(201,168,76,0.24) 62%, rgba(255,255,255,0.28) 100%)',
+                backgroundSize: '250% 100%',
+                animation: 'shimmer 1.7s ease-in-out infinite',
               }}
             >
-              🔔
-              {unreadCount > 0 && (
-                <span style={{ position: 'absolute', top: 7, right: 7, width: 10, height: 10, borderRadius: '50%', background: '#E64646', border: '2px solid #101012' }} />
-              )}
+              <span style={{ position: 'relative', zIndex: 1, animation: 'pulse-glow 1.8s ease-in-out infinite' }}>🎁</span>
             </button>
             <button
               type="button"
@@ -927,6 +927,7 @@ function V2FirstScreenDesktop({
           onSearchClear={() => setDesktopSearchQuery('')}
           unreadCount={unreadCount}
           onOpenNotifications={onOpenNotifications}
+          onOpenRewards={onOpenRewards}
           onOpenMessages={onOpenMessages}
           onOpenLoki={onOpenLoki}
           onOpenProfile={onOpenProfile}
@@ -962,8 +963,8 @@ function V2FirstScreenDesktop({
           progressValue={nextAchievementProgress}
           quickActions={[
             { id: 'profile', label: 'Профиль', icon: '👤', tone: 'gold', onClick: onOpenProfile },
+            { id: 'rewards', label: 'Подарки', icon: '🎁', tone: 'gold', onClick: onOpenRewards },
             { id: 'tasks', label: 'Достижения', icon: '☆', onClick: onOpenTasks },
-            { id: 'rewards', label: 'Награды', icon: '🎁', onClick: onOpenRewards },
           ]}
           isOffline={isOffline}
         />

@@ -15,6 +15,20 @@
 
 ---
 
+## [2026-07-25] fix: Gifts CTA and canonical People search
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/HomePanelV2.jsx`, `src/components/DesktopUI.jsx`, `src/ProfilePanel.jsx`, `server/src/routes/user-actions.js`, `scripts/people-actions-test.mjs`, `scripts/connections-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** переливающаяся кнопка 🎁 на главной и desktop overview снова открывает `Подарки`, а не уведомления; в быстрых действиях профиля `Подарки` выделены золотым переливом; исходящую заявку в People теперь можно отозвать и затем отправить заново; `connections:search` склеивает alias/legacy-профили по canonical identity и отдаёт одного человека вместо дублей.
+**Почему:** production-проверка показала, что подарок был связан с уведомлениями, People показывал три профиля Татьяны Гордеевой, а исходящая заявка была заблокирована без возможности повторной отправки.
+
+## [2026-07-25] fix: Social identity-aware request resolution
+**Коммит:** `локально, без коммита`
+**Файлы:** `server/src/routes/user-actions.js`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** в social backend добавлен единый alias-aware путь для заявок и связок: список заявок, создание/поиск запроса на дружбу/общение и проверки блокировок/статусов теперь работают по всем связанным identity-профилям через `collectSocialRequestsForPair` и `getSocialIdentityContext`.
+**Почему:** после слияния/дублирования профилей отдельные alias-идентификаторы приводили к «потере» заявок и некорректному отображению в People, поэтому требуется разрешать запросы и статус не только по одному `requestId`.
+
 ## [2026-07-22] feat: профессиональный desktop-профиль и Telegram-аватар
 **Коммит:** `локально, без коммита`
 **Файлы:** `src/ProfilePanel.jsx`, `scripts/desktop-profile-test.mjs`, `.ai/17_CHANGELOG_AI.md`
