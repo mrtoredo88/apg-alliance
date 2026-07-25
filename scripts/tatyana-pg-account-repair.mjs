@@ -189,9 +189,9 @@ async function applyRepair(client, repair) {
         UPDATE apg_account_profiles
         SET canonical_user_id = $1,
             profile = profile || jsonb_build_object(
-              'canonicalUserId', $1,
+              'canonicalUserId', $1::text,
               'identityStatus', 'legacy_linked',
-              'mergedInto', $1,
+              'mergedInto', $1::text,
               'mergedBy', 'tatyana-pg-account-repair'
             ),
             updated_at = now()
