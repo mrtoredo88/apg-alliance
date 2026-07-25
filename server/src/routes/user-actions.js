@@ -4697,6 +4697,132 @@ function socialSearchProfileScore(row = {}, id = '', canonicalId = '') {
   return score;
 }
 
+function buildSocialSearchAliasSet(row = {}) {
+  const aliases = new Set();
+  collectSocialAliasesFromRecord(aliases, row);
+  collectSocialAliasesFromRecord(aliases, row.user);
+  addSocialAlias(aliases, row.canonicalUserId || row.canonical_user_id);
+  addSocialAlias(aliases, row.mergedInto || row.dataMigratedInto);
+  if (row.linkedAccountId) addSocialAlias(aliases, row.linkedAccountId);
+  if (row.phone) {
+    const digits = String(row.phone).replace(/[^\d]+/g, '');
+    if (digits.length >= 8) addSocialAlias(aliases, `phone:${digits}`);
+  }
+  return Array.from(aliases).filter(Boolean);
+}
+
+function canMergeSocialSearchRows(left = {}, right = {}) {
+  const leftCanonical = String(left.canonicalId || left.row?.canonicalUserId || '').trim();
+  const rightCanonical = String(right.canonicalId || right.row?.canonicalUserId || '').trim();
+  if (leftCanonical && rightCanonical && leftCanonical === rightCanonical) return true;
+
+  if (leftCanonical && (right?.row?.mergedInto || right?.row?.dataMigratedInto || right?.row?.canonicalUserId) && [String(right.row.mergedInto || ''), String(right.row.dataMigratedInto || ''), String(right.row.canonicalUserId || '')].includes(leftCanonical)) return true;
+  if (rightCanonical && (left?.row?.mergedInto || left?.row?.dataMigratedInto || left?.row?.canonicalUserId) && [String(left.row.mergedInto || ''), String(left.row.dataMigratedInto || ''), String(left.row.canonicalUserId || '')].includes(rightCanonical)) return true;
+
+  const leftAliases = new Set(left.aliases || []);
+  const rightAliases = right.aliases || [];
+  return rightAliases.some(alias => leftAliases.has(alias));
+}
+
+function parseAccountJson(value, fallback) {
+  if (value == null) return fallback;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function accountSearchRowFromPg(row = {}) {
+  const profile = parseAccountJson(row.profile, {}) || {};
+  const roles = parseAccountJson(row.roles, []) || [];
+  const canonicalUserId = safeString(row.canonical_user_id || profile.canonicalUserId || row.user_id, 260);
+  const userId = safeString(row.user_id || canonicalUserId, 260);
+  const displayName = safeString(row.display_name || profile.displayName || profile.name || [row.first_name || profile.firstName, row.last_name || profile.lastName].filter(Boolean).join(' '), 180);
+  return {
+    ...profile,
+    id: userId,
+    userId,
+    canonicalUserId,
+    displayName,
+    name: displayName,
+    firstName: safeString(row.first_name || profile.firstName, 120),
+    lastName: safeString(row.last_name || profile.lastName, 120),
+    email: safeString(row.email || profile.email, 220),
+    photo: safeString(row.photo || profile.photo || profile.avatar || profile.photo_200, 1000),
+    city: safeString(row.city || profile.city, 120),
+    role: safeString(row.primary_role || profile.role || profile.userRole || 'user', 80),
+    userRole: safeString(row.primary_role || profile.userRole || profile.role || 'user', 80),
+    roles: Array.from(new Set((Array.isArray(roles) && roles.length ? roles : profile.roles || [row.primary_role || profile.role || 'user']).map(role => safeString(role, 80)).filter(Boolean))),
+    identityAliases: Array.from(new Set([
+      userId,
+      canonicalUserId,
+      ...(Array.isArray(profile.identityAliases) ? profile.identityAliases : []),
+      ...(Array.isArray(profile.linkedAccounts) ? profile.linkedAccounts : []),
+    ].map(cleanSocialId).filter(Boolean))),
+    identitySource: 'account-core-postgres',
+  };
+}
+
+function mergeAccountSearchRows(rows = []) {
+  const groups = new Map();
+  for (const row of rows.map(accountSearchRowFromPg)) {
+    const canonicalId = cleanSocialId(row.canonicalUserId || row.id);
+    if (!canonicalId) continue;
+    const current = groups.get(canonicalId);
+    if (!current) {
+      groups.set(canonicalId, { ...row, id: canonicalId, userId: canonicalId, identityAliases: Array.from(new Set([canonicalId, ...(row.identityAliases || [])])) });
+      continue;
+    }
+    const leftScore = socialSearchProfileScore(current, current.id, canonicalId);
+    const rightScore = socialSearchProfileScore(row, row.id, canonicalId);
+    const best = rightScore > leftScore ? row : current;
+    groups.set(canonicalId, {
+      ...current,
+      ...best,
+      id: canonicalId,
+      userId: canonicalId,
+      canonicalUserId: canonicalId,
+      displayName: best.displayName || current.displayName,
+      photo: best.photo || current.photo,
+      role: (best.roles || []).includes('super_admin') ? 'super_admin' : best.role || current.role,
+      roles: Array.from(new Set([...(current.roles || []), ...(row.roles || [])].filter(Boolean))),
+      identityAliases: Array.from(new Set([canonicalId, ...(current.identityAliases || []), ...(row.identityAliases || [])].map(cleanSocialId).filter(Boolean))),
+    });
+  }
+  return Array.from(groups.values());
+}
+
+async function searchAccountProfilesForConnections(query = '', actorUserId = '') {
+  const adapter = serverFoundation.account?.profiles?.adapter;
+  if (!adapter?.available) return null;
+  const normalized = safeString(query, 120).toLowerCase().replace(/ё/g, 'е');
+  if (normalized.length < 2) return [];
+  const result = await adapter.query(`
+    SELECT
+      p.user_id,
+      p.canonical_user_id,
+      p.email,
+      p.display_name,
+      p.first_name,
+      p.last_name,
+      p.photo,
+      p.city,
+      p.profile,
+      r.primary_role,
+      r.roles
+    FROM apg_account_profiles p
+    LEFT JOIN apg_account_roles r ON r.user_id = p.user_id
+    WHERE lower(replace(concat_ws(' ', p.user_id, p.canonical_user_id, p.email, p.display_name, p.first_name, p.last_name, p.city, p.profile::text), 'ё', 'е')) LIKE $1
+    ORDER BY p.updated_at DESC NULLS LAST
+    LIMIT 120
+  `, [`%${normalized}%`]);
+  return mergeAccountSearchRows(result.rows || [])
+    .filter(row => row.id !== actorUserId && !isArchivedUser(row))
+    .slice(0, 80);
+}
+
 async function dedupeSocialSearchRows(db, rows = []) {
   const enriched = await Promise.all(rows.map(async row => {
     const context = await getSocialIdentityContext(db, row.id, row).catch(() => null);
@@ -4707,6 +4833,8 @@ async function dedupeSocialSearchRows(db, rows = []) {
       ...(context?.candidates || []),
       ...(Array.isArray(row.identityAliases) ? row.identityAliases : []),
     ].map(cleanSocialId).filter(Boolean)));
+    const identityAliases = buildSocialSearchAliasSet(row);
+    for (const alias of identityAliases) aliases.push(alias);
     return {
       row,
       canonicalId: canonicalId || row.id,
@@ -4714,27 +4842,62 @@ async function dedupeSocialSearchRows(db, rows = []) {
       score: socialSearchProfileScore(row, row.id, canonicalId || row.id),
     };
   }));
-  const byCanonical = new Map();
-  for (const item of enriched) {
-    const key = item.canonicalId || item.row.id;
-    const current = byCanonical.get(key);
+  if (!enriched.length) return [];
+
+  const parent = Array.from({ length: enriched.length }, (_, index) => index);
+  const find = (index) => {
+    let current = index;
+    while (parent[current] !== current) current = parent[current];
+    let cursor = index;
+    while (parent[cursor] !== current) {
+      const next = parent[cursor];
+      parent[cursor] = current;
+      cursor = next;
+    }
+    return current;
+  };
+  const union = (left, right) => {
+    const a = find(left);
+    const b = find(right);
+    if (a !== b) parent[b] = a;
+  };
+
+  for (let i = 0; i < enriched.length; i += 1) {
+    for (let j = 0; j < i; j += 1) {
+      if (canMergeSocialSearchRows(enriched[i], enriched[j])) {
+        union(i, j);
+      }
+    }
+  }
+
+  const groups = new Map();
+  for (let index = 0; index < enriched.length; index += 1) {
+    const root = find(index);
+    const current = groups.get(root);
+    const item = enriched[index];
     if (!current || item.score > current.score) {
-      byCanonical.set(key, {
+      groups.set(root, {
         ...item,
         aliases: Array.from(new Set([...(current?.aliases || []), ...item.aliases])),
+        members: [...(current?.members || []), index],
       });
     } else {
       current.aliases = Array.from(new Set([...current.aliases, ...item.aliases]));
+      current.members = [...current.members, index];
     }
   }
-  return Array.from(byCanonical.values()).sort((left, right) => right.score - left.score);
+  return Array.from(groups.values()).sort((left, right) => right.score - left.score);
 }
 
 async function actionConnectionsSearch(db, req, actor) {
   const query = safeString(req.body?.query, 120).toLowerCase().replace(/ё/g, 'е');
   if (query.length < 2) return { ok: true, people: [] };
-  const [usersSnap, requests, contactsSnap, blockedSnap] = await Promise.all([
-    db.collection('users').limit(700).get(),
+  const [accountRows, usersSnap, requests, contactsSnap, blockedSnap] = await Promise.all([
+    accountCoreWriteEnabled() ? searchAccountProfilesForConnections(query, actor.userId).catch(error => {
+      serverFoundation.account.metrics.recordError(error);
+      return null;
+    }) : Promise.resolve(null),
+    accountCoreWriteEnabled() ? Promise.resolve(null) : db.collection('users').limit(700).get(),
     querySocialRequestsForUser(db, actor.userId).catch(() => []),
     db.collection('users').doc(actor.userId).collection('connections').limit(300).get().catch(() => null),
     db.collection('users').doc(actor.userId).collection('blockedUsers').limit(100).get().catch(() => null),
@@ -4751,11 +4914,13 @@ async function actionConnectionsSearch(db, req, actor) {
     .forEach(item => {
       [item.senderId, item.recipientId].map(String).filter(id => id && id !== String(actor.userId)).forEach(id => pendingByUser.set(id, item));
     });
-  const matchedRows = usersSnap.docs
-    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
-    .filter(row => row.id !== actor.userId && !blocked.has(String(row.id)) && !isArchivedUser(row))
-    .filter(row => publicUserSearchText(row, row.id).includes(query))
-    .slice(0, 80);
+  const matchedRows = Array.isArray(accountRows)
+    ? accountRows.filter(row => !blocked.has(String(row.id)) && !(row.identityAliases || []).some(id => blocked.has(String(id))))
+    : usersSnap.docs
+      .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+      .filter(row => row.id !== actor.userId && !blocked.has(String(row.id)) && !isArchivedUser(row))
+      .filter(row => publicUserSearchText(row, row.id).includes(query))
+      .slice(0, 80);
   const dedupedRows = await dedupeSocialSearchRows(db, matchedRows);
   const people = dedupedRows.slice(0, 40).map(({ row, canonicalId, aliases }) => {
       const aliasSet = new Set(aliases.map(String));
