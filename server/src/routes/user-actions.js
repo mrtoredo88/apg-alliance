@@ -4985,7 +4985,8 @@ async function searchAccountProfilesForConnections(query = '', actorUserId = '')
   if (!adapter?.available) return null;
   const normalized = safeString(query, 120).toLowerCase().replace(/ё/g, 'е');
   if (normalized.length < 2) return [];
-  const result = await adapter.query(`
+  const [accountResult, migratedUsersResult] = await Promise.all([
+    adapter.query(`
     SELECT
       p.user_id,
       p.canonical_user_id,
@@ -5003,8 +5004,29 @@ async function searchAccountProfilesForConnections(query = '', actorUserId = '')
     WHERE lower(replace(concat_ws(' ', p.user_id, p.canonical_user_id, p.email, p.display_name, p.first_name, p.last_name, p.city, p.profile::text), 'ё', 'е')) LIKE $1
     ORDER BY p.updated_at DESC NULLS LAST
     LIMIT 120
-  `, [`%${normalized}%`]);
-  return mergeAccountSearchRows(result.rows || [])
+  `, [`%${normalized}%`]),
+    adapter.query(`
+      SELECT
+        d.document_id AS user_id,
+        COALESCE(NULLIF(d.data->>'canonicalUserId', ''), d.document_id) AS canonical_user_id,
+        COALESCE(d.data->>'email', d.data->>'linkedEmail') AS email,
+        COALESCE(d.data->>'displayName', d.data->>'name') AS display_name,
+        d.data->>'firstName' AS first_name,
+        d.data->>'lastName' AS last_name,
+        COALESCE(d.data->>'photo', d.data->>'photo_200', d.data->>'avatar') AS photo,
+        d.data->>'city' AS city,
+        d.data AS profile,
+        COALESCE(d.data->>'role', d.data->>'userRole', 'user') AS primary_role,
+        COALESCE(d.data->'roles', '["user"]'::jsonb) AS roles
+      FROM apg_app_documents d
+      WHERE d.collection_name = 'users'
+        AND d.parent_path = ''
+        AND lower(replace(concat_ws(' ', d.document_id, d.data::text), 'ё', 'е')) LIKE $1
+      ORDER BY d.updated_at DESC NULLS LAST
+      LIMIT 160
+    `, [`%${normalized}%`]),
+  ]);
+  return mergeAccountSearchRows([...(accountResult.rows || []), ...(migratedUsersResult.rows || [])])
     .filter(row => row.id !== actorUserId && !isArchivedUser(row))
     .slice(0, 80);
 }

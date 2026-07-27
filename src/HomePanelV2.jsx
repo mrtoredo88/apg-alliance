@@ -612,13 +612,13 @@ function V2FirstScreenMobile({
       position: 'relative',
       minHeight: 'auto',
       boxSizing: 'border-box',
-      padding: desktopMode ? 'calc(20px + var(--safe-top, 0px)) 26px 18px' : 'calc(14px + var(--safe-top, 0px)) 18px 24px',
+      padding: desktopMode ? 'calc(20px + var(--safe-top, 0px)) 26px 18px' : 'calc(10px + var(--safe-top, 0px)) 18px 18px',
       overflow: 'hidden',
       background: V2.pageBg,
     }}>
       <div style={{ position: 'absolute', left: -80, right: -80, top: 128, height: 230, background: 'linear-gradient(110deg, transparent 8%, rgba(244,217,140,0.055) 35%, rgba(255,255,255,0.04) 48%, transparent 74%)', transform: 'rotate(-8deg)', filter: 'blur(1px)', pointerEvents: 'none' }} />
       <div style={{ position: 'relative', zIndex: 1, maxWidth: desktopMode ? 1180 : 'none', margin: desktopMode ? '0 auto' : 0, ...revealMotion(0, 'splash') }}>
-        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginBottom: 'clamp(16px, 2.4svh, 22px)' }}>
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginBottom: 'clamp(10px, 1.6svh, 14px)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
             <picture>
               <source srcSet="/logo.webp" type="image/webp" />
@@ -662,7 +662,7 @@ function V2FirstScreenMobile({
           </div>
         </header>
 
-        <div style={{ display: 'grid', gridTemplateColumns: desktopMode ? 'minmax(0, 1.45fr) minmax(320px, 0.85fr)' : '1fr', gap: desktopMode ? 16 : 12, alignItems: 'stretch' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: desktopMode ? 'minmax(0, 1.45fr) minmax(320px, 0.85fr)' : '1fr', gap: desktopMode ? 16 : 9, alignItems: 'start' }}>
         <button
           onClick={heroAction}
           {...pressMotion}
@@ -721,34 +721,34 @@ function V2FirstScreenMobile({
             marginTop: 0,
             order: desktopMode ? undefined : -1,
             border: '1px solid rgba(244,217,140,0.22)',
-            borderRadius: 26,
-            padding: '10px 11px',
+            borderRadius: 23,
+            padding: '8px 9px',
             textAlign: 'left',
             cursor: 'pointer',
             color: V2.text,
             background: 'radial-gradient(circle at 18% 0%, rgba(244,217,140,0.18), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.105), rgba(255,255,255,0.034))',
             boxShadow: '0 18px 48px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.13)',
             display: 'grid',
-            gap: 7,
+            gap: 5,
             ...revealMotion(2, 'splash'),
           }}
         >
           <div>
-            <h1 style={{ margin: 0, color: V2.text, fontSize: 'clamp(23px, 3.4svh, 29px)', lineHeight: 'clamp(27px, 3.9svh, 33px)', fontWeight: 800, letterSpacing: 0 }}>
+            <h1 style={{ margin: 0, color: V2.text, fontSize: 'clamp(21px, 3svh, 26px)', lineHeight: 'clamp(24px, 3.5svh, 29px)', fontWeight: 800, letterSpacing: 0 }}>
               {greeting}
             </h1>
-            <p style={{ margin: '3px 0 0', color: V2.textSoft, fontSize: 11.5, lineHeight: '16px', fontWeight: 400 }}>
+            <p style={{ margin: '2px 0 0', color: V2.textSoft, fontSize: 10.5, lineHeight: '14px', fontWeight: 400 }}>
               Сегодня в Зеленограде происходит много интересного.
             </p>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '48px minmax(0, 1fr) auto', gap: 8, alignItems: 'center' }}>
-            <span style={{ width: 48, height: 48, borderRadius: '50%', padding: 3, background: `conic-gradient(${level.color || V2.gold} ${profileProgress * 3.6}deg, rgba(255,255,255,0.14) 0deg)`, color: '#211706', display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 920, boxShadow: '0 10px 24px rgba(216,184,103,0.14)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '42px minmax(0, 1fr) auto', gap: 7, alignItems: 'center' }}>
+            <span style={{ width: 42, height: 42, borderRadius: '50%', padding: 3, background: `conic-gradient(${level.color || V2.gold} ${profileProgress * 3.6}deg, rgba(255,255,255,0.14) 0deg)`, color: '#211706', display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 920, boxShadow: '0 10px 24px rgba(216,184,103,0.14)' }}>
               <span style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: V2.goldMetal, display: 'grid', placeItems: 'center' }}>
                 {avatarUrl ? <img src={avatarUrl} alt="" loading="eager" fetchPriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
               </span>
             </span>
             <span style={{ minWidth: 0 }}>
-              <span style={{ display: 'block', color: V2.text, fontSize: 15, lineHeight: '18px', fontWeight: 920, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullName}</span>
+              <span style={{ display: 'block', color: V2.text, fontSize: 13.5, lineHeight: '16px', fontWeight: 920, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullName}</span>
               <span style={{ display: 'block', color: V2.textSoft, fontSize: 10.5, lineHeight: '13px', fontWeight: 720, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{level.label} · {todayForYou}</span>
             </span>
             <button type="button" onClick={hasPartnerCabinet ? onOpenPartnerCabinet : onOpenProfile} style={{ borderRadius: 999, padding: '7px 10px', background: V2.goldMetal, border: '1px solid rgba(255,235,174,0.5)', color: '#211706', boxShadow: '0 8px 22px rgba(216,184,103,0.22)', fontSize: 10.2, lineHeight: '12px', fontWeight: 900, cursor: 'pointer' }}>{hasPartnerCabinet ? 'Кабинет партнёра' : 'Профиль'}</button>

@@ -15,7 +15,8 @@ assert.match(actions, /assertOwn\(actor, req\.body\?\.userId \|\| actor\.userId\
 assert.match(actions, /action === 'economy:history'/);
 assert.match(actions, /keys: -cost/);
 assert.match(rewards, /targetUserId: context\.userId/);
-assert.match(rewards, /balanceAfter: Number\(user\.keys \|\| 0\) \+ keyBonus/);
+assert.match(rewards, /accountCore\.awardVisit/);
+assert.match(rewards, /balanceAfter: awarded\.operation\.balanceAfter/);
 assert.match(userApp, /rewardBelongsToCurrentUser/);
 assert.match(userApp, /document\.addEventListener\('visibilitychange', handleResume\)/);
 assert.match(userApp, /<KeyHistoryModal/);

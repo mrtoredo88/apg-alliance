@@ -2235,6 +2235,8 @@ export function UserApp() {
               const effectiveLinkedTelegram = identityOwnsLinkedTelegram ? userData.linkedTelegram || null : data.linkedTelegram || null;
               setUser(u => u ? ({
                 ...u,
+                id: data.canonicalUserId || data.id || String(userData.id),
+                uid: data.canonicalUserId || data.id || String(userData.id),
                 canonicalUserId: data.canonicalUserId || data.id || String(userData.id),
                 ...(data.displayName ? { displayName: data.displayName } : {}),
                 ...(data.email ? { email: data.email } : {}),
@@ -4607,16 +4609,16 @@ export function UserApp() {
       {TABS.map((tab, i) => {
         if (tab.workspaceId === 'scan' || !tab.id) return (
           <button key="scan" ref={node => { tabSlotRefs.current[i] = node; }} data-apg-tab-slot="scan" aria-label="Открыть сканер" onClick={() => { openScanner('tabbar'); }}
-            style={{ flex: 1.34, background: 'linear-gradient(145deg, rgba(244,217,140,0.30), rgba(201,168,76,0.16))', border: '1px solid rgba(244,217,140,0.34)', borderRadius: 23, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.30), 0 12px 28px rgba(201,168,76,0.18)', cursor: 'pointer', display: 'flex', flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', padding: '0 8px', position: 'relative', zIndex: 2, transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
+            style={{ flex: 1.34, background: 'linear-gradient(145deg, rgba(232,70,70,0.98), rgba(174,28,38,0.94))', border: '1px solid rgba(255,138,138,0.72)', borderRadius: 23, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.30), 0 12px 30px rgba(194,36,48,0.30)', cursor: 'pointer', display: 'flex', flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', padding: '0 8px', position: 'relative', zIndex: 2, transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
             <div style={{
               width: 46, height: 46, marginTop: 0, borderRadius: 19,
-              background: isScannerOpen ? 'rgba(201,168,76,0.25)' : V2GoldMetal,
-              boxShadow: isScannerOpen ? 'none' : '0 12px 26px rgba(216,184,103,0.18), inset 0 1px 0 rgba(255,255,255,0.36), inset 0 -8px 18px rgba(83,58,18,0.20)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#0F0F1A',
+              background: isScannerOpen ? 'rgba(255,255,255,0.16)' : 'linear-gradient(145deg, #FF7777, #D92F3E)',
+              boxShadow: isScannerOpen ? 'none' : '0 12px 26px rgba(91,8,18,0.30), inset 0 1px 0 rgba(255,255,255,0.38), inset 0 -8px 18px rgba(91,8,18,0.24)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#FFFFFF',
               transition: `transform ${MOTION.duration.modal}ms ${MOTION.ease.standard}, box-shadow ${MOTION.duration.modal}ms ${MOTION.ease.standard}`,
               transform: isScannerOpen ? 'scale(0.88)' : 'scale(1)',
             }}>◎</div>
-            <span style={{ fontSize: 12, fontWeight: 900, color: T.gold, letterSpacing: 0, textTransform: 'none' }}>Скан</span>
+            <span style={{ fontSize: 12, fontWeight: 900, color: '#FFFFFF', letterSpacing: 0, textTransform: 'none' }}>Скан</span>
           </button>
         );
 

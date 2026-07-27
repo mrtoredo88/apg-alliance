@@ -193,6 +193,58 @@ VALUES (
 )
 ON CONFLICT (version) DO NOTHING;
 
+-- Reconcile the owner's canonical balance with the migrated user document.
+-- The native-auth cutover initially selected a technical account containing 4
+-- keys while the verified migrated profile contains 32.
+WITH migrated_owner AS (
+  SELECT MAX(
+    CASE
+      WHEN (data->>'keys') ~ '^[0-9]+$' THEN (data->>'keys')::integer
+      ELSE 0
+    END
+  ) AS keys
+  FROM apg_app_documents
+  WHERE collection_name = 'users'
+    AND parent_path = ''
+    AND lower(COALESCE(data->>'email', data->>'linkedEmail', '')) = 'mrtoredo88@mail.ru'
+    AND NOT EXISTS (
+      SELECT 1
+      FROM apg_account_schema_versions
+      WHERE version = 'owner-keys-reconcile-2026-07-27'
+    )
+)
+UPDATE apg_account_profiles AS profile
+SET profile = jsonb_set(
+      profile.profile,
+      '{keys}',
+      to_jsonb(migrated_owner.keys),
+      true
+    ),
+    updated_at = now()
+FROM migrated_owner
+WHERE migrated_owner.keys = 32
+  AND lower(COALESCE(profile.email, profile.profile->>'email', profile.profile->>'linkedEmail', '')) = 'mrtoredo88@mail.ru'
+  AND CASE
+        WHEN (profile.profile->>'keys') ~ '^[0-9]+$' THEN (profile.profile->>'keys')::integer
+        ELSE 0
+      END <> migrated_owner.keys;
+
+INSERT INTO apg_account_schema_versions (version, checksum, description)
+SELECT
+  'owner-keys-reconcile-2026-07-27',
+  'owner-keys-reconcile-v1',
+  'Reconcile owner canonical key balance with the verified migrated profile'
+WHERE EXISTS (
+  SELECT 1
+  FROM apg_app_documents
+  WHERE collection_name = 'users'
+    AND parent_path = ''
+    AND lower(COALESCE(data->>'email', data->>'linkedEmail', '')) = 'mrtoredo88@mail.ru'
+    AND (data->>'keys') ~ '^[0-9]+$'
+    AND (data->>'keys')::integer = 32
+)
+ON CONFLICT (version) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_email ON apg_account_profiles(email);
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_firebase_uid ON apg_account_profiles(firebase_uid);
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_telegram_id ON apg_account_profiles(telegram_id);
