@@ -184,11 +184,81 @@ docker push cr.yandex/crpvv13u8vr3qjftdvvg/apg-api:latest
 
 **Параметры контейнера:**
 - CPU: 1 core
+- Гарантированная доля CPU: 20%
 - RAM: 512 MB
 - Concurrency: 16 запросов одновременно
 - Timeout: 30 секунд
-- Min instances: 0 (cold start при бездействии)
+- Min instances: 1
 - Service account: `ajegfv96md2tqri8gjdp`
+
+### Раздельный release frontend/backend
+
+Основная команда релиза:
+
+```bash
+npm run release:plan -- --base <previous-production-commit> --head HEAD
+npm run release:changed -- --base <previous-production-commit> --head HEAD
+```
+
+`scripts/deploy-changed.mjs` получает точный список файлов через
+`git diff --name-only --diff-filter=ACMR <base>...<head>` и строит независимый план:
+
+- `src/**`, `public/**`, Vite и frontend dependencies → только `deploy-frontend.sh`;
+- `server/**`, `server-shared/**` и Docker build-context API → только `server/deploy.sh`;
+- одновременно frontend и backend → обе ветки;
+- documentation-only изменения → деплой не выполняется;
+- migration operator собирается только при изменении файлов из его Docker build-context
+  и только с явным флагом `--deploy-migration-operator`.
+
+Без `--base` сравнивается последний коммит (`HEAD^...HEAD`). Для серии коммитов
+обязательно передавать предыдущий production commit или `APG_RELEASE_BASE`.
+
+Backend и migration operator используют BuildKit registry cache с отдельным тегом
+`buildcache`. Backend сначала собирается в локальный OCI layout без публикации.
+Фактический OCI digest сравнивается с digest активной production-ревизии. Если они
+совпадают, push и новая Serverless revision пропускаются со статусом
+`SKIPPED_IDENTICAL_IMAGE`. Если production digest нельзя надёжно получить, deploy
+останавливается без публикации.
+
+Read-only анализ с причинами и ожидаемыми действиями:
+
+```bash
+npm run release:why -- --base <previous-production-commit> --head HEAD
+npm run release:explain -- --base <previous-production-commit> --head HEAD
+```
+
+После анализа и реального запуска выводится Release Summary со статусами веток,
+Docker build/push, Serverless revision, длительностью и предотвращёнными действиями
+только за текущий запуск. Накопительная статистика намеренно не сохраняется: без
+надёжного централизованного хранилища локальный счётчик создавал бы ложные данные.
+
+Проверка классификации:
+
+```bash
+npm run test:release-change-plan
+npm run test:release-cicd-v2
+```
+
+Тест покрывает frontend-only, CSS-only, backend-only, mixed, migration-only и
+documentation-only сценарии.
+
+### Lifecycle Container Registry
+
+Правила находятся в `ops/registry-lifecycle/`. Безопасный первый запуск создаёт
+неактивные политики и запускает dry-run:
+
+```bash
+./scripts/configure-registry-lifecycle.sh
+```
+
+После проверки списка затронутых образов политики активируются отдельно:
+
+```bash
+./scripts/configure-registry-lifecycle.sh --apply
+```
+
+Для `apg-api` сохраняются 15 последних commit-tagged образов (10 production +
+5 rollback), для migration operator — 3 последних; untagged удаляются через 72 часа.
 
 ### Переключение API
 

@@ -15,6 +15,14 @@ const REQUIRED_ENV = [
   'GOOGLE_APPLICATION_CREDENTIALS',
   'IDENTITY_PROVIDER',
   'IDENTITY_STORAGE',
+];
+const OPTIONAL_ENV_DEFAULTS = {
+  IDENTITY_DUAL_READ: '0',
+  IDENTITY_DUAL_WRITE: '0',
+  IDENTITY_FALLBACK: '1',
+};
+const OPERATOR_ENV_NAMES = [
+  ...REQUIRED_ENV,
   'IDENTITY_DUAL_READ',
   'IDENTITY_DUAL_WRITE',
   'IDENTITY_FALLBACK',
@@ -67,6 +75,9 @@ function latestRevisionEnv() {
   const selected = {};
   for (const key of REQUIRED_ENV) {
     if (env[key]) selected[key] = env[key];
+  }
+  for (const [key, fallback] of Object.entries(OPTIONAL_ENV_DEFAULTS)) {
+    selected[key] = env[key] || fallback;
   }
   return { latest, selected };
 }
@@ -132,7 +143,7 @@ function main() {
     image,
     networkId: NETWORK_ID,
     serviceAccountId: SERVICE_ACCOUNT_ID,
-    envNames: [...REQUIRED_ENV, 'APG_REMOTE_OPERATOR_RUNTIME', 'APG_REMOTE_PREFLIGHT_EXECUTION', 'APG_OPERATOR_TOKEN'].sort(),
+    envNames: [...OPERATOR_ENV_NAMES, 'APG_REMOTE_OPERATOR_RUNTIME', 'APG_REMOTE_PREFLIGHT_EXECUTION', 'APG_OPERATOR_TOKEN'].sort(),
     valuesPrinted: false,
   });
 
@@ -145,6 +156,10 @@ function main() {
     'ops/migration-operator/Dockerfile',
     '-t',
     image,
+    '--cache-from',
+    `type=registry,ref=cr.yandex/${REGISTRY_ID}/${CONTAINER_NAME}:buildcache`,
+    '--cache-to',
+    `type=registry,ref=cr.yandex/${REGISTRY_ID}/${CONTAINER_NAME}:buildcache,mode=max`,
     '--push',
     '.',
   ], { stdio: 'inherit' });

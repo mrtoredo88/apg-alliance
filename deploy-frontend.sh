@@ -16,7 +16,11 @@ ENDPOINT="https://storage.yandexcloud.net"
 S3="--endpoint-url $ENDPOINT --region ru-central1"
 
 echo "Building..."
-npm run build
+if [ "${APG_SKIP_FRONTEND_BUILD:-0}" != "1" ]; then
+  npm run build
+else
+  echo "Using existing dist/ build."
+fi
 
 # Hashed assets — immutable, 1 year cache
 echo "Uploading assets/..."

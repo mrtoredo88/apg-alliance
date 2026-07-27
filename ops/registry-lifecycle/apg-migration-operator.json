@@ -1,0 +1,12 @@
+[
+  {
+    "description": "Delete untagged migration operator images after three days",
+    "expire_period": "72h",
+    "untagged": true
+  },
+  {
+    "description": "Retain the newest three tagged migration operator images",
+    "tag_regexp": "^[0-9a-f]{7,8}$",
+    "retained_top": 3
+  }
+]

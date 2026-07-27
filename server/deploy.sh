@@ -34,36 +34,68 @@ GIT_SHA_SHORT="$(git -C "$ROOT_DIR" rev-parse --short=8 HEAD)"
 BUILD_TIME="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 IMAGE_TAG="$GIT_SHA_SHORT"
 IMAGE_URI="$IMAGE_NAME:$IMAGE_TAG"
+CACHE_URI="$IMAGE_NAME:buildcache"
 
 echo "Deploy commit: $GIT_SHA"
 echo "Image: $IMAGE_URI"
 
-docker buildx build --platform linux/amd64 -f "$ROOT_DIR/server/Dockerfile" -t "$IMAGE_URI" \
-  --build-arg APP_VERSION="$GIT_SHA_SHORT" \
-  --build-arg GIT_SHA="$GIT_SHA" \
-  --build-arg BUILD_TIME="$BUILD_TIME" \
-  "$ROOT_DIR"
+if [[ "${APG_SKIP_IMAGE_BUILD:-0}" != "1" ]]; then
+  METADATA_FILE="$(mktemp)"
+  PUBLISH_METADATA_FILE="$(mktemp)"
+  OCI_ARCHIVE="$(mktemp)"
+  trap 'rm -f "$METADATA_FILE" "$PUBLISH_METADATA_FILE" "$OCI_ARCHIVE"' EXIT
 
-docker push "$IMAGE_URI"
+  docker buildx build --platform linux/amd64 -f "$ROOT_DIR/server/Dockerfile" -t "$IMAGE_URI" \
+    --cache-from "type=registry,ref=$CACHE_URI" \
+    --provenance=false \
+    --metadata-file "$METADATA_FILE" \
+    --output "type=oci,dest=$OCI_ARCHIVE" \
+    "$ROOT_DIR"
 
-DIGEST_WITH_TAG="$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE_URI")"
-if [[ -z "$DIGEST_WITH_TAG" || "$DIGEST_WITH_TAG" == "<no value>" ]]; then
+  IMAGE_DIGEST="$(node -e "const m=require(process.argv[1]);process.stdout.write(m['containerimage.digest']||'')" "$METADATA_FILE")"
+
+  COMPARISON="$(yc serverless container revision list --container-name apg-api --format json \
+    | node "$ROOT_DIR/scripts/backend-image-decision.mjs" "$IMAGE_DIGEST")"
+  IMAGE_STATUS="$(node -e "process.stdout.write(JSON.parse(process.argv[1]).status)" "$COMPARISON")"
+  PRODUCTION_DIGEST="$(node -e "process.stdout.write(JSON.parse(process.argv[1]).productionDigest)" "$COMPARISON")"
+
+  echo "Candidate image digest: $IMAGE_DIGEST"
+  echo "Production image digest: $PRODUCTION_DIGEST"
+
+  if [[ "$IMAGE_STATUS" == "SKIPPED_IDENTICAL_IMAGE" ]]; then
+    echo "Backend status: SKIPPED_IDENTICAL_IMAGE"
+    exit 42
+  fi
+
+  docker buildx build --platform linux/amd64 -f "$ROOT_DIR/server/Dockerfile" -t "$IMAGE_URI" \
+    --cache-from "type=registry,ref=$CACHE_URI" \
+    --cache-to "type=registry,ref=$CACHE_URI,mode=max" \
+    --provenance=false \
+    --metadata-file "$PUBLISH_METADATA_FILE" \
+    --push \
+    "$ROOT_DIR"
+
+  PUBLISHED_DIGEST="$(node -e "const m=require(process.argv[1]);process.stdout.write(m['containerimage.digest']||'')" "$PUBLISH_METADATA_FILE")"
+  if [[ "$PUBLISHED_DIGEST" != "$IMAGE_DIGEST" ]]; then
+    echo "Published digest differs from the verified candidate digest." >&2
+    exit 1
+  fi
+else
+  echo "Using already pushed image: $IMAGE_URI"
+  IMAGE_DIGEST="$(docker buildx imagetools inspect "$IMAGE_URI" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+fi
+
+if [[ -z "$IMAGE_DIGEST" ]]; then
   echo "Unable to resolve image digest for $IMAGE_URI" >&2
   exit 1
 fi
 
-IMAGE_DIGEST="${DIGEST_WITH_TAG##*@}"
-if [[ -z "$IMAGE_DIGEST" ]]; then
-  echo "Unable to parse image digest from: $DIGEST_WITH_TAG" >&2
-  exit 1
-fi
-
-echo "Pushed image digest: $IMAGE_DIGEST"
+echo "Published image digest: $IMAGE_DIGEST"
 
 yc serverless container revision deploy \
   --container-name apg-api \
   --image "$IMAGE_URI" \
-  --cores 1 --memory 512MB --execution-timeout 30s \
+  --cores 1 --core-fraction 20 --memory 512MB --execution-timeout 30s \
   --concurrency 16 --min-instances 1 \
   --network-id enpa19j9jpki1f67p6kq \
   --service-account-id ajegfv96md2tqri8gjdp \

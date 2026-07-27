@@ -15,6 +15,20 @@
 
 ---
 
+## [2026-07-27] fix: мобильный UX, PWA-онбординг и история ключей
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `src/ProfilePanel.jsx`, `src/OffersPage.jsx`, `src/RewardsPage.jsx`, `src/TasksPage.jsx`, `src/components/KeyHistoryModal.jsx`, `src/components/onboarding/PwaInstallGuide.jsx`, `src/loki/LokiAssistant.jsx`, `server/src/routes/user-actions.js`, `server-shared/reward-service.js`, `scripts/key-history-regression-test.mjs`, `scripts/home-profile-dashboard-test.mjs`, `scripts/pwa-user-mode-regression.mjs`, `.ai/04_API.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** установленная PWA получила одноразовый email/Telegram-онбординг; нижняя навигация, Скан, Диалоги и кабинет партнёра исправлены; приветствие, профиль, быстрые действия и показатели объединены; добавлен отдельный экран избранного и единая история ключей; QR-награды и push-состояние синхронизируются с сервером.
+**Почему:** пакет закрывает собранную мобильную обратную связь, убирает ошибочные переходы и устаревшее подтверждение email, а баланс ключей делает проверяемым и актуальным без перезапуска.
+
+## [2026-07-27] refactor: раздельный CI/CD frontend и backend
+**Коммит:** `локально, без коммита`
+**Файлы:** `scripts/deploy-changed.mjs`, `scripts/release-change-plan.mjs`, `scripts/release-change-plan-test.mjs`, `server/deploy.sh`, `scripts/account-operator-deploy.mjs`, `scripts/configure-registry-lifecycle.sh`, `ops/registry-lifecycle/*.json`, `package.json`, `.ai/13_DEPLOYMENT.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** refactor
+**Что изменено:** release-orchestrator классифицирует точный `git diff` и независимо запускает frontend, backend и migration operator; Docker-сборки получили BuildKit registry cache; для Registry добавлены lifecycle-политики с обязательным dry-run; backend deploy фиксирует 20% гарантированной доли CPU.
+**Почему:** frontend-only релизы не должны создавать Docker-образы и ревизии Serverless Container, а migration operator и старые образы не должны пересобираться или удаляться без необходимости и проверки.
+
 ## [2026-07-25] fix: Gifts CTA and canonical People search
 **Коммит:** `локально, без коммита`
 **Файлы:** `src/HomePanelV2.jsx`, `src/components/DesktopUI.jsx`, `src/ProfilePanel.jsx`, `server/src/routes/user-actions.js`, `scripts/people-actions-test.mjs`, `scripts/connections-test.mjs`, `.ai/17_CHANGELOG_AI.md`
@@ -4667,3 +4681,21 @@
 - На iPhone сохранена инструкция Safari через «Поделиться» → «На экран Домой».
 - Существующие правила показа, закрытие на текущую сессию, «Больше не показывать» и скрытие для уже установленной PWA сохранены; событие успешной установки теперь также закрывает подсказку навсегда.
 - Файл Android-пакета, параметры источника и инфраструктура сборки оставлены без изменений для возможного возврата.
+## 2026-07-27 — CI/CD: identical image guard and release explanation
+
+- Backend build now produces a local OCI layout and compares its real digest with
+  the active production revision before publishing.
+- Identical images stop with `SKIPPED_IDENTICAL_IMAGE`; Registry push and
+  Serverless revision creation are skipped.
+- Added `release:why` and `release:explain` read-only analysis plus per-run Release
+  Summary and prevented-action counters.
+- Added deterministic scenario tests; cumulative counters are intentionally not
+  persisted without a reliable centralized store.
+# 2026-07-27 — Mobile UX и единая история ключей
+
+- Добавлено защищённое действие `economy:history` с серверным балансом и историей начислений/списаний.
+- Все основные счётчики ключей в главной карточке и профиле открывают единое окно истории.
+- Исправлен служебный QR: интерфейс сотрудника больше не прибавляет себе ключи целевого пользователя.
+- QR API возвращает `targetUserId` и `balanceAfter`; баланс владельца синхронизируется при возврате в PWA.
+- Новые QR-операции и получение подарка сохраняют signed-изменение, источник и статус.
+- Добавлен установленный PWA-онбординг email OTP → привязка Telegram, обновлена мобильная навигация и устранён конфликт жестов категорий.
