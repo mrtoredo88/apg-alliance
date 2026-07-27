@@ -1972,13 +1972,20 @@ export function UserApp() {
             userId: String(userData.id),
             email: userData.email || userData.linkedEmail || '',
           });
-          if (identity?.canonicalUserId && String(identity.canonicalUserId) !== String(userData.id)) {
+          if (identity?.canonicalUserId) {
+            const partnerCabinetIds = safeStringList(identity.cabinets?.partnerCabinetIds);
+            const expertCabinetIds = safeStringList(identity.cabinets?.expertCabinetIds);
             userData = {
               ...userData,
               id: identity.canonicalUserId,
+              uid: identity.canonicalUserId,
               canonicalUserId: identity.canonicalUserId,
               role: identity.roles?.[0] || userData.role,
               roles: identity.roles || userData.roles,
+              partnerId: partnerCabinetIds[0] || userData.partnerId,
+              partnerCabinetIds: partnerCabinetIds.length ? partnerCabinetIds : userData.partnerCabinetIds,
+              expertId: expertCabinetIds[0] || userData.expertId,
+              expertCabinetIds: expertCabinetIds.length ? expertCabinetIds : userData.expertCabinetIds,
             };
             setUser(userData);
             setErrorLoggerUser(String(userData.id));

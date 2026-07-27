@@ -25,8 +25,16 @@ assert.equal(adapter.client.options.max, 2);
 await adapter.dispose();
 
 const userApp = readFileSync(new URL('../src/UserApp.jsx', import.meta.url), 'utf8');
+const userActions = readFileSync(new URL('../server/src/routes/user-actions.js', import.meta.url), 'utf8');
+const cabinetCore = readFileSync(new URL('../src/cabinet/CabinetCorePage.jsx', import.meta.url), 'utf8');
 assert.match(userApp, /apg_canonical_key_balance/);
 assert.match(userApp, /if \(accountBootstrap\?\.profile\) \{\s*setUserKeys\(keys\)/);
 assert.match(userApp, /refreshKeyBalance\(\);\s*const handleResume/);
+assert.match(userActions, /ACCOUNT_CORE_ECONOMY_FIELDS/);
+assert.match(userActions, /withoutAccountCoreEconomy\(profile\)/);
+assert.match(userActions, /canonical\?\.canonicalUserId \|\| canonical\?\.id/);
+assert.match(userApp, /partnerCabinetIds: partnerCabinetIds\.length \? partnerCabinetIds : userData\.partnerCabinetIds/);
+assert.match(cabinetCore, /shareEntity\(\{/);
+assert.doesNotMatch(cabinetCore, /window\.open\(shareLink\([^)]*\), '_blank'\)/);
 
 console.log('postgres-pool-regression-test: ok');

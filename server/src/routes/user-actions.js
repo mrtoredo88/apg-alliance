@@ -113,14 +113,37 @@ function accountCoreWriteEnabled() {
     || String(process.env.ACCOUNT_STORAGE || '').toLowerCase() === 'postgres';
 }
 
+const ACCOUNT_CORE_ECONOMY_FIELDS = new Set([
+  'keys',
+  'tickets',
+  'reputation',
+  'reputationStatus',
+  'reputationStatusLabel',
+  'economyVersion',
+  'lastBonusDate',
+  'lastScanDate',
+  'scanDates',
+  'scannedPartners',
+  'scannedExperts',
+  'visitCounts',
+  'streak',
+]);
+
+function withoutAccountCoreEconomy(profile = {}) {
+  return Object.fromEntries(
+    Object.entries(profile || {}).filter(([key]) => !ACCOUNT_CORE_ECONOMY_FIELDS.has(key)),
+  );
+}
+
 async function writeAccountProfileBestEffort(userId, profile = {}, extra = {}) {
   if (!accountCoreWriteEnabled()) return null;
+  const safeProfile = withoutAccountCoreEconomy(profile);
   return serverFoundation.account.upsertProfile({
-    ...profile,
+    ...safeProfile,
     ...extra,
     id: userId,
     userId,
-    canonicalUserId: profile.canonicalUserId || userId,
+    canonicalUserId: safeProfile.canonicalUserId || userId,
   }).catch(error => {
     serverFoundation.account.metrics.recordError(error);
     return null;
@@ -514,6 +537,13 @@ async function actionIdentityDiagnostics(db, req, actor) {
       userRole: safeString(doc.userRole || doc.role || 'user', 80),
       roles: normalizeRoles(doc.roles || ['user']),
       identityStatus: safeString(doc.identityStatus || doc.identity_version || doc.identityVersion || 'legacy', 80),
+      email: safeString(doc.email || doc.linkedEmail, 220).toLowerCase(),
+      partnerId: safeString(doc.partnerId, 220),
+      partnerCabinetIds: (Array.isArray(doc.partnerCabinetIds) ? doc.partnerCabinetIds : [])
+        .map(item => safeString(item, 220)).filter(Boolean),
+      expertId: safeString(doc.expertId, 220),
+      expertCabinetIds: (Array.isArray(doc.expertCabinetIds) ? doc.expertCabinetIds : [])
+        .map(item => safeString(item, 220)).filter(Boolean),
       score: 1000 + (Array.isArray(doc.roles) ? doc.roles.length * 10 : 0),
     });
   };
@@ -560,12 +590,16 @@ async function actionIdentityDiagnostics(db, req, actor) {
   const canonical = documents.length ? documents.sort((left, right) => right.score - left.score)[0] : null;
   const actorCanonical = safeUserId(canonical?.canonicalUserId || actor.user?.canonicalUserId || requestedUserId || actor.userId);
   const openedUserId = safeUserId(requestedUserId || actor.userId || actor.uid);
-  const canonicalUserId = safeUserId(canonical?.id || canonical?.canonicalUserId || actorCanonical || openedUserId);
+  const canonicalUserId = safeUserId(canonical?.canonicalUserId || canonical?.id || actorCanonical || openedUserId);
   const canonicalDoc = documents.find(row => row.id === canonicalUserId) || documents.find(row => row.canonicalUserId === canonicalUserId);
-  const roles = normalizeRoles(canonicalDoc?.roles || actor.user?.roles || actor.user?.role || ['user']);
-  const userDocs = canonicalDoc || {};
-  const partnerCabinetIds = Array.isArray(userDocs.partnerCabinetIds) ? userDocs.partnerCabinetIds : [];
-  const expertCabinetIds = Array.isArray(userDocs.expertCabinetIds) ? userDocs.expertCabinetIds : [];
+  const relatedDocs = documents.filter(row => row.id === canonicalUserId || row.canonicalUserId === canonicalUserId);
+  const roles = normalizeRoles([
+    ...relatedDocs.flatMap(row => row.roles || []),
+    ...(canonicalDoc?.roles || []),
+    ...(Array.isArray(actor.user?.roles) ? actor.user.roles : [actor.user?.role || 'user']),
+  ]);
+  const partnerCabinetIds = relatedDocs.flatMap(row => [row.partnerId, ...(row.partnerCabinetIds || [])]);
+  const expertCabinetIds = relatedDocs.flatMap(row => [row.expertId, ...(row.expertCabinetIds || [])]);
   const cabinets = {
     partnerCabinetIds: Array.from(new Set(partnerCabinetIds.map(item => safeString(item, 220)).filter(Boolean))),
     expertCabinetIds: Array.from(new Set(expertCabinetIds.map(item => safeString(item, 220)).filter(Boolean))),

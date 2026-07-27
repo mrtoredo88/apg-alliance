@@ -8,7 +8,7 @@ import { CabinetEventsBlock } from '../EventProposalTools.jsx';
 import { AiProfileSection, Stars } from '../PartnerCabinetPage.jsx';
 import { userAction } from '../userApi.js';
 import { normalizeExternalUrl, validateExternalUrl } from '../utils/externalUrls.js';
-import { shareLink } from '../utils/shareLink.js';
+import { shareEntity, shareLink } from '../utils/shareLink.js';
 import { ContentGrid } from '../workspace/WorkspaceComponents.jsx';
 import { WorkspaceNewsCenter } from '../workspace/WorkspaceNewsCenter.jsx';
 import { WorkspaceEventsManager } from '../workspace/WorkspaceEventsManager.jsx';
@@ -843,7 +843,25 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
         )}
         <GlassCard style={{ borderRadius: 26, marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <GlassButton onClick={() => publicUrl && window.open(publicUrl, '_blank')}>Открыть карточку</GlassButton>
-          <GlassButton tone="gold" onClick={() => window.open(shareLink(activeRole.id === 'expert' ? 'expert' : 'partner', currentProfile.id), '_blank')} style={{ color: '#17120a' }}>Поделиться</GlassButton>
+          <GlassButton
+            tone="gold"
+            onClick={async () => {
+              try {
+                const result = await shareEntity({
+                  entityType: activeRole.id === 'expert' ? 'expert' : 'partner',
+                  id: currentProfile.id,
+                  title: currentProfile.name || activeRole.label || 'АПГ',
+                  text: `Посмотрите ${activeRole.id === 'expert' ? 'профиль эксперта' : 'карточку партнёра'} в АПГ`,
+                });
+                if (result?.method === 'clipboard') onToast?.('Ссылка скопирована');
+              } catch (error) {
+                if (error?.name !== 'AbortError') onToast?.('Не удалось поделиться ссылкой');
+              }
+            }}
+            style={{ color: '#17120a' }}
+          >
+            Поделиться
+          </GlassButton>
         </GlassCard>
         {renderModule()}
       </GlassPanel>
