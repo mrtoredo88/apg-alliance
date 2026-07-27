@@ -27,7 +27,13 @@ async function run() {
     hasTouch: true,
   });
   const errors = [];
+  const failedResponses = [];
   page.on('pageerror', error => errors.push(error.message || String(error)));
+  page.on('response', response => {
+    if (response.status() >= 400) {
+      failedResponses.push({ status: response.status(), url: response.url() });
+    }
+  });
   page.on('console', message => {
     if (message.type() !== 'error') return;
     const text = message.text();
@@ -50,6 +56,7 @@ async function run() {
       version,
       rootHtmlLength,
       fatalText,
+      failedResponses: failedResponses.slice(0, 10),
       errors: errors.slice(0, 10),
     };
     console.log(JSON.stringify(result, null, 2));
