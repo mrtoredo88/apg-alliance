@@ -5790,6 +5790,9 @@ export default async function userActionsRoutes(fastify) {
     const db = getDb();
     let actor = null;
     try {
+      if (safeString(req.body?.action, 80) === 'guest:session') {
+        return await actionGuestSession(db, req, null);
+      }
       actor = await requireActor(req);
       return await routeAction(db, req, actor);
     } catch (error) {
