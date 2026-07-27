@@ -72,13 +72,15 @@ async function postgresRows(client, collectionName) {
 async function upsertCollection(client, collectionName, rows) {
   await client.query('BEGIN');
   try {
-    for (const row of rows) {
+    for (let offset = 0; offset < rows.length; offset += 250) {
+      const batch = rows.slice(offset, offset + 250);
       await client.query(
         `INSERT INTO apg_app_documents (collection_name, document_id, parent_path, data)
-         VALUES ($1, $2, '', $3::jsonb)
+         SELECT $1, item.id, '', item.data
+         FROM jsonb_to_recordset($2::jsonb) AS item(id text, data jsonb)
          ON CONFLICT (collection_name, parent_path, document_id) DO UPDATE
          SET data = EXCLUDED.data, updated_at = now()`,
-        [collectionName, row.id, JSON.stringify({ ...row.data, id: row.id })],
+        [collectionName, JSON.stringify(batch)],
       );
     }
     await client.query('COMMIT');
