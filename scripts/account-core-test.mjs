@@ -91,7 +91,7 @@ const service = new AccountCoreService({
 
 await service.upsertProfile({ id: 'u1', canonicalUserId: 'u1', email: 'USER@example.com', displayName: 'User One' });
 await service.setRoles({ userId: 'u1', roles: ['partner'], primaryRole: 'partner', permissions: ['workspace:open'] });
-await service.cabinets.upsert({ userId: 'u1', type: 'partner', entityId: 'p1' });
+await service.upsertCabinet({ userId: 'u1', type: 'partner', entityId: 'p1' });
 const session = await service.restoreSession({ userId: 'u1', firebaseUid: 'fb1' });
 const workspace = await service.bootstrapWorkspace('u1');
 const home = await service.bootstrapHome('u1');

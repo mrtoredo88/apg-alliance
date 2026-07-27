@@ -847,6 +847,29 @@ async function actionProfileSync(db, req, actor) {
   consentStatus = getConsentStatus(userDoc);
   await audit(db, req, actor, created ? 'profile:create' : 'profile:sync', 'users', userId, 'success', { dailyBonusAwarded, referralBonusAwarded, referralRecoveryStatus, referralRecoveryReason, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion });
   await writeAccountProfileBestEffort(userId, userDoc, { bootstrap: { profileSync: true, created } });
+  if (accountCoreWriteEnabled()) {
+    const cabinetLinks = [
+      ...Array.from(new Set([
+        userDoc?.partnerId,
+        ...(Array.isArray(userDoc?.partnerCabinetIds) ? userDoc.partnerCabinetIds : []),
+      ].map(item => safeString(item, 220)).filter(Boolean))).map(entityId => ({ type: 'partner', entityId })),
+      ...Array.from(new Set([
+        userDoc?.expertId,
+        ...(Array.isArray(userDoc?.expertCabinetIds) ? userDoc.expertCabinetIds : []),
+      ].map(item => safeString(item, 220)).filter(Boolean))).map(entityId => ({ type: 'expert', entityId })),
+    ];
+    await Promise.all(cabinetLinks.map(({ type, entityId }) => serverFoundation.account.upsertCabinet({
+      userId,
+      type,
+      entityId,
+      role: 'owner',
+      status: 'active',
+      metadata: { source: 'profile-sync', migrated: true },
+    }).catch(error => {
+      serverFoundation.account.metrics.recordError(error);
+      return null;
+    })));
+  }
   let accountBalance = null;
   if (dailyBonusAwarded && accountCoreWriteEnabled()) {
     const dailyResult = await serverFoundation.account.awardDailyBonus({

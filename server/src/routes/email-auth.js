@@ -449,6 +449,14 @@ async function attachPendingPartnerInvites(db, email, userId) {
       linkedPartnerAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
+    await serverFoundation.account.upsertCabinet({
+      userId,
+      type: 'partner',
+      entityId: partnerId,
+      role: 'owner',
+      status: 'active',
+      metadata: { source: 'partner-invite', email: normalizedEmail },
+    });
     await inviteDoc.ref.set({ status: 'accepted', acceptedBy: userId, acceptedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     await db.collection('partnerConnectionEvents').add({
       partnerId,

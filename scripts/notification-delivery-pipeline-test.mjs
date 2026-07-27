@@ -42,7 +42,8 @@ assert.match(pushRoute, /stale_pending_notification/, 'stale pending notificatio
 assert.match(pushRoute, /reason: 'category_disabled'/, 'direct delivery respects category preferences');
 assert.match(userActions, /sendDialogVkPush/, 'message notifications support VK delivery');
 assert.match(userActions, /deadFcmTokens[\s\S]*deadWebSubscriptions/, 'message delivery cleans broken subscriptions');
-assert.match(userApp, /Согласие без подписки не является работающим push-каналом/, 'UI does not report consent-only users as push-enabled');
+assert.match(userApp, /browser's current PushManager[\s\S]*subscription is authoritative/, 'installed PWA uses its actual device subscription as the notification source');
+assert.doesNotMatch(userApp, /hasStoredPushChannel[\s\S]{0,800}setNotifEnabled\(false\)/, 'a lagging server profile cannot disable a working PWA subscription');
 assert.equal(pkg.scripts['test:notification-delivery'], 'node scripts/notification-delivery-pipeline-test.mjs');
 
 console.log('notification delivery pipeline PASS');

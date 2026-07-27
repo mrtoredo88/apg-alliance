@@ -2376,18 +2376,13 @@ export function UserApp() {
                 }
               }
 
-              const hasStoredPushChannel =
-                data.notificationProvider === 'vk'
-                || (Array.isArray(data.webPushSubscriptions) && data.webPushSubscriptions.length > 0)
-                || (Array.isArray(data.fcmTokens) && data.fcmTokens.length > 0);
-              if (data.notificationsEnabled && hasStoredPushChannel) {
+              // For installed web apps the browser's current PushManager
+              // subscription is authoritative. A migrated server profile can
+              // lag behind and must never turn off a working device while the
+              // service worker is still restoring.
+              if (data.notificationsEnabled && data.notificationProvider === 'vk') {
                 localStorage.setItem('apg_notif_enabled', '1');
                 setNotifEnabled(true);
-              } else if (data.notificationsEnabled) {
-                // Согласие без подписки не является работающим push-каналом.
-                // Показываем кнопку подключения, чтобы восстановить устройство.
-                localStorage.removeItem('apg_notif_enabled');
-                setNotifEnabled(false);
               }
               if (!data.onboardingDone && !needsLegalConsent) setShowOnboarding(true);
 

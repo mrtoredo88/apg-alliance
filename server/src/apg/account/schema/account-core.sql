@@ -392,6 +392,72 @@ VALUES (
 )
 ON CONFLICT (version) DO NOTHING;
 
+-- Cabinet ownership was migrated in application user documents before
+-- Account Core became authoritative. Materialize those links once so account
+-- bootstrap never depends on client-side loading order.
+WITH migrated_cabinet_links AS (
+  SELECT document_id AS legacy_user_id, 'partner'::text AS cabinet_type, NULLIF(data->>'partnerId', '') AS entity_id
+  FROM apg_app_documents
+  WHERE collection_name = 'users' AND parent_path = ''
+  UNION ALL
+  SELECT document_id, 'partner', NULLIF(value, '')
+  FROM apg_app_documents
+  CROSS JOIN LATERAL jsonb_array_elements_text(
+    CASE WHEN jsonb_typeof(data->'partnerCabinetIds') = 'array' THEN data->'partnerCabinetIds' ELSE '[]'::jsonb END
+  )
+  WHERE collection_name = 'users' AND parent_path = ''
+  UNION ALL
+  SELECT document_id, 'expert', NULLIF(data->>'expertId', '')
+  FROM apg_app_documents
+  WHERE collection_name = 'users' AND parent_path = ''
+  UNION ALL
+  SELECT document_id, 'expert', NULLIF(value, '')
+  FROM apg_app_documents
+  CROSS JOIN LATERAL jsonb_array_elements_text(
+    CASE WHEN jsonb_typeof(data->'expertCabinetIds') = 'array' THEN data->'expertCabinetIds' ELSE '[]'::jsonb END
+  )
+  WHERE collection_name = 'users' AND parent_path = ''
+),
+resolved_cabinet_links AS (
+  SELECT DISTINCT
+    account.user_id,
+    link.cabinet_type,
+    link.entity_id
+  FROM migrated_cabinet_links link
+  JOIN apg_account_profiles account
+    ON account.user_id = link.legacy_user_id
+    OR account.canonical_user_id = link.legacy_user_id
+    OR account.user_id = (
+      SELECT canonical_user_id FROM apg_identity_users
+      WHERE id = link.legacy_user_id
+      LIMIT 1
+    )
+  WHERE link.entity_id IS NOT NULL
+)
+INSERT INTO apg_account_cabinets (id, user_id, type, role, entity_id, status, metadata, updated_at)
+SELECT
+  cabinet_type || ':' || entity_id || ':' || user_id,
+  user_id,
+  cabinet_type,
+  'owner',
+  entity_id,
+  'active',
+  '{"source":"account-core-migration","migrated":true}'::jsonb,
+  now()
+FROM resolved_cabinet_links
+ON CONFLICT (id) DO UPDATE SET
+  status = 'active',
+  metadata = apg_account_cabinets.metadata || EXCLUDED.metadata,
+  updated_at = now();
+
+INSERT INTO apg_account_schema_versions (version, checksum, description)
+VALUES (
+  'account-cabinet-links-migration-2026-07-28',
+  'account-cabinet-links-migration-v1',
+  'Materialize migrated partner and expert ownership in Account Core'
+)
+ON CONFLICT (version) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_email ON apg_account_profiles(email);
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_firebase_uid ON apg_account_profiles(firebase_uid);
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_telegram_id ON apg_account_profiles(telegram_id);
