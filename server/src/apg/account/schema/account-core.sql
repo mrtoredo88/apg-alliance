@@ -75,6 +75,19 @@ CREATE TABLE IF NOT EXISTS apg_catalog_partners (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS apg_app_documents (
+  collection_name TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  parent_path TEXT NOT NULL DEFAULT '',
+  data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (collection_name, parent_path, document_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_apg_app_documents_collection_updated
+  ON apg_app_documents (collection_name, parent_path, updated_at DESC);
+
 CREATE INDEX IF NOT EXISTS idx_apg_catalog_partners_name
   ON apg_catalog_partners ((lower(data->>'name')));
 

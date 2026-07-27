@@ -173,6 +173,8 @@
     "account:operator:deploy": "node scripts/account-operator-deploy.mjs",
     "account:operator:invoke": "node scripts/account-operator-invoke.mjs",
     "account:operator:import": "node scripts/account-operator-import.mjs",
+    "app-data:operator:inventory": "node scripts/app-data-operator.mjs",
+    "app-data:operator:migrate": "node scripts/app-data-operator.mjs --execute",
     "audit:migration-env": "node scripts/migration-environment-audit.mjs",
     "postgres:diagnostics": "node scripts/postgres-connectivity-diagnostics.mjs",
     "readiness:account": "node scripts/account-readiness.mjs",

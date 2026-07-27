@@ -1,4 +1,5 @@
 import { FirestoreAdminAdapter } from './data/FirestoreAdminAdapter.js';
+import { PostgresDataAdapter } from './data/PostgresDataAdapter.js';
 import { ServerRepository } from './data/ServerRepository.js';
 import { createIdentityV2 } from './createIdentityV2.js';
 import { FirebaseAdminIdentityProvider } from './identity/providers/FirebaseAdminIdentityProvider.js';
@@ -57,6 +58,7 @@ export { createIdentityV2 } from './createIdentityV2.js';
 export * from './identity/repositories/index.js';
 export { ServerDataAdapter } from './data/ServerDataAdapter.js';
 export { FirestoreAdminAdapter } from './data/FirestoreAdminAdapter.js';
+export { PostgresDataAdapter } from './data/PostgresDataAdapter.js';
 export { ServerRepository } from './data/ServerRepository.js';
 export { PostgresIdentityAdapter } from './infrastructure/adapters/PostgresIdentityAdapter.js';
 export * from './account/index.js';

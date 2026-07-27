@@ -15,6 +15,8 @@ const IDENTITY_MERGE_COMMAND = ['node', ['scripts/identity-merge-execute.mjs', '
 const ADMIN_PASSWORD_REPAIR_COMMAND = ['node', ['scripts/admin-pg-password-repair.mjs']];
 const TATYANA_PG_AUDIT_COMMAND = ['node', ['scripts/tatyana-pg-account-repair.mjs']];
 const TATYANA_PG_REPAIR_COMMAND = ['node', ['scripts/tatyana-pg-account-repair.mjs', '--execute']];
+const APP_DATA_INVENTORY_COMMAND = ['node', ['scripts/app-data-postgres-migrate.mjs']];
+const APP_DATA_MIGRATE_COMMAND = ['node', ['scripts/app-data-postgres-migrate.mjs', '--execute']];
 
 let running = false;
 let completed = false;
@@ -151,7 +153,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const allowed = ['/run', '/import', '/import-resume', '/verify', '/identity-merge', '/admin-password-repair', '/tatyana-pg-audit', '/tatyana-pg-repair'];
+  const allowed = ['/run', '/import', '/import-resume', '/verify', '/identity-merge', '/admin-password-repair', '/tatyana-pg-audit', '/tatyana-pg-repair', '/app-data-inventory', '/app-data-migrate'];
   if (!allowed.includes(req.url) || req.method !== 'POST') {
     json(res, 404, { ok: false, error: 'NOT_FOUND' });
     return;
@@ -219,6 +221,17 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       lastResult = await runCommand(TATYANA_PG_REPAIR_COMMAND, '', {}, { productionChanged: true });
+    }
+    if (req.url === '/app-data-inventory') {
+      lastResult = await runCommand(APP_DATA_INVENTORY_COMMAND, '', {}, { productionChanged: false });
+    }
+    if (req.url === '/app-data-migrate') {
+      if (String(payload.confirm || '') !== 'MIGRATE_APP_DATA_TO_POSTGRES') {
+        running = false;
+        json(res, 400, { ok: false, error: 'APP_DATA_MIGRATION_CONFIRMATION_REQUIRED', productionChanged: false });
+        return;
+      }
+      lastResult = await runCommand(APP_DATA_MIGRATE_COMMAND, '', {}, { productionChanged: true });
     }
   }
   running = false;
