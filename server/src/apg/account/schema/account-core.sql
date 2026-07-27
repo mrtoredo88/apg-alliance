@@ -156,6 +156,43 @@ INSERT INTO apg_account_schema_versions (version, checksum, description)
 VALUES ('account-core-v1-2026-07-20', 'account-core-schema-v1', 'APG Account Core PostgreSQL schema')
 ON CONFLICT (version) DO NOTHING;
 
+-- The MD flowers card was public before the Firestore cutover but its imported
+-- lifecycle flags described a draft. Restore only that known catalog record.
+UPDATE apg_app_documents
+SET data = data || jsonb_build_object(
+      'active', true,
+      'archived', false,
+      'deleted', false,
+      'catalogPublished', true,
+      'status', 'published',
+      'contentStatus', 'published',
+      'lifecycleStatus', 'published',
+      'publishedAt', COALESCE(data->'publishedAt', to_jsonb(now())),
+      'lifecycle', COALESCE(data->'lifecycle', '{}'::jsonb) || jsonb_build_object(
+        'version', 'content-lifecycle-v1',
+        'status', 'published',
+        'resource', 'partners',
+        'updatedBy', 'firestore-cutover-repair'
+      )
+    ),
+    updated_at = now()
+WHERE collection_name = 'partners'
+  AND parent_path = ''
+  AND document_id = 'endo3pMXsQlsBaM2sQFe'
+  AND (
+    data->>'catalogPublished' = 'false'
+    OR data->>'status' = 'draft'
+    OR data->>'active' = 'false'
+  );
+
+INSERT INTO apg_account_schema_versions (version, checksum, description)
+VALUES (
+  'catalog-md-flowers-public-2026-07-27',
+  'catalog-md-flowers-public-v1',
+  'Restore MD flowers public lifecycle flags after Firestore cutover'
+)
+ON CONFLICT (version) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_email ON apg_account_profiles(email);
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_firebase_uid ON apg_account_profiles(firebase_uid);
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_telegram_id ON apg_account_profiles(telegram_id);
