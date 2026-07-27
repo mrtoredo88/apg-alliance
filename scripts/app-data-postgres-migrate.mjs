@@ -45,8 +45,16 @@ function plain(value) {
   return value;
 }
 
+function stable(value) {
+  if (Array.isArray(value)) return value.map(stable);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, stable(value[key])]));
+  }
+  return value;
+}
+
 function canonical(rows) {
-  return JSON.stringify(rows.map(row => ({ id: row.id, data: row.data })).sort((a, b) => a.id.localeCompare(b.id)));
+  return JSON.stringify(rows.map(row => stable({ id: row.id, data: row.data })).sort((a, b) => a.id.localeCompare(b.id)));
 }
 
 function digest(rows) {
