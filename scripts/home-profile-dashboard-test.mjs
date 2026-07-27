@@ -42,8 +42,13 @@ if (!homeSource.includes("progressTitle={nextAchievement?.title || (nextLevel ? 
   throw new Error('Desktop profile dashboard must safely handle users without a next level.');
 }
 
-if (!homeSource.includes("['Ключи', userKeys") || !homeSource.includes("['Партнёры', scannedCount")) {
-  throw new Error('Mobile home profile dashboard must render the same core KPI set.');
+if (!homeSource.includes("['Ключи', userKeys") || !homeSource.includes("['Мои события'") || !homeSource.includes("['Избранное', favorites.length")) {
+  throw new Error('Mobile home profile dashboard must render keys, personal events and favorites.');
+}
+
+const partnerPropOccurrences = homeSource.match(/partners=\{partners\}/g) || [];
+if (partnerPropOccurrences.length < 3 || !homeSource.includes('function V2FirstScreenMobile({') || !homeSource.includes('partners = [],')) {
+  throw new Error('Partner catalog must be passed through HomePanelV2, V2FirstScreen and V2FirstScreenMobile.');
 }
 
 console.log('home-profile-dashboard-test: ok');

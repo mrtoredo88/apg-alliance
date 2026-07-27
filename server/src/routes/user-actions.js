@@ -1300,6 +1300,10 @@ async function actionPrizeClaim(db, req, actor) {
       type: 'prize',
       icon: safeString(prize.emoji || '🎁', 20),
       text: `Приз получен: ${safeString(prize.name, 200)} (−${cost} ключей)`,
+      keys: -cost,
+      prizeId,
+      prizeName: safeString(prize.name, 200),
+      status: 'completed',
       ts: FieldValue.serverTimestamp(),
     });
     tx.set(claimRef, {
@@ -4595,8 +4599,96 @@ async function actionSocialUpdatePrivacy(db, req, actor) {
   return { ok: true, privacy };
 }
 
+function postgresSocialAdapter() {
+  const adapter = serverFoundation.account?.profiles?.adapter;
+  return adapter?.available ? adapter : null;
+}
+
+function postgresConnectionRecord(row = {}) {
+  const payload = parseAccountJson(row.payload, {}) || {};
+  return {
+    ...payload,
+    id: safeString(row.id || payload.id, 260),
+    pairKey: safeString(row.pair_key || payload.pairKey, 520),
+    senderId: safeString(row.sender_id || payload.senderId, 260),
+    recipientId: safeString(row.recipient_id || payload.recipientId, 260),
+    status: safeString(row.status || payload.status || SOCIAL_REQUEST_STATUS.PENDING, 40),
+    connection: true,
+    connectionStatus: safeString(
+      payload.connectionStatus
+        || (row.status === SOCIAL_REQUEST_STATUS.ACCEPTED ? CONNECTION_STATUS.CONNECTED : row.status),
+      40,
+    ),
+    createdAt: row.created_at || payload.createdAt || null,
+    updatedAt: row.updated_at || payload.updatedAt || null,
+    expiresAt: row.expires_at || payload.expiresAt || null,
+  };
+}
+
+async function postgresConnectionProfile(adapter, userId = '') {
+  const id = cleanSocialId(userId);
+  if (!id) return null;
+  const result = await adapter.query(`
+    SELECT
+      p.user_id,
+      p.canonical_user_id,
+      p.email,
+      p.display_name,
+      p.first_name,
+      p.last_name,
+      p.photo,
+      p.city,
+      p.profile,
+      r.primary_role,
+      r.roles
+    FROM apg_account_profiles p
+    LEFT JOIN apg_account_roles r ON r.user_id = p.user_id
+    WHERE p.user_id = $1 OR p.canonical_user_id = $1
+    ORDER BY (p.user_id = p.canonical_user_id) DESC, p.updated_at DESC
+    LIMIT 1
+  `, [id]);
+  return result.rows?.[0] ? accountSearchRowFromPg(result.rows[0]) : null;
+}
+
+async function postgresConnectionsForUser(adapter, userId = '') {
+  const result = await adapter.query(`
+    SELECT *
+    FROM apg_social_connection_requests
+    WHERE sender_id = $1 OR recipient_id = $1
+    ORDER BY updated_at DESC
+    LIMIT 300
+  `, [cleanSocialId(userId)]);
+  return (result.rows || []).map(postgresConnectionRecord);
+}
+
 async function actionConnectionsCheck(db, req, actor) {
   const targetUserId = cleanSocialId(req.body?.targetUserId || req.body?.recipientId || req.body?.userId);
+  const adapter = postgresSocialAdapter();
+  if (adapter) {
+    const [target, requests] = await Promise.all([
+      postgresConnectionProfile(adapter, targetUserId),
+      postgresConnectionsForUser(adapter, actor.userId),
+    ]);
+    if (!target) return { ok: true, eligible: false, reason: 'recipient_not_found', status: 'stranger', request: null, target: null };
+    const request = requests.find(item => [item.senderId, item.recipientId].includes(target.id)) || null;
+    const status = request?.status === SOCIAL_REQUEST_STATUS.ACCEPTED
+      ? CONNECTION_STATUS.CONNECTED
+      : request?.status === SOCIAL_REQUEST_STATUS.PENDING
+        ? CONNECTION_STATUS.PENDING
+        : 'stranger';
+    return {
+      ok: true,
+      eligible: status === CONNECTION_STATUS.CONNECTED,
+      reason: status === CONNECTION_STATUS.CONNECTED ? 'friends' : 'manual_request_available',
+      dialogId: request?.dialogId || '',
+      status,
+      request: request ? socialRequestMirror(request, actor.userId) : null,
+      target: socialPublicUser(target, target.id),
+      shared: buildConnectionSharedContext(actor.user || {}, target),
+      action: status === CONNECTION_STATUS.CONNECTED ? 'message' : status === CONNECTION_STATUS.PENDING ? 'pending' : 'request',
+      connectionContext: { source: request?.connectionSource || '', sourceLabel: request?.connectionSourceLabel || '', shared: buildConnectionSharedContext(actor.user || {}, target) },
+    };
+  }
   const result = await evaluateServerSocialEligibility(db, actor, targetUserId);
   const senderCanonicalId = cleanSocialId(result.senderCanonicalId || actor.userId);
   const recipientCanonicalId = cleanSocialId(result.recipientCanonicalId || targetUserId);
@@ -4629,6 +4721,26 @@ async function actionConnectionsCheck(db, req, actor) {
 }
 
 async function actionConnectionsList(db, req, actor) {
+  const adapter = postgresSocialAdapter();
+  if (adapter) {
+    const requests = await postgresConnectionsForUser(adapter, actor.userId);
+    const contacts = requests
+      .filter(item => item.status === SOCIAL_REQUEST_STATUS.ACCEPTED)
+      .map(item => connectionMirror(item, actor.userId));
+    const connectionRequests = requests.map(item => socialRequestMirror(item, actor.userId));
+    return {
+      ok: true,
+      contacts,
+      requests: connectionRequests,
+      count: contacts.length,
+      lastConnections: contacts.slice(0, 5),
+      connectionContext: {
+        contactCount: contacts.length,
+        pendingIncoming: connectionRequests.filter(item => item.direction === 'incoming' && item.status === SOCIAL_REQUEST_STATUS.PENDING).length,
+        pendingOutgoing: connectionRequests.filter(item => item.direction === 'outgoing' && item.status === SOCIAL_REQUEST_STATUS.PENDING).length,
+      },
+    };
+  }
   const [contactsSnap, requests] = await Promise.all([
     db.collection('users').doc(actor.userId).collection('connections').limit(100).get().catch(() => null),
     querySocialRequestsForUser(db, actor.userId).catch(() => []),
@@ -4680,6 +4792,15 @@ function publicUserSearchText(user = {}, id = '') {
   ].map(value => safeString(value, 240).toLowerCase().replace(/ё/g, 'е')).filter(Boolean).join(' ');
 }
 
+function isLegacyOwnerPlaceholder(row = {}) {
+  const id = safeString(row.id || row.userId, 260).toLowerCase();
+  const name = safeString(row.displayName || row.name, 180).toLowerCase();
+  const email = safeString(row.email || row.linkedEmail, 220).toLowerCase();
+  return (id === 'owner' || id === 'user:owner')
+    && (!email || email === 'owner')
+    && (!name || name === 'owner');
+}
+
 function socialSearchProfileScore(row = {}, id = '', canonicalId = '') {
   const displayName = safeString(row.displayName || row.name || [row.firstName || row.first_name, row.lastName || row.last_name].filter(Boolean).join(' '), 180);
   const emailLocal = safeString(row.email || row.linkedEmail || id.replace(/^email:/, '').split('@')[0], 180).split('@')[0];
@@ -4711,6 +4832,51 @@ function buildSocialSearchAliasSet(row = {}) {
   return Array.from(aliases).filter(Boolean);
 }
 
+function buildSocialSearchMatchSignatures(row = {}) {
+  const strong = new Set();
+  const soft = new Set();
+
+  const addStrong = (value = '', prefix = 'strong') => {
+    const raw = safeString(value, 260).toLowerCase().replace(/\s+/g, ' ').trim();
+    if (!raw) return;
+    strong.add(`${prefix}:${raw}`);
+  };
+
+  const addSoft = (value = '', prefix = 'soft') => {
+    const raw = safeString(value, 260).toLowerCase().replace(/\s+/g, ' ').trim();
+    if (!raw) return;
+    soft.add(`${prefix}:${raw}`);
+  };
+
+  const email = safeString(row.email, 260).toLowerCase().trim();
+  if (email) addStrong(email, 'email');
+
+  const phoneDigits = safeString(row.phone, 260).replace(/[^\d]+/g, '');
+  if (phoneDigits.length >= 8) addStrong(phoneDigits, 'phone');
+
+  if (row.vkId || row.vk_id) addStrong(row.vkId || row.vk_id, 'vk');
+  if (row.telegramId || row.tgId) addStrong(row.telegramId || row.tgId, 'tg');
+
+  const candidateName = safeString(row.displayName || row.name || [row.firstName || row.first_name, row.lastName || row.last_name].filter(Boolean).join(' '), 220)
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (candidateName) addSoft(candidateName, 'name');
+
+  const normalizedCity = safeString(row.city || row.town, 140).toLowerCase().replace(/\s+/g, ' ').trim();
+  if (candidateName && normalizedCity) addSoft(`${candidateName}|${normalizedCity}`, 'name-city');
+
+  const role = safeString(row.role || row.userRole, 80).toLowerCase().trim();
+  if (candidateName && role) addSoft(`${candidateName}|${role}`, 'name-role');
+
+  if (row.partnerId) addStrong(row.partnerId, 'partner');
+  return {
+    strong: Array.from(strong),
+    soft: Array.from(soft),
+    all: Array.from(new Set([...strong, ...soft])),
+  };
+}
+
 function canMergeSocialSearchRows(left = {}, right = {}) {
   const leftCanonical = String(left.canonicalId || left.row?.canonicalUserId || '').trim();
   const rightCanonical = String(right.canonicalId || right.row?.canonicalUserId || '').trim();
@@ -4721,7 +4887,21 @@ function canMergeSocialSearchRows(left = {}, right = {}) {
 
   const leftAliases = new Set(left.aliases || []);
   const rightAliases = right.aliases || [];
-  return rightAliases.some(alias => leftAliases.has(alias));
+  if (rightAliases.some(alias => leftAliases.has(alias))) return true;
+
+  const leftStrong = new Set(left.signatures?.strong || []);
+  const rightStrong = new Set(right.signatures?.strong || []);
+  if ([...leftStrong].some(alias => rightStrong.has(alias))) return true;
+
+  const leftSoft = new Set(left.signatures?.soft || []);
+  const rightSoft = new Set(right.signatures?.soft || []);
+  if ([...leftSoft].some(alias => rightSoft.has(alias))) {
+    const leftHasContext = (left.aliases?.length || 0) > 0;
+    const rightHasContext = (right.aliases?.length || 0) > 0;
+    if (leftHasContext && rightHasContext) return true;
+  }
+
+  return false;
 }
 
 function parseAccountJson(value, fallback) {
@@ -4827,6 +5007,11 @@ async function dedupeSocialSearchRows(db, rows = []) {
   const enriched = await Promise.all(rows.map(async row => {
     const context = await getSocialIdentityContext(db, row.id, row).catch(() => null);
     const canonicalId = cleanSocialId(context?.canonicalId || row.canonicalUserId || row.id);
+    const signatures = buildSocialSearchMatchSignatures({
+      ...row,
+      id: row.id || context?.id,
+      canonicalUserId: canonicalId || row.canonicalUserId || row.userId || row.user?.id,
+    });
     const aliases = Array.from(new Set([
       row.id,
       canonicalId,
@@ -4839,6 +5024,7 @@ async function dedupeSocialSearchRows(db, rows = []) {
       row,
       canonicalId: canonicalId || row.id,
       aliases,
+      signatures,
       score: socialSearchProfileScore(row, row.id, canonicalId || row.id),
     };
   }));
@@ -4892,12 +5078,44 @@ async function dedupeSocialSearchRows(db, rows = []) {
 async function actionConnectionsSearch(db, req, actor) {
   const query = safeString(req.body?.query, 120).toLowerCase().replace(/ё/g, 'е');
   if (query.length < 2) return { ok: true, people: [] };
+  const adapter = postgresSocialAdapter();
+  if (adapter) {
+    const [accountRows, requests] = await Promise.all([
+      searchAccountProfilesForConnections(query, actor.userId),
+      postgresConnectionsForUser(adapter, actor.userId),
+    ]);
+    const people = (accountRows || []).slice(0, 40).map(row => {
+      const aliases = Array.from(new Set([row.id, row.canonicalUserId, ...(row.identityAliases || [])].map(cleanSocialId).filter(Boolean)));
+      const request = requests.find(item => {
+        const otherId = item.senderId === actor.userId ? item.recipientId : item.senderId;
+        return aliases.includes(otherId);
+      }) || null;
+      const status = request?.status === SOCIAL_REQUEST_STATUS.ACCEPTED
+        ? CONNECTION_STATUS.CONNECTED
+        : request?.status === SOCIAL_REQUEST_STATUS.PENDING
+          ? CONNECTION_STATUS.PENDING
+          : 'stranger';
+      return {
+        ...socialPublicUser(row, row.id),
+        identityAliases: aliases,
+        username: safeString(row.username, 80),
+        company: safeString(row.company || row.companyName || row.organization || row.partnerName || row.expertName, 160),
+        city: safeString(row.city || row.town, 120),
+        about: safeString(row.about || row.bio || row.description, 240),
+        status,
+        direction: request ? socialRequestMirror(request, actor.userId).direction : '',
+        dialogId: request?.dialogId || '',
+        shared: buildConnectionSharedContext(actor.user || {}, row),
+      };
+    });
+    return { ok: true, people };
+  }
   const [accountRows, usersSnap, requests, contactsSnap, blockedSnap] = await Promise.all([
-    accountCoreWriteEnabled() ? searchAccountProfilesForConnections(query, actor.userId).catch(error => {
+    searchAccountProfilesForConnections(query, actor.userId).catch(error => {
       serverFoundation.account.metrics.recordError(error);
       return null;
-    }) : Promise.resolve(null),
-    accountCoreWriteEnabled() ? Promise.resolve(null) : db.collection('users').limit(700).get(),
+    }),
+    db.collection('users').limit(700).get(),
     querySocialRequestsForUser(db, actor.userId).catch(() => []),
     db.collection('users').doc(actor.userId).collection('connections').limit(300).get().catch(() => null),
     db.collection('users').doc(actor.userId).collection('blockedUsers').limit(100).get().catch(() => null),
@@ -4914,35 +5132,45 @@ async function actionConnectionsSearch(db, req, actor) {
     .forEach(item => {
       [item.senderId, item.recipientId].map(String).filter(id => id && id !== String(actor.userId)).forEach(id => pendingByUser.set(id, item));
     });
-  const matchedRows = Array.isArray(accountRows)
-    ? accountRows.filter(row => !blocked.has(String(row.id)) && !(row.identityAliases || []).some(id => blocked.has(String(id))))
-    : usersSnap.docs
+  const accountMatches = (Array.isArray(accountRows) ? accountRows : [])
+    .filter(row => !blocked.has(String(row.id)) && !(row.identityAliases || []).some(id => blocked.has(String(id))))
+    .filter(row => row.id !== actor.userId);
+  const usersMatches = Array.isArray(accountRows) ? [] : (usersSnap?.docs || [])
       .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
       .filter(row => row.id !== actor.userId && !blocked.has(String(row.id)) && !isArchivedUser(row))
+      .filter(row => !isLegacyOwnerPlaceholder(row))
       .filter(row => publicUserSearchText(row, row.id).includes(query))
+      .filter(row => !(row.identityAliases || []).some(id => blocked.has(String(id))))
       .slice(0, 80);
+  const matchedRows = [
+    ...accountMatches,
+    ...usersMatches,
+  ];
   const dedupedRows = await dedupeSocialSearchRows(db, matchedRows);
-  const people = dedupedRows.slice(0, 40).map(({ row, canonicalId, aliases }) => {
-      const aliasSet = new Set(aliases.map(String));
-      const pending = aliases.map(id => pendingByUser.get(String(id))).find(Boolean);
-      const contact = contacts.find(item => aliasSet.has(String(item.contactUserId || item.id || '')));
-      const status = aliases.some(id => connected.has(String(id)))
-        ? CONNECTION_STATUS.CONNECTED
-        : pending
-          ? SOCIAL_REQUEST_STATUS.PENDING
-          : 'stranger';
-      return {
-        ...socialPublicUser(row, canonicalId || row.id),
-        identityAliases: aliases,
-        username: safeString(row.username, 80),
-        company: safeString(row.company || row.companyName || row.organization || row.partnerName || row.expertName, 160),
-        city: safeString(row.city || row.town, 120),
-        about: safeString(row.about || row.bio || row.description, 240),
-        status,
-        direction: pending ? socialRequestMirror(pending, actor.userId).direction : '',
-        dialogId: contact?.dialogId || '',
-        shared: buildConnectionSharedContext(actor.user || {}, row),
-      };
+  const people = dedupedRows
+    .filter(({ canonicalId, aliases }) => canonicalId !== actor.userId && !(aliases || []).includes(actor.userId))
+    .slice(0, 40)
+    .map(({ row, canonicalId, aliases }) => {
+    const aliasSet = new Set(aliases.map(String));
+    const pending = aliases.map(id => pendingByUser.get(String(id))).find(Boolean);
+    const contact = contacts.find(item => aliasSet.has(String(item.contactUserId || item.id || '')));
+    const status = aliases.some(id => connected.has(String(id)))
+      ? CONNECTION_STATUS.CONNECTED
+      : pending
+        ? SOCIAL_REQUEST_STATUS.PENDING
+        : 'stranger';
+    return {
+      ...socialPublicUser(row, canonicalId || row.id),
+      identityAliases: aliases,
+      username: safeString(row.username, 80),
+      company: safeString(row.company || row.companyName || row.organization || row.partnerName || row.expertName, 160),
+      city: safeString(row.city || row.town, 120),
+      about: safeString(row.about || row.bio || row.description, 240),
+      status,
+      direction: pending ? socialRequestMirror(pending, actor.userId).direction : '',
+      dialogId: contact?.dialogId || '',
+      shared: buildConnectionSharedContext(actor.user || {}, row),
+    };
     });
   return { ok: true, people };
 }
@@ -4951,6 +5179,78 @@ async function actionConnectionsRequest(db, req, actor) {
   const senderId = cleanSocialId(actor.userId);
   const recipientId = cleanSocialId(req.body?.recipientId || req.body?.targetUserId || req.body?.userId);
   if (!recipientId || senderId === recipientId) throw Object.assign(new Error('Некорректный получатель.'), { statusCode: 400, code: 'INVALID_RECIPIENT' });
+  const adapter = postgresSocialAdapter();
+  if (adapter) {
+    const [sender, recipient] = await Promise.all([
+      postgresConnectionProfile(adapter, senderId),
+      postgresConnectionProfile(adapter, recipientId),
+    ]);
+    if (!recipient) throw Object.assign(new Error('Получатель не найден.'), { statusCode: 404, code: 'RECIPIENT_NOT_FOUND' });
+    const normalizedSenderId = cleanSocialId(sender?.canonicalUserId || sender?.id || senderId);
+    const normalizedRecipientId = cleanSocialId(recipient.canonicalUserId || recipient.id);
+    if (normalizedSenderId === normalizedRecipientId) throw Object.assign(new Error('Нельзя добавить в друзья собственный профиль.'), { statusCode: 400, code: 'INVALID_RECIPIENT' });
+    const pairKey = [normalizedSenderId, normalizedRecipientId].sort().join('::');
+    const existingResult = await adapter.query('SELECT * FROM apg_social_connection_requests WHERE pair_key = $1 LIMIT 1', [pairKey]);
+    const existing = existingResult.rows?.[0] ? postgresConnectionRecord(existingResult.rows[0]) : null;
+    if (existing?.status === SOCIAL_REQUEST_STATUS.PENDING) {
+      return { ok: true, status: CONNECTION_STATUS.PENDING, request: socialRequestMirror(existing, normalizedSenderId), connection: connectionSnapshot(existing, normalizedSenderId) };
+    }
+    if (existing?.status === SOCIAL_REQUEST_STATUS.ACCEPTED) {
+      return { ok: true, status: CONNECTION_STATUS.CONNECTED, dialogId: existing.dialogId || '', request: socialRequestMirror(existing, normalizedSenderId), connection: connectionSnapshot(existing, normalizedSenderId) };
+    }
+    const recentResult = await adapter.query(`
+      SELECT count(*)::int AS count
+      FROM apg_social_connection_requests
+      WHERE sender_id = $1 AND created_at >= now() - interval '24 hours'
+    `, [normalizedSenderId]);
+    if (Number(recentResult.rows?.[0]?.count || 0) >= SOCIAL_REQUEST_LIMIT) {
+      throw Object.assign(new Error('Лимит запросов на сегодня исчерпан.'), { statusCode: 429, code: 'CONNECTION_RATE_LIMITED' });
+    }
+    const context = connectionSourceFromRequest(req);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const requestId = existing?.id || socialRequestId(normalizedSenderId, normalizedRecipientId);
+    const record = {
+      ...createSocialRequestRecord({
+        senderId: normalizedSenderId,
+        recipientId: normalizedRecipientId,
+        sender: sender || actor.user || {},
+        recipient,
+        relationshipReason: 'digital_handshake',
+        now: now.getTime(),
+      }),
+      id: requestId,
+      pairKey,
+      connection: true,
+      connectionStatus: CONNECTION_STATUS.PENDING,
+      connectionSource: context.source,
+      connectionSourceLabel: context.sourceLabel,
+      connectionSourceId: context.sourceId,
+      connectionSourceTitle: context.sourceTitle,
+      connectionSourceDate: context.sourceDate,
+      shared: buildConnectionSharedContext(sender || actor.user || {}, recipient),
+      history: [connectionHistoryEntry('requested', normalizedSenderId, context)],
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+    };
+    await adapter.query(`
+      INSERT INTO apg_social_connection_requests
+        (id, pair_key, sender_id, recipient_id, status, payload, created_at, updated_at, expires_at, resolved_at)
+      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $7, $8, NULL)
+      ON CONFLICT (pair_key) DO UPDATE SET
+        id = EXCLUDED.id,
+        sender_id = EXCLUDED.sender_id,
+        recipient_id = EXCLUDED.recipient_id,
+        status = EXCLUDED.status,
+        payload = EXCLUDED.payload,
+        created_at = EXCLUDED.created_at,
+        updated_at = EXCLUDED.updated_at,
+        expires_at = EXCLUDED.expires_at,
+        resolved_at = NULL
+    `, [requestId, pairKey, normalizedSenderId, normalizedRecipientId, SOCIAL_REQUEST_STATUS.PENDING, JSON.stringify(record), now, expiresAt]);
+    return { ok: true, status: CONNECTION_STATUS.PENDING, request: socialRequestMirror(record, normalizedSenderId), connection: connectionSnapshot(record, normalizedSenderId) };
+  }
   const eligibility = await evaluateServerSocialEligibility(db, actor, recipientId);
   if (!eligibility.recipient) throw Object.assign(new Error('Получатель не найден.'), { statusCode: 404, code: 'RECIPIENT_NOT_FOUND' });
   if (eligibility.reason === 'blocked') throw Object.assign(new Error('Знакомство недоступно.'), { statusCode: 403, code: 'CONNECTION_BLOCKED' });
@@ -5013,6 +5313,70 @@ async function actionConnectionsRequest(db, req, actor) {
 }
 
 async function actionConnectionsResolve(db, req, actor, status) {
+  const adapter = postgresSocialAdapter();
+  if (adapter) {
+    const requestId = safeString(req.body?.requestId, 260);
+    const targetId = cleanSocialId(req.body?.targetUserId || req.body?.recipientId || req.body?.userId);
+    const params = requestId ? [requestId] : [actor.userId, targetId];
+    const result = requestId
+      ? await adapter.query('SELECT * FROM apg_social_connection_requests WHERE id = $1 LIMIT 1', params)
+      : await adapter.query(`
+          SELECT *
+          FROM apg_social_connection_requests
+          WHERE (sender_id = $1 AND recipient_id = $2) OR (sender_id = $2 AND recipient_id = $1)
+          ORDER BY updated_at DESC
+          LIMIT 1
+        `, params);
+    const request = result.rows?.[0] ? postgresConnectionRecord(result.rows[0]) : null;
+    if (!request) throw Object.assign(new Error('Запрос не найден.'), { statusCode: 404, code: 'REQUEST_NOT_FOUND' });
+    if (status === SOCIAL_REQUEST_STATUS.CANCELLED && request.senderId !== actor.userId) {
+      throw Object.assign(new Error('Нельзя отменить чужой запрос.'), { statusCode: 403, code: 'REQUEST_FORBIDDEN' });
+    }
+    if ([SOCIAL_REQUEST_STATUS.ACCEPTED, SOCIAL_REQUEST_STATUS.DECLINED].includes(status) && request.recipientId !== actor.userId) {
+      throw Object.assign(new Error('Нельзя отвечать на чужой запрос.'), { statusCode: 403, code: 'REQUEST_FORBIDDEN' });
+    }
+    if (request.status !== SOCIAL_REQUEST_STATUS.PENDING) {
+      if (request.status === status) {
+        return { ok: true, request: socialRequestMirror(request, actor.userId), status, dialogId: request.dialogId || '', connectionStatus: status === SOCIAL_REQUEST_STATUS.ACCEPTED ? CONNECTION_STATUS.CONNECTED : CONNECTION_STATUS.DECLINED, connection: connectionSnapshot(request, actor.userId) };
+      }
+      throw Object.assign(new Error('Запрос уже обработан.'), { statusCode: 409, code: 'REQUEST_ALREADY_RESOLVED' });
+    }
+    const now = new Date();
+    const connectionStatus = status === SOCIAL_REQUEST_STATUS.ACCEPTED ? CONNECTION_STATUS.CONNECTED : CONNECTION_STATUS.DECLINED;
+    const mirrored = {
+      ...request,
+      status,
+      connectionStatus,
+      updatedAt: now.toISOString(),
+      acceptedAt: status === SOCIAL_REQUEST_STATUS.ACCEPTED ? now.toISOString() : request.acceptedAt || null,
+      declinedAt: status === SOCIAL_REQUEST_STATUS.DECLINED ? now.toISOString() : request.declinedAt || null,
+      cancelledAt: status === SOCIAL_REQUEST_STATUS.CANCELLED ? now.toISOString() : request.cancelledAt || null,
+      connectedAt: status === SOCIAL_REQUEST_STATUS.ACCEPTED ? now.toISOString() : request.connectedAt || null,
+      history: [
+        ...(Array.isArray(request.history) ? request.history.slice(-10) : []),
+        connectionHistoryEntry(status === SOCIAL_REQUEST_STATUS.ACCEPTED ? 'connected' : status, actor.userId, {
+          source: request.connectionSource,
+          sourceLabel: request.connectionSourceLabel,
+          sourceId: request.connectionSourceId,
+          sourceTitle: request.connectionSourceTitle,
+          sourceDate: request.connectionSourceDate,
+        }),
+      ],
+    };
+    await adapter.query(`
+      UPDATE apg_social_connection_requests
+      SET status = $2, payload = $3::jsonb, updated_at = $4, resolved_at = $4
+      WHERE id = $1
+    `, [request.id, status, JSON.stringify(mirrored), now]);
+    return {
+      ok: true,
+      request: socialRequestMirror(mirrored, actor.userId),
+      status,
+      dialogId: mirrored.dialogId || '',
+      connectionStatus,
+      connection: connectionSnapshot(mirrored, actor.userId),
+    };
+  }
   const result = await actionSocialResolveRequest(db, req, actor, status);
   const request = result.request || null;
   return {
@@ -5243,6 +5607,59 @@ async function actionPushTestDevice(db, req, actor) {
   return { ok: sent === 1, userId, deviceId, sent, failed, reason, errorCode };
 }
 
+function economyTimestamp(value) {
+  if (!value) return null;
+  if (typeof value.toDate === 'function') return value.toDate().toISOString();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function economyDelta(item = {}) {
+  const explicit = Number(item.keys);
+  if (Number.isFinite(explicit) && explicit !== 0) return explicit;
+  const text = safeString(item.text, 500);
+  const negative = text.match(/[−-]\s*(\d+)\s*ключ/i);
+  if (negative) return -Number(negative[1]);
+  const positive = text.match(/\+\s*(\d+)\s*ключ/i);
+  return positive ? Number(positive[1]) : 0;
+}
+
+async function actionEconomyHistory(db, req, actor) {
+  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const requestedLimit = Math.max(1, Math.min(200, Number(req.body?.limit) || 100));
+  const userRef = db.collection('users').doc(userId);
+  const [userSnap, activitySnap] = await Promise.all([
+    userRef.get(),
+    userRef.collection('activity').orderBy('ts', 'desc').limit(requestedLimit).get(),
+  ]);
+  if (!userSnap.exists) throw Object.assign(new Error('Пользователь не найден.'), { statusCode: 404, code: 'USER_NOT_FOUND' });
+  const balance = Number(userSnap.data()?.keys || 0);
+  let runningBalance = balance;
+  const operations = activitySnap.docs
+    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+    .filter(item => economyDelta(item) !== 0)
+    .map(item => {
+      const delta = economyDelta(item);
+      const balanceAfter = runningBalance;
+      runningBalance -= delta;
+      return {
+        id: item.id,
+        type: safeString(item.type || 'keys', 80),
+        title: safeString(item.title, 180),
+        text: safeString(item.text, 320),
+        reason: safeString(item.reason || item.description, 320),
+        sourceId: safeString(item.partnerId || item.expertId || item.eventId || item.prizeId || item.sourceId, 220),
+        sourceLabel: safeString(item.partnerName || item.expertName || item.eventName || item.prizeName || item.sourceLabel, 220),
+        delta,
+        balanceAfter,
+        status: safeString(item.status || 'completed', 40),
+        statusLabel: item.status === 'reverted' ? 'Отменено' : item.status === 'pending' ? 'В обработке' : 'Выполнено',
+        createdAt: economyTimestamp(item.ts || item.createdAt || item.updatedAt),
+      };
+    });
+  return { ok: true, userId, balance, operations, hasMore: activitySnap.size >= requestedLimit };
+}
+
 async function routeAction(db, req, actor) {
   const action = safeString(req.body?.action, 80);
   if (action === 'auth:linkUser') return actionAuthLink(db, req, actor);
@@ -5267,6 +5684,7 @@ async function routeAction(db, req, actor) {
   if (action === 'prize:claim') return actionPrizeClaim(db, req, actor);
   if (action === 'raffle:enter') return actionRaffleEnter(db, req, actor);
   if (action === 'economy:exchangeTickets') return actionEconomyExchangeTickets(db, req, actor);
+  if (action === 'economy:history') return actionEconomyHistory(db, req, actor);
   if (action === 'event:toggle') return actionEventToggle(db, req, actor);
   if (action === 'event:propose') return actionEventPropose(db, req, actor);
   if (action === 'workspace:eventCreate') return actionWorkspaceEventCreate(db, req, actor);

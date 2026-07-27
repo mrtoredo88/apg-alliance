@@ -414,6 +414,10 @@ function V2FirstScreen({
   onOpenReference,
   onOpenLoki,
   onOpenProfile,
+  onOpenKeyHistory,
+  onOpenFavorites,
+  onOpenPartnerCabinet,
+  hasPartnerCabinet = false,
   onOpenOffers,
   onOpenPartners,
   onOpenNews,
@@ -452,6 +456,10 @@ function V2FirstScreen({
         onOpenReference={onOpenReference}
         onOpenLoki={onOpenLoki}
         onOpenProfile={onOpenProfile}
+        onOpenKeyHistory={onOpenKeyHistory}
+        onOpenFavorites={onOpenFavorites}
+        onOpenPartnerCabinet={onOpenPartnerCabinet}
+        hasPartnerCabinet={hasPartnerCabinet}
         onOpenOffers={onOpenOffers}
         onOpenPartners={onOpenPartners}
         onOpenNews={onOpenNews}
@@ -474,6 +482,7 @@ function V2FirstScreen({
       scannedCount={scannedCount}
       registeredEventIds={registeredEventIds}
       favorites={favorites}
+      partners={partners}
       events={events}
       featuredPartner={featuredPartner}
       partnerOfMonth={partnerOfMonth}
@@ -487,6 +496,10 @@ function V2FirstScreen({
       onOpenReference={onOpenReference}
       onOpenLoki={onOpenLoki}
       onOpenProfile={onOpenProfile}
+      onOpenKeyHistory={onOpenKeyHistory}
+      onOpenFavorites={onOpenFavorites}
+      onOpenPartnerCabinet={onOpenPartnerCabinet}
+      hasPartnerCabinet={hasPartnerCabinet}
       isOffline={isOffline}
       desktopMode={desktopMode}
     />
@@ -502,6 +515,7 @@ function V2FirstScreenMobile({
   scannedCount = 0,
   registeredEventIds = [],
   favorites = [],
+  partners = [],
   events,
   featuredPartner,
   partnerOfMonth,
@@ -516,6 +530,10 @@ function V2FirstScreenMobile({
   onOpenReference,
   onOpenLoki,
   onOpenProfile,
+  onOpenKeyHistory,
+  onOpenFavorites,
+  onOpenPartnerCabinet,
+  hasPartnerCabinet = false,
   desktopMode = false,
   isOffline = false,
 }) {
@@ -621,12 +639,11 @@ function V2FirstScreenMobile({
                 ...V2.glass,
                 color: V2.text, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(115deg, rgba(201,168,76,0.24) 0%, rgba(255,255,255,0.54) 42%, rgba(201,168,76,0.24) 62%, rgba(255,255,255,0.28) 100%)',
-                backgroundSize: '250% 100%',
-                animation: 'shimmer 1.7s ease-in-out infinite',
+                background: 'linear-gradient(145deg, rgba(201,168,76,0.26), rgba(255,255,255,0.12))',
+                boxShadow: '0 12px 28px rgba(201,168,76,0.14), inset 0 1px 0 rgba(255,255,255,0.24)',
               }}
             >
-              <span style={{ position: 'relative', zIndex: 1, animation: 'pulse-glow 1.8s ease-in-out infinite' }}>🎁</span>
+              <span style={{ position: 'relative', zIndex: 1 }}>🎁</span>
             </button>
             <button
               type="button"
@@ -645,19 +662,7 @@ function V2FirstScreenMobile({
           </div>
         </header>
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 'clamp(9px, 1.7svh, 14px)' }}>
-          <div style={{ minWidth: 0 }}>
-            <h1 style={{ margin: 0, color: V2.text, fontSize: 'clamp(28px, 4.1svh, 34px)', lineHeight: 'clamp(31px, 4.6svh, 38px)', fontWeight: 780, letterSpacing: 0 }}>
-              {greeting}
-            </h1>
-            <p style={{ margin: 'clamp(6px, 1.2svh, 10px) 0 0', color: V2.textSoft, fontSize: 'clamp(13px, 1.8svh, 14px)', lineHeight: 'clamp(19px, 2.7svh, 22px)', fontWeight: 400, maxWidth: 310 }}>
-              Сегодня в Зеленограде происходит много интересного.
-            </p>
-          </div>
-
-        </div>
-
-        <div style={{ display: desktopMode ? 'grid' : 'block', gridTemplateColumns: desktopMode ? 'minmax(0, 1.45fr) minmax(320px, 0.85fr)' : undefined, gap: desktopMode ? 16 : undefined, alignItems: 'stretch' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: desktopMode ? 'minmax(0, 1.45fr) minmax(320px, 0.85fr)' : '1fr', gap: desktopMode ? 16 : 12, alignItems: 'stretch' }}>
         <button
           onClick={heroAction}
           {...pressMotion}
@@ -709,13 +714,12 @@ function V2FirstScreenMobile({
           </div>
         </button>
 
-        <button
-          type="button"
-          onClick={onOpenTasks}
+        <div
           {...pressMotion}
           style={{
             width: '100%',
-            marginTop: desktopMode ? 0 : 'clamp(10px, 1.9svh, 16px)',
+            marginTop: 0,
+            order: desktopMode ? undefined : -1,
             border: '1px solid rgba(244,217,140,0.22)',
             borderRadius: 30,
             padding: 'clamp(10px, 1.8svh, 13px)',
@@ -729,6 +733,14 @@ function V2FirstScreenMobile({
             ...revealMotion(2, 'splash'),
           }}
         >
+          <div>
+            <h1 style={{ margin: 0, color: V2.text, fontSize: 'clamp(26px, 4svh, 33px)', lineHeight: 'clamp(30px, 4.5svh, 37px)', fontWeight: 800, letterSpacing: 0 }}>
+              {greeting}
+            </h1>
+            <p style={{ margin: '6px 0 0', color: V2.textSoft, fontSize: 13, lineHeight: '19px', fontWeight: 400 }}>
+              Сегодня в Зеленограде происходит много интересного.
+            </p>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '58px minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
             <span style={{ width: 58, height: 58, borderRadius: '50%', padding: 3, background: `conic-gradient(${level.color || V2.gold} ${profileProgress * 3.6}deg, rgba(255,255,255,0.14) 0deg)`, color: '#211706', display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 920, boxShadow: '0 12px 30px rgba(216,184,103,0.14)' }}>
               <span style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: V2.goldMetal, display: 'grid', placeItems: 'center' }}>
@@ -739,20 +751,19 @@ function V2FirstScreenMobile({
               <span style={{ display: 'block', color: V2.text, fontSize: 17, lineHeight: '20px', fontWeight: 920, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullName}</span>
               <span style={{ display: 'block', color: V2.textSoft, fontSize: 11.3, lineHeight: '14px', fontWeight: 720, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{level.label} · {todayForYou}</span>
             </span>
-            <span style={{ borderRadius: 999, padding: '6px 9px', background: 'rgba(244,217,140,0.14)', border: '1px solid rgba(244,217,140,0.28)', color: V2.gold, fontSize: 10.2, lineHeight: '12px', fontWeight: 880 }}>Кабинет</span>
+            <button type="button" onClick={hasPartnerCabinet ? onOpenPartnerCabinet : onOpenProfile} style={{ borderRadius: 999, padding: '7px 10px', background: V2.goldMetal, border: '1px solid rgba(255,235,174,0.5)', color: '#211706', boxShadow: '0 8px 22px rgba(216,184,103,0.22)', fontSize: 10.2, lineHeight: '12px', fontWeight: 900, cursor: 'pointer' }}>{hasPartnerCabinet ? 'Кабинет партнёра' : 'Профиль'}</button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6 }}>
             {[
-              ['Ключи', userKeys, '🗝️', keysToNext > 0 ? `ещё ${keysToNext}` : 'уровень'],
-              ['Серия', streak, '🔥', streak > 0 ? 'дней' : 'старт'],
-              ['События', Array.isArray(registeredEventIds) ? registeredEventIds.length : 0, '📅', eventsTodayCount > 0 ? 'сегодня' : 'афиша'],
-              ['Партнёры', scannedCount, '🏙️', scannedCount > 0 ? 'визиты' : 'рядом'],
-            ].map(([label, value, icon, sub]) => (
-              <span key={label} style={{ minHeight: 41, borderRadius: 16, padding: '6px 5px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.11)', overflow: 'hidden' }}>
+              ['Ключи', userKeys, '🗝️', keysToNext > 0 ? `ещё ${keysToNext}` : 'уровень', onOpenKeyHistory],
+              ['Мои события', Array.isArray(registeredEventIds) ? registeredEventIds.length : 0, '📅', eventsTodayCount > 0 ? 'сегодня' : 'афиша', onOpenEvents],
+              ['Избранное', favorites.length, '⭐', favorites.length > 0 ? 'сохранено' : 'добавить', onOpenFavorites],
+            ].map(([label, value, icon, sub, onClick]) => (
+              <button type="button" onClick={onClick} key={label} style={{ minHeight: 41, borderRadius: 16, padding: '6px 5px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.11)', overflow: 'hidden', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
                 <span style={{ display: 'flex', justifyContent: 'space-between', gap: 3, color: V2.gold, fontSize: 12, lineHeight: '14px', fontWeight: 900 }}><span>{icon}</span><span>{value}</span></span>
                 <span style={{ display: 'block', color: V2.textMuted, fontSize: 8.6, lineHeight: '10px', fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{label}</span>
                 <span style={{ display: 'block', color: V2.gold, fontSize: 8.1, lineHeight: '10px', fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{sub}</span>
-              </span>
+              </button>
             ))}
           </div>
           <span style={{ display: 'grid', gap: 5 }}>
@@ -764,7 +775,7 @@ function V2FirstScreenMobile({
               <span style={{ display: 'block', width: `${profileProgress}%`, height: '100%', borderRadius: 999, background: `linear-gradient(90deg, ${level.color || V2.gold}, #E8C97A)`, transition: 'width 0.65s ease' }} />
             </span>
           </span>
-        </button>
+        </div>
 
         </div>
       </div>
@@ -797,6 +808,10 @@ function V2FirstScreenDesktop({
   onOpenReference,
   onOpenLoki,
   onOpenProfile,
+  onOpenKeyHistory,
+  onOpenFavorites,
+  onOpenPartnerCabinet,
+  hasPartnerCabinet = false,
   onOpenPartners,
   onOpenOffers,
   onOpenNews,
@@ -856,12 +871,9 @@ function V2FirstScreenDesktop({
           ? `Последнее: баланс ${userKeys} ключей`
           : '';
   const profileStats = [
-    { label: 'Ключи', value: counterPulse ? `+${userKeys}` : userKeys, accent: V2.gold, icon: '🗝️', sub: keysToNext > 0 ? `ещё ${keysToNext}` : 'уровень' },
-    { label: 'События', value: Array.isArray(registeredEventIds) ? registeredEventIds.length : 0, accent: '#8EC5FF', icon: '📅', sub: eventsTodayCount > 0 ? `${eventsTodayCount} сегодня` : 'афиша' },
-    { label: 'Партнёры', value: scannedCount, accent: '#7EE0B8', icon: '🏙️', sub: scannedCount > 0 ? 'посещено' : 'начните' },
-    { label: 'Достиж.', value: completedTasks.length, accent: '#E8C97A', icon: '🏆', sub: nextAchievement ? 'цель рядом' : 'готово' },
-    { label: 'Серия', value: streak, accent: '#FF8C42', icon: '🔥', sub: streak > 0 ? 'дней' : 'начните' },
-    { label: 'Друзья', value: referralCount, icon: '👥', sub: referralCount > 0 ? 'приглашено' : 'пригласить' },
+    { label: 'Ключи', value: counterPulse ? `+${userKeys}` : userKeys, accent: V2.gold, icon: '🗝️', sub: keysToNext > 0 ? `ещё ${keysToNext}` : 'уровень', onClick: onOpenKeyHistory },
+    { label: 'Мои события', value: Array.isArray(registeredEventIds) ? registeredEventIds.length : 0, accent: '#8EC5FF', icon: '📅', sub: eventsTodayCount > 0 ? `${eventsTodayCount} сегодня` : 'афиша', onClick: onOpenEvents },
+    { label: 'Избранное', value: favorites.length, accent: '#E8C97A', icon: '⭐', sub: favorites.length > 0 ? 'сохранено' : 'добавить', onClick: onOpenFavorites },
   ];
   const navItems = [
     { label: 'Главная', isActive: true, onClick: () => {} },
@@ -963,6 +975,7 @@ function V2FirstScreenDesktop({
           progressValue={nextAchievementProgress}
           quickActions={[
             { id: 'profile', label: 'Профиль', icon: '👤', tone: 'gold', onClick: onOpenProfile },
+            ...(hasPartnerCabinet ? [{ id: 'partner-cabinet', label: 'Кабинет партнёра', icon: '◆', tone: 'gold', onClick: onOpenPartnerCabinet }] : []),
             { id: 'rewards', label: 'Подарки', icon: '🎁', tone: 'gold', onClick: onOpenRewards },
             { id: 'tasks', label: 'Достижения', icon: '☆', onClick: onOpenTasks },
           ]}
@@ -1622,7 +1635,7 @@ function V2SecondScreenDesktop({
       .slice(0, 4);
   }, [allEvents, eventDayParts, experts, favorites, homeExperience, partners, recommendations, titleOf, userCoords]);
   const nearbySummary = useMemo(() => ({
-    partners: nearbyObjects.filter(item => item.type === 'partner').length || (Array.isArray(partners) ? partners.length : 0),
+    partners: Array.isArray(partners) ? partners.length : 0,
     eventsToday: (Array.isArray(allEvents) ? allEvents : []).filter(isTodayEntity).length,
     experts: nearbyObjects.filter(item => item.type === 'expert').length || (Array.isArray(experts) ? experts.length : 0),
     offers: (Array.isArray(partners) ? partners : []).filter(partner => partner?.offer || partner?.discount || partner?.promo).length,
@@ -2068,7 +2081,7 @@ function V2SecondScreenDesktop({
                       <span style={{ color: V2.gold, fontSize: 10.5, fontWeight: 820 }}>Карта</span>
                     </button>
                   ) : null}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6 }}>
                     {[
                       ['📍', nearbySummary.partners, 'партнёров'],
                       ['🎉', nearbySummary.eventsToday, 'сегодня'],
@@ -2913,6 +2926,10 @@ export function HomePanelV2({
   desktopMode = false,
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenPartners, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onOpenMessages, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki, onOpenNews, onOpenNewsItem,
   onOpenProfile,
+  onOpenKeyHistory,
+  onOpenFavorites,
+  onOpenPartnerCabinet,
+  hasPartnerCabinet = false,
   desktopWorkspaceAvailable = false,
   onSwitchAppMode,
   desktopWorkspaceMode = 'user',
@@ -3089,6 +3106,7 @@ export function HomePanelV2({
         scannedCount={scannedCount}
         registeredEventIds={registeredEventIds}
         favorites={favorites}
+        partners={partners}
         events={adaptiveHome.events}
         featuredPartner={featuredPartner}
         partnerOfMonth={partnerOfMonth}
@@ -3106,6 +3124,10 @@ export function HomePanelV2({
         onOpenReference={onOpenReference}
         onOpenLoki={onOpenLoki}
         onOpenProfile={onOpenProfile}
+        onOpenKeyHistory={onOpenKeyHistory}
+        onOpenFavorites={onOpenFavorites}
+        onOpenPartnerCabinet={onOpenPartnerCabinet}
+        hasPartnerCabinet={hasPartnerCabinet}
         onOpenNews={onOpenNews}
         onOpenMap={onOpenMap}
         onOpenExperts={onOpenExperts}

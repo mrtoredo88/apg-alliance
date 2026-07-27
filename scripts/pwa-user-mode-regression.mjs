@@ -24,6 +24,7 @@ assert.equal(normalizeRole('administrator'), 'admin');
 const userAppSource = readFileSync(new URL('../src/UserApp.jsx', import.meta.url), 'utf8');
 const lokiAssistantSource = readFileSync(new URL('../src/loki/LokiAssistant.jsx', import.meta.url), 'utf8');
 const workspaceCoreSource = readFileSync(new URL('../src/workspace/WorkspaceCore.js', import.meta.url), 'utf8');
+const offersSource = readFileSync(new URL('../src/OffersPage.jsx', import.meta.url), 'utf8');
 assert.match(userAppSource, /restoreHomeCache\(\)/);
 assert.match(userAppSource, /restoredHomeCache\.values\.news[\s\S]*isNotArchived\(item\) && isPublicContent\(item\)/);
 assert.match(userAppSource, /restoredHomeCache\.values\.events[\s\S]*isPublicContent\(item\) \|\| normalizeContentStatus\(item\) === 'completed'/);
@@ -32,5 +33,10 @@ assert.match(userAppSource, /'serviceWorker' in navigator/);
 assert.match(lokiAssistantSource, /data-floating-messages-button/);
 assert.match(lokiAssistantSource, /zIndex: 10040/);
 assert.doesNotMatch(workspaceCoreSource, /id: 'messages',[\s\S]{0,160}regions: \[WORKSPACE_REGIONS\.bottomBar\]/);
+assert.match(offersSource, /ScreenHeader title=\{title\}/);
+assert.match(userAppSource, /<Panel id="favorites">/);
+assert.match(userAppSource, /setPartnerCabinetEntryModule\('dashboard'\)/);
+assert.match(offersSource, /mobileFiltered\.map/);
+assert.match(offersSource, /activeCategory === 'all'\s*\?\s*partners\.filter\(Boolean\)/);
 
 console.log('PWA User Mode regression passed');

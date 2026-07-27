@@ -265,11 +265,11 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
         data-floating-messages-root="independent"
         style={{
           position: 'fixed',
-          right: 'max(14px, env(safe-area-inset-right, 0px))',
+          left: 'max(14px, env(safe-area-inset-left, 0px))',
           bottom: 'calc(112px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))',
           zIndex: 10040,
           display: 'grid',
-          justifyItems: 'end',
+          justifyItems: 'start',
           pointerEvents: 'auto',
         }}
       >
@@ -421,7 +421,7 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
       )}
 
       <div style={{ position: 'relative', pointerEvents: 'auto' }}>
-        {messageFab && <div style={{ display: 'grid', justifyItems: 'end', gap: 10, marginBottom: 10, pointerEvents: 'auto' }}>{messageFab}</div>}
+        {messageFab && <div style={{ position: 'fixed', left: 'max(14px, env(safe-area-inset-left, 0px))', bottom: 'calc(112px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))', zIndex: 10041, display: 'grid', justifyItems: 'start', gap: 10, pointerEvents: 'auto' }}>{messageFab}</div>}
         {hitDebug && (
           <div
             aria-hidden="true"

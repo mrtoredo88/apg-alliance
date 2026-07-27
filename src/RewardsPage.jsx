@@ -446,7 +446,7 @@ function ClaimSuccessModal({ prize, onClose, partners = [], experts = [] }) {
 
 // ─── Главная страница наград ──────────────────────────────────────────────────
 
-export function RewardsPage({ nav = 'rewards', variant = 'v2', user, userKeys, userTickets = 0, userReputation = 0, onBack, onClaim, onExchangeTickets, onRaffleEnter, partners = [], experts = [], desktopOverview = null, desktopMode = false }) {
+export function RewardsPage({ nav = 'rewards', variant = 'v2', user, userKeys, userTickets = 0, userReputation = 0, onBack, onClaim, onExchangeTickets, onRaffleEnter, onOpenKeyHistory, partners = [], experts = [], desktopOverview = null, desktopMode = false }) {
   const [prizes, setPrizes]               = useState([]);
   const [myClaims, setMyClaims]           = useState([]);
   const [loading, setLoading]             = useState(true);
@@ -597,7 +597,7 @@ export function RewardsPage({ nav = 'rewards', variant = 'v2', user, userKeys, u
         info={
           <DesktopSidebarCard title="Баланс" subtitle="Доступно для обмена">
             <div style={{ display: 'grid', gap: 12 }}>
-              <GlassCard tone="gold" style={{ borderRadius: 24, padding: 18 }}>
+              <GlassCard tone="gold" onClick={onOpenKeyHistory} style={{ borderRadius: 24, padding: 18 }}>
                 <div style={{ color: 'rgba(20,15,8,0.62)', fontSize: 12, fontWeight: 760, marginBottom: 4 }}>Ключи</div>
                 <div style={{ color: '#17120a', fontSize: 42, lineHeight: '44px', fontWeight: 940 }}>{userKeys} <span style={{ fontSize: 22 }}>🗝️</span></div>
               </GlassCard>
@@ -660,7 +660,7 @@ export function RewardsPage({ nav = 'rewards', variant = 'v2', user, userKeys, u
     return (
       <GlassPanel>
         <ScreenHeader title="Магазин возможностей" subtitle={`${userKeys} ключей · ${userTickets} билетов`} kicker="APG Economy 1.0" onBack={onBack} />
-        <GlassCard tone="gold" style={{ borderRadius: 36, padding: 20, marginBottom: 18 }}>
+        <GlassCard tone="gold" onClick={onOpenKeyHistory} style={{ borderRadius: 36, padding: 20, marginBottom: 18 }}>
           <div style={{ color: 'rgba(20,15,8,0.62)', fontSize: 12, fontWeight: 760, marginBottom: 4 }}>Доступно для обмена</div>
           <div style={{ color: '#17120a', fontSize: 44, lineHeight: '46px', fontWeight: 940 }}>{userKeys} <span style={{ fontSize: 24 }}>🗝️</span></div>
           <div style={{ color: 'rgba(20,15,8,0.66)', fontSize: 13, lineHeight: '18px', marginTop: 10 }}>Ключи открывают возможности. Розыгрыши используют билеты, а репутация растёт и не тратится.</div>

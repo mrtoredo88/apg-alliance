@@ -170,7 +170,7 @@ function OfferCardV2({ partner, onOpenPartner, onAskQuestion, index }) {
   );
 }
 
-export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartner, onAskQuestion, desktopOverview = null, desktopMode = false }) {
+export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartner, onAskQuestion, desktopOverview = null, desktopMode = false, title = 'Партнёры', subtitle = '', showAllPartners = false }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch]                 = useState('');
   const inputRef                            = useRef(null);
@@ -180,23 +180,37 @@ export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartne
       .filter(p => p.offer?.trim())
       .sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0)),
     [partners]);
+  const catalogItems = showAllPartners ? partners.filter(Boolean) : withOffers;
 
   const categories = useMemo(() => {
     const counts = {};
-    withOffers.forEach(p => {
+    catalogItems.forEach(p => {
       const cat = p.category || 'other';
       counts[cat] = (counts[cat] || 0) + 1;
     });
     return Object.entries(counts).map(([id, count]) => ({
       id, label: CATEGORY_LABELS[id] ?? id, count,
     }));
-  }, [withOffers]);
+  }, [catalogItems]);
+
+  const mobileCategories = useMemo(() => {
+    const counts = {};
+    partners.filter(Boolean).forEach(p => {
+      const cat = p.category || 'other';
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return Object.entries(counts).map(([id, count]) => ({
+      id, label: CATEGORY_LABELS[id] ?? id, count,
+    }));
+  }, [partners]);
+
+  const availableCategories = variant === 'v2' && !desktopMode ? mobileCategories : categories;
 
   useEffect(() => {
-    if (activeCategory !== 'all' && !categories.find(c => c.id === activeCategory)) {
+    if (activeCategory !== 'all' && !availableCategories.find(c => c.id === activeCategory)) {
       setActiveCategory('all');
     }
-  }, [categories, activeCategory]);
+  }, [availableCategories, activeCategory]);
 
   const isSearching = search.trim().length > 0;
 
@@ -213,9 +227,16 @@ export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartne
 
   const filtered = useMemo(() =>
     activeCategory === 'all'
-      ? withOffers
-      : withOffers.filter(p => (p.category || 'other') === activeCategory),
-    [withOffers, activeCategory]
+      ? catalogItems
+      : catalogItems.filter(p => (p.category || 'other') === activeCategory),
+    [catalogItems, activeCategory]
+  );
+
+  const mobileFiltered = useMemo(() =>
+    activeCategory === 'all'
+      ? partners.filter(Boolean)
+      : partners.filter(p => p && (p.category || 'other') === activeCategory),
+    [partners, activeCategory]
   );
 
   if (variant === 'v2' && desktopMode) {
@@ -236,9 +257,9 @@ export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartne
         topOverview={desktopOverview ? <DesktopTopOverview {...desktopOverview} activeSection="offers" /> : null}
         header={
           <DesktopHeader
-            title="Акции"
-            subtitle={`${withOffers.length} предложений · ${partners.length} партнёров`}
-            kicker="Выгода АПГ"
+            title={showAllPartners ? title : 'Акции'}
+            subtitle={subtitle || `${withOffers.length} предложений · ${partners.length} партнёров`}
+            kicker={showAllPartners ? 'Каталог АПГ' : 'Выгода АПГ'}
             onBack={onBack}
             actions={
               <>
@@ -273,9 +294,9 @@ export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartne
           </DesktopSidebarCard>
         }
       >
-        <DesktopSectionTitle title={isSearching ? `Найдено ${searchResults.length}` : `${filtered.length} предложений`} subtitle={isSearching ? `По запросу: ${search.trim()}` : 'Актуальные предложения партнёров'} />
-        {withOffers.length === 0 ? (
-          <DesktopEmptyState icon="🎁" title="Акции скоро появятся" text="Партнёры АПГ готовят специальные предложения." />
+        <DesktopSectionTitle title={isSearching ? `Найдено ${searchResults.length}` : showAllPartners ? `${filtered.length} сохранено` : `${filtered.length} предложений`} subtitle={isSearching ? `По запросу: ${search.trim()}` : showAllPartners ? 'Сохранённые партнёры' : 'Актуальные предложения партнёров'} />
+        {catalogItems.length === 0 ? (
+          <DesktopEmptyState icon={showAllPartners ? '⭐' : '🎁'} title={showAllPartners ? 'В избранном пока пусто' : 'Акции скоро появятся'} text={showAllPartners ? 'Сохранённые партнёры появятся здесь.' : 'Партнёры АПГ готовят специальные предложения.'} />
         ) : activeList.length === 0 ? (
           <DesktopEmptyState icon="🔍" title="Ничего не найдено" text="Попробуйте другой запрос или сбросьте фильтры." action={<GlassButton onClick={() => { setSearch(''); setActiveCategory('all'); }} tone="gold" style={{ color: '#17120a' }}>Сбросить</GlassButton>} />
         ) : (
@@ -290,20 +311,20 @@ export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartne
   if (variant === 'v2') {
     return (
       <GlassPanel>
-        <ScreenHeader title="Акции" subtitle={`${withOffers.length} предложений · ${partners.length} партнеров`} kicker="Выгода АПГ" onBack={onBack} />
+        <ScreenHeader title={title} subtitle={subtitle || `${partners.length} организаций · ${withOffers.length} предложений`} kicker="Каталог АПГ" onBack={onBack} />
         <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-          <StatPill label="акций" value={withOffers.length} tone="gold" />
-          <StatPill label="партнеров" value={partners.length} />
+          <StatPill label="партнёров" value={partners.length} tone="gold" />
+          <StatPill label="предложений" value={withOffers.length} />
         </div>
         <GlassCard style={{ borderRadius: 28, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <span style={{ color: APG2_PROFILE.textMuted }}>🔍</span>
           <input ref={inputRef} value={search} onChange={e => setSearch(e.target.value)} placeholder="Найти партнера или акцию" style={{ flex: 1, minWidth: 0, background: 'transparent', border: 0, outline: 0, color: APG2_PROFILE.text, fontSize: 14 }} />
           {isSearching && <button onClick={() => setSearch('')} style={{ border: 0, background: 'transparent', color: APG2_PROFILE.textSoft, fontSize: 16 }}>✕</button>}
         </GlassCard>
-        {!isSearching && categories.length > 1 && (
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '0 -16px 14px', padding: '0 16px', WebkitOverflowScrolling: 'touch' }}>
-            <GlassButton onClick={() => setActiveCategory('all')} tone={activeCategory === 'all' ? 'gold' : 'glass'} style={{ minHeight: 38, borderRadius: 18, padding: '8px 12px', color: activeCategory === 'all' ? '#17120a' : APG2_PROFILE.text }}>Все · {withOffers.length}</GlassButton>
-            {categories.map(cat => <GlassButton key={cat.id} onClick={() => setActiveCategory(cat.id)} tone={activeCategory === cat.id ? 'gold' : 'glass'} style={{ minHeight: 38, borderRadius: 18, padding: '8px 12px', whiteSpace: 'nowrap', color: activeCategory === cat.id ? '#17120a' : APG2_PROFILE.text }}>{cat.label} · {cat.count}</GlassButton>)}
+        {!isSearching && mobileCategories.length > 1 && (
+          <div data-horizontal-gesture-boundary="true" style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '0 -16px 14px', padding: '0 16px', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', overscrollBehaviorX: 'contain' }}>
+            <GlassButton onClick={() => setActiveCategory('all')} tone={activeCategory === 'all' ? 'gold' : 'glass'} style={{ minHeight: 38, borderRadius: 18, padding: '8px 12px', color: activeCategory === 'all' ? '#17120a' : APG2_PROFILE.text }}>Все · {partners.length}</GlassButton>
+            {mobileCategories.map(cat => <GlassButton key={cat.id} onClick={() => setActiveCategory(cat.id)} tone={activeCategory === cat.id ? 'gold' : 'glass'} style={{ minHeight: 38, borderRadius: 18, padding: '8px 12px', whiteSpace: 'nowrap', color: activeCategory === cat.id ? '#17120a' : APG2_PROFILE.text }}>{cat.label} · {cat.count}</GlassButton>)}
           </div>
         )}
         {isSearching ? (
@@ -312,12 +333,24 @@ export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartne
               {searchResults.map((p, i) => <GlassListItem key={p.id} icon={p.logoUrl ? <img src={p.logoUrl} alt="" style={{ width: 42, height: 42, borderRadius: 16, objectFit: 'cover' }} /> : (p.emoji ?? '🏪')} title={p.name} subtitle={p.offer || p.categoryLabel || 'Партнер АПГ'} meta="›" onClick={() => onOpenPartner(p)} style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }} />)}
             </div>
           )
-        ) : withOffers.length === 0 ? (
-          <EmptyStateV2 icon="🎁" title="Акции скоро появятся" text="Партнеры АПГ готовят специальные предложения." />
-        ) : filtered.length === 0 ? (
+        ) : partners.length === 0 ? (
+          <EmptyStateV2 icon="🏪" title="Партнёры скоро появятся" text="Каталог организаций АПГ пока пуст." />
+        ) : mobileFiltered.length === 0 ? (
           <EmptyStateV2 icon="🔍" title="В категории пока пусто" text="Можно вернуться ко всем предложениям." action={<GlassButton onClick={() => setActiveCategory('all')} tone="gold" style={{ color: '#17120a' }}>Показать все</GlassButton>} />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{filtered.map((p, i) => <OfferCardV2 key={p.id} partner={p} index={i} onOpenPartner={onOpenPartner} onAskQuestion={onAskQuestion} />)}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {mobileFiltered.map((p, i) => (
+              <GlassListItem
+                key={p.id}
+                icon={p.logoUrl ? <img src={p.logoUrl} alt="" style={{ width: 42, height: 42, borderRadius: 16, objectFit: 'cover' }} /> : (p.emoji ?? '🏪')}
+                title={p.name}
+                subtitle={p.offer || p.categoryLabel || 'Партнёр АПГ'}
+                meta="›"
+                onClick={() => onOpenPartner(p)}
+                style={{ animation: `fadeInUp 0.32s ease ${i * 0.035}s both` }}
+              />
+            ))}
+          </div>
         )}
       </GlassPanel>
     );

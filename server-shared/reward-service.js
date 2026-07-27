@@ -292,6 +292,10 @@ async function awardVisitTransaction(db, context) {
 	        : `Визит отмечен: ${subject.name ?? 'АПГ'}`,
 	      keys: keyBonus,
 	      reputation: reputationBonus,
+      partnerId: context.subjectType === 'partner' ? context.subjectId : null,
+      expertId: context.subjectType === 'expert' ? context.subjectId : null,
+      sourceLabel: subject.name ?? 'АПГ',
+      status: 'completed',
 	      economyVersion: ECONOMY_VERSION,
 	      ts: FieldValue.serverTimestamp(),
     });
@@ -308,6 +312,8 @@ async function awardVisitTransaction(db, context) {
     return {
 	      awardedKeys: keyBonus,
 	      awardedReputation: reputationBonus,
+      targetUserId: context.userId,
+      balanceAfter: Number(user.keys || 0) + keyBonus,
       alreadyAwarded,
       streak: newStreak,
       scanDates,

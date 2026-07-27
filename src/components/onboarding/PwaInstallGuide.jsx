@@ -3,7 +3,7 @@ import { APG2_PROFILE, GlassButton, GlassCard } from '../Apg2ProfileGlass.jsx';
 
 export const PWA_INSTALL_GUIDE_HIDDEN_KEY = 'apg_mobile_pwa_onboarding_hidden_v2';
 export const PWA_INSTALL_GUIDE_SESSION_KEY = 'apg_mobile_pwa_onboarding_session_closed_v2';
-export const PWA_EMAIL_HINT_HIDDEN_KEY = 'apg_pwa_email_hint_done';
+export const PWA_EMAIL_HINT_HIDDEN_KEY = 'apg_pwa_email_hint_done_v2';
 
 function getPlatform() {
   if (typeof navigator === 'undefined') return 'other';
@@ -186,22 +186,23 @@ export function PwaInstallGuide({ open, onClose }) {
 
 export function PwaEmailLoginHint({ open, onClose, onEmailLogin }) {
   if (!open) return null;
-  const close = () => {
-    safeSet(localStorage, PWA_EMAIL_HINT_HIDDEN_KEY, '1');
-    onClose?.();
-  };
+  const close = () => onClose?.();
   return (
-    <div data-pwa-email-hint style={{ position: 'fixed', left: 12, right: 12, bottom: 'calc(94px + env(safe-area-inset-bottom, 0px))', zIndex: 4300, pointerEvents: 'none' }}>
-      <GlassCard interactiveAs="div" style={{ maxWidth: 520, margin: '0 auto', borderRadius: 26, padding: 14, pointerEvents: 'auto', border: '1px solid rgba(215,184,106,0.28)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '46px minmax(0,1fr) auto', gap: 11, alignItems: 'center' }}>
-          <span style={{ width: 46, height: 46, borderRadius: 18, display: 'grid', placeItems: 'center', background: APG2_PROFILE.goldSoft, color: APG2_PROFILE.gold, fontSize: 21 }}>✉️</span>
-          <span style={{ minWidth: 0 }}>
-            <strong style={{ display: 'block', color: APG2_PROFILE.text, fontSize: 14.5, lineHeight: '18px', fontWeight: 880 }}>Остался последний шаг</strong>
-            <span style={{ display: 'block', color: APG2_PROFILE.textSoft, fontSize: 12.4, lineHeight: '17px', marginTop: 3 }}>Войдите по электронной почте, чтобы сохранить профиль, друзей, бонусы, сообщения и записи.</span>
-          </span>
-          <button type="button" onClick={close} aria-label="Скрыть подсказку" style={{ width: 28, height: 28, borderRadius: 14, border: 0, background: 'transparent', color: APG2_PROFILE.textMuted, cursor: 'pointer', fontSize: 18 }}>×</button>
+    <div data-pwa-email-hint style={{ position: 'fixed', inset: 0, zIndex: 12550, pointerEvents: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'calc(16px + env(safe-area-inset-top, 0px)) 14px calc(16px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box', background: 'rgba(10,10,14,0.78)', backdropFilter: 'blur(18px) saturate(1.4)', WebkitBackdropFilter: 'blur(18px) saturate(1.4)' }}>
+      <GlassCard interactiveAs="div" style={{ width: '100%', maxWidth: 430, borderRadius: 32, padding: 18, border: '1px solid rgba(215,184,106,0.30)', boxShadow: '0 32px 100px rgba(0,0,0,0.48)' }}>
+        <div style={{ display: 'grid', gap: 14 }}>
+          <PhoneIllustration mode="email" />
+          <div style={{ textAlign: 'center' }}>
+            <strong style={{ display: 'block', color: APG2_PROFILE.text, fontSize: 23, lineHeight: '28px', fontWeight: 920 }}>Сначала войдите по почте</strong>
+            <span style={{ display: 'block', color: APG2_PROFILE.textSoft, fontSize: 13.5, lineHeight: '20px', marginTop: 7 }}>Мы пришлём одноразовый код. После входа вы сможете привязать Telegram для быстрого доступа к тому же аккаунту.</span>
+          </div>
+          <div style={{ display: 'grid', gap: 9 }}>
+            <Step icon="1" title="Введите электронную почту" text="Получите код и подтвердите вход." />
+            <Step icon="2" title="Привяжите Telegram" text="Это можно сделать после авторизации в профиле." />
+          </div>
+          <GlassButton tone="gold" onClick={onEmailLogin} style={{ width: '100%', minHeight: 52, borderRadius: 20, color: '#17120a', fontSize: 15, fontWeight: 880 }}>Войти по электронной почте</GlassButton>
+          <GlassButton onClick={close} style={{ width: '100%', minHeight: 46, borderRadius: 18, color: APG2_PROFILE.textSoft }}>Позже</GlassButton>
         </div>
-        <GlassButton tone="gold" onClick={onEmailLogin} style={{ width: '100%', minHeight: 42, borderRadius: 17, marginTop: 11, color: '#17120a' }}>Войти по электронной почте</GlassButton>
       </GlassCard>
     </div>
   );

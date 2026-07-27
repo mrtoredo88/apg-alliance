@@ -177,7 +177,7 @@ function progressCustom(task, keys, favs, refs, streak, scanned) {
   }
 }
 
-export function TasksPage({ variant = 'v2', userKeys = 0, favCount = 0, referralCount = 0, streak = 0, scannedCount = 0, learningProgress = {}, completedTasks = [], customTasks = [], onClaim, onBack }) {
+export function TasksPage({ variant = 'v2', userKeys = 0, favCount = 0, referralCount = 0, streak = 0, scannedCount = 0, learningProgress = {}, completedTasks = [], customTasks = [], onClaim, onOpenKeyHistory, onBack }) {
   const [claiming, setClaiming] = useState(null);
 
   const handleClaim = async (taskId, reward) => {
@@ -235,7 +235,7 @@ export function TasksPage({ variant = 'v2', userKeys = 0, favCount = 0, referral
               <div style={{ color: 'rgba(20,15,8,0.62)', fontSize: 12, fontWeight: 760, marginBottom: 4 }}>Прогресс заданий</div>
               <div style={{ color: '#17120a', fontSize: 34, lineHeight: '36px', fontWeight: 930 }}>{pct}%</div>
             </div>
-            <GlassBadge style={{ color: '#17120a', background: 'rgba(255,255,255,0.28)' }}>{userKeys} ключей</GlassBadge>
+            <button type="button" onClick={onOpenKeyHistory} style={{ border: 0, background: 'transparent', padding: 0, fontFamily: 'inherit', cursor: 'pointer' }}><GlassBadge style={{ color: '#17120a', background: 'rgba(255,255,255,0.28)' }}>{userKeys} ключей</GlassBadge></button>
           </div>
           <div style={{ height: 8, borderRadius: 999, background: 'rgba(20,15,8,0.15)', overflow: 'hidden' }}>
             <div style={{ width: `${pct}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg,#19140b,#745829,#FFF0B8)', transition: 'width 0.6s ease' }} />

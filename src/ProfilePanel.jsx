@@ -706,7 +706,7 @@ function StreakCalendar({ scanDates = [], streak = 0 }) {
 }
 
 
-export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, onOpenRewards = () => {}, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingDialog, onOpenBookingReview, initialConnectionTargetId = '', initialPeopleAction = null, desktopOverview = null, desktopMode = false, onBack }) {
+export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [], partners = [], events = [], registeredEventIds = [], bookings = [], news = [], savedNews = [], readLaterNews = [], onOpenNews, onToggleFavorite, onOpenPartner, onOpenActivity, onOpenKeyHistory, onOpenFavorites, onEnableNotifications, notificationsEnabled = false, onLogout, onDeleteProfile, referralCount = 0, streak = 0, scannedCount = 0, completedTasks = [], scanDates = [], onShare, onOpenReferral, onOpenRewards = () => {}, ownedPartner = null, onOpenPartnerCabinet, ownedExpert = null, onOpenExpertCabinet, appearance = 'light', onToggleTheme = () => {}, lastBonusDate = null, onUserUpdate = () => {}, onEmailAuthSuccess, onOpenReference, onOpenLoki, workspaceDiagnostics = null, onResetWorkspaceMode, onOpenPartnership, onRestartLearning, onOpenHealth, onOpenDialog, onOpenBookingDialog, onOpenBookingReview, initialConnectionTargetId = '', initialPeopleAction = null, desktopOverview = null, desktopMode = false, onBack }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showWorkspaceDiagnostics, setShowWorkspaceDiagnostics] = useState(false);
@@ -1613,10 +1613,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   }, [userAction]);
 
   const stats = useMemo(() => [
-    { label: 'Ключей', value: userKeys, emoji: '🗝️' },
-    { label: 'Избранное', value: favorites.length, emoji: '⭐' },
-    { label: 'Достижения', value: `${unlockedCount}/${achievements.length}`, emoji: '🏆' },
-  ], [userKeys, favorites.length, unlockedCount, achievements.length]);
+    { label: 'Ключей', value: userKeys, emoji: '🗝️', onClick: onOpenKeyHistory },
+    { label: 'Избранное', value: favorites.length, emoji: '⭐', onClick: onOpenFavorites },
+    { label: 'Достижения', value: `${unlockedCount}/${achievements.length}`, emoji: '🏆', onClick: onOpenActivity },
+  ], [userKeys, favorites, unlockedCount, achievements.length, onOpenActivity, onOpenKeyHistory, onOpenFavorites]);
 
   const handleSupport = async () => {
     try {
@@ -1925,6 +1925,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     const primaryActions = [
       { label: 'Активность', icon: '◷', onClick: onOpenActivity },
       { label: 'Рефералы', icon: '↗', onClick: onOpenReferral },
+      { label: 'Подарки', icon: '🎁', onClick: onOpenRewards },
       ownedPartner && { label: 'Кабинет партнера', icon: '◆', onClick: onOpenPartnerCabinet },
       ownedExpert && { label: 'Кабинет эксперта', icon: '✦', onClick: onOpenExpertCabinet },
     ].filter(Boolean);
@@ -2040,11 +2041,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
                 <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', gap: 12, paddingLeft: 28, borderLeft: `1px solid ${DP.border}` }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 16, alignItems: 'end', padding: '2px 2px 12px' }}>
-                    <div>
+                    <button type="button" onClick={onOpenKeyHistory} style={{ border: 0, padding: 0, background: 'transparent', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
                       <div style={{ color: DP.muted, fontSize: 10.5, fontWeight: 820, letterSpacing: 0.8, textTransform: 'uppercase' }}>Городской баланс</div>
                       <div style={{ color: DP.text, fontSize: 42, lineHeight: '46px', fontWeight: 950, marginTop: 4 }}>{userKeys}</div>
                       <div style={{ color: DP.gold, fontSize: 11.5, fontWeight: 820 }}>ключей АПГ</div>
-                    </div>
+                    </button>
                     <div style={{ minWidth: 180 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: DP.soft, fontSize: 11, lineHeight: '14px', fontWeight: 760, marginBottom: 7 }}><span>{nextLevel ? `До ${nextLevel.label}` : 'Максимальный уровень'}</span><b style={{ color: DP.gold }}>{pct}%</b></div>
                       <DesktopProgress value={pct} color={level.color || DP.gold} />
@@ -2141,12 +2142,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               <aside style={{ display: 'grid', gap: 16 }}>
                 <DesktopSection title="Ключи и достижения" icon="🗝">
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <div style={{ borderRadius: 8, border: `1px solid ${DP.border}`, background: DP.controlSoft, padding: 12 }}>
+                    <button type="button" onClick={onOpenKeyHistory} style={{ borderRadius: 8, border: `1px solid ${DP.border}`, background: DP.controlSoft, padding: 12, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
                       <div style={{ color: DP.soft, fontSize: 12, fontWeight: 820 }}>Ключи</div>
                       <div style={{ color: DP.text, fontSize: 27, lineHeight: '32px', fontWeight: 950, marginTop: 6 }}>{userKeys}</div>
                       <DesktopProgress value={pct} color={level.color || DP.gold} />
                       <div style={{ color: DP.muted, fontSize: 11.5, lineHeight: '16px', marginTop: 6 }}>{nextLevel ? `До следующего уровня: ${toNext} ключей` : 'Максимальный уровень'}</div>
-                    </div>
+                    </button>
                     <div style={{ borderRadius: 8, border: `1px solid ${DP.border}`, background: DP.controlSoft, padding: 12 }}>
                       <div style={{ color: DP.soft, fontSize: 12, fontWeight: 820 }}>Достижения</div>
                       <div style={{ color: DP.text, fontSize: 27, lineHeight: '32px', fontWeight: 950, marginTop: 6 }}>{unlockedCount}/{achievements.length}</div>
@@ -2194,7 +2195,19 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                     <button type="button" onClick={() => setShowShareModal(true)} style={dpButton('light', { justifyContent: 'space-between' })}>Поделиться АПГ <span>↗</span></button>
                     <button type="button" onClick={handleWriteAdmin} style={dpButton('light', { justifyContent: 'space-between' })}>Написать в поддержку <span>↗</span></button>
                     {!isGuest && <button type="button" onClick={onLogout} style={dpButton('danger', { justifyContent: 'space-between' })}>Выйти <span>→</span></button>}
-                    {isGuest && <button type="button" onClick={() => setShowEmailAuth(true)} style={dpButton('primary')}>Войти по email</button>}
+                    {isGuest && (
+                      <>
+                        <button type="button" onClick={() => setShowEmailAuth(true)} style={dpButton('primary')}>Войти по email</button>
+                        {tgLoading ? (
+                          <button type="button" disabled style={dpButton('light')}>Создаём Telegram-сессию…</button>
+                        ) : tgStep === 'waiting' ? (
+                          <button type="button" onClick={() => openUrl(tgBotUrl)} style={dpButton('light', { color: '#26A8EA', borderColor: 'rgba(38,168,234,0.34)' })}><TelegramIcon /> Открыть Telegram</button>
+                        ) : (
+                          <button type="button" onClick={() => runTelegramAuth(false)} style={dpButton('light', { color: '#26A8EA', borderColor: 'rgba(38,168,234,0.34)' })}><TelegramIcon /> Войти через Telegram</button>
+                        )}
+                        {tgError && <div style={{ color: '#E64646', fontSize: 12, lineHeight: '17px' }}>{tgError}</div>}
+                      </>
+                    )}
                   </div>
                 </DesktopSection>
               </aside>
@@ -2237,12 +2250,26 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             </div>
             <div style={{ ...APG2.glass, borderRadius: 22, padding: 11 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: APG2.textSoft, fontSize: 12, marginBottom: 8 }}>
-                <span>{userKeys} ключей</span>
+                <button type="button" onClick={onOpenKeyHistory} style={{ border: 0, background: 'transparent', padding: 0, color: APG2.gold, font: 'inherit', fontWeight: 850, cursor: 'pointer' }}>{userKeys} ключей</button>
                 <span>{nextLabel}</span>
               </div>
               <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${pct}%`, borderRadius: 999, background: 'linear-gradient(135deg,#FFF0B8,#D9B965,#9F7932,#F4D98C)', boxShadow: '0 0 26px rgba(215,184,106,0.34)', transition: 'width 0.5s ease' }} />
               </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 8, marginTop: 10 }}>
+              <GlassButton onClick={onToggleTheme} style={{ minHeight: 40 }}><span>{isDark ? '☀️' : '🌙'}</span>{isDark ? 'Светлая тема' : 'Тёмная тема'}</GlassButton>
+              {!notificationsEnabled && <GlassButton onClick={onEnableNotifications} style={{ minHeight: 40 }}><span>🔔</span>Уведомления</GlassButton>}
+              {primaryActions.map(action => (
+                <GlassButton
+                  key={action.label}
+                  onClick={action.onClick}
+                  tone={action.label === 'Кабинет партнера' ? 'gold' : 'glass'}
+                  style={{ minHeight: 40, color: action.label === 'Кабинет партнера' ? '#17120a' : undefined, gridColumn: action.label === 'Кабинет партнера' ? '1 / -1' : undefined }}
+                >
+                  <span>{action.icon}</span>{action.label}
+                </GlassButton>
+              ))}
             </div>
           </div>
         </section>
@@ -2628,7 +2655,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               {isEmailUser && (
                 <>
                   <AccountMethodRow icon="✉️" title="Email" subtitle={userEmail} status="подключён" accent={APG2.gold} />
-                  {user?.emailVerified === false && <EmailVerifyBanner userId={String(user.id)} />}
                   {linkedTelegram ? (
                     <AccountMethodRow icon={<TelegramIcon />} title="Telegram" subtitle={linkedTelegramName} status="привязан" accent="#26A8EA" />
                   ) : tgStep === 'linked' ? (
@@ -2690,14 +2716,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           </GlassSection>
         )}
 
-        <GlassSection title="Быстрые действия">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <GlassButton onClick={onToggleTheme}><span>{isDark ? '☀️' : '🌙'}</span>{isDark ? 'Светлая тема' : 'Темная тема'}</GlassButton>
-            <GlassButton onClick={onEnableNotifications} tone={notificationsEnabled ? 'gold' : 'glass'}><span>{notificationsEnabled ? '✓' : '🔔'}</span>{notificationsEnabled ? 'Уведомления включены' : 'Уведомления'}</GlassButton>
-            {primaryActions.map(a => <GlassButton key={a.label} onClick={a.onClick}><span>{a.icon}</span>{a.label}</GlassButton>)}
-          </div>
-        </GlassSection>
-
         {!notificationsEnabled && (
           <GlassSection title="Уведомления">
             <GlassCard style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
@@ -2726,7 +2744,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         <GlassSection title="Показатели">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {stats.map(s => (
-              <GlassCard key={s.label} style={{ minHeight: 72, padding: 10, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <GlassCard key={s.label} onClick={s.onClick} style={{ minHeight: 72, padding: 10, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <div style={{ fontSize: 18, marginBottom: 5 }}>{s.emoji}</div>
                 <div style={{ color: APG2.text, fontSize: 19, lineHeight: '22px', fontWeight: 860 }}>{s.value}</div>
                 <div style={{ color: APG2.textMuted, fontSize: 11, marginTop: 4 }}>{s.label}</div>
@@ -3098,12 +3116,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       {!isVK() && user && String(user.id).startsWith('email:') && (
         <div style={{ margin: '14px 16px 0', borderRadius: 18, border: '1px solid rgba(38,168,234,0.25)', background: 'rgba(38,168,234,0.06)', padding: '14px 16px', overflow: 'hidden' }}>
           <div style={{ fontSize: 12, color: APG2.textSoft, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>Способы входа</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: user.emailVerified === false ? 8 : 10, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, minWidth: 0 }}>
             <span style={{ fontSize: 13, color: APG2.text, flexShrink: 0 }}>✉️ Email</span>
             <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: APG2.textSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email ?? String(user.id).replace('email:', '')}</span>
             <span style={{ marginLeft: 'auto', fontSize: 11, color: '#4BB34B', fontWeight: 700, background: 'rgba(75,179,75,0.12)', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>✓ подключён</span>
           </div>
-          {user.emailVerified === false && <EmailVerifyBanner userId={String(user.id)} />}
           {user.linkedTelegram
             ? <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 13, color: APG2.text }}>✈️ Telegram</span>
@@ -3240,10 +3257,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 </div>
 
                 {/* Счётчик ключей */}
-                <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                <button type="button" onClick={onOpenKeyHistory} style={{ textAlign: 'center', flexShrink: 0, border: 0, background: 'transparent', padding: 0, fontFamily: 'inherit', cursor: 'pointer' }}>
                   <div style={{ fontSize: 28, fontWeight: 900, color: isDark ? '#fff' : APG2.text, lineHeight: 1, letterSpacing: -1 }}>{userKeys}</div>
                   <div style={{ fontSize: 10, color: '#E8C97A', fontWeight: 700, marginTop: 3 }}>🗝️ ключей</div>
-                </div>
+                </button>
               </div>
 
               {/* Прогресс */}

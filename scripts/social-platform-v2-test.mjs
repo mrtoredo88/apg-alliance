@@ -74,6 +74,9 @@ assert.match(peopleCore, /peopleKind[\s\S]*Эксперт может быть п
 assert.match(profile, /Кто может писать и отправлять заявки/, 'privacy settings are present in People');
 assert.doesNotMatch(profile, /Dev Panel · Connections/, 'People panel does not expose connection dev fields');
 assert.match(userActions, /connections:search/, 'backend exposes People search over users');
+assert.match(userActions, /isLegacyOwnerPlaceholder/, 'legacy owner placeholder must not appear in People search');
+assert.match(userActions, /canonicalId !== actor\.userId/, 'People search must exclude the actor after canonical alias resolution');
+assert.match(userActions, /Array\.isArray\(accountRows\) \? \[\]/, 'People search must not mix PostgreSQL profiles with legacy profile rows');
 assert.match(actionRouter, /peoplePayload[\s\S]*peopleQuery/, 'Loki routes social requests to People with search payload');
 assert.match(capabilityRegistry, /SEARCH_PEOPLE[\s\S]*ADD_FRIEND/, 'Capability Registry includes people search and add friend');
 assert.match(executionRegistry, /profile#people/, 'Execution Registry resolves social actions to unified People');

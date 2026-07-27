@@ -431,7 +431,7 @@ export function DesktopTopOverview({
               <button type="button" aria-label="Запустить поиск" onClick={runSearch} style={{ width: 20, height: 20, borderRadius: 10, border: '1px solid rgba(201,168,76,0.22)', background: 'rgba(201,168,76,0.10)', color: APG2_PROFILE.gold, cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 11, padding: 0 }}>↵</button>
             )}
           </div>
-          <button type="button" onClick={onOpenRewards || onOpenNotifications} aria-label="Подарки" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(201,168,76,0.34)', background: 'linear-gradient(120deg, rgba(201,168,76,0.24) 0%, rgba(255,255,255,0.52) 42%, rgba(201,168,76,0.22) 62%, rgba(255,255,255,0.28) 100%)', color: APG2_PROFILE.text, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative', overflow: 'hidden', backgroundSize: '250% 100%', animation: 'shimmer 1.7s ease-in-out infinite' }}>
+          <button type="button" onClick={onOpenRewards} aria-label="Подарки" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(201,168,76,0.45)', background: 'linear-gradient(145deg, rgba(201,168,76,0.22), rgba(255,255,255,0.18))', boxShadow: '0 10px 24px rgba(201,168,76,0.12), inset 0 1px 0 rgba(255,255,255,0.24)', color: APG2_PROFILE.gold, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative', overflow: 'hidden' }}>
             <span style={{ position: 'relative', zIndex: 1 }}>🎁</span>
           </button>
           <button type="button" onClick={onOpenMessages} aria-label="Люди" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative' }}>
@@ -472,11 +472,11 @@ export function DesktopTopOverview({
               {levelBadgeText && <div style={{ color: APG2_PROFILE.gold, fontSize: 11.5, lineHeight: '15px', fontWeight: 850, marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Уровень · {levelBadgeText}</div>}
             </div>
             {balanceStat && (
-              <div style={{ minWidth: 92, textAlign: 'right', paddingLeft: 12, borderLeft: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)' }}>
+              <button type="button" onClick={balanceStat.onClick} style={{ minWidth: 92, textAlign: 'right', padding: '0 0 0 12px', border: 0, borderLeft: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'transparent', fontFamily: 'inherit', cursor: balanceStat.onClick ? 'pointer' : 'default' }}>
                 <div style={{ color: APG2_PROFILE.textMuted, fontSize: 9.5, lineHeight: '12px', fontWeight: 780, letterSpacing: 0.6, textTransform: 'uppercase' }}>Баланс</div>
                 <div style={{ color: APG2_PROFILE.text, fontSize: 30, lineHeight: '34px', fontWeight: 900, marginTop: 2 }}>{balanceStat.value}</div>
                 <div style={{ color: APG2_PROFILE.gold, fontSize: 10.5, lineHeight: '13px', fontWeight: 800 }}>ключей</div>
-              </div>
+              </button>
             )}
           </div>
           <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(220px, 1fr)', gap: 12, alignItems: 'stretch' }}>
@@ -496,10 +496,10 @@ export function DesktopTopOverview({
             {supportingStats.length > 0 && (
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${supportingStats.length}, minmax(0, 1fr))`, alignItems: 'center', borderRadius: 18, background: 'rgba(var(--apg2-glass-a,255,255,255),0.035)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', overflow: 'hidden' }}>
                 {supportingStats.map((stat, index) => (
-                  <div key={stat.label} style={{ minWidth: 0, textAlign: 'center', padding: '10px 6px', borderLeft: index > 0 ? '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)' : 0 }}>
+                  <button type="button" onClick={stat.onClick} key={stat.label} style={{ minWidth: 0, textAlign: 'center', padding: '10px 6px', border: 0, borderLeft: index > 0 ? '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)' : 0, background: 'transparent', fontFamily: 'inherit', cursor: stat.onClick ? 'pointer' : 'default' }}>
                     <div style={{ color: APG2_PROFILE.text, fontSize: 19, lineHeight: '22px', fontWeight: 900 }}>{stat.value}</div>
                     <div style={{ color: APG2_PROFILE.textSoft, fontSize: 9.2, lineHeight: '12px', fontWeight: 760, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stat.label}</div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}

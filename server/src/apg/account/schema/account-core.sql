@@ -69,10 +69,33 @@ CREATE TABLE IF NOT EXISTS apg_account_telegram_links (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS apg_catalog_partners (
+  id TEXT PRIMARY KEY,
+  data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_apg_catalog_partners_name
+  ON apg_catalog_partners ((lower(data->>'name')));
+
 CREATE TABLE IF NOT EXISTS apg_account_metrics (
   key TEXT PRIMARY KEY,
   value JSONB NOT NULL DEFAULT '{}'::jsonb,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS apg_social_connection_requests (
+  id TEXT PRIMARY KEY,
+  pair_key TEXT NOT NULL UNIQUE,
+  sender_id TEXT NOT NULL REFERENCES apg_account_profiles(user_id) ON DELETE CASCADE,
+  recipient_id TEXT NOT NULL REFERENCES apg_account_profiles(user_id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending',
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ,
+  resolved_at TIMESTAMPTZ,
+  CONSTRAINT apg_social_connection_distinct_users CHECK (sender_id <> recipient_id)
 );
 
 CREATE TABLE IF NOT EXISTS apg_admin_credentials (
@@ -102,3 +125,6 @@ CREATE INDEX IF NOT EXISTS idx_apg_account_cabinets_user ON apg_account_cabinets
 CREATE INDEX IF NOT EXISTS idx_apg_account_cabinets_entity ON apg_account_cabinets(entity_id);
 CREATE INDEX IF NOT EXISTS idx_apg_account_sessions_user ON apg_account_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_apg_admin_credentials_email ON apg_admin_credentials(email);
+CREATE INDEX IF NOT EXISTS idx_apg_social_connection_sender ON apg_social_connection_requests(sender_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_apg_social_connection_recipient ON apg_social_connection_requests(recipient_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_apg_social_connection_status ON apg_social_connection_requests(status, updated_at DESC);

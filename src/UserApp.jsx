@@ -26,6 +26,7 @@ import { recordEmailLoginStage } from './auth/emailLoginDiagnostics.js';
 import { SplashScreen }      from './SplashScreen.jsx';
 import { ConsentScreen, CONSENT_DOCS, CONSENT_DOCS_VERSION, LEGAL_VERSION } from './ConsentScreen.jsx';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassToast } from './components/Apg2ProfileGlass.jsx';
+import { KeyHistoryModal } from './components/KeyHistoryModal.jsx';
 import {
   PWA_EMAIL_HINT_HIDDEN_KEY,
   PwaEmailLoginHint,
@@ -1123,6 +1124,7 @@ export function UserApp() {
 
   const [user, setUser]                         = useState(null);
   const [userKeys, setUserKeys]                 = useState(0);
+  const [showKeyHistory, setShowKeyHistory]     = useState(false);
   const [userTickets, setUserTickets]           = useState(0);
   const [userReputation, setUserReputation]     = useState(0);
   const [favorites, setFavorites]               = useState([]);
@@ -1204,6 +1206,36 @@ export function UserApp() {
     return v ? Number(v) : null;
   });
   const [homeCacheSnapshot, setHomeCacheSnapshot] = useState(() => getHomeCacheSnapshot());
+
+  const refreshKeyBalance = useCallback(async () => {
+    const userId = String(user?.id || '');
+    if (!userId || userId.startsWith('guest_')) return null;
+    try {
+      const result = await userAction('economy:history', { userId, limit: 1 });
+      const balance = Number(result?.balance);
+      if (Number.isFinite(balance)) {
+        setUserKeys(balance);
+        setUser(prev => prev ? { ...prev, keys: balance } : prev);
+        return balance;
+      }
+    } catch (error) {
+      logError(error, 'UserApp.refreshKeyBalance');
+    }
+    return null;
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || String(user.id).startsWith('guest_')) return;
+    const handleResume = () => {
+      if (document.visibilityState === 'visible') refreshKeyBalance();
+    };
+    window.addEventListener('focus', handleResume);
+    document.addEventListener('visibilitychange', handleResume);
+    return () => {
+      window.removeEventListener('focus', handleResume);
+      document.removeEventListener('visibilitychange', handleResume);
+    };
+  }, [refreshKeyBalance, user?.id]);
 
   useEffect(() => {
     loggedOutRef.current = loggedOut;
@@ -1933,7 +1965,8 @@ export function UserApp() {
 
       if (isAuthLoadAborted(runId, 'before_account_bootstrap')) return;
       let accountBootstrap = null;
-      if (!isGuest && shouldUseAccountCoreCanary()) {
+      const hasAccountCoreIdentity = String(userData.id).startsWith('email:') || String(userData.id).startsWith('tg_');
+      if (!isGuest && hasAccountCoreIdentity && shouldUseAccountCoreCanary()) {
         try {
           accountBootstrap = await fetchAccountBootstrap({
             userId: String(userData.id),
@@ -1966,7 +1999,12 @@ export function UserApp() {
       // Start the private profile request before the public catalog. The avatar
       // should not wait for partners, events, news and experts to finish loading.
       const profileDocPromise = !isGuest
-        ? getDoc(doc(db, 'users', String(userData.id))).catch(error => {
+        ? (accountBootstrap?.profile
+          ? Promise.resolve({
+            exists: () => true,
+            data: () => accountBootstrap.profile,
+          })
+          : getDoc(doc(db, 'users', String(userData.id)))).catch(error => {
           logError(error, 'UserApp.profile.prefetch');
           return null;
         })
@@ -3041,21 +3079,25 @@ export function UserApp() {
       const result = await confirmQrScan({ qrValue, scannerUserId: String(user.id) });
       const awardedKeys = Number(result.awardedKeys ?? 0);
       const todayKey = new Date().toLocaleDateString('sv');
+      const rewardBelongsToCurrentUser = !result.targetUserId || String(result.targetUserId) === String(user.id);
 
-      setLastScanDate(todayKey);
-      if (Number.isFinite(result.streak)) setStreak(result.streak);
-      if (Array.isArray(result.scanDates)) setScanDates(result.scanDates);
-      if (result.subjectId && Number.isFinite(result.visitCount)) {
-        setVisitCounts(prev => ({ ...prev, [result.subjectId]: result.visitCount }));
+      if (rewardBelongsToCurrentUser) {
+        setLastScanDate(todayKey);
+        if (Number.isFinite(result.streak)) setStreak(result.streak);
+        if (Array.isArray(result.scanDates)) setScanDates(result.scanDates);
+        if (result.subjectId && Number.isFinite(result.visitCount)) {
+          setVisitCounts(prev => ({ ...prev, [result.subjectId]: result.visitCount }));
+        }
+        if (result.subjectType === 'partner' && result.subjectId && awardedKeys > 0) {
+          setScannedPartnerIds(prev => ({ ...prev, [result.subjectId]: true }));
+        }
+        if (result.subjectType === 'expert' && result.subjectId) {
+          setScannedExperts(prev => ({ ...prev, [result.subjectId]: result.visitCount ?? ((Number(prev[result.subjectId]) || 0) + 1) }));
+        }
       }
-      if (result.subjectType === 'partner' && result.subjectId && awardedKeys > 0) {
-        setScannedPartnerIds(prev => ({ ...prev, [result.subjectId]: true }));
-      }
-      if (result.subjectType === 'expert' && result.subjectId) {
-        setScannedExperts(prev => ({ ...prev, [result.subjectId]: result.visitCount ?? ((Number(prev[result.subjectId]) || 0) + 1) }));
-      }
-      if (awardedKeys > 0) {
-        setUserKeys(prev => prev + awardedKeys);
+      if (awardedKeys > 0 && rewardBelongsToCurrentUser) {
+        const serverBalance = Number(result.balanceAfter);
+        setUserKeys(prev => Number.isFinite(serverBalance) ? serverBalance : prev + awardedKeys);
         setKeyBurst({ amount: awardedKeys, id: Date.now() });
         showLokiMessage(LOKI_EVENTS.KEY_RECEIVED, { keysCount: awardedKeys, source: result.subjectType, id: result.subjectId });
         const partner = result.subjectType === 'partner'
@@ -3072,6 +3114,16 @@ export function UserApp() {
         setScanSuccess({ ...result, partner });
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         setToast(null);
+      } else if (awardedKeys > 0) {
+        showToast(`Начислено ${awardedKeys} ключа пользователю. Его баланс обновится автоматически.`, 'success');
+        trackAppEvent('qr:scan_success', {
+          type: APG_EVENT_TYPES.QR_SCANNED,
+          user,
+          entityType: result.subjectType || 'qrcode',
+          entityId: result.subjectId || qrValue,
+          payload: { qrValue, awardedKeys, targetUserId: result.targetUserId, subjectType: result.subjectType, subjectId: result.subjectId },
+          source: platformSource,
+        });
       } else {
         const days = Number(result.streak ?? streak) || 1;
         const label = days === 1 ? 'день' : days < 5 ? 'дня' : 'дней';
@@ -3715,15 +3767,15 @@ export function UserApp() {
   ]);
 
   const handlePwaEmailLoginOpen = useCallback(() => {
-    try {
-      localStorage.setItem(PWA_EMAIL_HINT_HIDDEN_KEY, '1');
-    } catch {}
     setShowPwaInstallGuide(false);
     setShowPwaEmailHint(false);
     setShowPwaEmailAuth(true);
   }, []);
 
   const handlePwaEmailAuthSuccess = useCallback((emailUser, authPayload) => {
+    try {
+      localStorage.setItem(PWA_EMAIL_HINT_HIDDEN_KEY, '1');
+    } catch {}
     markFirstJourneyStep('email');
     setShowPwaEmailAuth(false);
     setShowPwaInstallGuide(false);
@@ -3981,10 +4033,11 @@ export function UserApp() {
 
   const handleSwipeStart = useCallback((e) => {
     const touch = e.touches[0];
+    const gestureBoundary = e.target?.closest?.('[data-horizontal-gesture-boundary="true"]');
     const pullState = getPullStartState(e, activePanel, pullRefreshing);
     setPullDistance(0);
-    swipeTouchX.current = touch.clientX;
-    swipeTouchY.current = touch.clientY;
+    swipeTouchX.current = gestureBoundary ? null : touch.clientX;
+    swipeTouchY.current = gestureBoundary ? null : touch.clientY;
     edgeSwipeRef.current = touch.clientX <= 24 && (activePanel !== 'home' || panelHistoryRef.current.length > 1);
     pullTouchRef.current = {
       active: pullState.active,
@@ -4121,11 +4174,27 @@ export function UserApp() {
     if (isVK() || !user?.id) return;
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
     if (Notification.permission !== 'granted') return;
-    if (user.notificationsEnabled !== true && localStorage.getItem('apg_notif_enabled') !== '1') return;
     const syncKey = `apg_webpush_sync_${user.id}_${WEB_PUSH_VAPID_PUBLIC_KEY.slice(0, 12)}`;
     if (sessionStorage.getItem(syncKey) === '1') return;
-    sessionStorage.setItem(syncKey, '1');
-    requestWebPushPermission({ silent: true });
+    let cancelled = false;
+    navigator.serviceWorker.ready
+      .then(registration => registration.pushManager.getSubscription())
+      .then(subscription => {
+        if (cancelled || !subscription) {
+          if (!cancelled) {
+            setNotifEnabled(false);
+            localStorage.removeItem('apg_notif_enabled');
+          }
+          return;
+        }
+        setNotifEnabled(true);
+        localStorage.setItem('apg_notif_enabled', '1');
+        setUser(prev => prev ? { ...prev, notificationsEnabled: true, notificationConsent: true } : prev);
+        sessionStorage.setItem(syncKey, '1');
+        return requestWebPushPermission({ silent: true });
+      })
+      .catch(error => logError(error, 'UserApp.pushSubscription.restore'));
+    return () => { cancelled = true; };
   }, [user, requestWebPushPermission]);
 
   const handleEnableNotifications = useCallback(() => {
@@ -4322,7 +4391,7 @@ export function UserApp() {
     icon: tabIconByKey[item.iconKey] || null,
   }));
   const TAB_PANELS = TABS.map(tab => tab.id);
-  const showTabBar = !desktopDevice && !isScannerOpen && TAB_PANELS.includes(activePanel);
+  const showTabBar = !desktopDevice && !isScannerOpen && (TAB_PANELS.includes(activePanel) || activePanel === 'partner-cabinet');
   const userAppBranch = desktopWorkspaceActive
     ? 'UserApp Branch: DesktopWorkspace'
     : publicSubmitRoute
@@ -4510,16 +4579,16 @@ export function UserApp() {
       {TABS.map((tab, i) => {
         if (tab.workspaceId === 'scan' || !tab.id) return (
           <button key="scan" ref={node => { tabSlotRefs.current[i] = node; }} data-apg-tab-slot="scan" aria-label="Открыть сканер" onClick={() => { openScanner('tabbar'); }}
-            style={{ flex: 1, background: isScannerOpen ? 'linear-gradient(145deg, rgba(244,217,140,0.18), rgba(255,255,255,0.08))' : 'none', border: isScannerOpen ? '1px solid rgba(244,217,140,0.23)' : '1px solid transparent', borderRadius: 23, boxShadow: isScannerOpen ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 26px var(--apg2-elev-shadow, rgba(0,0,0,0.18))' : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 0, position: 'relative', zIndex: 2, transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
+            style={{ flex: 1.34, background: 'linear-gradient(145deg, rgba(244,217,140,0.30), rgba(201,168,76,0.16))', border: '1px solid rgba(244,217,140,0.34)', borderRadius: 23, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.30), 0 12px 28px rgba(201,168,76,0.18)', cursor: 'pointer', display: 'flex', flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', padding: '0 8px', position: 'relative', zIndex: 2, transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
             <div style={{
-              width: 42, height: 42, marginTop: 0, borderRadius: 18,
+              width: 46, height: 46, marginTop: 0, borderRadius: 19,
               background: isScannerOpen ? 'rgba(201,168,76,0.25)' : V2GoldMetal,
               boxShadow: isScannerOpen ? 'none' : '0 12px 26px rgba(216,184,103,0.18), inset 0 1px 0 rgba(255,255,255,0.36), inset 0 -8px 18px rgba(83,58,18,0.20)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#0F0F1A',
               transition: `transform ${MOTION.duration.modal}ms ${MOTION.ease.standard}, box-shadow ${MOTION.duration.modal}ms ${MOTION.ease.standard}`,
               transform: isScannerOpen ? 'scale(0.88)' : 'scale(1)',
             }}>◎</div>
-            <span style={{ fontSize: 8.5, fontWeight: 780, color: isScannerOpen ? T.gold : T.textSec, opacity: isScannerOpen ? 1 : 0.62, letterSpacing: 0, textTransform: 'none', marginTop: 2 }}>Скан</span>
+            <span style={{ fontSize: 12, fontWeight: 900, color: T.gold, letterSpacing: 0, textTransform: 'none' }}>Скан</span>
           </button>
         );
 
@@ -4857,6 +4926,7 @@ export function UserApp() {
     onSearchSubmit: desktopOverviewSearch,
     onSearchClear: () => {},
     unreadCount,
+    onOpenRewards: handleOpenRewards,
     onOpenNotifications: openNotifications,
     onOpenMessages: handleOpenMessages,
     messageUnreadCount: unreadCount,
@@ -5133,6 +5203,13 @@ export function UserApp() {
     onOpenPartners: handleOpenPartners,
     onOpenOffers: () => goPanel('offers'),
     onOpenProfile: () => goPanel('profile'),
+    onOpenKeyHistory: () => setShowKeyHistory(true),
+    onOpenFavorites: () => goPanel('favorites'),
+    hasPartnerCabinet: Boolean(ownedPartner),
+    onOpenPartnerCabinet: () => {
+      setPartnerCabinetEntryModule('dashboard');
+      goPanel('partner-cabinet');
+    },
     onOpenReference: () => goPanel('reference'),
     onOpenLoki: () => goPanel('loki'),
     desktopWorkspaceAvailable,
@@ -5370,8 +5447,11 @@ export function UserApp() {
                     onToggleFavorite={toggleFavorite}
                     onOpenPartner={openPartner}
                     onOpenActivity={() => goPanel('activity')}
+                    onOpenKeyHistory={() => setShowKeyHistory(true)}
+                    onOpenFavorites={() => goPanel('favorites')}
                     onEnableNotifications={handleEnableNotifications}
                     onOpenReferral={() => goPanel('referral')}
+                    onOpenRewards={() => goPanel('rewards')}
                     onShare={handleShare}
                     onLogout={handleLogout}
                     onDeleteProfile={handleDeleteProfile}
@@ -5379,7 +5459,7 @@ export function UserApp() {
                     lastBonusDate={lastBonusDate}
                     ownedPartner={ownedPartner}
                     onOpenPartnerCabinet={() => {
-                      setPartnerCabinetEntryModule('showcase-builder');
+                      setPartnerCabinetEntryModule('dashboard');
                       goPanel('partner-cabinet');
                     }}
                     ownedExpert={ownedExpert}
@@ -5449,6 +5529,7 @@ export function UserApp() {
                     customTasks={customTasks}
                     onBack={goBackPanel}
                     onClaim={handleClaim}
+                    onOpenKeyHistory={() => setShowKeyHistory(true)}
                   />
                 </Suspense>
               </Panel>
@@ -5472,6 +5553,23 @@ export function UserApp() {
                     partners={enrichedPartners}
                     onOpenPartner={openPartner}
                     onAskQuestion={(partner) => openContextDialog('promotion', partner, 'promotion-card')}
+                    onBack={goBackPanel}
+                    desktopOverview={desktopOverview}
+                    desktopMode={desktopDevice}
+                  />
+                </Suspense>
+              </Panel>
+
+              <Panel id="favorites">
+                <Suspense fallback={<LazyFallback />}>
+                  <OffersPage
+                    variant="v2"
+                    title="Избранное"
+                    subtitle={`${favorites.length} сохранённых партнёров`}
+                    showAllPartners
+                    partners={enrichedPartners.filter((partner) => favorites.some((favoriteId) => String(favoriteId) === String(partner?.id)))}
+                    onOpenPartner={openPartner}
+                    onAskQuestion={(partner) => openContextDialog('partner', partner, 'favorites')}
                     onBack={goBackPanel}
                     desktopOverview={desktopOverview}
                     desktopMode={desktopDevice}
@@ -5596,6 +5694,7 @@ export function UserApp() {
                     onClaim={handlePrizeClaim}
                     onExchangeTickets={handleExchangeTickets}
                     onRaffleEnter={handleRaffleEnter}
+                    onOpenKeyHistory={() => setShowKeyHistory(true)}
                     partners={partners}
                     experts={experts}
                     desktopOverview={desktopOverview}
@@ -5752,6 +5851,14 @@ export function UserApp() {
               setReviewPromptBookingId('');
               openPartner(partner);
             }}
+          />
+
+          <KeyHistoryModal
+            open={showKeyHistory}
+            userId={String(user?.id || '')}
+            currentBalance={userKeys}
+            onBalance={setUserKeys}
+            onClose={() => setShowKeyHistory(false)}
           />
 
           {bookingRequest && (
