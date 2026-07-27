@@ -718,6 +718,8 @@ function V2FirstScreenMobile({
           {...pressMotion}
           style={{
             width: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box',
             marginTop: 0,
             order: desktopMode ? undefined : -1,
             border: '1px solid rgba(244,217,140,0.22)',
@@ -1245,7 +1247,7 @@ function V2SecondScreenMobile({
         )}
         </div>
 
-        <div>
+        <div style={desktopMode ? undefined : { margin: '0 18px' }}>
         <div style={{ color: V2.text, fontSize: 26, lineHeight: '31px', fontWeight: 780, marginBottom: 16 }}>
           Ближайшие мероприятия
         </div>
@@ -2530,7 +2532,7 @@ function NewsWidget({ news = [], onOpenNews, onOpenNewsItem }) {
 
   return (
     <>
-      <div style={{ margin: '0 0 28px', ...V2.glowGlass, borderRadius: 32, overflow: 'hidden', position: 'relative', ...revealMotion(0, 'panel') }}>
+      <div style={{ margin: '0 18px 28px', ...V2.glowGlass, borderRadius: 32, overflow: 'hidden', position: 'relative', ...revealMotion(0, 'panel') }}>
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(circle at 16% 0%, rgba(244,217,140,0.13), transparent 34%)' }} />
         <div style={{ position: 'relative', padding: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, marginBottom: 14 }}>
