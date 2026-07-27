@@ -10,19 +10,29 @@ export class PostgresAccountAdapter extends PostgresIdentityAdapter {
     super(config);
     this.name = 'postgres-account';
     this.accountSchemaReady = false;
+    this.accountSchemaPromise = null;
   }
 
   async ensureSchema() {
     await super.ensureSchema();
     if (this.accountSchemaReady || !this.available) return { ok: this.available, skipped: !this.available };
-    const schemaPath = path.resolve(__dirname, '../schema/account-core.sql');
-    await this.client.query(fs.readFileSync(schemaPath, 'utf8'));
-    this.accountSchemaReady = true;
-    return { ok: true };
+    if (!this.accountSchemaPromise) {
+      this.accountSchemaPromise = (async () => {
+        const schemaPath = path.resolve(__dirname, '../schema/account-core.sql');
+        await this.client.query(fs.readFileSync(schemaPath, 'utf8'));
+        this.accountSchemaReady = true;
+        return { ok: true };
+      })().catch(error => {
+        this.accountSchemaPromise = null;
+        throw error;
+      });
+    }
+    return this.accountSchemaPromise;
   }
 
   async dispose() {
     await super.dispose();
     this.accountSchemaReady = false;
+    this.accountSchemaPromise = null;
   }
 }

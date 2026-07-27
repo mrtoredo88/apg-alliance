@@ -96,7 +96,7 @@ yc serverless container revision deploy \
   --container-name apg-api \
   --image "$IMAGE_URI" \
   --cores 1 --core-fraction 20 --memory 512MB --execution-timeout 30s \
-  --concurrency 16 --min-instances 1 \
+  --concurrency 16 --min-instances 1 --zone-instances-limit 1 \
   --network-id enpa19j9jpki1f67p6kq \
   --service-account-id ajegfv96md2tqri8gjdp \
   --environment YC_ACCESS_KEY="$(get_env YC_ACCESS_KEY)" \

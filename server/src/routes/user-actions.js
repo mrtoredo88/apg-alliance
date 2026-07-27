@@ -5836,8 +5836,12 @@ export default async function userActionsRoutes(fastify) {
           });
         }
       }
-      await audit(db, req, actor, safeString(req.body?.action || 'unknown'), 'unknown', req.body?.id || req.body?.userId || '', 'error', { message: String(error?.message || error).slice(0, 500) });
-      return reply.code(error.statusCode || 500).send({ ok: false, code: error.code || 'USER_ACTION_ERROR', error: error.message || 'Не удалось выполнить действие.' });
+      await audit(db, req, actor, safeString(req.body?.action || 'unknown'), 'unknown', req.body?.id || req.body?.userId || '', 'error', { message: String(error?.message || error).slice(0, 500) }).catch(() => {});
+      const statusCode = error.statusCode || 500;
+      const publicMessage = statusCode >= 500
+        ? 'Сервис временно недоступен. Попробуйте ещё раз через несколько секунд.'
+        : error.message || 'Не удалось выполнить действие.';
+      return reply.code(statusCode).send({ ok: false, code: error.code || 'USER_ACTION_ERROR', error: publicMessage });
     }
   });
 }

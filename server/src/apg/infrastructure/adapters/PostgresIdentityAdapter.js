@@ -28,6 +28,7 @@ export class PostgresIdentityAdapter {
     this.config = normalizeConfig(config);
     this.pool = null;
     this.schemaReady = false;
+    this.schemaPromise = null;
   }
 
   get available() {
@@ -39,7 +40,10 @@ export class PostgresIdentityAdapter {
     if (!this.pool) {
       this.pool = new Pool({
         connectionString: this.config.connectionString,
-        max: Number(process.env.APG_IDENTITY_POOL_SIZE || 4),
+        // Odyssey limits this database user to 8 clients. All server
+        // repositories share this adapter, so two connections are enough for
+        // one serverless instance without exhausting the database proxy.
+        max: Math.max(1, Number(process.env.APG_IDENTITY_POOL_SIZE || 2)),
         idleTimeoutMillis: 20_000,
         connectionTimeoutMillis: 4_000,
         ssl: process.env.APG_IDENTITY_PG_SSL === '0' ? false : { rejectUnauthorized: false },
@@ -57,11 +61,19 @@ export class PostgresIdentityAdapter {
 
   async ensureSchema() {
     if (this.schemaReady || !this.available) return { ok: this.available, skipped: !this.available };
-    const schemaPath = path.resolve(__dirname, '../../identity/schema/identity-v2.sql');
-    const sql = fs.readFileSync(schemaPath, 'utf8');
-    await this.client.query(sql);
-    this.schemaReady = true;
-    return { ok: true };
+    if (!this.schemaPromise) {
+      this.schemaPromise = (async () => {
+        const schemaPath = path.resolve(__dirname, '../../identity/schema/identity-v2.sql');
+        const sql = fs.readFileSync(schemaPath, 'utf8');
+        await this.client.query(sql);
+        this.schemaReady = true;
+        return { ok: true };
+      })().catch(error => {
+        this.schemaPromise = null;
+        throw error;
+      });
+    }
+    return this.schemaPromise;
   }
 
   async query(sql, params = []) {
@@ -89,5 +101,6 @@ export class PostgresIdentityAdapter {
     if (this.pool) await this.pool.end();
     this.pool = null;
     this.schemaReady = false;
+    this.schemaPromise = null;
   }
 }

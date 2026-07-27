@@ -245,6 +245,67 @@ WHERE EXISTS (
 )
 ON CONFLICT (version) DO NOTHING;
 
+-- The first reconciliation only matched account profiles that already carried
+-- the email. Native-auth aliases may have no email in Account Core, although
+-- Identity PostgreSQL links them to the same verified address. Reconcile those
+-- exact 0/4-key migration artefacts as well, without touching later balances.
+WITH verified_balance AS (
+  SELECT 32::integer AS keys
+  WHERE EXISTS (
+    SELECT 1
+    FROM apg_app_documents
+    WHERE collection_name = 'users'
+      AND parent_path = ''
+      AND lower(COALESCE(data->>'email', data->>'linkedEmail', '')) = 'mrtoredo88@mail.ru'
+      AND (data->>'keys') ~ '^[0-9]+$'
+      AND (data->>'keys')::integer = 32
+  )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM apg_account_schema_versions
+      WHERE version = 'owner-canonical-keys-reconcile-2026-07-27'
+    )
+),
+owner_identity_ids AS (
+  SELECT id AS user_id
+  FROM apg_identity_users
+  WHERE lower(COALESCE(email, '')) = 'mrtoredo88@mail.ru'
+  UNION
+  SELECT canonical_user_id
+  FROM apg_identity_users
+  WHERE lower(COALESCE(email, '')) = 'mrtoredo88@mail.ru'
+    AND canonical_user_id IS NOT NULL
+    AND canonical_user_id <> ''
+)
+UPDATE apg_account_profiles AS account
+SET profile = jsonb_set(account.profile, '{keys}', to_jsonb(verified_balance.keys), true),
+    updated_at = now()
+FROM verified_balance
+WHERE (
+    account.user_id IN (SELECT user_id FROM owner_identity_ids)
+    OR account.canonical_user_id IN (SELECT user_id FROM owner_identity_ids)
+  )
+  AND CASE
+        WHEN (account.profile->>'keys') ~ '^[0-9]+$' THEN (account.profile->>'keys')::integer
+        ELSE 0
+      END IN (0, 4);
+
+INSERT INTO apg_account_schema_versions (version, checksum, description)
+SELECT
+  'owner-canonical-keys-reconcile-2026-07-27',
+  'owner-canonical-keys-reconcile-v1',
+  'Reconcile native-auth aliases with the verified canonical owner balance'
+WHERE EXISTS (
+  SELECT 1
+  FROM apg_app_documents
+  WHERE collection_name = 'users'
+    AND parent_path = ''
+    AND lower(COALESCE(data->>'email', data->>'linkedEmail', '')) = 'mrtoredo88@mail.ru'
+    AND (data->>'keys') ~ '^[0-9]+$'
+    AND (data->>'keys')::integer = 32
+)
+ON CONFLICT (version) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_email ON apg_account_profiles(email);
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_firebase_uid ON apg_account_profiles(firebase_uid);
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_telegram_id ON apg_account_profiles(telegram_id);

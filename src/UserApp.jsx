@@ -1123,7 +1123,10 @@ export function UserApp() {
   const [eventSheetOpen, setEventSheetOpen]     = useState(false);
 
   const [user, setUser]                         = useState(null);
-  const [userKeys, setUserKeys]                 = useState(0);
+  const [userKeys, setUserKeys]                 = useState(() => {
+    const cached = Number(localStorage.getItem('apg_canonical_key_balance'));
+    return Number.isFinite(cached) && cached >= 0 ? cached : 0;
+  });
   const [showKeyHistory, setShowKeyHistory]     = useState(false);
   const [userTickets, setUserTickets]           = useState(0);
   const [userReputation, setUserReputation]     = useState(0);
@@ -1216,6 +1219,7 @@ export function UserApp() {
       const balance = Number(result?.balance);
       if (Number.isFinite(balance)) {
         setUserKeys(balance);
+        try { localStorage.setItem('apg_canonical_key_balance', String(balance)); } catch {}
         setUser(prev => prev ? { ...prev, keys: balance } : prev);
         return balance;
       }
@@ -1227,6 +1231,7 @@ export function UserApp() {
 
   useEffect(() => {
     if (!user?.id || String(user.id).startsWith('guest_')) return;
+    refreshKeyBalance();
     const handleResume = () => {
       if (document.visibilityState === 'visible') refreshKeyBalance();
     };
@@ -2248,7 +2253,14 @@ export function UserApp() {
                 ...(data.notificationPreferences ? { notificationPreferences: data.notificationPreferences } : {}),
                 ...(data.notificationsEnabled !== undefined ? { notificationsEnabled: data.notificationsEnabled } : {}),
               }) : u);
-              setUserKeys(keys);
+              // The migrated application document is still used for profile
+              // preferences, but it is never an economy source. Only a
+              // successful Account Core bootstrap may seed the balance; all
+              // subsequent refreshes come from economy:history.
+              if (accountBootstrap?.profile) {
+                setUserKeys(keys);
+                try { localStorage.setItem('apg_canonical_key_balance', String(keys)); } catch {}
+              }
               setUserTickets(tickets);
               setUserReputation(reputation);
               setFavorites(data.favorites ?? []);

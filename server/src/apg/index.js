@@ -4,6 +4,7 @@ import { createIdentityV2 } from './createIdentityV2.js';
 import { NativeApgServerIdentityProvider } from './identity/providers/NativeApgServerIdentityProvider.js';
 import { YandexServerIdentityProvider } from './identity/providers/YandexServerIdentityProvider.js';
 import { createAccountCore } from './account/index.js';
+import { PostgresAccountAdapter } from './account/adapters/PostgresAccountAdapter.js';
 
 export const SERVER_REPOSITORY_DEFINITIONS = {
   UserRepository: 'users',
@@ -21,20 +22,21 @@ export const SERVER_REPOSITORY_DEFINITIONS = {
   AnalyticsRepository: 'diagnostics',
 };
 
-export function createServerFoundation({ dataAdapter = new PostgresDataAdapter(), identityProvider = null } = {}) {
-  const identityV2 = createIdentityV2({ tokenProvider: identityProvider });
+export function createServerFoundation({ postgresAdapter = new PostgresAccountAdapter(), dataAdapter = null, identityProvider = null } = {}) {
+  const resolvedDataAdapter = dataAdapter || new PostgresDataAdapter(postgresAdapter);
+  const identityV2 = createIdentityV2({ postgresAdapter, tokenProvider: identityProvider });
   const resolvedIdentityProvider = identityProvider || identityV2.tokenProvider;
-  const account = createAccountCore();
+  const account = createAccountCore({ postgresAdapter });
   return {
     identity: resolvedIdentityProvider,
     identityV2,
     account,
     data: {
-      adapter: dataAdapter,
+      adapter: resolvedDataAdapter,
       repositories: Object.fromEntries(
         Object.entries(SERVER_REPOSITORY_DEFINITIONS).map(([name, collectionName]) => [
           name,
-          new ServerRepository({ name, collectionName, adapter: dataAdapter }),
+          new ServerRepository({ name, collectionName, adapter: resolvedDataAdapter }),
         ]),
       ),
     },
