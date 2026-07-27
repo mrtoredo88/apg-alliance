@@ -84,6 +84,31 @@ CREATE TABLE IF NOT EXISTS apg_account_metrics (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS apg_economy_operations (
+  id TEXT PRIMARY KEY,
+  idempotency_key TEXT NOT NULL UNIQUE,
+  user_id TEXT NOT NULL REFERENCES apg_account_profiles(user_id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
+  source_type TEXT NOT NULL DEFAULT '',
+  source_id TEXT NOT NULL DEFAULT '',
+  source_label TEXT NOT NULL DEFAULT '',
+  delta INTEGER NOT NULL,
+  balance_after INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'completed',
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS apg_economy_visit_rewards (
+  user_id TEXT NOT NULL REFERENCES apg_account_profiles(user_id) ON DELETE CASCADE,
+  subject_type TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  operation_id TEXT NOT NULL REFERENCES apg_economy_operations(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, subject_type, subject_id)
+);
+
 CREATE TABLE IF NOT EXISTS apg_social_connection_requests (
   id TEXT PRIMARY KEY,
   pair_key TEXT NOT NULL UNIQUE,
@@ -128,3 +153,4 @@ CREATE INDEX IF NOT EXISTS idx_apg_admin_credentials_email ON apg_admin_credenti
 CREATE INDEX IF NOT EXISTS idx_apg_social_connection_sender ON apg_social_connection_requests(sender_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_apg_social_connection_recipient ON apg_social_connection_requests(recipient_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_apg_social_connection_status ON apg_social_connection_requests(status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_apg_economy_operations_user_created ON apg_economy_operations(user_id, created_at DESC);

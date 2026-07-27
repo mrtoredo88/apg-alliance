@@ -5627,37 +5627,26 @@ function economyDelta(item = {}) {
 async function actionEconomyHistory(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
   const requestedLimit = Math.max(1, Math.min(200, Number(req.body?.limit) || 100));
-  const userRef = db.collection('users').doc(userId);
-  const [userSnap, activitySnap] = await Promise.all([
-    userRef.get(),
-    userRef.collection('activity').orderBy('ts', 'desc').limit(requestedLimit).get(),
+  const [profile, rows] = await Promise.all([
+    serverFoundation.account.getProfile(userId),
+    serverFoundation.account.economyHistory(userId, requestedLimit),
   ]);
-  if (!userSnap.exists) throw Object.assign(new Error('Пользователь не найден.'), { statusCode: 404, code: 'USER_NOT_FOUND' });
-  const balance = Number(userSnap.data()?.keys || 0);
-  let runningBalance = balance;
-  const operations = activitySnap.docs
-    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
-    .filter(item => economyDelta(item) !== 0)
-    .map(item => {
-      const delta = economyDelta(item);
-      const balanceAfter = runningBalance;
-      runningBalance -= delta;
-      return {
-        id: item.id,
-        type: safeString(item.type || 'keys', 80),
-        title: safeString(item.title, 180),
-        text: safeString(item.text, 320),
-        reason: safeString(item.reason || item.description, 320),
-        sourceId: safeString(item.partnerId || item.expertId || item.eventId || item.prizeId || item.sourceId, 220),
-        sourceLabel: safeString(item.partnerName || item.expertName || item.eventName || item.prizeName || item.sourceLabel, 220),
-        delta,
-        balanceAfter,
-        status: safeString(item.status || 'completed', 40),
-        statusLabel: item.status === 'reverted' ? 'Отменено' : item.status === 'pending' ? 'В обработке' : 'Выполнено',
-        createdAt: economyTimestamp(item.ts || item.createdAt || item.updatedAt),
-      };
-    });
-  return { ok: true, userId, balance, operations, hasMore: activitySnap.size >= requestedLimit };
+  if (!profile) throw Object.assign(new Error('Пользователь не найден.'), { statusCode: 404, code: 'USER_NOT_FOUND' });
+  const operations = rows.map(item => ({
+    id: item.id,
+    type: item.type,
+    title: item.delta > 0 ? `Начислено ${item.delta} ключей` : item.delta < 0 ? `Списано ${Math.abs(item.delta)} ключей` : 'Визит отмечен',
+    text: item.reason,
+    reason: item.reason,
+    sourceId: item.sourceId,
+    sourceLabel: item.sourceLabel,
+    delta: item.delta,
+    balanceAfter: item.balanceAfter,
+    status: item.status,
+    statusLabel: item.status === 'reverted' ? 'Отменено' : item.status === 'pending' ? 'В обработке' : 'Выполнено',
+    createdAt: economyTimestamp(item.createdAt),
+  }));
+  return { ok: true, userId, balance: Number(profile.keys || 0), operations, hasMore: rows.length >= requestedLimit, storage: 'postgres' };
 }
 
 async function routeAction(db, req, actor) {

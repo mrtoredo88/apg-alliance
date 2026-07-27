@@ -4,6 +4,7 @@ import {
   AccountRoleRepository,
   AccountSessionRepository,
   CabinetRepository,
+  EconomyRepository,
   ProfileRepository,
   TelegramSupportRepository,
 } from '../repositories/index.js';
@@ -19,5 +20,6 @@ export function createAccountCore({
   const sessions = new AccountSessionRepository(postgresAdapter);
   const cabinets = new CabinetRepository(postgresAdapter);
   const telegram = new TelegramSupportRepository(postgresAdapter);
-  return new AccountCoreService({ profiles, roles, sessions, cabinets, telegram, fallback, flags });
+  const economy = new EconomyRepository(postgresAdapter);
+  return new AccountCoreService({ profiles, roles, sessions, cabinets, telegram, economy, fallback, flags });
 }

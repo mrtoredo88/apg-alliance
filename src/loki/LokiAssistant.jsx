@@ -280,21 +280,35 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
   }
 
   if (shouldShowRestore) {
-    return (
-      <div
-        data-loki-floating-root="restore"
-        style={{
-          position: 'fixed',
-          right: 'max(14px, env(safe-area-inset-right, 0px))',
-          bottom: desktopMode ? 'max(18px, env(safe-area-inset-bottom, 0px))' : 'calc(112px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))',
-          zIndex: 10040,
-          display: 'grid',
-          gap: 10,
-          justifyItems: 'end',
-          pointerEvents: 'auto',
-        }}
-      >
-        {messageFab}
+    return createPortal(
+      <>
+        {messageFab && (
+          <div
+            data-floating-messages-root="independent"
+            style={{
+              position: 'fixed',
+              left: 'max(14px, env(safe-area-inset-left, 0px))',
+              bottom: 'calc(112px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))',
+              zIndex: 10041,
+              pointerEvents: 'auto',
+            }}
+          >
+            {messageFab}
+          </div>
+        )}
+        <div
+          data-loki-floating-root="restore"
+          style={{
+            position: 'fixed',
+            right: 'max(14px, env(safe-area-inset-right, 0px))',
+            bottom: desktopMode ? 'max(18px, env(safe-area-inset-bottom, 0px))' : 'calc(112px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))',
+            zIndex: 10040,
+            display: 'grid',
+            gap: 10,
+            justifyItems: 'end',
+            pointerEvents: 'auto',
+          }}
+        >
         <button
           ref={floatingButtonRef}
           type="button"
@@ -329,7 +343,9 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
           <LokiIdentity size={48} state="ready" showText={false} style={{ width: '100%', height: '100%', placeItems: 'center' }} />
           {hasLokiSignal && <span style={{ position: 'absolute', right: 5, top: 5, width: 9, height: 9, borderRadius: '50%', background: '#78D6FF', border: '2px solid rgba(9,10,16,0.96)', boxShadow: '0 0 16px rgba(120,214,255,0.72)' }} />}
         </button>
-      </div>
+        </div>
+      </>,
+      document.body,
     );
   }
 

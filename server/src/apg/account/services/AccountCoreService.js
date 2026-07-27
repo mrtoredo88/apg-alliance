@@ -23,6 +23,7 @@ export class AccountCoreService {
     sessions,
     cabinets,
     telegram,
+    economy,
     fallback = null,
     flags = {},
     metrics = new AccountMetrics(),
@@ -32,6 +33,7 @@ export class AccountCoreService {
     this.sessions = sessions;
     this.cabinets = cabinets;
     this.telegram = telegram;
+    this.economy = economy;
     this.fallback = fallback;
     this.flags = getAccountFlags(flags);
     this.metrics = metrics;
@@ -78,6 +80,16 @@ export class AccountCoreService {
       this.fallback.upsertProfile(saved).catch(error => this.metrics.recordError(error));
     }
     return saved;
+  }
+
+  async awardVisit(payload) {
+    this.metrics.increment('accountWrites');
+    return this.measure('postgres', () => this.economy.awardVisit(payload));
+  }
+
+  async economyHistory(userId, limit = 100) {
+    this.metrics.increment('accountReads');
+    return this.measure('postgres', () => this.economy.history(userId, limit));
   }
 
   async resolveRoles(userId) {

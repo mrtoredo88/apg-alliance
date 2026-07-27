@@ -721,35 +721,35 @@ function V2FirstScreenMobile({
             marginTop: 0,
             order: desktopMode ? undefined : -1,
             border: '1px solid rgba(244,217,140,0.22)',
-            borderRadius: 30,
-            padding: 'clamp(10px, 1.8svh, 13px)',
+            borderRadius: 26,
+            padding: '10px 11px',
             textAlign: 'left',
             cursor: 'pointer',
             color: V2.text,
             background: 'radial-gradient(circle at 18% 0%, rgba(244,217,140,0.18), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.105), rgba(255,255,255,0.034))',
             boxShadow: '0 18px 48px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.13)',
             display: 'grid',
-            gap: 9,
+            gap: 7,
             ...revealMotion(2, 'splash'),
           }}
         >
           <div>
-            <h1 style={{ margin: 0, color: V2.text, fontSize: 'clamp(26px, 4svh, 33px)', lineHeight: 'clamp(30px, 4.5svh, 37px)', fontWeight: 800, letterSpacing: 0 }}>
+            <h1 style={{ margin: 0, color: V2.text, fontSize: 'clamp(23px, 3.4svh, 29px)', lineHeight: 'clamp(27px, 3.9svh, 33px)', fontWeight: 800, letterSpacing: 0 }}>
               {greeting}
             </h1>
-            <p style={{ margin: '6px 0 0', color: V2.textSoft, fontSize: 13, lineHeight: '19px', fontWeight: 400 }}>
+            <p style={{ margin: '3px 0 0', color: V2.textSoft, fontSize: 11.5, lineHeight: '16px', fontWeight: 400 }}>
               Сегодня в Зеленограде происходит много интересного.
             </p>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '58px minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
-            <span style={{ width: 58, height: 58, borderRadius: '50%', padding: 3, background: `conic-gradient(${level.color || V2.gold} ${profileProgress * 3.6}deg, rgba(255,255,255,0.14) 0deg)`, color: '#211706', display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 920, boxShadow: '0 12px 30px rgba(216,184,103,0.14)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '48px minmax(0, 1fr) auto', gap: 8, alignItems: 'center' }}>
+            <span style={{ width: 48, height: 48, borderRadius: '50%', padding: 3, background: `conic-gradient(${level.color || V2.gold} ${profileProgress * 3.6}deg, rgba(255,255,255,0.14) 0deg)`, color: '#211706', display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 920, boxShadow: '0 10px 24px rgba(216,184,103,0.14)' }}>
               <span style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: V2.goldMetal, display: 'grid', placeItems: 'center' }}>
                 {avatarUrl ? <img src={avatarUrl} alt="" loading="eager" fetchPriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : initials}
               </span>
             </span>
             <span style={{ minWidth: 0 }}>
-              <span style={{ display: 'block', color: V2.text, fontSize: 17, lineHeight: '20px', fontWeight: 920, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullName}</span>
-              <span style={{ display: 'block', color: V2.textSoft, fontSize: 11.3, lineHeight: '14px', fontWeight: 720, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{level.label} · {todayForYou}</span>
+              <span style={{ display: 'block', color: V2.text, fontSize: 15, lineHeight: '18px', fontWeight: 920, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullName}</span>
+              <span style={{ display: 'block', color: V2.textSoft, fontSize: 10.5, lineHeight: '13px', fontWeight: 720, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{level.label} · {todayForYou}</span>
             </span>
             <button type="button" onClick={hasPartnerCabinet ? onOpenPartnerCabinet : onOpenProfile} style={{ borderRadius: 999, padding: '7px 10px', background: V2.goldMetal, border: '1px solid rgba(255,235,174,0.5)', color: '#211706', boxShadow: '0 8px 22px rgba(216,184,103,0.22)', fontSize: 10.2, lineHeight: '12px', fontWeight: 900, cursor: 'pointer' }}>{hasPartnerCabinet ? 'Кабинет партнёра' : 'Профиль'}</button>
           </div>
@@ -759,7 +759,7 @@ function V2FirstScreenMobile({
               ['Мои события', Array.isArray(registeredEventIds) ? registeredEventIds.length : 0, '📅', eventsTodayCount > 0 ? 'сегодня' : 'афиша', onOpenEvents],
               ['Избранное', favorites.length, '⭐', favorites.length > 0 ? 'сохранено' : 'добавить', onOpenFavorites],
             ].map(([label, value, icon, sub, onClick]) => (
-              <button type="button" onClick={onClick} key={label} style={{ minHeight: 41, borderRadius: 16, padding: '6px 5px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.11)', overflow: 'hidden', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
+              <button type="button" onClick={onClick} key={label} style={{ minHeight: 37, borderRadius: 14, padding: '5px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.11)', overflow: 'hidden', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer' }}>
                 <span style={{ display: 'flex', justifyContent: 'space-between', gap: 3, color: V2.gold, fontSize: 12, lineHeight: '14px', fontWeight: 900 }}><span>{icon}</span><span>{value}</span></span>
                 <span style={{ display: 'block', color: V2.textMuted, fontSize: 8.6, lineHeight: '10px', fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{label}</span>
                 <span style={{ display: 'block', color: V2.gold, fontSize: 8.1, lineHeight: '10px', fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{sub}</span>
@@ -771,7 +771,7 @@ function V2FirstScreenMobile({
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nextAchievement?.title || (nextLevel ? `До уровня ${nextLevel.label}` : 'Максимальный уровень')}</span>
               <span style={{ color: V2.gold, fontWeight: 900 }}>{profileProgress}%</span>
             </span>
-            <span style={{ height: 7, borderRadius: 999, overflow: 'hidden', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <span style={{ height: 5, borderRadius: 999, overflow: 'hidden', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.12)' }}>
               <span style={{ display: 'block', width: `${profileProgress}%`, height: '100%', borderRadius: 999, background: `linear-gradient(90deg, ${level.color || V2.gold}, #E8C97A)`, transition: 'width 0.65s ease' }} />
             </span>
           </span>

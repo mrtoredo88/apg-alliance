@@ -4929,7 +4929,7 @@ export function UserApp() {
     onOpenRewards: handleOpenRewards,
     onOpenNotifications: openNotifications,
     onOpenMessages: handleOpenMessages,
-    messageUnreadCount: unreadCount,
+    messageUnreadCount: 0,
     onOpenLoki: handleOpenLoki,
     onOpenProfile: handleOpenProfile,
     workspaceAction: desktopWorkspaceAvailable ? (
@@ -6063,7 +6063,7 @@ export function UserApp() {
           />
           {splashDone && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && (
             <Suspense fallback={null}>
-              <LokiAssistant desktopMode={desktopDevice} onOpenMessages={handleOpenMessages} messageUnreadCount={unreadCount} hideMessagesButton={activePanel === 'dialogs'} />
+              <LokiAssistant desktopMode={desktopDevice} onOpenMessages={handleOpenMessages} messageUnreadCount={0} hideMessagesButton={activePanel === 'dialogs'} />
             </Suspense>
           )}
           </LokiProvider>

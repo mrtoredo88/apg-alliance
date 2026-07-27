@@ -74,12 +74,11 @@ function isPrivilegedUser(user) {
   return Boolean(user?.isAdmin || user?.admin || role === 'admin' || role === 'owner');
 }
 
-async function validateScannerForOneTime(db, subject, scannerUserId) {
+async function validateScannerForOneTime(accountCore, subject, scannerUserId) {
   const scannerId = normalizeId(scannerUserId);
   if (!scannerId) return { ok: false, code: 'NO_SCANNER', message: 'Не удалось определить сканирующего пользователя' };
 
-  const scannerSnap = await db.collection('users').doc(scannerId).get();
-  const scanner = scannerSnap.exists ? scannerSnap.data() : null;
+  const scanner = await accountCore?.getProfile(scannerId);
   if (isPrivilegedUser(scanner)) return { ok: true, role: 'admin' };
 
   const owners = ownerValues(subject);
@@ -193,84 +192,48 @@ export async function createVisitQrToken(db, { userId, subjectType, subjectId, r
   return { ok: true, qrValue, expiresAt: payload.exp, ttlMs: TOKEN_TTL_MS };
 }
 
-async function awardVisitTransaction(db, context) {
+async function awardVisitTransaction(db, accountCore, context) {
   const now = new Date();
   const dateKey = todayKey(now);
-  const userRef = db.collection('users').doc(context.userId);
   const globalRef = db.collection('stats').doc('global');
   const scanRef = context.subjectType === 'partner'
     ? db.collection('scans').doc()
     : db.collection('expertScans').doc();
-  const activityRef = db.collection('users').doc(context.userId).collection('activity').doc();
+  if (!accountCore?.awardVisit) throw Object.assign(new Error('PostgreSQL Economy недоступна'), { code: 'ECONOMY_NOT_CONFIGURED' });
 
-  return db.runTransaction(async tx => {
-    const [userSnap, tokenSnap] = await Promise.all([
-      tx.get(userRef),
-      context.tokenRef ? tx.get(context.tokenRef) : Promise.resolve(null),
-    ]);
+  if (context.tokenRef) {
+    const tokenSnap = await context.tokenRef.get();
+    const token = tokenSnap.data();
+    if (!token || token.used) throw Object.assign(new Error('QR уже использован'), { code: 'TOKEN_USED' });
+    if (Number(token.expiresAtMs) < Date.now()) throw Object.assign(new Error('QR истёк'), { code: 'TOKEN_EXPIRED' });
+  }
 
-    if (!userSnap.exists) {
-      const err = new Error('Пользователь не найден');
-      err.code = 'USER_NOT_FOUND';
-      throw err;
-    }
+  const subject = context.subject.data;
+  const baseReward = getEconomyReward(context.subjectType === 'expert' ? 'expert_visit' : 'partner_visit');
+  const partnerBoost = Math.max(1, Math.min(5, Number(subject.keyMultiplier || subject.keysMultiplier || (subject.featured || subject.partnerOfMonth ? 2 : 1)) || 1));
+  const configuredKeys = Number(subject.keys || subject.visitKeys || 0);
+  const requestedKeys = Math.max(0, configuredKeys || Math.round(baseReward.keys * partnerBoost));
+  const idempotencyKey = context.nonce
+    ? `qr:${context.nonce}`
+    : `legacy-visit:${context.userId}:${context.subjectType}:${context.subjectId}`;
+  const awarded = await accountCore.awardVisit({
+    userId: context.userId,
+    subjectType: context.subjectType,
+    subjectId: context.subjectId,
+    subjectLabel: subject.name || 'АПГ',
+    idempotencyKey,
+    requestedKeys,
+    reputation: baseReward.reputation,
+    dateKey,
+    scanDate: dateKey,
+  });
+  const keyBonus = awarded.replayed ? 0 : awarded.operation.delta;
+  const reputationBonus = awarded.alreadyAwarded || awarded.replayed ? 0 : baseReward.reputation;
 
-    if (context.tokenRef) {
-      const token = tokenSnap?.data();
-      if (!token || token.used) {
-        const err = new Error('QR уже использован');
-        err.code = 'TOKEN_USED';
-        throw err;
-      }
-      if (Number(token.expiresAtMs) < Date.now()) {
-        const err = new Error('QR истёк');
-        err.code = 'TOKEN_EXPIRED';
-        throw err;
-      }
-    }
-
-    const user = userSnap.data();
-    const subject = context.subject.data;
-    const prevCounts = user.visitCounts ?? {};
-    const scannedPartners = user.scannedPartners ?? {};
-    const scannedExperts = user.scannedExperts ?? {};
-    const prevCount = Number(context.subjectType === 'expert' ? scannedExperts[context.subjectId] : prevCounts[context.subjectId]) || 0;
-    const alreadyAwarded = context.subjectType === 'expert'
-      ? prevCount > 0
-      : Boolean(scannedPartners[context.subjectId]);
-    const yesterdayKey = new Date(Date.now() - 86_400_000).toLocaleDateString('sv');
-    const lastScanDate = user.lastScanDate ?? '';
-    const alreadyToday = lastScanDate === dateKey;
-    const newStreak = alreadyToday ? (user.streak ?? 0) : (lastScanDate === yesterdayKey ? (user.streak ?? 0) + 1 : 1);
-    const previousDates = Array.isArray(user.scanDates) ? user.scanDates : [];
-    const scanDates = previousDates.includes(dateKey) ? previousDates : [...previousDates.slice(-89), dateKey];
-    const baseReward = getEconomyReward(context.subjectType === 'expert' ? 'expert_visit' : 'partner_visit');
-    const partnerBoost = Math.max(1, Math.min(5, Number(subject.keyMultiplier || subject.keysMultiplier || (subject.featured || subject.partnerOfMonth ? 2 : 1)) || 1));
-    const configuredKeys = Number(subject.keys || subject.visitKeys || 0);
-    const keyBonus = alreadyAwarded ? 0 : Math.max(0, configuredKeys || Math.round(baseReward.keys * partnerBoost));
-    const reputationBonus = alreadyAwarded ? 0 : baseReward.reputation;
-    const newCount = prevCount + 1;
-
-    const userUpdate = {
-      lastScanDate: dateKey,
-      streak: newStreak,
-      scanDates,
-	      [`visitCounts.${context.subjectId}`]: FieldValue.increment(1),
-	      economyVersion: ECONOMY_VERSION,
-	      updatedAt: FieldValue.serverTimestamp(),
-    };
-    if (context.subjectType === 'expert') {
-      userUpdate[`scannedExperts.${context.subjectId}`] = FieldValue.increment(1);
-    } else if (!alreadyAwarded) {
-      userUpdate[`scannedPartners.${context.subjectId}`] = true;
-    }
-    if (keyBonus > 0) userUpdate.keys = FieldValue.increment(keyBonus);
-    if (reputationBonus > 0) userUpdate.reputation = FieldValue.increment(reputationBonus);
-
-    tx.update(userRef, userUpdate);
-    tx.update(context.subject.ref, { totalVisits: FieldValue.increment(1) });
-    tx.set(globalRef, { totalScans: FieldValue.increment(1) }, { merge: true });
-    tx.set(scanRef, {
+  const batch = db.batch();
+  batch.update(context.subject.ref, { totalVisits: FieldValue.increment(1) });
+  batch.set(globalRef, { totalScans: FieldValue.increment(1) }, { merge: true });
+  batch.set(scanRef, {
       userId: context.userId,
       subjectType: context.subjectType,
       partnerId: context.subjectType === 'partner' ? context.subjectId : null,
@@ -283,49 +246,34 @@ async function awardVisitTransaction(db, context) {
 	      monthKey: monthKeyFromToday(dateKey),
       scannedBy: context.scannerUserId,
       scannedAt: FieldValue.serverTimestamp(),
-    });
-    tx.set(activityRef, {
-      type: context.subjectType === 'expert' ? 'expert_scan' : 'scan',
-      icon: keyBonus > 1 ? '⭐' : keyBonus > 0 ? '🔑' : '🔥',
-	      text: keyBonus > 0
-	        ? `Посещён: ${subject.name ?? 'АПГ'}${keyBonus > 1 ? ' (бонус × 2)' : ''}`
-	        : `Визит отмечен: ${subject.name ?? 'АПГ'}`,
-	      keys: keyBonus,
-	      reputation: reputationBonus,
-      partnerId: context.subjectType === 'partner' ? context.subjectId : null,
-      expertId: context.subjectType === 'expert' ? context.subjectId : null,
-      sourceLabel: subject.name ?? 'АПГ',
-      status: 'completed',
-	      economyVersion: ECONOMY_VERSION,
-	      ts: FieldValue.serverTimestamp(),
-    });
-    if (context.tokenRef) {
-      tx.update(context.tokenRef, {
+  });
+  if (context.tokenRef) {
+    batch.update(context.tokenRef, {
         used: true,
         usedAt: FieldValue.serverTimestamp(),
 	        usedBy: context.scannerUserId,
 	        keysAwarded: keyBonus,
 	        reputationAwarded: reputationBonus,
-	      });
-    }
+    });
+  }
+  await batch.commit();
 
-    return {
-	      awardedKeys: keyBonus,
-	      awardedReputation: reputationBonus,
+  return {
+      awardedKeys: keyBonus,
+      awardedReputation: reputationBonus,
       targetUserId: context.userId,
-      balanceAfter: Number(user.keys || 0) + keyBonus,
-      alreadyAwarded,
-      streak: newStreak,
-      scanDates,
-      visitCount: newCount,
+      balanceAfter: awarded.operation.balanceAfter,
+      alreadyAwarded: awarded.alreadyAwarded || awarded.replayed,
+      streak: awarded.streak,
+      scanDates: awarded.scanDates,
+      visitCount: awarded.visitCount,
       subjectName: subject.name ?? '',
       subjectType: context.subjectType,
       subjectId: context.subjectId,
-    };
-  });
+  };
 }
 
-export async function awardVisit(db, { qrValue, scannerUserId }) {
+export async function awardVisit(db, { qrValue, scannerUserId, accountCore }) {
   const scannerId = normalizeId(scannerUserId);
   if (!scannerId) {
     return { ok: false, status: 400, code: 'NO_SCANNER', message: 'Не удалось определить пользователя' };
@@ -344,7 +292,7 @@ export async function awardVisit(db, { qrValue, scannerUserId }) {
       }
       const subject = await loadSubject(db, parsed.subjectType, parsed.subjectId);
       if (!subject) return { ok: false, status: 404, code: 'SUBJECT_NOT_FOUND', message: 'Партнёр или эксперт не найден' };
-      const scannerCheck = await validateScannerForOneTime(db, subject.data, scannerId);
+      const scannerCheck = await validateScannerForOneTime(accountCore, subject.data, scannerId);
       if (!scannerCheck.ok) {
         await writeQrLog(db, { event: 'qr_rejected', reason: scannerCheck.code, scannerUserId: scannerId, userId: parsed.userId, subjectType: parsed.subjectType, subjectId: parsed.subjectId, nonce: parsed.nonce });
         return { ok: false, status: 403, code: scannerCheck.code, message: scannerCheck.message };
@@ -356,6 +304,7 @@ export async function awardVisit(db, { qrValue, scannerUserId }) {
         subjectId: parsed.subjectId,
         scannerUserId: scannerId,
         tokenRef: db.collection('visitTokens').doc(parsed.nonce),
+        nonce: parsed.nonce,
         subject,
       };
     }
@@ -378,7 +327,7 @@ export async function awardVisit(db, { qrValue, scannerUserId }) {
   }
 
   try {
-    const result = await awardVisitTransaction(db, context);
+    const result = await awardVisitTransaction(db, accountCore, context);
     await writeQrLog(db, {
       event: result.awardedKeys > 0 ? 'reward_awarded' : 'visit_recorded',
       source: context.source,
