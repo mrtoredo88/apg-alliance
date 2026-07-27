@@ -7,7 +7,13 @@ export class ProfileRepository {
   }
 
   async get(userId) {
-    const result = await this.adapter.query('SELECT * FROM apg_account_profiles WHERE user_id = $1 LIMIT 1', [safeString(userId, 260)]);
+    const result = await this.adapter.query(`
+      SELECT *
+      FROM apg_account_profiles
+      WHERE user_id = $1 OR canonical_user_id = $1
+      ORDER BY (user_id = canonical_user_id) DESC, updated_at DESC
+      LIMIT 1
+    `, [safeString(userId, 260)]);
     return mapProfile(result.rows[0]);
   }
 

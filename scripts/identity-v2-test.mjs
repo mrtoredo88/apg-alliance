@@ -8,7 +8,6 @@ function read(file) {
 
 [
   'server/src/apg/identity/schema/identity-v2.sql',
-  'server/src/routes/identity-v2-admin.js',
   'server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js',
   'server/src/apg/identity/ApgIdentityV2Service.js',
   'server/src/apg/identity/repositories/IdentityRepository.js',
@@ -61,29 +60,8 @@ const flags = read('src/apg/core/FeatureFlags.js');
 const systemStatus = read('server/src/routes/system-status.js');
 assert.ok(systemStatus.includes('identityV2.snapshot'), 'APG Health backend exposes Identity v2 snapshot');
 
-const adminRoute = read('server/src/routes/identity-v2-admin.js');
-[
-  'apply-schema',
-  'snapshot',
-  'dry-run-import',
-  'import',
-  'verify',
-  'cutover-status',
-  'enable-postgres',
-  'cutover-postgres',
-  'disable-firestore-fallback',
-  'rollback',
-  'architecture-report',
-  'maintenance:write',
-  'duplicateReport',
-  'orphanReport',
-  'checksum',
-  'dependencyMonitor',
-  'activeOperation',
-].forEach(token => assert.ok(adminRoute.includes(token), `Identity v2 admin route supports ${token}`));
-
 const server = read('server/src/server.js');
-assert.ok(server.includes('identityV2AdminRoutes'), 'server registers Identity v2 admin cutover route');
+assert.equal(server.includes('identityV2AdminRoutes'), false, 'removed migration-only Identity admin route stays disabled');
 
 const deploy = read('server/deploy.sh');
 [

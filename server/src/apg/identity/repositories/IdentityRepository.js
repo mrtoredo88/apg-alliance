@@ -44,14 +44,15 @@ export class IdentityRepository {
     const normalized = normalizeEmail(email);
     const index = await this.emails.get(normalized);
     if (index?.userId) {
-      const user = await this.getUser(index.userId);
-      if (user) return { userId: user.id, canonicalUserId: user.canonicalUserId || user.id, user, source: 'identity_v2_email_index' };
+      const user = await this.getCanonicalUser(index.userId, index.canonicalUserId);
+      if (user) return { userId: ensureCanonicalId(user), canonicalUserId: ensureCanonicalId(user), user, source: 'identity_v2_email_index' };
     }
     const users = await this.users.findByEmail(normalized);
     if (users.length) {
-      const user = await this.decorateUserWithLinks(users[0]);
-      await this.emails.set({ email: normalized, userId: user.id, canonicalUserId: user.canonicalUserId || user.id });
-      return { userId: user.id, canonicalUserId: user.canonicalUserId || user.id, user, source: 'identity_v2_user_email' };
+      const user = await this.getCanonicalUser(users[0].id, users[0].canonicalUserId);
+      const canonicalUserId = ensureCanonicalId(user);
+      await this.emails.set({ email: normalized, userId: canonicalUserId, canonicalUserId });
+      return { userId: canonicalUserId, canonicalUserId, user, source: 'identity_v2_user_email' };
     }
     return null;
   }
@@ -69,16 +70,26 @@ export class IdentityRepository {
     return this.decorateUserWithLinks(await this.users.get(userId));
   }
 
+  async getCanonicalUser(userId, knownCanonicalUserId = '') {
+    const user = await this.users.get(userId);
+    if (!user) return null;
+    const canonicalUserId = safeString(knownCanonicalUserId || ensureCanonicalId(user), 260);
+    const canonical = canonicalUserId && canonicalUserId !== user.id
+      ? await this.users.get(canonicalUserId)
+      : user;
+    return this.decorateUserWithLinks(canonical || user);
+  }
+
   async resolveByProvider(provider, providerUserId) {
     const normalizedProvider = normalizeIdentityProviderValue(provider);
     const normalizedProviderUserId = normalizedProvider === 'telegram' ? normalizeTelegramId(providerUserId) : safeString(providerUserId, 260);
     const link = await this.links.get(normalizedProvider, normalizedProviderUserId);
     if (!link?.userId) return null;
-    const user = await this.getUser(link.userId);
+    const user = await this.getCanonicalUser(link.userId, link.canonicalUserId);
     return user
       ? {
-          userId: user.id,
-          canonicalUserId: user.canonicalUserId || user.id,
+          userId: ensureCanonicalId(user),
+          canonicalUserId: ensureCanonicalId(user),
           user,
           link,
           identityId: link?.id || `${provider}:${normalizedProviderUserId}`,

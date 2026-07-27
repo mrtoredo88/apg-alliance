@@ -158,8 +158,14 @@ export default async function accountRoutes(fastify) {
     if (!token) return reply.code(401).send({ ok: false, code: 'AUTH_REQUIRED', error: 'Требуется авторизация.' });
     try {
       const decoded = await serverFoundation.identity.verifySession({ token });
-      const requestedUserId = safeString(request.body?.userId || decoded.uid, 260);
-      const userId = requestedUserId === decoded.uid ? requestedUserId : decoded.uid;
+      const sessionIdentity = await serverFoundation.identityV2.getUser(decoded.uid).catch(() => null);
+      const userId = safeString(
+        sessionIdentity?.canonicalUserId
+          || sessionIdentity?.canonical_user_id
+          || sessionIdentity?.id
+          || decoded.uid,
+        260,
+      );
       const canary = canaryAllowed(userId);
       if (canaryModeEnabled() && !canary) {
         return reply.code(403).send({ ok: false, code: 'ACCOUNT_CANARY_NOT_ALLOWED', error: 'Account Core canary недоступен для пользователя.' });

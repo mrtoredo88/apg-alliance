@@ -393,7 +393,11 @@ function mergePushSubscriptions(existing = [], current = null) {
 }
 
 async function resolveActor(db, decoded) {
-  const identity = await serverFoundation.identityV2.getUser(decoded.uid).catch(() => null);
+  const rawIdentity = await serverFoundation.identityV2.getUser(decoded.uid).catch(() => null);
+  const canonicalUserId = safeUserId(rawIdentity?.canonicalUserId || rawIdentity?.canonical_user_id || rawIdentity?.id || decoded.uid);
+  const identity = canonicalUserId && canonicalUserId !== rawIdentity?.id
+    ? await serverFoundation.identityV2.getUser(canonicalUserId).catch(() => rawIdentity)
+    : rawIdentity;
   if (!identity?.id && !identity?.userId) {
     const error = new Error('Пользователь Identity не найден.');
     error.statusCode = 401;
@@ -402,7 +406,7 @@ async function resolveActor(db, decoded) {
   }
   return {
     uid: decoded.uid,
-    userId: safeUserId(identity?.id || identity?.userId || ''),
+    userId: safeUserId(identity?.canonicalUserId || identity?.canonical_user_id || identity?.id || identity?.userId || ''),
     user: identity?.user || identity || {},
     source: 'identity_v2',
   };
