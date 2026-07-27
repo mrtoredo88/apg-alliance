@@ -1,5 +1,5 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import { getDb, getDbAuth } from './firebase.js';
+import { FieldValue } from './documentValues.js';
+import { getDb } from './documentStore.js';
 import { serverFoundation } from '../apg/index.js';
 import { getPrimaryRole, normalizeRole as normalizeSharedRole, ROLE_REGISTRY } from '../../../server-shared/role-engine.js';
 
@@ -30,7 +30,7 @@ function hasPermission(role, permission) {
 }
 
 function getBearerToken(request) {
-  const direct = String(request.headers['x-firebase-auth'] || request.headers['x-apg-auth'] || '').trim();
+  const direct = String(request.headers['x-apg-auth'] || '').trim();
   if (direct) return direct.replace(/^Bearer\s+/i, '');
   const header = String(request.headers.authorization || '');
   const match = header.match(/^Bearer\s+(.+)$/i);
@@ -52,7 +52,7 @@ export async function requireAdminPermission(request, permission) {
     throw error;
   }
 
-  const decoded = await getDbAuth().verifyIdToken(token);
+  const decoded = await serverFoundation.identity.verifySession({ token });
   const userRecord = await findUserByFirebaseUid(db, decoded.uid);
   if (!userRecord) {
     const error = new Error('Пользователь Identity не найден.');

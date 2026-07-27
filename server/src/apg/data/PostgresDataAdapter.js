@@ -42,7 +42,7 @@ export class PostgresDataAdapter extends ServerDataAdapter {
        WHERE collection_name = $1 AND parent_path = $2
        ORDER BY ${safeOrder} ${safeDirection}, document_id ASC
        LIMIT $3`,
-      [clean(collectionName, 160), clean(parentPath, 700), Math.max(1, Math.min(1000, Number(limit) || 100))],
+      [clean(collectionName, 160), clean(parentPath, 700), Math.max(1, Math.min(10000, Number(limit) || 100))],
     );
     return result.rows.map(mapRow);
   }

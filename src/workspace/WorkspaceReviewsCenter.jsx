@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
-import { db } from '../firebase.js';
+import { collection, getDocs, limit, orderBy, query, where } from '../postgres/documentApi.js';
+import { db } from '../platformDataAuth.js';
 import { saveWorkspaceLinkIntent } from './WorkspaceLinks.jsx';
 
 const UI = {

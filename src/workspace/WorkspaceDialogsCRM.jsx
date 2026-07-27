@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase.js';
+import { collection, onSnapshot } from '../postgres/documentApi.js';
+import { db } from '../platformDataAuth.js';
 import { userAction } from '../userApi.js';
 import { buildDialogAutoAnswer, getDialogObjectLabel } from '../../server-shared/context-dialogs.js';
 import { normalizeBooking } from '../../server-shared/booking.js';

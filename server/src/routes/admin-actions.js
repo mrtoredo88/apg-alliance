@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
-import { FieldValue } from 'firebase-admin/firestore';
-import { getDb } from '../lib/firebase.js';
+import { FieldValue } from '../lib/documentValues.js';
+import { getDb } from '../lib/documentStore.js';
 import { adminReplyError, requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 import { APP_URL } from '../lib/config.js';
 import { serverFoundation } from '../apg/index.js';

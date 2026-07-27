@@ -11,7 +11,7 @@ export async function fetchAccountBootstrap(payload = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Firebase-Auth': token,
+      'X-APG-Auth': token,
       'X-APG-Version': version,
     },
     body: JSON.stringify(payload),

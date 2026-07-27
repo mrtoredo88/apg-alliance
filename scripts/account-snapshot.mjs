@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { loadMigrationEnv } from './lib/migration-env-loader.mjs';
-import { getDb } from '../server/src/lib/firebase.js';
+import { getDb } from '../server/src/lib/documentStore.js';
 
 loadMigrationEnv();
 

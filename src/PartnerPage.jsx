@@ -15,8 +15,8 @@ function formatProfileDate(value) {
   const date = toDate(value);
   return date ? date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
 }
-import { db } from './firebase';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from './platformDataAuth.js';
+import { collection, getDocs, query, orderBy } from './postgres/documentApi.js';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { logError } from './errorLogger.js';

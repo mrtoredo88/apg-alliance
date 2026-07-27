@@ -1,4 +1,4 @@
-import { getDb } from '../lib/firebase.js';
+import { getDb } from '../lib/documentStore.js';
 import { processTelegramUpdate, pollTelegramUpdates } from '../lib/telegramUpdates.js';
 
 export default async function telegramWebhookRoutes(fastify) {

@@ -1,8 +1,6 @@
-import { FirestoreAdminAdapter } from './data/FirestoreAdminAdapter.js';
 import { PostgresDataAdapter } from './data/PostgresDataAdapter.js';
 import { ServerRepository } from './data/ServerRepository.js';
 import { createIdentityV2 } from './createIdentityV2.js';
-import { FirebaseAdminIdentityProvider } from './identity/providers/FirebaseAdminIdentityProvider.js';
 import { NativeApgServerIdentityProvider } from './identity/providers/NativeApgServerIdentityProvider.js';
 import { YandexServerIdentityProvider } from './identity/providers/YandexServerIdentityProvider.js';
 import { createAccountCore } from './account/index.js';
@@ -23,11 +21,12 @@ export const SERVER_REPOSITORY_DEFINITIONS = {
   AnalyticsRepository: 'diagnostics',
 };
 
-export function createServerFoundation({ dataAdapter = new PostgresDataAdapter(), identityProvider = new FirebaseAdminIdentityProvider() } = {}) {
+export function createServerFoundation({ dataAdapter = new PostgresDataAdapter(), identityProvider = null } = {}) {
   const identityV2 = createIdentityV2({ tokenProvider: identityProvider });
+  const resolvedIdentityProvider = identityProvider || identityV2.tokenProvider;
   const account = createAccountCore();
   return {
-    identity: identityProvider,
+    identity: resolvedIdentityProvider,
     identityV2,
     account,
     data: {
@@ -40,9 +39,8 @@ export function createServerFoundation({ dataAdapter = new PostgresDataAdapter()
       ),
     },
     providers: {
-      firebase: identityProvider,
+      nativeApg: resolvedIdentityProvider,
       yandex: new YandexServerIdentityProvider(),
-      nativeApg: new NativeApgServerIdentityProvider(),
     },
   };
 }
@@ -50,14 +48,12 @@ export function createServerFoundation({ dataAdapter = new PostgresDataAdapter()
 export const serverFoundation = createServerFoundation();
 
 export { ServerIdentityProvider } from './identity/ServerIdentityProvider.js';
-export { FirebaseAdminIdentityProvider } from './identity/providers/FirebaseAdminIdentityProvider.js';
 export { YandexServerIdentityProvider } from './identity/providers/YandexServerIdentityProvider.js';
 export { NativeApgServerIdentityProvider } from './identity/providers/NativeApgServerIdentityProvider.js';
 export { ApgIdentityV2Service } from './identity/ApgIdentityV2Service.js';
 export { createIdentityV2 } from './createIdentityV2.js';
 export * from './identity/repositories/index.js';
 export { ServerDataAdapter } from './data/ServerDataAdapter.js';
-export { FirestoreAdminAdapter } from './data/FirestoreAdminAdapter.js';
 export { PostgresDataAdapter } from './data/PostgresDataAdapter.js';
 export { ServerRepository } from './data/ServerRepository.js';
 export { PostgresIdentityAdapter } from './infrastructure/adapters/PostgresIdentityAdapter.js';

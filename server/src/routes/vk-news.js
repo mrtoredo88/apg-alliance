@@ -1,5 +1,5 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import { getDb } from '../lib/firebase.js';
+import { FieldValue } from '../lib/documentValues.js';
+import { getDb } from '../lib/documentStore.js';
 import { getVkCommunityScreenName, normalizeVkCommunityUrl } from '../../../server-shared/vk-community.js';
 
 const GROUP_ID = 229980067;

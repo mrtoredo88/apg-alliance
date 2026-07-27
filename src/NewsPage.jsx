@@ -610,7 +610,7 @@ async function requestNewsComments(path, options = {}) {
   const token = apgIdentity.getCurrentIdentity() ? await apgIdentity.getSessionToken().catch(() => '') : '';
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Firebase-Auth': token } : {}), ...(options.headers || {}) },
+    headers: { 'Content-Type': 'application/json', ...(token ? { 'X-APG-Auth': token } : {}), ...(options.headers || {}) },
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok === false) {

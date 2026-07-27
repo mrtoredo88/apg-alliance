@@ -1,8 +1,8 @@
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import crypto from 'node:crypto';
 import { APP_URL } from '../lib/config.js';
-import { getDb } from '../lib/firebase.js';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { getDb } from '../lib/documentStore.js';
+import { FieldValue } from '../lib/documentValues.js';
 import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';
 import { recordReferralClientEventsAsync, recordReferralEventAsync, referralContextFromBody } from '../lib/referralEvents.js';
 import { resolveReferralSessionReferrer } from '../lib/referralSessions.js';
@@ -223,7 +223,7 @@ function buildAuditTimelineDocId(stage) {
 }
 
 function buildEmailAuthAuditExpiresAt() {
-  return Timestamp.fromDate(new Date(Date.now() + EMAIL_AUTH_AUDIT_TTL_DAYS * 24 * 60 * 60 * 1000));
+  return new Date(Date.now() + EMAIL_AUTH_AUDIT_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
 }
 
 function buildTraceId(prefix, fallback = 'trace') {
@@ -399,7 +399,7 @@ function emailPublicMeta(email) {
 }
 
 function getBearerToken(req) {
-  const direct = String(req.headers['x-firebase-auth'] || req.headers['x-apg-auth'] || '').trim();
+  const direct = String(req.headers['x-apg-auth'] || '').trim();
   if (direct) return direct.replace(/^Bearer\s+/i, '');
   const header = String(req.headers.authorization || req.headers.Authorization || '');
   const match = header.match(/^Bearer\s+(.+)$/i);
@@ -636,7 +636,7 @@ async function sendVerificationEmail(db, email, userId, appUrl) {
     if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
     await db.collection('emailVerifyTokens').doc(token).set({
       email, userId,
-      expiresAt: Timestamp.fromMillis(expiresAt.getTime()),
+      expiresAt: expiresAt.toISOString(),
       createdAt: FieldValue.serverTimestamp(),
     });
   }
@@ -706,7 +706,7 @@ async function setEmailOtp(codeRef, email, code) {
     if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
     await codeRef.set({
       code,
-      expiresAt: Timestamp.fromMillis(expiresAt.getTime()),
+      expiresAt: expiresAt.toISOString(),
       attempts: 0,
       createdAt: FieldValue.serverTimestamp(),
     });

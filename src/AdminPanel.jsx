@@ -10,8 +10,8 @@ import vkBridge from './vk.js';
 import { parseVideoUrl } from './utils/parseVideoUrl.js';
 import { geocodeAddress } from './utils/geo.js';
 import { EXPERT_CATEGORIES, APP_URL, API_BASE_URL } from './constants.js';
-import { db, auth, FIREBASE_CLIENT_DIAGNOSTICS } from './firebase';
-import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
+import { db, auth, APG_PLATFORM_DIAGNOSTICS } from './platformDataAuth.js';
+import { collection, getDocs, query, orderBy, where, limit } from './postgres/documentApi.js';
 import { apgIdentity } from './apg/index.js';
 import { runServiceChecks } from './diagnostics.js';
 import { logError } from './errorLogger.js';
@@ -274,7 +274,7 @@ function buildAdminLoadDiagnostic(name, label, error, authInfo) {
     message: error?.message ?? String(error ?? ''),
     stack: error?.stack ? String(error.stack).slice(0, 1800) : '',
     auth: authInfo,
-    firebase: FIREBASE_CLIENT_DIAGNOSTICS,
+    platform: APG_PLATFORM_DIAGNOSTICS,
     version: import.meta.env.VITE_APP_VERSION || 'local',
     environment: import.meta.env.MODE,
     route: loc ? `${loc.pathname}${loc.hash}` : '',
@@ -315,8 +315,8 @@ async function waitForAdminAuth(onStage) {
   };
 
   emit('firebase_initialized', {
-    projectId: FIREBASE_CLIENT_DIAGNOSTICS.projectId,
-    authDomain: FIREBASE_CLIENT_DIAGNOSTICS.authDomain,
+    projectId: APG_PLATFORM_DIAGNOSTICS.projectId,
+    authDomain: APG_PLATFORM_DIAGNOSTICS.authDomain,
   });
 
   if (apgIdentity.getCurrentIdentity()) {
@@ -3521,7 +3521,7 @@ async function lokiEditorRequest(action, payload = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Firebase-Auth': token,
+      'X-APG-Auth': token,
       'X-APG-Version': 'v5.0-local',
     },
     body: JSON.stringify({ action, ...payload }),
@@ -3803,7 +3803,7 @@ async function adminSecurityRequest(action, payload = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Firebase-Auth': token,
+      'X-APG-Auth': token,
       'X-APG-Version': 'admin-rbac-v1',
     },
     body: JSON.stringify({ action, ...payload }),
@@ -3860,7 +3860,13 @@ function AdminLoginGate({ onAllow }) {
         throw new Error('Введите email администратора и пароль.');
       }
       const loginData = await adminLoginRequest(login.trim(), password);
-      await apgIdentity.authenticate({ provider: 'firebaseCustomToken', token: loginData.customToken });
+      await apgIdentity.authenticate({
+        provider: 'native-apg',
+        token: loginData.customToken,
+        uid: loginData.actor?.uid,
+        email: loginData.actor?.email,
+        claims: { role: loginData.actor?.role, admin: true },
+      });
       const data = await adminSecurityRequest('status');
       if (data.actor?.mustChangePassword) {
         setPendingActor(data.actor);
@@ -4384,7 +4390,7 @@ function RotationTab({ experts, A, s }) {
 
   useEffect(() => {
     if (!Object.keys(byCategory).length) return;
-    import('firebase/firestore').then(({ collection: c, getDocs: gd }) => {
+    import('./postgres/documentApi.js').then(({ collection: c, getDocs: gd }) => {
       gd(c(db, 'expertRotation')).then(snap => {
         const map = {};
         snap.docs.forEach(d => { map[d.id] = d.data(); });
@@ -4394,7 +4400,7 @@ function RotationTab({ experts, A, s }) {
   }, [ambassadors.length]);
 
   const loadRotation = () => {
-    import('firebase/firestore').then(({ collection: c, getDocs: gd }) => {
+    import('./postgres/documentApi.js').then(({ collection: c, getDocs: gd }) => {
       gd(c(db, 'expertRotation')).then(snap => {
         const map = {};
         snap.docs.forEach(d => { map[d.id] = d.data(); });
@@ -5085,7 +5091,7 @@ export const AdminPanel = () => {
     });
     return {
       'Content-Type': 'application/json',
-      'X-Firebase-Auth': token,
+      'X-APG-Auth': token,
       'X-Idempotency-Key': idempotencyKey || `${Date.now()}_${Math.random().toString(16).slice(2)}`,
       'X-APG-Version': 'v4.4.2',
     };
@@ -5685,7 +5691,7 @@ export const AdminPanel = () => {
         authEmail: authDiagnostics?.email ?? null,
         authRole: authDiagnostics?.role ?? null,
         authIsAnonymous: authDiagnostics?.isAnonymous ?? null,
-        firebase: FIREBASE_CLIENT_DIAGNOSTICS,
+        platform: APG_PLATFORM_DIAGNOSTICS,
         counts: Object.fromEntries(allResults.filter(item => item.ok).map(item => [item.name, item.count])),
         timings: Object.fromEntries(allResults.map(item => [item.name, { ok: item.ok, count: item.count, durationMs: item.durationMs, attempts: item.attempts }])),
       }));
@@ -7944,8 +7950,7 @@ export const AdminPanel = () => {
                 {adminLoadInfo.authRole && ` · role: ${adminLoadInfo.authRole}`}
                 {adminLoadInfo.authStatus && ` · ${adminLoadInfo.authStatus}`}
                 {adminLoadInfo.authIsAnonymous === true && ' · anonymous'}
-                {adminLoadInfo.firebase?.staleAdminEmulatorCleared && ' · очищен stale Firestore emulator'}
-                {adminLoadInfo.firebase?.emulatorConnected && ` · emulator: ${adminLoadInfo.firebase.emulatorHost}:${adminLoadInfo.firebase.emulatorPort}`}
+                {adminLoadInfo.platform?.provider && ` · identity: ${adminLoadInfo.platform.provider}`}
                 {adminLoadInfo.lastLoadedAt && ` · ${new Date(adminLoadInfo.lastLoadedAt).toLocaleString('ru-RU')}`}
                 {adminLoadInfo.authError && ` · ${adminLoadInfo.authError}`}
               </div>
@@ -7975,8 +7980,7 @@ export const AdminPanel = () => {
                   )}
                   {item.diagnostic && (
                     <div style={{ marginTop: 4, color: 'rgba(240,240,240,0.42)', fontSize: 10, lineHeight: '14px', wordBreak: 'break-word' }}>
-                      {item.diagnostic.environment} · {item.diagnostic.firebase?.projectId} · auth: {item.diagnostic.auth?.uid || 'none'} · online: {String(item.diagnostic.online)}
-                      {item.diagnostic.firebase?.emulatorConnected ? ` · emulator ${item.diagnostic.firebase.emulatorHost}:${item.diagnostic.firebase.emulatorPort}` : ''}
+                      {item.diagnostic.environment} · {item.diagnostic.platform?.provider || 'native-apg'} · auth: {item.diagnostic.auth?.uid || 'none'} · online: {String(item.diagnostic.online)}
                     </div>
                   )}
                 </div>

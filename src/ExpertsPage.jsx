@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import { HorizontalScroll } from '@vkontakte/vkui';
 import { EXPERT_CATEGORIES } from './constants.js';
-import { db } from './firebase';
+import { db } from './platformDataAuth.js';
 import {
   collection, getDocs, query, where,
-} from 'firebase/firestore';
+} from './postgres/documentApi.js';
 import { userAction } from './userApi.js';
 import { APG_EVENT_TYPES, trackAppEvent } from './intelligence/index.js';
 import { releaseMobileInputFocus } from './utils/mobileInput.js';

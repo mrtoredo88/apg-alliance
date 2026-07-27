@@ -1,5 +1,5 @@
 import { APP_URL } from './config.js';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from './documentValues.js';
 import { telegramUrl } from '../../../server-shared/telegram.js';
 import { ECONOMY_VERSION, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
 import { REFERRAL_EVENT_TYPES } from '../../../server-shared/referral-observability.js';

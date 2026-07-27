@@ -69,7 +69,6 @@ class MemoryAdapter {
 [
   'server/src/apg/account/schema/account-core.sql',
   'server/src/apg/account/adapters/PostgresAccountAdapter.js',
-  'server/src/apg/account/adapters/FirestoreAccountFallbackAdapter.js',
   'server/src/apg/account/services/AccountCoreService.js',
   'server/src/apg/account/bootstrap/createAccountCore.js',
   'scripts/account-core-architecture-guard.mjs',

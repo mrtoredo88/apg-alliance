@@ -1,4 +1,4 @@
-import { getDb } from '../lib/firebase.js';
+import { getDb } from '../lib/documentStore.js';
 import { pollTelegramUpdates } from '../lib/telegramUpdates.js';
 import { serverFoundation } from '../apg/index.js';
 

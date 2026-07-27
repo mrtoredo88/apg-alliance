@@ -42,7 +42,7 @@ export const MIGRATION_OPERATOR_INPUTS = [
   'server-shared/admin-password.js',
   'server/src/apg/identity/schema/identity-v2.sql',
   'server/src/apg/account/schema/account-core.sql',
-  'server/src/lib/firebase.js',
+  'server/src/lib/documentStore.js',
   'server/firebase-service-account.json',
   'server/src/routes/system-status.js',
   'backups/audits/merge-tatyana/merge-plan.json',

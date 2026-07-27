@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { db } from './firebase';
-import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
+import { db } from './platformDataAuth.js';
+import { collection, getDocs, query, orderBy, where, limit } from './postgres/documentApi.js';
 import { getLevel } from './levels.js';
 
 import { T, GLASS, GLASS_GOLD } from './design.js';

@@ -1,4 +1,4 @@
-import { getDb } from '../server/src/lib/firebase.js';
+import { getDb } from '../server/src/lib/documentStore.js';
 import { serverFoundation } from '../server/src/apg/index.js';
 
 const LIMIT = Number(process.env.IDENTITY_IMPORT_LIMIT || process.argv.find(arg => arg.startsWith('--limit='))?.split('=')[1] || 5000);

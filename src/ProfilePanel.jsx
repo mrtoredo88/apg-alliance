@@ -4,12 +4,12 @@ import { EmailAuth } from './EmailAuth.jsx';
 import { Avatar } from '@vkontakte/vkui';
 import vkBridge, { isVK, vkWebLogin, openUrl } from './vk.js';
 import { QRCodeSVG } from 'qrcode.react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged } from './nativeAuth.js';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot } from './postgres/documentApi.js';
 
 import { APP_URL, API_BASE_URL } from './constants.js';
-import { auth, db } from './firebase.js';
+import { auth, db } from './platformDataAuth.js';
 import { apgIdentity } from './apg/index.js';
 import { logError } from './errorLogger.js';
 import { userAction } from './userApi.js';
@@ -101,7 +101,7 @@ async function getAuthHeaders() {
   const token = await apgIdentity.getSessionToken?.();
   return {
     'Content-Type': 'application/json',
-    ...(token ? { 'X-Firebase-Auth': token } : {}),
+    ...(token ? { 'X-APG-Auth': token } : {}),
   };
 }
 
@@ -1128,7 +1128,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 ...tgAuthTraceRef.current,
               });
               traceAuthStage('firebase_signin_start', { state, ...tgAuthTraceRef.current, identityResolved });
-              await apgIdentity.authenticate({ provider: 'firebaseCustomToken', token: data.token });
+              await apgIdentity.authenticate({
+                provider: 'native-apg',
+                token: data.token,
+                uid: data.user?.id || data.userId || expected,
+                email: data.user?.email || '',
+              });
               const expectedUid = safeTraceString(data.user?.id || data.tgId || '', 220);
               const authUser = await waitForAuthStateChanged(expectedUid, 8000);
               if (expectedUid && authUser?.uid !== expectedUid) {

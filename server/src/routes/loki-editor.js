@@ -1,6 +1,6 @@
 import crypto from 'crypto';
-import { FieldValue } from 'firebase-admin/firestore';
-import { getDb } from '../lib/firebase.js';
+import { FieldValue } from '../lib/documentValues.js';
+import { getDb } from '../lib/documentStore.js';
 import { requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 
 const DEFAULT_SETTINGS = {

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Panel } from '@vkontakte/vkui';
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
-import { db } from '../firebase.js';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from '../postgres/documentApi.js';
+import { db } from '../platformDataAuth.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassInput, GlassPanel, GlassSection, ProfileHero, ScreenHeader, StatPill } from '../components/Apg2ProfileGlass.jsx';
 import { PartnerQRSection, ExpertQRSection } from '../PartnerQRSection.jsx';
 import { CabinetEventsBlock } from '../EventProposalTools.jsx';

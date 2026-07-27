@@ -1,5 +1,5 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import { getDb } from '../lib/firebase.js';
+import { FieldValue } from '../lib/documentValues.js';
+import { getDb } from '../lib/documentStore.js';
 import { analyzePublicSubmission } from './public-submit.js';
 
 const TYPES = {

@@ -1,4 +1,4 @@
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from './documentValues.js';
 import { APP_URL } from './config.js';
 import { sendBroadcastPush } from '../routes/send-push.js';
 
@@ -121,4 +121,3 @@ export async function notifyContentPublished({
     throw error;
   }
 }
-

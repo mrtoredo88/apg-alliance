@@ -3,7 +3,7 @@
 // lifecycle-фильтром, возвращаются в published (события в прошлом — в completed).
 // Запуск: node scripts/content-lifecycle-repair.mjs [--dry-run]
 import { readFileSync } from 'node:fs';
-import { getDb } from '../server/src/lib/firebase.js';
+import { getDb } from '../server/src/lib/documentStore.js';
 import { buildLifecyclePatch, isEventPast, isLifecyclePublic, normalizeContentStatus } from '../server-shared/content-lifecycle.js';
 
 const dryRun = process.argv.includes('--dry-run');

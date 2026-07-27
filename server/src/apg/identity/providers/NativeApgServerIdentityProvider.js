@@ -1,7 +1,35 @@
 import { ServerIdentityProvider } from '../ServerIdentityProvider.js';
 
 export class NativeApgServerIdentityProvider extends ServerIdentityProvider {
-  constructor() {
+  constructor(sessionRepository = null) {
     super('native-apg-server');
+    this.sessions = sessionRepository;
+  }
+
+  async authenticate(input = {}) {
+    if (!this.sessions || !input.uid) throw new Error('native_apg_session_repository_unavailable');
+    return this.sessions.createBearerSession({
+      userId: String(input.uid),
+      device: input.device || {},
+      platform: input.platform || 'web-app',
+      ttlDays: input.ttlDays || 30,
+    });
+  }
+
+  async verifySession(input = {}) {
+    if (!this.sessions) throw new Error('native_apg_session_repository_unavailable');
+    const identity = await this.sessions.verifyBearerToken(input.token);
+    if (!identity) throw Object.assign(new Error('Недействительная сессия.'), { code: 'AUTH_SESSION_INVALID', statusCode: 401 });
+    return identity;
+  }
+
+  async refreshSession(input = {}) {
+    const identity = await this.verifySession(input);
+    await this.sessions.revokeBearerToken(input.token);
+    return this.authenticate({ uid: identity.uid, device: input.device, platform: input.platform });
+  }
+
+  async invalidateSession(input = {}) {
+    return this.sessions ? this.sessions.revokeBearerToken(input.token) : false;
   }
 }

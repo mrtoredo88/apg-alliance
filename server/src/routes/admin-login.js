@@ -1,5 +1,5 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import { getDb, getDbAuth } from '../lib/firebase.js';
+import { FieldValue } from '../lib/documentValues.js';
+import { getDb } from '../lib/documentStore.js';
 import { verifyPasswordRecord } from '../../../server-shared/admin-password.js';
 import { CAPABILITIES, getPrimaryRole, hasCapability, hasRole, ROLES } from '../../../server-shared/role-engine.js';
 import { serverFoundation } from '../apg/index.js';
@@ -22,7 +22,6 @@ export default async function adminLoginRoutes(fastify) {
     }
 
     const db = getDb();
-    const auth = getDbAuth();
     const log = async (result, details = {}) => db.collection('adminSecurityLog').add({
       action: 'admin-login',
       targetId: email,
@@ -61,10 +60,13 @@ export default async function adminLoginRoutes(fastify) {
         await log('error', { code: 'INVALID_CREDENTIALS', role });
         return reply.code(401).send({ ok: false, code: 'INVALID_CREDENTIALS', error: 'Неверный email или пароль администратора.' });
       }
-      await auth.updateUser(uid, { email, emailVerified: true, disabled: false }).catch(() => {});
       const owner = hasRole(user, ROLES.owner);
-      await auth.setCustomUserClaims(uid, { role, owner, admin: true }).catch(() => {});
-      const customToken = await auth.createCustomToken(uid, { role, owner, admin: true });
+      const customToken = await serverFoundation.identityV2.createCustomToken(uid, {
+        ...combinedUser,
+        role,
+        roles: combinedUser.roles || [role],
+        claims: { role, owner, admin: true },
+      });
       if (userDoc?.ref) await userDoc.ref.set({ lastLoginAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       await log('success', { role, uid });
       return reply.send({ ok: true, customToken, actor: { uid, email, role, mustChangePassword: Boolean(user.mustChangePassword) } });

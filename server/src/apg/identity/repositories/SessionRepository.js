@@ -12,13 +12,57 @@ export class SessionRepository {
     this.name = 'SessionRepository';
   }
 
-  async create({ userId, refreshToken = '', device = {}, platform = '' }) {
+  async create({ userId, refreshToken = '', device = {}, platform = '', expiresAt = null }) {
     const id = `sess_${Date.now().toString(36)}_${crypto.randomBytes(8).toString('hex')}`;
     await this.adapter.query(`
-      INSERT INTO apg_identity_sessions (id, user_id, refresh_token_hash, device, platform, last_seen_at)
-      VALUES ($1, $2, $3, $4::jsonb, $5, now())
-    `, [id, safeString(userId, 260), hash(refreshToken) || null, JSON.stringify(device || {}), safeString(platform, 120) || null]);
-    return { id, userId: safeString(userId, 260), status: 'active' };
+      INSERT INTO apg_identity_sessions (id, user_id, refresh_token_hash, device, platform, expires_at, last_seen_at)
+      VALUES ($1, $2, $3, $4::jsonb, $5, $6, now())
+    `, [id, safeString(userId, 260), hash(refreshToken) || null, JSON.stringify(device || {}), safeString(platform, 120) || null, expiresAt]);
+    return { id, userId: safeString(userId, 260), status: 'active', expiresAt };
+  }
+
+  async createBearerSession({ userId, device = {}, platform = '', ttlDays = 30 }) {
+    const token = `apg_${crypto.randomBytes(32).toString('base64url')}`;
+    const expiresAt = new Date(Date.now() + Math.max(1, Number(ttlDays) || 30) * 86_400_000);
+    const session = await this.create({ userId, refreshToken: token, device, platform, expiresAt });
+    return { ...session, token };
+  }
+
+  async verifyBearerToken(token) {
+    const tokenHash = hash(token);
+    if (!tokenHash) return null;
+    const result = await this.adapter.query(`
+      SELECT s.*, u.email, u.display_name, r.primary_role, r.roles, r.claims
+      FROM apg_identity_sessions s
+      JOIN apg_identity_users u ON u.id = s.user_id
+      LEFT JOIN apg_identity_roles r ON r.user_id = s.user_id
+      WHERE s.refresh_token_hash = $1
+        AND s.status = 'active'
+        AND (s.expires_at IS NULL OR s.expires_at > now())
+      LIMIT 1
+    `, [tokenHash]);
+    const row = result.rows[0];
+    if (!row) return null;
+    await this.adapter.query('UPDATE apg_identity_sessions SET last_seen_at = now() WHERE id = $1', [row.id]);
+    return {
+      uid: row.user_id,
+      userId: row.user_id,
+      email: row.email || '',
+      name: row.display_name || '',
+      role: row.primary_role || 'user',
+      roles: Array.isArray(row.roles) ? row.roles : ['user'],
+      claims: row.claims || {},
+      sessionId: row.id,
+      provider: 'native-apg',
+    };
+  }
+
+  async revokeBearerToken(token) {
+    const result = await this.adapter.query(
+      "UPDATE apg_identity_sessions SET status = 'revoked', revoked_at = now() WHERE refresh_token_hash = $1 RETURNING id",
+      [hash(token)],
+    );
+    return result.rowCount > 0;
   }
 
   async revoke(sessionId) {
@@ -27,6 +71,14 @@ export class SessionRepository {
       [safeString(sessionId, 260)],
     );
     return { id: safeString(sessionId, 260), status: 'revoked' };
+  }
+
+  async revokeUser(userId) {
+    const result = await this.adapter.query(
+      "UPDATE apg_identity_sessions SET status = 'revoked', revoked_at = now() WHERE user_id = $1 AND status = 'active'",
+      [safeString(userId, 260)],
+    );
+    return { userId: safeString(userId, 260), revoked: result.rowCount };
   }
 
   async putEmailOtp({ email, code, expiresAt }) {

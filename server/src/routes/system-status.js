@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { getDb } from '../lib/firebase.js';
+import { getDb } from '../lib/documentStore.js';
 import { adminReplyError, requireAdminPermission } from '../lib/adminSecurity.js';
 import { serverFoundation } from '../apg/index.js';
 

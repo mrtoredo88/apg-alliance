@@ -30,8 +30,8 @@ import lokiEditorRoutes       from './routes/loki-editor.js';
 import publicDataRoutes       from './routes/public-data.js';
 import publicSubmitRoutes     from './routes/public-submit.js';
 import partnershipApplicationRoutes from './routes/partnership-application.js';
-import identityV2AdminRoutes from './routes/identity-v2-admin.js';
 import accountRoutes from './routes/account.js';
+import appDataRoutes from './routes/app-data.js';
 
 const fastify = Fastify({ logger: true, bodyLimit: 8_388_608 });
 
@@ -54,7 +54,7 @@ await fastify.register(cors, {
     /^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/,
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-push-secret', 'Authorization', 'X-Firebase-Auth', 'X-APG-Auth', 'X-Idempotency-Key', 'X-APG-Version'],
+  allowedHeaders: ['Content-Type', 'x-push-secret', 'Authorization', 'X-APG-Auth', 'X-Idempotency-Key', 'X-APG-Version'],
 });
 
 fastify.addHook('onSend', async (request, reply) => {
@@ -87,8 +87,8 @@ fastify.register(lokiEditorRoutes);
 fastify.register(publicDataRoutes);
 fastify.register(publicSubmitRoutes);
 fastify.register(partnershipApplicationRoutes);
-fastify.register(identityV2AdminRoutes);
 fastify.register(accountRoutes);
+fastify.register(appDataRoutes);
 
 fastify.get('/version', async () => ({
   git: process.env.GIT_SHA || process.env.APP_VERSION || '',

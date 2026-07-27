@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase.js';
+import { doc, getDoc } from '../postgres/documentApi.js';
+import { db } from '../platformDataAuth.js';
 import { userAction } from '../userApi.js';
 import {
   buildChangedPatch,

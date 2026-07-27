@@ -1,8 +1,7 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import { getDb, getDbAuth } from '../lib/firebase.js';
+import { FieldValue } from '../lib/documentValues.js';
+import { getDb } from '../lib/documentStore.js';
 import { serverFoundation } from '../apg/index.js';
 import { APP_URL } from '../lib/config.js';
-import { getDbMessaging } from '../lib/firebase.js';
 import webpush from 'web-push';
 import { ECONOMY_CONFIG, ECONOMY_VERSION, calculateTicketExchange, economyMigrationPatch, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
 import { upsertErrorLog } from '../../../server-shared/error-log.js';
@@ -219,7 +218,7 @@ function jsonError(res, status, message, code = 'USER_ACTION_ERROR') {
 }
 
 function getBearerToken(req) {
-  const direct = String(req.headers['x-firebase-auth'] || req.headers['x-apg-auth'] || '').trim();
+  const direct = String(req.headers['x-apg-auth'] || '').trim();
   if (direct) return direct.replace(/^Bearer\s+/i, '');
   const header = String(req.headers.authorization || req.headers.Authorization || '');
   const match = header.match(/^Bearer\s+(.+)$/i);
@@ -416,7 +415,7 @@ async function requireActor(req) {
     error.statusCode = 401;
     throw error;
   }
-  const decoded = await getDbAuth().verifyIdToken(token);
+  const decoded = await serverFoundation.identity.verifySession({ token });
   return resolveActor(getDb(), decoded);
 }
 
@@ -4141,32 +4140,7 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
   const deadFcmTokens = [];
   const deadWebSubscriptions = [];
 
-  if (fcmTokens.length) {
-    try {
-      const result = await withDialogPushTimeout(getDbMessaging().sendEachForMulticast({
-        tokens: fcmTokens,
-        notification: { title, body },
-        data: { title, body, url, tag: `dialog-${dialogId}`, notificationId, category: 'messages', type: 'contextDialogMessage', priority: 'normal' },
-        webpush: {
-          notification: { icon: `${APP_URL}/192.png`, badge: `${APP_URL}/32.png`, tag: `dialog-${dialogId}`, renotify: true },
-          fcmOptions: { link: url },
-        },
-      }));
-      sent += result.successCount;
-      failed += result.failureCount;
-      result.responses.forEach((response, index) => {
-        if (response.success) return;
-        const code = response.error?.code || 'fcm/error';
-        if (['messaging/invalid-registration-token', 'messaging/registration-token-not-registered'].includes(code)) {
-          deadFcmTokens.push(fcmTokens[index]);
-        }
-        if (errors.length < 6) errors.push({ code, message: safeString(response.error?.message, 240) });
-      });
-    } catch (e) {
-      failed += fcmTokens.length;
-      errors.push({ code: 'fcm/error', message: safeString(e?.message, 240) });
-    }
-  }
+  if (fcmTokens.length) deadFcmTokens.push(...fcmTokens);
 
   if (webSubscriptions.length && initDialogWebPush()) {
     await Promise.all(webSubscriptions.map(async subscription => {

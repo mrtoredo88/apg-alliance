@@ -1,4 +1,4 @@
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from './documentValues.js';
 import { normalizeReferralEvent } from '../../../server-shared/referral-observability.js';
 
 function cleanEventForFirestore(event) {

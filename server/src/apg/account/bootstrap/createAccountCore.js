@@ -1,4 +1,3 @@
-import { FirestoreAccountFallbackAdapter } from '../adapters/FirestoreAccountFallbackAdapter.js';
 import { PostgresAccountAdapter } from '../adapters/PostgresAccountAdapter.js';
 import {
   AccountRoleRepository,
@@ -12,7 +11,7 @@ import { AccountCoreService } from '../services/AccountCoreService.js';
 
 export function createAccountCore({
   postgresAdapter = new PostgresAccountAdapter(),
-  fallback = new FirestoreAccountFallbackAdapter(),
+  fallback = null,
   flags = {},
 } = {}) {
   const profiles = new ProfileRepository(postgresAdapter);

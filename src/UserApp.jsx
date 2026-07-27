@@ -12,13 +12,13 @@ import { confirmQrScan } from './rewardApi.js';
 import { getReputationStatus } from './economyEngine.js';
 import { userAction } from './userApi.js';
 import { fetchAccountBootstrap, shouldUseAccountCoreCanary } from './accountApi.js';
-import { db, auth } from './firebase';
+import { db, auth } from './platformDataAuth.js';
 import {
   doc, getDoc,
   collection, getDocs, query, orderBy,
   where, getCountFromServer, limit,
-} from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+} from './postgres/documentApi.js';
+import { onAuthStateChanged } from './nativeAuth.js';
 import { apgIdentity } from './apg/index.js';
 import { HomePanelV2 }       from './HomePanelV2.jsx';
 import { EmailAuth } from './EmailAuth.jsx';
@@ -3623,7 +3623,12 @@ export function UserApp() {
           expectedUidHash,
           publicErrorCode: null,
         });
-        await apgIdentity.authenticate({ provider: 'firebaseCustomToken', token: authPayload.token });
+        await apgIdentity.authenticate({
+          provider: 'native-apg',
+          token: authPayload.token,
+          uid: emailUser.id,
+          email: emailUser.email,
+        });
         recordEmailLoginStage('firebase_custom_token_end', { profileId: emailUser.id, uid: auth.currentUser?.uid ?? null });
         await emitEmailAuthAuditEvent('firebase_signin_succeeded', 'OK', {
           expectedUidHash,

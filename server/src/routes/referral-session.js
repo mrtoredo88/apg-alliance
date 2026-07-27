@@ -1,4 +1,4 @@
-import { getDb } from '../lib/firebase.js';
+import { getDb } from '../lib/documentStore.js';
 import { createOrRestoreReferralSession } from '../lib/referralSessions.js';
 
 export default async function referralSessionRoutes(fastify) {

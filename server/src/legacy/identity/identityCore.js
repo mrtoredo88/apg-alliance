@@ -1,4 +1,4 @@
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from '../../lib/documentValues.js';
 import { getPrimaryRole, getUserRoles, normalizeRole as normalizeRoleShared, ROLE_REGISTRY } from '../../../../server-shared/role-engine.js';
 
 const ADMIN_STATUS_ACTIVE = new Set(['active', 'enabled', '']);

@@ -1,5 +1,4 @@
 import { createHash, createHmac } from 'crypto';
-import { getDbAuth } from '../lib/firebase.js';
 import { serverFoundation } from '../apg/index.js';
 
 function verifyTelegramHash(data, botToken) {
@@ -47,7 +46,7 @@ export default async function verifyTelegramRoutes(fastify) {
         photo: photo_url ?? null,
       },
     });
-    const token = await getDbAuth().createCustomToken(identity.userId);
+    const token = await serverFoundation.identityV2.createCustomToken(identity.userId, identity.user || {});
     const identityUser = identity.user || {};
     return {
       ok: true,

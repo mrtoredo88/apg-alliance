@@ -120,7 +120,7 @@ async function checkPostgres() {
 async function checkFirebaseReadAccess() {
   const configured = Boolean(process.env.FIREBASE_SERVICE_ACCOUNT || process.env.GOOGLE_APPLICATION_CREDENTIALS);
   if (!configured) return { configured, readable: false, reason: 'FIREBASE_ADMIN_CREDENTIALS_NOT_CONFIGURED' };
-  const { getDb } = await import('../server/src/lib/firebase.js');
+  const { getDb } = await import('../server/src/lib/documentStore.js');
   const snap = await getDb().collection('users').limit(1).get();
   return { configured, readable: true, sampleCount: snap.size };
 }

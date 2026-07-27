@@ -1,5 +1,5 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import { getDb } from '../lib/firebase.js';
+import { FieldValue } from '../lib/documentValues.js';
+import { getDb } from '../lib/documentStore.js';
 import { ECONOMY_VERSION, getEconomyReward } from '../../../server-shared/economy-engine.js';
 
 function safeId(value, fallback = '') {

@@ -1,4 +1,3 @@
-import { getDbAuth } from '../lib/firebase.js';
 import { serverFoundation } from '../apg/index.js';
 
 function safeString(value, max = 300) {
@@ -6,7 +5,7 @@ function safeString(value, max = 300) {
 }
 
 function getBearerToken(request) {
-  const direct = safeString(request.headers['x-firebase-auth'] || request.headers['x-apg-auth'] || '', 2000);
+  const direct = safeString(request.headers['x-apg-auth'] || '', 2000);
   if (direct) return direct.replace(/^Bearer\s+/i, '');
   const header = safeString(request.headers.authorization || '', 2200);
   const match = header.match(/^Bearer\s+(.+)$/i);
@@ -158,7 +157,7 @@ export default async function accountRoutes(fastify) {
     const token = getBearerToken(request);
     if (!token) return reply.code(401).send({ ok: false, code: 'AUTH_REQUIRED', error: 'Требуется авторизация.' });
     try {
-      const decoded = await getDbAuth().verifyIdToken(token);
+      const decoded = await serverFoundation.identity.verifySession({ token });
       const requestedUserId = safeString(request.body?.userId || decoded.uid, 260);
       const userId = requestedUserId === decoded.uid ? requestedUserId : decoded.uid;
       const canary = canaryAllowed(userId);

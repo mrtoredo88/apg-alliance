@@ -152,7 +152,7 @@ async function importUsers(rows, dryRun = true) {
 }
 
 async function run() {
-  ({ getDb } = await import('../server/src/lib/firebase.js'));
+  ({ getDb } = await import('../server/src/lib/documentStore.js'));
   ({ serverFoundation } = await import('../server/src/apg/index.js'));
   const startedAt = Date.now();
   const steps = {};

@@ -1,5 +1,5 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import { getDb, getDbAuth } from '../lib/firebase.js';
+import { FieldValue } from '../lib/documentValues.js';
+import { getDb } from '../lib/documentStore.js';
 import { ROLE_PERMISSIONS, adminReplyError, requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 import { createPasswordRecord, requireStrongAdminPassword } from '../../../server-shared/admin-password.js';
 import { CAPABILITIES, getPrimaryRole, getUserRoles, hasCapability, hasRole, normalizeRole as normalizeSharedRole, ROLES } from '../../../server-shared/role-engine.js';
@@ -173,7 +173,6 @@ export default async function adminSecurityRoutes(fastify) {
       if (action === 'admin:selfChangePassword') {
         const password = requireStrongPassword(request.body?.password);
         const passwordRecord = createPasswordRecord(password);
-        await getDbAuth().updateUser(actor.uid, { password }).catch(() => {});
         const { ref, snap } = await findAdminUserRef(db, actor.userId || actor.uid);
         await setPgAdminCredential(serverFoundation.account, {
           userId: actor.uid,
@@ -222,9 +221,11 @@ export default async function adminSecurityRoutes(fastify) {
           throw error;
         }
         const password = requireStrongPassword(request.body?.password);
-        const auth = getDbAuth();
-        const existingAuth = await auth.getUserByEmail(nextAdmin.email).catch(() => null);
-        if (existingAuth) {
+        const existingIdentity = await serverFoundation.identityV2.resolveEmailIdentity({
+          email: nextAdmin.email,
+          createIfMissing: false,
+        }).catch(() => null);
+        if (existingIdentity?.userId) {
           const error = new Error('Пользователь с таким email уже существует.');
           error.statusCode = 409;
           throw error;
@@ -235,14 +236,17 @@ export default async function adminSecurityRoutes(fastify) {
           error.statusCode = 409;
           throw error;
         }
-        const record = await auth.createUser({
+        const identity = await serverFoundation.identityV2.resolveEmailIdentity({
           email: nextAdmin.email,
-          password,
-          displayName: nextAdmin.name,
-          emailVerified: true,
-          disabled: false,
+          createIfMissing: true,
         });
-        await auth.setCustomUserClaims(record.uid, { role: nextAdmin.role, owner: nextAdmin.role === ROLES.owner, admin: hasCapability({ role: nextAdmin.role }, CAPABILITIES.canOpenAdminPanel) });
+        const record = { uid: String(identity.userId) };
+        await serverFoundation.identityV2.repository.roles.set({
+          userId: record.uid,
+          primaryRole: nextAdmin.role,
+          roles: [nextAdmin.role],
+          claims: { role: nextAdmin.role, owner: nextAdmin.role === ROLES.owner, admin: true },
+        });
         const passwordRecord = createPasswordRecord(password);
         await setPgAdminCredential(serverFoundation.account, {
           userId: record.uid,
@@ -258,8 +262,7 @@ export default async function adminSecurityRoutes(fastify) {
           createdAt: FieldValue.serverTimestamp(),
         }, { merge: true });
         const profile = {
-          firebaseUid: record.uid,
-          authUid: record.uid,
+          identityId: record.uid,
           email: nextAdmin.email,
           login: nextAdmin.email,
           name: nextAdmin.name,
@@ -297,7 +300,12 @@ export default async function adminSecurityRoutes(fastify) {
           updatedAt: FieldValue.serverTimestamp(),
         };
         await ref.set(patch, { merge: true });
-        await getDbAuth().setCustomUserClaims(String(currentData.firebaseUid || currentData.authUid || snap.id), { role: nextRole, owner: nextRole === ROLES.owner, admin: hasCapability({ role: nextRole }, CAPABILITIES.canOpenAdminPanel) }).catch(() => {});
+        await serverFoundation.identityV2.repository.roles.set({
+          userId: snap.id,
+          primaryRole: nextRole,
+          roles: patch.roles,
+          claims: { role: nextRole, owner: nextRole === ROLES.owner, admin: hasCapability({ role: nextRole }, CAPABILITIES.canOpenAdminPanel) },
+        });
         await writeSecurityLog(db, request, actor, 'admin:updateRole', snap.id, { before: getPrimaryRole(currentData || {}), after: nextRole });
         return reply.send({ ok: true, id: snap.id, patch });
       }
@@ -317,7 +325,6 @@ export default async function adminSecurityRoutes(fastify) {
             error.statusCode = 400;
             throw error;
           }
-          await getDbAuth().updateUser(String(currentData.firebaseUid || currentData.authUid || snap.id), { email });
           patch.email = email;
           patch.login = email;
         }
@@ -331,7 +338,6 @@ export default async function adminSecurityRoutes(fastify) {
         const uid = String(currentData.firebaseUid || currentData.authUid || snap.id);
         const password = requireStrongPassword(request.body?.password);
         const passwordRecord = createPasswordRecord(password);
-        await getDbAuth().updateUser(uid, { password }).catch(() => {});
         await setPgAdminCredential(serverFoundation.account, {
           userId: uid,
           email: String(currentData.email || '').trim().toLowerCase(),
@@ -372,7 +378,7 @@ export default async function adminSecurityRoutes(fastify) {
       if (action === 'admin:revokeSessions') {
         await assertCanManage(actor, currentData);
         const uid = String(currentData.firebaseUid || currentData.authUid || snap.id);
-        await getDbAuth().revokeRefreshTokens(uid).catch(() => {});
+        await serverFoundation.identityV2.sessionRepository.revokeUser(uid);
         await ref.set({ forceLogoutAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
         await writeSecurityLog(db, request, actor, action, snap.id, { uid });
         return reply.send({ ok: true, id: snap.id });
@@ -386,9 +392,8 @@ export default async function adminSecurityRoutes(fastify) {
           error.statusCode = 400;
           throw error;
         }
-        const resetLink = await getDbAuth().generatePasswordResetLink(email).catch(() => '');
-        await writeSecurityLog(db, request, actor, action, snap.id, { email, linkGenerated: Boolean(resetLink) });
-        return reply.send({ ok: true, id: snap.id, resetLinkGenerated: Boolean(resetLink), resetLink });
+        await writeSecurityLog(db, request, actor, action, snap.id, { email, flow: 'email_otp' });
+        return reply.send({ ok: true, id: snap.id, resetLinkGenerated: false, resetLink: '', flow: 'email_otp' });
       }
 
       const error = new Error('Неизвестное действие безопасности.');

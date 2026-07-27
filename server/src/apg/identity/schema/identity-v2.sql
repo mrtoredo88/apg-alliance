@@ -52,10 +52,14 @@ CREATE TABLE IF NOT EXISTS apg_identity_sessions (
   device JSONB NOT NULL DEFAULT '{}'::jsonb,
   platform TEXT,
   status TEXT NOT NULL DEFAULT 'active',
+  expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_seen_at TIMESTAMPTZ,
   revoked_at TIMESTAMPTZ
 );
+
+ALTER TABLE apg_identity_sessions
+  ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS apg_identity_email_otps (
   email TEXT PRIMARY KEY,
@@ -88,4 +92,5 @@ ON CONFLICT (version) DO NOTHING;
 CREATE INDEX IF NOT EXISTS idx_apg_identity_users_email ON apg_identity_users(email);
 CREATE INDEX IF NOT EXISTS idx_apg_identity_links_user ON apg_identity_links(user_id);
 CREATE INDEX IF NOT EXISTS idx_apg_identity_sessions_user ON apg_identity_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_apg_identity_sessions_token ON apg_identity_sessions(refresh_token_hash);
 CREATE INDEX IF NOT EXISTS idx_apg_identity_email_verify_tokens_user ON apg_identity_email_verify_tokens(user_id);

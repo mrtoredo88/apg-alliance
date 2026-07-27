@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Panel } from '@vkontakte/vkui';
-import { db, auth } from './firebase';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { db, auth } from './platformDataAuth.js';
+import { collection, getDocs, query, orderBy, limit } from './postgres/documentApi.js';
 import { API_BASE_URL } from './constants.js';
 import { runServiceChecks, getDeviceInfo } from './diagnostics.js';
 import { cleanupCurrentPushSubscriptions, collectPushDiagnostics, getPushRegistrationLog, registerCurrentPushDevice, sendCurrentDeviceTestPush } from './pushDiagnostics.js';
@@ -136,7 +136,7 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
         return null;
       }
       const response = await fetch(`${API_BASE_URL}/api/system-status`, {
-        headers: { 'X-Firebase-Auth': token, 'X-APG-Version': 'health-architecture-v1' },
+        headers: { 'X-APG-Auth': token, 'X-APG-Version': 'health-architecture-v1' },
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data?.ok === false) throw new Error(data?.error || 'Architecture status unavailable');

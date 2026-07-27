@@ -99,7 +99,6 @@ yc serverless container revision deploy \
   --concurrency 16 --min-instances 1 \
   --network-id enpa19j9jpki1f67p6kq \
   --service-account-id ajegfv96md2tqri8gjdp \
-  --environment GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json \
   --environment YC_ACCESS_KEY="$(get_env YC_ACCESS_KEY)" \
   --environment YC_SECRET_KEY="$(get_env YC_SECRET_KEY)" \
   --environment PUSH_SECRET="$(get_env PUSH_SECRET)" \
@@ -118,8 +117,8 @@ yc serverless container revision deploy \
   --environment POSTBOX_KEY_ID="$(get_env POSTBOX_KEY_ID)" \
   --environment POSTBOX_SECRET="$(get_env POSTBOX_SECRET)" \
   --environment APG_IDENTITY_DATABASE_URL="$(get_env APG_IDENTITY_DATABASE_URL)" \
-  --environment IDENTITY_PROVIDER="$(get_env IDENTITY_PROVIDER)" \
-  --environment IDENTITY_STORAGE="$(get_env IDENTITY_STORAGE)" \
+  --environment IDENTITY_PROVIDER=native-apg \
+  --environment IDENTITY_STORAGE=postgres \
   --environment APP_VERSION="$GIT_SHA_SHORT" \
   --environment GIT_SHA="$GIT_SHA" \
   --environment BUILD_TIME="$BUILD_TIME" \

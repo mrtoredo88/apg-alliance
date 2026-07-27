@@ -1,4 +1,4 @@
-import { getDb } from '../lib/firebase.js';
+import { getDb } from '../lib/documentStore.js';
 import { adminReplyError, requireAdminPermission } from '../lib/adminSecurity.js';
 import { buildReferralMonitoring } from '../../../server-shared/referral-monitoring.js';
 

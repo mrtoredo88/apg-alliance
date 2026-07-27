@@ -1,5 +1,5 @@
 import { getFoundationFlag } from '../core/FeatureFlags.js';
-import { FirestoreAdapter, MemoryAdapter, PostgresAdapter, YdbAdapter } from '../infrastructure/adapters/index.js';
+import { MemoryAdapter, PostgresAdapter, YdbAdapter } from '../infrastructure/adapters/index.js';
 import { createRepository } from './Repository.js';
 
 export const APG_REPOSITORY_DEFINITIONS = {
@@ -26,7 +26,7 @@ export function createDataAdapter(name = getFoundationFlag('DATA_PROVIDER')) {
   if (name === 'postgres') return new PostgresAdapter();
   if (name === 'ydb') return new YdbAdapter();
   if (name === 'memory') return new MemoryAdapter();
-  return new FirestoreAdapter();
+  return new PostgresAdapter();
 }
 
 export class ApgDataLayer {
