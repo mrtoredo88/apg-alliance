@@ -71,7 +71,4 @@ export class PostgresDataAdapter extends ServerDataAdapter {
     return this.setDocument(collectionName, id, data, { ...options, merge: false });
   }
 
-  async runTransaction(fn) {
-    return this.adapter.transaction(fn);
-  }
 }

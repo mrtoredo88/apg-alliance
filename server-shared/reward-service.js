@@ -1,5 +1,4 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { FieldValue } from 'firebase-admin/firestore';
 import { ECONOMY_VERSION, getEconomyReward } from './economy-engine.js';
 
 const TOKEN_PREFIX = 'apg:visit:v1:';
@@ -43,19 +42,18 @@ function normalizeId(value) {
   return value == null ? '' : String(value).trim();
 }
 
-async function writeQrLog(db, data) {
-  await db.collection('qrLogs').add({
+async function writeQrLog(store, data) {
+  await store.addDocument('qrLogs', {
     ...data,
-    createdAt: FieldValue.serverTimestamp(),
+    createdAt: new Date().toISOString(),
   }).catch(() => {});
 }
 
-async function loadSubject(db, subjectType, subjectId) {
+async function loadSubject(store, subjectType, subjectId) {
   const collectionName = subjectType === 'expert' ? 'experts' : 'partners';
-  const ref = db.collection(collectionName).doc(subjectId);
-  const snap = await ref.get();
-  if (!snap.exists) return null;
-  return { ref, data: snap.data(), collectionName };
+  const data = await store.getDocument(collectionName, subjectId);
+  if (!data) return null;
+  return { data, collectionName, id: subjectId };
 }
 
 function ownerValues(subject) {
@@ -115,13 +113,13 @@ function parseSignedVisitToken(qrValue) {
   };
 }
 
-async function resolveLegacyQr(db, qrValue, scannerUserId) {
+async function resolveLegacyQr(store, qrValue, scannerUserId) {
   const raw = normalizeId(qrValue);
   if (!raw) return null;
 
   if (raw.startsWith('expert_')) {
     const subjectId = raw.slice(7);
-    const subject = await loadSubject(db, 'expert', subjectId);
+    const subject = await loadSubject(store, 'expert', subjectId);
     if (!subject) return null;
     return {
       source: 'legacy_service_expert',
@@ -132,7 +130,7 @@ async function resolveLegacyQr(db, qrValue, scannerUserId) {
     };
   }
 
-  const subject = await loadSubject(db, 'partner', raw);
+  const subject = await loadSubject(store, 'partner', raw);
   if (!subject) return null;
   return {
     source: 'legacy_service_partner',
@@ -143,7 +141,7 @@ async function resolveLegacyQr(db, qrValue, scannerUserId) {
   };
 }
 
-export async function createVisitQrToken(db, { userId, subjectType, subjectId, requestedBy }) {
+export async function createVisitQrToken(store, { userId, subjectType, subjectId, requestedBy }) {
   const cleanUserId = normalizeId(userId);
   const cleanSubjectId = normalizeId(subjectId);
   const cleanType = subjectType === 'expert' ? 'expert' : 'partner';
@@ -152,9 +150,9 @@ export async function createVisitQrToken(db, { userId, subjectType, subjectId, r
     return { ok: false, status: 400, code: 'BAD_REQUEST', message: 'Не хватает пользователя или партнёра' };
   }
 
-  const subject = await loadSubject(db, cleanType, cleanSubjectId);
+  const subject = await loadSubject(store, cleanType, cleanSubjectId);
   if (!subject) {
-    await writeQrLog(db, { event: 'qr_create_rejected', reason: 'subject_not_found', userId: cleanUserId, subjectType: cleanType, subjectId: cleanSubjectId, requestedBy: normalizeId(requestedBy) });
+    await writeQrLog(store, { event: 'qr_create_rejected', reason: 'subject_not_found', userId: cleanUserId, subjectType: cleanType, subjectId: cleanSubjectId, requestedBy: normalizeId(requestedBy) });
     return { ok: false, status: 404, code: 'SUBJECT_NOT_FOUND', message: cleanType === 'expert' ? 'Эксперт не найден' : 'Партнёр не найден' };
   }
 
@@ -170,15 +168,15 @@ export async function createVisitQrToken(db, { userId, subjectType, subjectId, r
   const encodedPayload = base64url(JSON.stringify(payload));
   const qrValue = `${TOKEN_PREFIX}${encodedPayload}.${signPayload(encodedPayload)}`;
 
-  await db.collection('visitTokens').doc(payload.nonce).set({
+  await store.setDocument('visitTokens', payload.nonce, {
     ...payload,
     used: false,
     requestedBy: normalizeId(requestedBy) || cleanUserId,
     qrType: `service_${cleanType}`,
-    createdAt: FieldValue.serverTimestamp(),
-  });
+    createdAt: new Date().toISOString(),
+  }, { merge: false });
 
-  await writeQrLog(db, {
+  await writeQrLog(store, {
     event: 'qr_created',
     qrType: `service_${cleanType}`,
     userId: cleanUserId,
@@ -192,18 +190,19 @@ export async function createVisitQrToken(db, { userId, subjectType, subjectId, r
   return { ok: true, qrValue, expiresAt: payload.exp, ttlMs: TOKEN_TTL_MS };
 }
 
-async function awardVisitTransaction(db, accountCore, context) {
+async function incrementDocument(store, collectionName, id, field, amount = 1) {
+  const current = await store.getDocument(collectionName, id);
+  if (!current) return null;
+  return store.updateDocument(collectionName, id, { [field]: Number(current[field] || 0) + amount });
+}
+
+async function awardVisitTransaction(store, accountCore, context) {
   const now = new Date();
   const dateKey = todayKey(now);
-  const globalRef = db.collection('stats').doc('global');
-  const scanRef = context.subjectType === 'partner'
-    ? db.collection('scans').doc()
-    : db.collection('expertScans').doc();
   if (!accountCore?.awardVisit) throw Object.assign(new Error('PostgreSQL Economy недоступна'), { code: 'ECONOMY_NOT_CONFIGURED' });
 
-  if (context.tokenRef) {
-    const tokenSnap = await context.tokenRef.get();
-    const token = tokenSnap.data();
+  if (context.tokenId) {
+    const token = await store.getDocument('visitTokens', context.tokenId);
     if (!token || token.used) throw Object.assign(new Error('QR уже использован'), { code: 'TOKEN_USED' });
     if (Number(token.expiresAtMs) < Date.now()) throw Object.assign(new Error('QR истёк'), { code: 'TOKEN_EXPIRED' });
   }
@@ -230,10 +229,10 @@ async function awardVisitTransaction(db, accountCore, context) {
   const keyBonus = awarded.replayed ? 0 : awarded.operation.delta;
   const reputationBonus = awarded.alreadyAwarded || awarded.replayed ? 0 : baseReward.reputation;
 
-  const batch = db.batch();
-  batch.update(context.subject.ref, { totalVisits: FieldValue.increment(1) });
-  batch.set(globalRef, { totalScans: FieldValue.increment(1) }, { merge: true });
-  batch.set(scanRef, {
+  await Promise.all([
+    incrementDocument(store, context.subject.collectionName, context.subjectId, 'totalVisits', 1),
+    incrementDocument(store, 'stats', 'global', 'totalScans', 1),
+    store.addDocument(context.subjectType === 'partner' ? 'scans' : 'expertScans', {
       userId: context.userId,
       subjectType: context.subjectType,
       partnerId: context.subjectType === 'partner' ? context.subjectId : null,
@@ -245,18 +244,16 @@ async function awardVisitTransaction(db, accountCore, context) {
 	      economyVersion: ECONOMY_VERSION,
 	      monthKey: monthKeyFromToday(dateKey),
       scannedBy: context.scannerUserId,
-      scannedAt: FieldValue.serverTimestamp(),
-  });
-  if (context.tokenRef) {
-    batch.update(context.tokenRef, {
+      scannedAt: new Date().toISOString(),
+    }),
+    context.tokenId ? store.updateDocument('visitTokens', context.tokenId, {
         used: true,
-        usedAt: FieldValue.serverTimestamp(),
+        usedAt: new Date().toISOString(),
 	        usedBy: context.scannerUserId,
 	        keysAwarded: keyBonus,
 	        reputationAwarded: reputationBonus,
-    });
-  }
-  await batch.commit();
+    }) : Promise.resolve(),
+  ]);
 
   return {
       awardedKeys: keyBonus,
@@ -273,7 +270,7 @@ async function awardVisitTransaction(db, accountCore, context) {
   };
 }
 
-export async function awardVisit(db, { qrValue, scannerUserId, accountCore }) {
+export async function awardVisit(store, { qrValue, scannerUserId, accountCore }) {
   const scannerId = normalizeId(scannerUserId);
   if (!scannerId) {
     return { ok: false, status: 400, code: 'NO_SCANNER', message: 'Не удалось определить пользователя' };
@@ -287,14 +284,14 @@ export async function awardVisit(db, { qrValue, scannerUserId, accountCore }) {
         return { ok: false, status: 400, code: 'BAD_TOKEN', message: 'QR повреждён' };
       }
       if (parsed.exp < Date.now()) {
-        await writeQrLog(db, { event: 'qr_rejected', reason: 'expired', scannerUserId: scannerId, userId: parsed.userId, subjectType: parsed.subjectType, subjectId: parsed.subjectId, nonce: parsed.nonce });
+      await writeQrLog(store, { event: 'qr_rejected', reason: 'expired', scannerUserId: scannerId, userId: parsed.userId, subjectType: parsed.subjectType, subjectId: parsed.subjectId, nonce: parsed.nonce });
         return { ok: false, status: 410, code: 'TOKEN_EXPIRED', message: 'QR истёк. Сгенерируйте новый.' };
       }
-      const subject = await loadSubject(db, parsed.subjectType, parsed.subjectId);
+      const subject = await loadSubject(store, parsed.subjectType, parsed.subjectId);
       if (!subject) return { ok: false, status: 404, code: 'SUBJECT_NOT_FOUND', message: 'Партнёр или эксперт не найден' };
       const scannerCheck = await validateScannerForOneTime(accountCore, subject.data, scannerId);
       if (!scannerCheck.ok) {
-        await writeQrLog(db, { event: 'qr_rejected', reason: scannerCheck.code, scannerUserId: scannerId, userId: parsed.userId, subjectType: parsed.subjectType, subjectId: parsed.subjectId, nonce: parsed.nonce });
+        await writeQrLog(store, { event: 'qr_rejected', reason: scannerCheck.code, scannerUserId: scannerId, userId: parsed.userId, subjectType: parsed.subjectType, subjectId: parsed.subjectId, nonce: parsed.nonce });
         return { ok: false, status: 403, code: scannerCheck.code, message: scannerCheck.message };
       }
       context = {
@@ -303,32 +300,32 @@ export async function awardVisit(db, { qrValue, scannerUserId, accountCore }) {
         subjectType: parsed.subjectType,
         subjectId: parsed.subjectId,
         scannerUserId: scannerId,
-        tokenRef: db.collection('visitTokens').doc(parsed.nonce),
+        tokenId: parsed.nonce,
         nonce: parsed.nonce,
         subject,
       };
     }
   } catch (e) {
-    await writeQrLog(db, { event: 'qr_rejected', reason: e.code ?? 'bad_token', scannerUserId: scannerId, error: e.message });
+    await writeQrLog(store, { event: 'qr_rejected', reason: e.code ?? 'bad_token', scannerUserId: scannerId, error: e.message });
     return { ok: false, status: 400, code: e.code ?? 'BAD_TOKEN', message: 'QR не прошёл проверку безопасности' };
   }
 
   if (!context) {
-    const legacy = await resolveLegacyQr(db, qrValue, scannerId);
+    const legacy = await resolveLegacyQr(store, qrValue, scannerId);
     if (!legacy) {
-      await writeQrLog(db, { event: 'qr_rejected', reason: 'unknown_qr', scannerUserId: scannerId, raw: normalizeId(qrValue).slice(0, 120) });
+      await writeQrLog(store, { event: 'qr_rejected', reason: 'unknown_qr', scannerUserId: scannerId, raw: normalizeId(qrValue).slice(0, 120) });
       return { ok: false, status: 404, code: 'UNKNOWN_QR', message: 'QR-код не распознан' };
     }
     context = {
       ...legacy,
       scannerUserId: scannerId,
-      tokenRef: null,
+      tokenId: null,
     };
   }
 
   try {
-    const result = await awardVisitTransaction(db, accountCore, context);
-    await writeQrLog(db, {
+    const result = await awardVisitTransaction(store, accountCore, context);
+    await writeQrLog(store, {
       event: result.awardedKeys > 0 ? 'reward_awarded' : 'visit_recorded',
       source: context.source,
       scannerUserId: scannerId,
@@ -348,7 +345,7 @@ export async function awardVisit(db, { qrValue, scannerUserId, accountCore }) {
         : `Визит отмечен — ${result.subjectName}`,
     };
   } catch (e) {
-    await writeQrLog(db, {
+    await writeQrLog(store, {
       event: 'reward_rejected',
       reason: e.code ?? 'award_error',
       source: context.source,

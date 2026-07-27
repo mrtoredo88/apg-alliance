@@ -1,15 +1,16 @@
-import { getDb } from '../lib/firebase.js';
 import { awardVisit, createVisitQrToken } from '../../../server-shared/reward-service.js';
 import { serverFoundation } from '../apg/index.js';
+import { PostgresDataAdapter } from '../apg/data/PostgresDataAdapter.js';
+
+const data = new PostgresDataAdapter();
 
 export default async function qrTokenRoutes(fastify) {
   fastify.post('/api/qr-token', async (request, reply) => {
-    const db = getDb();
     const action = request.body?.action;
     const result = action === 'create'
-      ? await createVisitQrToken(db, request.body)
+      ? await createVisitQrToken(data, request.body)
       : action === 'scan'
-        ? await awardVisit(db, { qrValue: request.body?.qrValue, scannerUserId: request.body?.scannerUserId, accountCore: serverFoundation.account })
+        ? await awardVisit(data, { qrValue: request.body?.qrValue, scannerUserId: request.body?.scannerUserId, accountCore: serverFoundation.account })
         : { ok: false, status: 400, code: 'BAD_ACTION', message: 'Неизвестное действие QR' };
 
     return reply.code(result.status ?? (result.ok ? 200 : 400)).send(result);

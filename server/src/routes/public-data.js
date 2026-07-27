@@ -1,5 +1,7 @@
-import { getDb } from '../lib/firebase.js';
 import { isLifecyclePublic, normalizeContentStatus } from '../../../server-shared/content-lifecycle.js';
+import { PostgresDataAdapter } from '../apg/data/PostgresDataAdapter.js';
+
+const data = new PostgresDataAdapter();
 
 const PUBLIC_COLLECTIONS = {
   partners:      { collection: 'partners', limit: 100 },
@@ -30,21 +32,22 @@ function isPublicRow(collectionName, item) {
   return item.archived !== true && item.deleted !== true && !['archived', 'deleted', 'trash'].includes(normalizeContentStatus(item));
 }
 
-async function readPublicCollection(db, name, config) {
-  let ref = db.collection(config.collection);
-  if (config.orderBy) ref = ref.orderBy(config.orderBy[0], config.orderBy[1]);
-  if (config.limit) ref = ref.limit(config.limit);
-  const snap = await ref.get();
-  return snap.docs
-    .map(doc => ({ id: doc.id, ...serializePublicValue(doc.data()) }))
+async function readPublicCollection(adapter, name, config) {
+  const rows = await adapter.listDocuments(config.collection, {
+    limit: config.limit || 100,
+    orderBy: config.orderBy?.[0] === 'createdAt' ? 'created_at' : 'updated_at',
+    direction: config.orderBy?.[1] || 'desc',
+  });
+  return rows
+    .map(item => serializePublicValue(item))
     .filter(item => isPublicRow(config.collection, item))
     .filter(item => !config.activeOnly || item.active !== false)
     .filter(item => config.collection !== 'partners' || item.catalogPublished !== false);
 }
 
-async function readPublicCollections(db, names, logger) {
+async function readPublicCollections(adapter, names, logger) {
   const settled = await Promise.allSettled(names.map(async name => {
-    const rows = await readPublicCollection(db, name, PUBLIC_COLLECTIONS[name]);
+    const rows = await readPublicCollection(adapter, name, PUBLIC_COLLECTIONS[name]);
     return [name, rows];
   }));
   const data = {};
@@ -71,18 +74,17 @@ export default async function publicDataRoutes(fastify) {
   fastify.get('/api/public-data', async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     try {
-      const db = getDb();
       const requested = String(request.query?.resources || '')
         .split(',')
         .map(item => item.trim())
         .filter(Boolean);
       const names = requested.length ? requested.filter(name => PUBLIC_COLLECTIONS[name]) : Object.keys(PUBLIC_COLLECTIONS);
-      const { data, errors } = await readPublicCollections(db, names, request.log);
-      const statsSnap = !requested.length || requested.includes('stats')
-        ? await db.collection('stats').doc('global').get().catch(() => null)
+      const { data: publicRows, errors } = await readPublicCollections(data, names, request.log);
+      const stats = !requested.length || requested.includes('stats')
+        ? await data.getDocument('stats', 'global').catch(() => null)
         : null;
-      const categoriesSnap = !requested.length || requested.includes('expertCategories')
-        ? await db.collection('config').doc('expertCategories').get().catch(() => null)
+      const categories = !requested.length || requested.includes('expertCategories')
+        ? await data.getDocument('config', 'expertCategories').catch(() => null)
         : null;
       return {
         ok: errors.length === 0,
@@ -90,9 +92,9 @@ export default async function publicDataRoutes(fastify) {
         source: 'backend',
         errors,
         data: {
-          ...data,
-          ...(statsSnap?.exists ? { stats: { id: statsSnap.id, ...serializePublicValue(statsSnap.data()) } } : {}),
-          expertCategories: Array.isArray(categoriesSnap?.data()?.custom) ? serializePublicValue(categoriesSnap.data().custom) : [],
+          ...publicRows,
+          ...(stats ? { stats: serializePublicValue(stats) } : {}),
+          expertCategories: Array.isArray(categories?.custom) ? serializePublicValue(categories.custom) : [],
         },
       };
     } catch (error) {
