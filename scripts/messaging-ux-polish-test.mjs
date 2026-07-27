@@ -121,12 +121,13 @@ scenario('empty and loading states are soft', () => {
   ].forEach(token => assert.ok(source.includes(token), token));
 });
 
-scenario('architecture remains unchanged', () => {
-  assert.ok(source.includes("onSnapshot(collection(db, 'users', uid, 'contextDialogs')"));
-  assert.ok(source.includes("onSnapshot(collection(db, 'users', uid, 'contextDialogMessages')"));
+scenario('dialog reads use the PostgreSQL-backed API', () => {
+  assert.ok(source.includes("userAction('dialog:list'"));
   assert.ok(source.includes("userAction('dialog:message'"));
   assert.ok(source.includes("userAction('dialog:read'"));
   assert.ok(source.includes("userAction('dialog:open'"));
+  assert.equal(source.includes("from 'firebase/firestore'"), false);
+  assert.equal(source.includes("from '../firebase.js'"), false);
   assert.equal(source.includes('/api/messages'), false);
   assert.equal(source.includes('addDoc('), false);
   assert.equal(source.includes('updateDoc('), false);
