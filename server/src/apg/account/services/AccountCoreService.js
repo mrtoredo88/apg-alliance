@@ -87,6 +87,11 @@ export class AccountCoreService {
     return this.measure('postgres', () => this.economy.awardVisit(payload));
   }
 
+  async awardDailyBonus(payload) {
+    this.metrics.increment('accountWrites');
+    return this.measure('postgres', () => this.economy.awardDailyBonus(payload));
+  }
+
   async economyHistory(userId, limit = 100) {
     this.metrics.increment('accountReads');
     return this.measure('postgres', () => this.economy.history(userId, limit));

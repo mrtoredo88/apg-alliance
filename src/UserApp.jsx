@@ -2442,9 +2442,12 @@ export function UserApp() {
                 userAction('profile:sync', syncExistingPayload)
                   .then(result => {
                     if (!isMounted.current) return;
-                    setUserKeys(prev => prev + 1);
-                    setUserReputation(prev => prev + 1);
-                    if (!needsLegalConsent) setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
+                    if (result?.dailyBonusAwarded) {
+                      const confirmedBalance = Number(result?.accountBalance);
+                      setUserKeys(prev => Number.isFinite(confirmedBalance) ? confirmedBalance : prev + 1);
+                      setUserReputation(prev => prev + 1);
+                      if (!needsLegalConsent) setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
+                    }
                     return result;
                   })
                   .then(handleReferralSyncResult)

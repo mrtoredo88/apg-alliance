@@ -148,6 +148,46 @@ export class EconomyRepository {
     });
   }
 
+  async awardDailyBonus({ userId, dateKey, keys = 1 } = {}) {
+    const cleanUserId = safeString(userId, 260);
+    const cleanDateKey = safeString(dateKey, 20);
+    const delta = Math.max(0, integer(keys, 1));
+    const idempotencyKey = `daily_bonus:${cleanUserId}:${cleanDateKey}`;
+    if (!cleanUserId || !cleanDateKey) {
+      throw Object.assign(new Error('Daily bonus identifiers are required.'), { code: 'ECONOMY_BAD_REQUEST' });
+    }
+    return this.adapter.transaction(async client => {
+      const previous = await client.query(
+        'SELECT * FROM apg_economy_operations WHERE idempotency_key = $1 LIMIT 1',
+        [idempotencyKey],
+      );
+      if (previous.rows[0]) return { operation: mapOperation(previous.rows[0]), replayed: true };
+
+      const profileResult = await client.query(
+        'SELECT * FROM apg_account_profiles WHERE user_id = $1 FOR UPDATE',
+        [cleanUserId],
+      );
+      const row = profileResult.rows[0];
+      if (!row) throw Object.assign(new Error('Пользователь не найден'), { code: 'USER_NOT_FOUND' });
+      const profile = mapProfile(row);
+      const balanceAfter = Math.max(0, integer(profile.keys)) + delta;
+      const nextProfile = { ...profile, keys: balanceAfter, lastBonusDate: cleanDateKey };
+      await client.query(
+        'UPDATE apg_account_profiles SET profile = $2::jsonb, updated_at = now() WHERE user_id = $1',
+        [cleanUserId, JSON.stringify(nextProfile)],
+      );
+      const operationId = randomUUID();
+      const inserted = await client.query(
+        `INSERT INTO apg_economy_operations
+          (id, idempotency_key, user_id, type, reason, source_type, source_id, source_label, delta, balance_after, status, metadata)
+         VALUES ($1, $2, $3, 'daily_bonus', 'Ежедневный бонус', 'system', $4, 'АПГ', $5, $6, 'completed', $7::jsonb)
+         RETURNING *`,
+        [operationId, idempotencyKey, cleanUserId, cleanDateKey, delta, balanceAfter, JSON.stringify({ dateKey: cleanDateKey })],
+      );
+      return { operation: mapOperation(inserted.rows[0]), replayed: false };
+    });
+  }
+
   async history(userId, limit = 100) {
     const cleanUserId = safeString(userId, 260);
     const result = await this.adapter.query(

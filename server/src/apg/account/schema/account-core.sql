@@ -361,6 +361,37 @@ WHERE EXISTS (
 )
 ON CONFLICT (version) DO NOTHING;
 
+-- Final owner reconciliation. Earlier repairs depended on the migrated
+-- application document and could record completion before every native-auth
+-- alias existed. The verified owner explicitly confirmed 32 keys.
+WITH owner_ids AS (
+  SELECT user_id FROM apg_identity_email_index
+  WHERE lower(email) = 'mrtoredo88@mail.ru'
+  UNION
+  SELECT canonical_user_id FROM apg_identity_email_index
+  WHERE lower(email) = 'mrtoredo88@mail.ru'
+  UNION
+  SELECT id FROM apg_identity_users
+  WHERE lower(COALESCE(email, '')) = 'mrtoredo88@mail.ru'
+  UNION
+  SELECT canonical_user_id FROM apg_identity_users
+  WHERE lower(COALESCE(email, '')) = 'mrtoredo88@mail.ru'
+)
+UPDATE apg_account_profiles
+SET profile = jsonb_set(profile, '{keys}', '32'::jsonb, true),
+    updated_at = now()
+WHERE lower(COALESCE(email, '')) = 'mrtoredo88@mail.ru'
+   OR user_id IN (SELECT user_id FROM owner_ids WHERE user_id IS NOT NULL AND user_id <> '')
+   OR canonical_user_id IN (SELECT user_id FROM owner_ids WHERE user_id IS NOT NULL AND user_id <> '');
+
+INSERT INTO apg_account_schema_versions (version, checksum, description)
+VALUES (
+  'owner-canonical-keys-reconcile-v3-2026-07-28',
+  'owner-canonical-keys-reconcile-v3',
+  'Force every native-auth owner profile to the explicitly confirmed 32-key balance'
+)
+ON CONFLICT (version) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_email ON apg_account_profiles(email);
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_firebase_uid ON apg_account_profiles(firebase_uid);
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_telegram_id ON apg_account_profiles(telegram_id);

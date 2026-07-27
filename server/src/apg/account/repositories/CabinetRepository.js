@@ -9,7 +9,13 @@ export class CabinetRepository {
   async listByUser(userId) {
     const result = await this.adapter.query(`
       SELECT * FROM apg_account_cabinets
-      WHERE user_id = $1 AND status = 'active'
+      WHERE status = 'active'
+        AND user_id IN (
+          SELECT $1
+          UNION
+          SELECT id FROM apg_identity_users
+          WHERE id = $1 OR canonical_user_id = $1
+        )
       ORDER BY type ASC, created_at ASC
     `, [safeString(userId, 260)]);
     return result.rows.map(mapCabinet).filter(Boolean);

@@ -847,6 +847,19 @@ async function actionProfileSync(db, req, actor) {
   consentStatus = getConsentStatus(userDoc);
   await audit(db, req, actor, created ? 'profile:create' : 'profile:sync', 'users', userId, 'success', { dailyBonusAwarded, referralBonusAwarded, referralRecoveryStatus, referralRecoveryReason, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion });
   await writeAccountProfileBestEffort(userId, userDoc, { bootstrap: { profileSync: true, created } });
+  let accountBalance = null;
+  if (dailyBonusAwarded && accountCoreWriteEnabled()) {
+    const dailyResult = await serverFoundation.account.awardDailyBonus({
+      userId,
+      dateKey: todayKey,
+      keys: 1,
+    }).catch(error => {
+      serverFoundation.account.metrics.recordError(error);
+      return null;
+    });
+    accountBalance = Number(dailyResult?.operation?.balanceAfter);
+    if (!Number.isFinite(accountBalance)) accountBalance = null;
+  }
   if (hasReferralObservability) {
     const effectiveReferrerId = userDoc?.referredBy || userDoc?.referralBonusGrantedTo || refId || referralContext.referralCode;
     recordReferralEventAsync(db, {
@@ -956,7 +969,7 @@ async function actionProfileSync(db, req, actor) {
       });
     }
   }
-  return { ok: true, userId, created, dailyBonusAwarded, referralBonusAwarded, referralRecoveryStatus, referralRecoveryReason, profileReady: true, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion, consentAcceptedAt: consentStatus.acceptedAt || null, user: userDoc };
+  return { ok: true, userId, created, dailyBonusAwarded, accountBalance, referralBonusAwarded, referralRecoveryStatus, referralRecoveryReason, profileReady: true, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion, consentAcceptedAt: consentStatus.acceptedAt || null, user: userDoc };
 }
 
 async function actionProfilePatch(db, req, actor) {

@@ -27,6 +27,8 @@ await adapter.dispose();
 const userApp = readFileSync(new URL('../src/UserApp.jsx', import.meta.url), 'utf8');
 const userActions = readFileSync(new URL('../server/src/routes/user-actions.js', import.meta.url), 'utf8');
 const cabinetCore = readFileSync(new URL('../src/cabinet/CabinetCorePage.jsx', import.meta.url), 'utf8');
+const economyRepository = readFileSync(new URL('../server/src/apg/account/repositories/EconomyRepository.js', import.meta.url), 'utf8');
+const profileRepository = readFileSync(new URL('../server/src/apg/account/repositories/ProfileRepository.js', import.meta.url), 'utf8');
 assert.match(userApp, /apg_canonical_key_balance/);
 assert.match(userApp, /if \(accountBootstrap\?\.profile\) \{\s*setUserKeys\(keys\)/);
 assert.match(userApp, /refreshKeyBalance\(\);\s*const handleResume/);
@@ -38,6 +40,9 @@ assert.match(userApp, /const bootstrapCabinets = Array\.isArray\(accountBootstra
 assert.match(userApp, /partnerId: data\.partnerId \|\| u\.partnerId \|\| null/);
 assert.match(userApp, /requestId === balanceRequestIdRef\.current/);
 assert.match(userApp, /activeBalanceUserIdRef\.current === userId/);
+assert.match(userApp, /if \(result\?\.dailyBonusAwarded\)/);
+assert.match(economyRepository, /daily_bonus:\$\{cleanUserId\}:\$\{cleanDateKey\}/);
+assert.match(profileRepository, /\(user_id = \$1\) DESC/);
 assert.match(cabinetCore, /shareEntity\(\{/);
 assert.doesNotMatch(cabinetCore, /window\.open\(shareLink\([^)]*\), '_blank'\)/);
 

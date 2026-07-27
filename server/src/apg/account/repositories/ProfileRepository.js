@@ -11,7 +11,11 @@ export class ProfileRepository {
       SELECT *
       FROM apg_account_profiles
       WHERE user_id = $1 OR canonical_user_id = $1
-      ORDER BY (user_id = canonical_user_id) DESC, updated_at DESC
+      ORDER BY
+        (user_id = $1) DESC,
+        (user_id = canonical_user_id) DESC,
+        updated_at DESC,
+        user_id ASC
       LIMIT 1
     `, [safeString(userId, 260)]);
     return mapProfile(result.rows[0]);
