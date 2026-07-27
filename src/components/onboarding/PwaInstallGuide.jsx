@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { APG2_PROFILE, GlassButton, GlassCard } from '../Apg2ProfileGlass.jsx';
-import { ANDROID_INSTALL_SOURCE } from '../../constants.js';
 
 export const PWA_INSTALL_GUIDE_HIDDEN_KEY = 'apg_mobile_pwa_onboarding_hidden_v2';
 export const PWA_INSTALL_GUIDE_SESSION_KEY = 'apg_mobile_pwa_onboarding_session_closed_v2';
@@ -88,7 +87,7 @@ function Step({ icon, title, text }) {
 
 export function PwaInstallGuide({ open, onClose }) {
   const [installPrompt, setInstallPrompt] = useState(null);
-  const [iosInstructions, setIosInstructions] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
   const [neverShow, setNeverShow] = useState(false);
   const platform = useMemo(getPlatform, []);
   const canUseInstallPrompt = platform === 'android' && installPrompt;
@@ -98,9 +97,18 @@ export function PwaInstallGuide({ open, onClose }) {
       event.preventDefault();
       setInstallPrompt(event);
     };
+    const handleInstalled = () => {
+      safeSet(localStorage, PWA_INSTALL_GUIDE_HIDDEN_KEY, '1');
+      setInstallPrompt(null);
+      onClose?.();
+    };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-  }, []);
+    window.addEventListener('appinstalled', handleInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleInstalled);
+    };
+  }, [onClose]);
 
   if (!open) return null;
 
@@ -118,7 +126,7 @@ export function PwaInstallGuide({ open, onClose }) {
       close({ remember: neverShow });
       return;
     }
-    setIosInstructions(true);
+    setShowInstructions(true);
   };
 
   return (
@@ -133,10 +141,19 @@ export function PwaInstallGuide({ open, onClose }) {
             </p>
           </div>
 
-          {iosInstructions ? (
+          {showInstructions ? (
             <div style={{ display: 'grid', gap: 10, borderRadius: 24, padding: 14, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)' }}>
-              <Step icon="↗" title="Нажмите «Поделиться»" text="Кнопка находится в нижней панели Safari." />
-              <Step icon="＋" title="Выберите «На экран Домой»" text="Safari добавит АПГ как обычное приложение." />
+              {platform === 'ios' ? (
+                <>
+                  <Step icon="↗" title="Нажмите «Поделиться»" text="Кнопка находится в нижней панели Safari." />
+                  <Step icon="＋" title="Выберите «На экран Домой»" text="Safari добавит АПГ как обычное приложение." />
+                </>
+              ) : (
+                <>
+                  <Step icon="⋮" title="Откройте меню браузера" text="Нажмите на значок меню в правом верхнем углу." />
+                  <Step icon="＋" title="Выберите «Добавить на главный экран»" text="Название пункта может немного отличаться в разных браузерах." />
+                </>
+              )}
               <Step icon="✓" title="Нажмите «Добавить»" text="После этого откройте АПГ с иконки на рабочем столе." />
             </div>
           ) : (
@@ -148,24 +165,9 @@ export function PwaInstallGuide({ open, onClose }) {
           )}
 
           <div style={{ display: 'grid', gap: 10 }}>
-            {platform === 'android' && (
-              <div data-android-install-option style={{ display: 'grid', gap: 8, borderRadius: 24, padding: 13, background: 'linear-gradient(145deg, rgba(215,184,106,0.18), rgba(255,255,255,0.065))', border: '1px solid rgba(215,184,106,0.30)' }}>
-                <div style={{ color: APG2_PROFILE.text, fontSize: 15, lineHeight: '20px', fontWeight: 860 }}>Скачать приложение</div>
-                <div style={{ color: APG2_PROFILE.textSoft, fontSize: 13, lineHeight: '18px', fontWeight: 620 }}>Работает быстрее, поддерживает уведомления и всегда под рукой.</div>
-                <GlassButton
-                  tone="gold"
-                  onClick={() => window.location.assign(ANDROID_INSTALL_SOURCE.url)}
-                  style={{ minHeight: 54, marginTop: 2, borderRadius: 22, color: '#17120a', fontSize: 15.5, fontWeight: 880 }}
-                >
-                  {ANDROID_INSTALL_SOURCE.buttonLabel}
-                </GlassButton>
-              </div>
-            )}
-            {(platform !== 'android' || canUseInstallPrompt) && (
-              <GlassButton tone="gold" onClick={startInstall} style={{ minHeight: 54, borderRadius: 22, color: '#17120a', fontSize: 15.5, fontWeight: 880 }}>
-                📲 {canUseInstallPrompt ? 'Установить PWA' : platform === 'ios' ? 'Показать инструкцию установки' : 'Как установить приложение'}
-              </GlassButton>
-            )}
+            <GlassButton data-pwa-install-action tone="gold" onClick={startInstall} style={{ minHeight: 54, borderRadius: 22, color: '#17120a', fontSize: 15.5, fontWeight: 880 }}>
+              📲 {canUseInstallPrompt ? 'Установить веб-приложение' : platform === 'ios' ? 'Показать инструкцию установки' : 'Как добавить на главный экран'}
+            </GlassButton>
             <GlassButton onClick={() => close()} style={{ minHeight: 50, borderRadius: 20, color: APG2_PROFILE.textSoft }}>
               Продолжить в браузере
             </GlassButton>

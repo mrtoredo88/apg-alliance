@@ -9,7 +9,6 @@ function assert(condition, message) {
 }
 
 const guide = readFileSync('src/components/onboarding/PwaInstallGuide.jsx', 'utf8');
-const constants = readFileSync('src/constants.js', 'utf8');
 const userApp = readFileSync('src/UserApp.jsx', 'utf8');
 const profile = readFileSync('src/ProfilePanel.jsx', 'utf8');
 
@@ -18,10 +17,11 @@ assert(guide.includes('export function shouldShowPwaEmailHint'), 'email hint exp
 assert(guide.includes("matchMedia?.('(display-mode: standalone)')"), 'standalone display-mode is checked');
 assert(guide.includes('navigator?.standalone === true'), 'iOS standalone mode is checked');
 assert(guide.includes('beforeinstallprompt'), 'Android beforeinstallprompt is supported');
+assert(guide.includes('appinstalled'), 'completed PWA installation permanently closes the guide');
 assert(guide.includes('PWA_INSTALL_GUIDE_HIDDEN_KEY'), 'permanent install-guide dismissal key exists');
 assert(guide.includes('PWA_INSTALL_GUIDE_SESSION_KEY'), 'session install-guide dismissal key exists');
-assert(guide.includes('apg_mobile_pwa_onboarding_hidden_v2'), 'APK release resets legacy permanent dismissal');
-assert(guide.includes('apg_mobile_pwa_onboarding_session_closed_v2'), 'APK release resets legacy session dismissal');
+assert(guide.includes('apg_mobile_pwa_onboarding_hidden_v2'), 'permanent dismissal remains compatible with the current onboarding release');
+assert(guide.includes('apg_mobile_pwa_onboarding_session_closed_v2'), 'session dismissal remains compatible with the current onboarding release');
 assert(guide.includes("if (getPlatform() === 'android') return true"), 'Android install guide is available to signed-in users');
 assert(guide.includes('navigator.userAgentData?.platform'), 'Android detection supports reduced and desktop-mode user agents');
 assert(guide.includes('/Linux (?:arm|aarch)/i.test(navigatorPlatform)'), 'Android emulator platform fallback is present');
@@ -32,14 +32,13 @@ assert(guide.includes('Добро пожаловать в АПГ'), 'welcome cop
 assert(guide.includes('После установки'), 'post-install email guidance is highlighted');
 assert(guide.includes('Войдите по электронной почте'), 'standalone PWA email prompt is present');
 assert(guide.includes('Нажмите «Поделиться»'), 'iOS Safari install instructions are present');
-assert(guide.includes("platform === 'android'"), 'APK option is limited to Android');
-assert(guide.includes("platform !== 'android' || canUseInstallPrompt"), 'Android PWA option requires beforeinstallprompt');
-assert(guide.includes('data-android-install-option'), 'Android install option has a stable smoke-test selector');
-assert(guide.includes('Работает быстрее, поддерживает уведомления и всегда под рукой.'), 'Android install benefit copy is present');
-assert(guide.includes('ANDROID_INSTALL_SOURCE.buttonLabel'), 'Android CTA is driven by the centralized install source');
-assert(constants.includes("VITE_ANDROID_INSTALL_PROVIDER || 'apk'"), 'Android provider defaults to APK');
-assert(constants.includes("VITE_ANDROID_INSTALL_URL || VITE_ENV.VITE_ANDROID_DOWNLOAD_URL"), 'Android install URL supports centralized override');
-assert(constants.includes("'Установить из RuStore' : '⬇ Скачать APK'"), 'RuStore switch does not require modal changes');
+assert(guide.includes('Добавить на главный экран'), 'Android manual PWA instructions are present');
+assert(guide.includes('data-pwa-install-action'), 'the cross-platform PWA action has a stable smoke-test selector');
+assert(guide.includes('Установить веб-приложение'), 'native Android prompt uses web-app wording');
+assert(!guide.includes('ANDROID_INSTALL_SOURCE'), 'the install guide has no Android package download branch');
+assert(!guide.includes('data-android-install-option'), 'the Android package option is absent');
+assert(!guide.includes('window.location.assign'), 'the install guide contains no direct download navigation');
+assert(!/APK|неизвестн(?:ый|ого) источник|сторонн(?:ий|его) источник/i.test(guide), 'package and side-load wording is absent from the install guide');
 
 assert(userApp.includes("import { EmailAuth } from './EmailAuth.jsx';"), 'UserApp reuses existing EmailAuth');
 assert(userApp.includes('PwaInstallGuide'), 'UserApp renders mobile browser install guide');
