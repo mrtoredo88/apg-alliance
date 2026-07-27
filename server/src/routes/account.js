@@ -53,6 +53,36 @@ function publicProfile(profile = null) {
     notificationPreferences,
     notificationsEnabled,
     messagingPrivacy,
+    keys,
+    tickets,
+    reputation,
+    reputationStatus,
+    reputationStatusLabel,
+    favorites,
+    savedNews,
+    readLaterNews,
+    newsReactions,
+    newsSubscriptions,
+    interestProfile,
+    scannedPartners,
+    completedTasks,
+    learningProgress,
+    learningHintsEnabled,
+    streak,
+    lastScanDate,
+    referralCount,
+    scanDates,
+    visitCounts,
+    registeredEvents,
+    joinedGroup,
+    lastBonusDate,
+    scannedExperts,
+    consents,
+    consentAcceptedAt,
+    consentDocsVersion,
+    consentLegalVersion,
+    legalVersion,
+    notificationConsent,
   } = profile;
   return {
     id: userId || id,
@@ -78,6 +108,36 @@ function publicProfile(profile = null) {
     notificationPreferences,
     notificationsEnabled,
     messagingPrivacy,
+    keys,
+    tickets,
+    reputation,
+    reputationStatus,
+    reputationStatusLabel,
+    favorites,
+    savedNews,
+    readLaterNews,
+    newsReactions,
+    newsSubscriptions,
+    interestProfile,
+    scannedPartners,
+    completedTasks,
+    learningProgress,
+    learningHintsEnabled,
+    streak,
+    lastScanDate,
+    referralCount,
+    scanDates,
+    visitCounts,
+    registeredEvents,
+    joinedGroup,
+    lastBonusDate,
+    scannedExperts,
+    consents,
+    consentAcceptedAt,
+    consentDocsVersion,
+    consentLegalVersion,
+    legalVersion,
+    notificationConsent,
   };
 }
 
@@ -100,9 +160,7 @@ export default async function accountRoutes(fastify) {
     try {
       const decoded = await getDbAuth().verifyIdToken(token);
       const requestedUserId = safeString(request.body?.userId || decoded.uid, 260);
-      const userId = requestedUserId === decoded.uid || requestedUserId.startsWith('email:') || requestedUserId.startsWith('tg_')
-        ? requestedUserId
-        : decoded.uid;
+      const userId = requestedUserId === decoded.uid ? requestedUserId : decoded.uid;
       const canary = canaryAllowed(userId);
       if (canaryModeEnabled() && !canary) {
         return reply.code(403).send({ ok: false, code: 'ACCOUNT_CANARY_NOT_ALLOWED', error: 'Account Core canary недоступен для пользователя.' });
