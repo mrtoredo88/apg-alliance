@@ -34,6 +34,10 @@ assert.match(userActions, /ACCOUNT_CORE_ECONOMY_FIELDS/);
 assert.match(userActions, /withoutAccountCoreEconomy\(profile\)/);
 assert.match(userActions, /canonical\?\.canonicalUserId \|\| canonical\?\.id/);
 assert.match(userApp, /partnerCabinetIds: partnerCabinetIds\.length \? partnerCabinetIds : userData\.partnerCabinetIds/);
+assert.match(userApp, /const bootstrapCabinets = Array\.isArray\(accountBootstrap\.cabinets\)/);
+assert.match(userApp, /partnerId: data\.partnerId \|\| u\.partnerId \|\| null/);
+assert.match(userApp, /requestId === balanceRequestIdRef\.current/);
+assert.match(userApp, /activeBalanceUserIdRef\.current === userId/);
 assert.match(cabinetCore, /shareEntity\(\{/);
 assert.doesNotMatch(cabinetCore, /window\.open\(shareLink\([^)]*\), '_blank'\)/);
 

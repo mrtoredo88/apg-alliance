@@ -1202,6 +1202,9 @@ export function UserApp() {
   const [userRank, setUserRank]                   = useState(null);
   const [ownedPartner, setOwnedPartner]           = useState(null);
   const [ownedExpert, setOwnedExpert]             = useState(null);
+  const balanceRequestIdRef                       = useRef(0);
+  const activeBalanceUserIdRef                    = useRef('');
+  activeBalanceUserIdRef.current = String(user?.id || '');
   const [joinedGroup, setJoinedGroup]             = useState(false);
   const [lastBonusDate, setLastBonusDate]         = useState(null);
   const [appearance, setAppearance]             = useState(() => localStorage.getItem('apg_theme') ?? 'light');
@@ -1214,10 +1217,16 @@ export function UserApp() {
   const refreshKeyBalance = useCallback(async () => {
     const userId = String(user?.id || '');
     if (!userId || userId.startsWith('guest_')) return null;
+    const requestId = ++balanceRequestIdRef.current;
     try {
       const result = await userAction('economy:history', { userId, limit: 1 });
       const balance = Number(result?.balance);
-      if (Number.isFinite(balance)) {
+      if (
+        Number.isFinite(balance)
+        && requestId === balanceRequestIdRef.current
+        && activeBalanceUserIdRef.current === userId
+        && String(result?.userId || userId) === userId
+      ) {
         setUserKeys(balance);
         try { localStorage.setItem('apg_canonical_key_balance', String(balance)); } catch {}
         setUser(prev => prev ? { ...prev, keys: balance } : prev);
@@ -2009,6 +2018,19 @@ export function UserApp() {
           });
           if (accountBootstrap?.profile && isMounted.current) {
             const accountProfile = accountBootstrap.profile;
+            const bootstrapCabinets = Array.isArray(accountBootstrap.cabinets) ? accountBootstrap.cabinets : [];
+            const bootstrapPartnerIds = bootstrapCabinets
+              .filter(cabinet => cabinet?.type === 'partner' && cabinet?.status !== 'disabled')
+              .map(cabinet => String(cabinet.entityId || '').trim())
+              .filter(Boolean);
+            const bootstrapExpertIds = bootstrapCabinets
+              .filter(cabinet => cabinet?.type === 'expert' && cabinet?.status !== 'disabled')
+              .map(cabinet => String(cabinet.entityId || '').trim())
+              .filter(Boolean);
+            const profilePartnerIds = safeStringList(accountProfile.partnerCabinetIds);
+            const profileExpertIds = safeStringList(accountProfile.expertCabinetIds);
+            const resolvedPartnerIds = [...new Set([...bootstrapPartnerIds, ...profilePartnerIds, ...safeStringList(userData.partnerCabinetIds)])];
+            const resolvedExpertIds = [...new Set([...bootstrapExpertIds, ...profileExpertIds, ...safeStringList(userData.expertCabinetIds)])];
             const identityOwnsLinkedTelegram = hasAuthoritativeLinkedTelegram(userData);
             userData = {
               ...userData,
@@ -2018,10 +2040,10 @@ export function UserApp() {
               linkedTelegram: identityOwnsLinkedTelegram ? userData.linkedTelegram || null : accountProfile.linkedTelegram || null,
               role: accountBootstrap.roles?.[0] || accountProfile.role || userData.role,
               roles: accountBootstrap.roles || accountProfile.roles || userData.roles,
-              partnerId: accountProfile.partnerId ?? userData.partnerId,
-              partnerCabinetIds: accountProfile.partnerCabinetIds ?? userData.partnerCabinetIds,
-              expertId: accountProfile.expertId ?? userData.expertId,
-              expertCabinetIds: accountProfile.expertCabinetIds ?? userData.expertCabinetIds,
+              partnerId: accountProfile.partnerId || resolvedPartnerIds[0] || userData.partnerId,
+              partnerCabinetIds: resolvedPartnerIds,
+              expertId: accountProfile.expertId || resolvedExpertIds[0] || userData.expertId,
+              expertCabinetIds: resolvedExpertIds,
             };
             setUser(userData);
             setErrorLoggerUser(String(userData.id));
@@ -2298,18 +2320,26 @@ export function UserApp() {
                 linkedTelegram: effectiveLinkedTelegram,
                 linkedEmail: data.linkedEmail || userData.linkedEmail,
                 normalizedEmail: data.normalizedEmail,
-                partnerId: data.partnerId,
-                partnerCabinetIds: data.partnerCabinetIds,
-                expertId: data.expertId,
-                expertCabinetIds: data.expertCabinetIds,
+                partnerId: data.partnerId || userData.partnerId,
+                partnerCabinetIds: safeStringList(data.partnerCabinetIds).length
+                  ? safeStringList(data.partnerCabinetIds)
+                  : safeStringList(userData.partnerCabinetIds),
+                expertId: data.expertId || userData.expertId,
+                expertCabinetIds: safeStringList(data.expertCabinetIds).length
+                  ? safeStringList(data.expertCabinetIds)
+                  : safeStringList(userData.expertCabinetIds),
               };
               if (isMounted.current) {
                 setUser(u => u ? ({
                   ...u,
-                  partnerId: data.partnerId ?? null,
-                  partnerCabinetIds: safeStringList(data.partnerCabinetIds),
-                  expertId: data.expertId ?? null,
-                  expertCabinetIds: safeStringList(data.expertCabinetIds),
+                  partnerId: data.partnerId || u.partnerId || null,
+                  partnerCabinetIds: safeStringList(data.partnerCabinetIds).length
+                    ? safeStringList(data.partnerCabinetIds)
+                    : safeStringList(u.partnerCabinetIds),
+                  expertId: data.expertId || u.expertId || null,
+                  expertCabinetIds: safeStringList(data.expertCabinetIds).length
+                    ? safeStringList(data.expertCabinetIds)
+                    : safeStringList(u.expertCabinetIds),
                   role: data.role ?? u.role ?? null,
                   userRole: data.userRole ?? u.userRole ?? null,
                   authRole: data.authRole ?? u.authRole ?? null,
@@ -2318,8 +2348,8 @@ export function UserApp() {
                 }) : u);
                 const exOwned = freshExperts.find(e => profileOwnedByUser(e, identityUser, fsEmail));
                 if (exOwned) setOwnedExpert(exOwned);
-                else if (data.expertId || safeStringList(data.expertCabinetIds).length) {
-                  const wantedExpert = String(data.expertId || safeStringList(data.expertCabinetIds)[0]);
+                else if (identityUser.expertId || safeStringList(identityUser.expertCabinetIds).length) {
+                  const wantedExpert = String(identityUser.expertId || safeStringList(identityUser.expertCabinetIds)[0]);
                   getDoc(doc(db, 'experts', wantedExpert))
                     .then(snap => {
                       if (snap.exists() && isMounted.current) {
@@ -2331,8 +2361,8 @@ export function UserApp() {
                 }
                 const ptOwned = freshPartners.find(p => profileOwnedByUser(p, identityUser, fsEmail));
                 if (ptOwned) setOwnedPartner(ptOwned);
-                else if (data.partnerId || safeStringList(data.partnerCabinetIds).length) {
-                  const wantedPartner = String(data.partnerId || safeStringList(data.partnerCabinetIds)[0]);
+                else if (identityUser.partnerId || safeStringList(identityUser.partnerCabinetIds).length) {
+                  const wantedPartner = String(identityUser.partnerId || safeStringList(identityUser.partnerCabinetIds)[0]);
                   getDoc(doc(db, 'partners', wantedPartner))
                     .then(snap => {
                       if (snap.exists() && isMounted.current) {
