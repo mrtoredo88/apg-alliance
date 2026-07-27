@@ -1,4 +1,4 @@
-import { FieldValue } from '../server/src/lib/documentValues.js';
+import { FieldValue } from './documentValues.js';
 
 export const ECONOMY_VERSION = '1.0';
 
