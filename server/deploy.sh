@@ -129,7 +129,9 @@ yc serverless container revision deploy \
   --environment ACCOUNT_DUAL_WRITE="${ACCOUNT_DUAL_WRITE_OVERRIDE:-${ACCOUNT_DUAL_WRITE:-0}}" \
   --environment ACCOUNT_FALLBACK="${ACCOUNT_FALLBACK_OVERRIDE:-${ACCOUNT_FALLBACK:-0}}" \
   --environment ACCOUNT_CANARY="${ACCOUNT_CANARY_OVERRIDE:-${ACCOUNT_CANARY:-0}}" \
-  --environment ACCOUNT_CANARY_ALLOWLIST="${ACCOUNT_CANARY_ALLOWLIST_OVERRIDE:-${ACCOUNT_CANARY_ALLOWLIST:-}}"
+  --environment ACCOUNT_CANARY_ALLOWLIST="${ACCOUNT_CANARY_ALLOWLIST_OVERRIDE:-${ACCOUNT_CANARY_ALLOWLIST:-}}" \
+  --format json \
+  | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const r=JSON.parse(s);process.stdout.write(JSON.stringify({id:r.id,status:r.status,imageDigest:r.image?.image_digest||''},null,2)+'\\n')})"
 
 API_BASE="${APG_BACKEND_API_BASE:-${APG_API_BASE_URL:-https://bbangqkf2d4pa9855lu0.containers.yandexcloud.net}}"
 
