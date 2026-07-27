@@ -21,8 +21,6 @@ COPY scripts/account-dry-run.mjs ./scripts/account-dry-run.mjs
 COPY scripts/account-verify.mjs ./scripts/account-verify.mjs
 COPY scripts/account-rollback.mjs ./scripts/account-rollback.mjs
 COPY scripts/account-observe.mjs ./scripts/account-observe.mjs
-COPY scripts/identity-merge-execute.mjs ./scripts/identity-merge-execute.mjs
-COPY scripts/admin-pg-password-repair.mjs ./scripts/admin-pg-password-repair.mjs
 COPY scripts/tatyana-pg-account-repair.mjs ./scripts/tatyana-pg-account-repair.mjs
 COPY scripts/app-data-postgres-migrate.mjs ./scripts/app-data-postgres-migrate.mjs
 COPY backups/audits/merge-tatyana/merge-plan.json ./backups/audits/merge-tatyana/merge-plan.json
