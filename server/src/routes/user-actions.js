@@ -4213,6 +4213,13 @@ async function mirrorDialog(db, dialog) {
     batch.set(db.collection('users').doc(participantId).collection('contextDialogs').doc(dialog.id), dialogMirrorPayload(dialog, participantId), { merge: true });
   }
   await batch.commit();
+  const now = new Date().toISOString();
+  await serverFoundation.data.adapter.setDocument('contextDialogs', dialog.id, {
+    ...dialog,
+    lastMessage: dialog.lastMessage ? { ...dialog.lastMessage, createdAt: economyTimestamp(dialog.lastMessage.createdAt) || now } : null,
+    lastMessageAt: economyTimestamp(dialog.lastMessageAt) || now,
+    updatedAt: now,
+  }, { merge: true });
 }
 
 async function actionDialogOpen(db, req, actor) {
@@ -4326,6 +4333,27 @@ async function actionDialogMessage(db, req, actor) {
   });
   preparedNotifications.forEach(item => batch.set(item.ref, item.data, { merge: true }));
   await batch.commit();
+  const postgresNow = new Date().toISOString();
+  const postgresMessage = {
+    ...message,
+    createdAt: postgresNow,
+    updatedAt: postgresNow,
+  };
+  await Promise.all([
+    serverFoundation.data.adapter.setDocument('dialogMessages', message.id, postgresMessage, {
+      merge: true,
+      parentPath: `contextDialogs/${dialogId}`,
+    }),
+    serverFoundation.data.adapter.setDocument('contextDialogs', dialogId, {
+      ...dialog,
+      participantIds,
+      unreadBy,
+      typing,
+      lastMessage: { ...lastMessage, createdAt: postgresNow },
+      lastMessageAt: postgresNow,
+      updatedAt: postgresNow,
+    }, { merge: true }),
+  ]);
   const pushTargets = preparedNotifications.filter(item => item.shouldPush);
   req.log?.info?.({ dialogPush: {
     stage: 'prepared',
@@ -5477,6 +5505,41 @@ async function actionDialogWorkspaceUpdate(db, req, actor) {
   };
 }
 
+async function actionDialogListPostgres(req, actor) {
+  const adapter = serverFoundation.data.adapter;
+  const actorIds = new Set([actor.userId, actor.uid].map(safeUserId).filter(Boolean));
+  const allDialogs = await adapter.listDocuments('contextDialogs', { limit: 1000 });
+  const dialogs = allDialogs
+    .filter(dialog => {
+      const participants = uniqueSafeIds([...(dialog.participantIds || []), ...(dialog.ownerUserIds || [])]);
+      return participants.some(id => actorIds.has(id));
+    })
+    .map(dialog => ({
+      ...dialog,
+      dialogId: dialog.id,
+      unreadCount: Math.max(...[...actorIds].map(id => Number(dialog.unreadBy?.[id] || 0)), 0),
+    }))
+    .sort((a, b) => new Date(b.lastMessageAt || b.updatedAt || 0).getTime() - new Date(a.lastMessageAt || a.updatedAt || 0).getTime());
+  const messageGroups = await Promise.all(dialogs.map(dialog => (
+    adapter.listDocuments('dialogMessages', {
+      parentPath: `contextDialogs/${dialog.id}`,
+      limit: 500,
+      orderBy: 'created_at',
+      direction: 'asc',
+    })
+  )));
+  const messages = messageGroups.flat().sort((a, b) => (
+    new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+  ));
+  return {
+    ok: true,
+    storage: 'postgres',
+    dialogs,
+    messages,
+    unreadCount: dialogs.reduce((sum, dialog) => sum + Number(dialog.unreadCount || 0), 0),
+  };
+}
+
 async function actionPushRegister(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
   const deviceId = safeString(req.body?.deviceId, 120);
@@ -5736,6 +5799,7 @@ async function routeAction(db, req, actor) {
   if (action === 'connections:cancel') return actionConnectionsResolve(db, req, actor, SOCIAL_REQUEST_STATUS.CANCELLED);
   if (action === 'connections:block') return actionConnectionsBlock(db, req, actor);
   if (action === 'dialog:open') return actionDialogOpen(db, req, actor);
+  if (action === 'dialog:list') return actionDialogListPostgres(req, actor);
   if (action === 'dialog:message') return actionDialogMessage(db, req, actor);
   if (action === 'dialog:read') return actionDialogRead(db, req, actor);
   if (action === 'dialog:typing') return actionDialogTyping(db, req, actor);

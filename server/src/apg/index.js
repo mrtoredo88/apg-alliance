@@ -23,7 +23,7 @@ export const SERVER_REPOSITORY_DEFINITIONS = {
   AnalyticsRepository: 'diagnostics',
 };
 
-export function createServerFoundation({ dataAdapter = new FirestoreAdminAdapter(), identityProvider = new FirebaseAdminIdentityProvider() } = {}) {
+export function createServerFoundation({ dataAdapter = new PostgresDataAdapter(), identityProvider = new FirebaseAdminIdentityProvider() } = {}) {
   const identityV2 = createIdentityV2({ tokenProvider: identityProvider });
   const account = createAccountCore();
   return {

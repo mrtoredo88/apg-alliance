@@ -1,6 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase.js';
 import { userAction } from '../userApi.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassPanel, ScreenHeader } from '../components/Apg2ProfileGlass.jsx';
 import { buildDialogAutoAnswer, buildDialogContext, getDialogObjectLabel } from '../../server-shared/context-dialogs.js';
@@ -547,13 +545,28 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
 
   useEffect(() => {
     if (!uid) return undefined;
-    const unsubDialogs = onSnapshot(collection(db, 'users', uid, 'contextDialogs'), snap => {
-      setDialogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => tsMs(b.lastMessageAt || b.updatedAt) - tsMs(a.lastMessageAt || a.updatedAt)));
-    });
-    const unsubMessages = onSnapshot(collection(db, 'users', uid, 'contextDialogMessages'), snap => {
-      setMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => tsMs(a.createdAt) - tsMs(b.createdAt)));
-    });
-    return () => { unsubDialogs(); unsubMessages(); };
+    let active = true;
+    const refresh = async () => {
+      try {
+        const result = await userAction('dialog:list', {});
+        if (!active) return;
+        setDialogs(Array.isArray(result?.dialogs) ? result.dialogs : []);
+        setMessages(Array.isArray(result?.messages) ? result.messages : []);
+      } catch (refreshError) {
+        if (active) setError(refreshError?.message || 'Не удалось обновить диалоги.');
+      }
+    };
+    refresh();
+    const timer = setInterval(refresh, 10_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      active = false;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [uid]);
 
   useEffect(() => {

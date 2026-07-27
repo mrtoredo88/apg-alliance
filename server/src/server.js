@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { getDb } from './lib/firebase.js';
+import { serverFoundation } from './apg/index.js';
 
 import vkNewsRoutes           from './routes/vk-news.js';
 import uploadPhotoRoutes      from './routes/upload-photo.js';
@@ -100,8 +100,8 @@ fastify.get('/version', async () => ({
 
 fastify.get('/health', async (request, reply) => {
   try {
-    await getDb().collection('_health').limit(1).get();
-    return { ok: true, ts: Date.now() };
+    const postgres = await serverFoundation.data.adapter.health();
+    return { ok: Boolean(postgres), storage: 'postgres', ts: Date.now() };
   } catch (e) {
     reply.code(503);
     return { ok: false, error: e.message };

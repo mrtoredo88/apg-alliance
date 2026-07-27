@@ -20,6 +20,11 @@ export class PostgresDataAdapter extends ServerDataAdapter {
     this.adapter = adapter;
   }
 
+  async health() {
+    const result = await this.adapter.query('SELECT 1 AS ok');
+    return result.rows[0]?.ok === 1;
+  }
+
   async getDocument(collectionName, id, { parentPath = '' } = {}) {
     const result = await this.adapter.query(
       `SELECT * FROM apg_app_documents

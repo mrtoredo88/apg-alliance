@@ -54,7 +54,7 @@ function stable(value) {
 }
 
 function canonical(rows) {
-  return JSON.stringify(rows.map(row => stable({ id: row.id, data: row.data })).sort((a, b) => a.id.localeCompare(b.id)));
+  return JSON.stringify(rows.map(row => stable({ id: row.id, parentPath: row.parentPath || '', data: row.data })).sort((a, b) => `${a.parentPath}/${a.id}`.localeCompare(`${b.parentPath}/${b.id}`)));
 }
 
 function digest(rows) {
@@ -63,18 +63,31 @@ function digest(rows) {
 
 async function firestoreRows(db, collectionName) {
   const snap = await db.collection(collectionName).get();
-  return snap.docs.map(doc => ({ id: doc.id, data: { ...plain(doc.data() || {}), id: doc.id } }));
+  return snap.docs.map(doc => ({ id: doc.id, parentPath: '', data: { ...plain(doc.data() || {}), id: doc.id } }));
+}
+
+async function firestoreDialogMessages(db) {
+  const dialogs = await db.collection('contextDialogs').get();
+  const groups = await Promise.all(dialogs.docs.map(async dialog => {
+    const messages = await dialog.ref.collection('messages').get();
+    return messages.docs.map(message => ({
+      id: message.id,
+      parentPath: `contextDialogs/${dialog.id}`,
+      data: { ...plain(message.data() || {}), id: message.id, dialogId: dialog.id },
+    }));
+  }));
+  return groups.flat();
 }
 
 async function postgresRows(client, collectionName) {
   const result = await client.query(
-    `SELECT document_id AS id, data
+    `SELECT document_id AS id, parent_path AS "parentPath", data
      FROM apg_app_documents
-     WHERE collection_name = $1 AND parent_path = ''
-     ORDER BY document_id`,
+     WHERE collection_name = $1
+     ORDER BY parent_path, document_id`,
     [collectionName],
   );
-  return result.rows.map(row => ({ id: row.id, data: plain(row.data || {}) }));
+  return result.rows.map(row => ({ id: row.id, parentPath: row.parentPath || '', data: plain(row.data || {}) }));
 }
 
 async function upsertCollection(client, collectionName, rows) {
@@ -84,11 +97,11 @@ async function upsertCollection(client, collectionName, rows) {
       const batch = rows.slice(offset, offset + 250);
       await client.query(
         `INSERT INTO apg_app_documents (collection_name, document_id, parent_path, data)
-         SELECT $1, item.id, '', item.data
-         FROM jsonb_to_recordset($2::jsonb) AS item(id text, data jsonb)
+         SELECT $1, item.id, item.parent_path, item.data
+         FROM jsonb_to_recordset($2::jsonb) AS item(id text, parent_path text, data jsonb)
          ON CONFLICT (collection_name, parent_path, document_id) DO UPDATE
          SET data = EXCLUDED.data, updated_at = now()`,
-        [collectionName, JSON.stringify(batch)],
+        [collectionName, JSON.stringify(batch.map(item => ({ id: item.id, parent_path: item.parentPath || '', data: item.data })))],
       );
     }
     await client.query('COMMIT');
@@ -125,6 +138,17 @@ async function main() {
         match: execute ? source.length === target.length && digest(source) === digest(target) : null,
       });
     }
+    const dialogMessages = await firestoreDialogMessages(db);
+    if (execute) await upsertCollection(client, 'dialogMessages', dialogMessages);
+    const targetDialogMessages = execute ? await postgresRows(client, 'dialogMessages') : [];
+    report.push({
+      collection: 'dialogMessages',
+      sourceCount: dialogMessages.length,
+      targetCount: targetDialogMessages.length,
+      sourceSha256: digest(dialogMessages),
+      targetSha256: execute ? digest(targetDialogMessages) : '',
+      match: execute ? dialogMessages.length === targetDialogMessages.length && digest(dialogMessages) === digest(targetDialogMessages) : null,
+    });
     const ok = execute ? report.every(item => item.match) : true;
     console.log(JSON.stringify({
       ok,

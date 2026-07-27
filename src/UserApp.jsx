@@ -1138,6 +1138,7 @@ export function UserApp() {
   const [visitCounts, setVisitCounts]           = useState({});
 
   const [unreadCount, setUnreadCount]           = useState(0);
+  const [messageUnreadCount, setMessageUnreadCount] = useState(0);
   const [notifEnabled, setNotifEnabled]         = useState(
     () => localStorage.getItem('apg_notif_enabled') === '1',
   );
@@ -1236,6 +1237,28 @@ export function UserApp() {
       document.removeEventListener('visibilitychange', handleResume);
     };
   }, [refreshKeyBalance, user?.id]);
+
+  useEffect(() => {
+    const userId = String(user?.id || '');
+    if (!userId || userId.startsWith('guest_')) {
+      setMessageUnreadCount(0);
+      return undefined;
+    }
+    let active = true;
+    const refresh = () => userAction('dialog:list', {})
+      .then(result => {
+        if (active) setMessageUnreadCount(Math.max(0, Number(result?.unreadCount || 0)));
+      })
+      .catch(() => {
+        if (active) setMessageUnreadCount(0);
+      });
+    refresh();
+    const timer = setInterval(refresh, 15_000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [user?.id, activePanel]);
 
   useEffect(() => {
     loggedOutRef.current = loggedOut;
@@ -4929,7 +4952,7 @@ export function UserApp() {
     onOpenRewards: handleOpenRewards,
     onOpenNotifications: openNotifications,
     onOpenMessages: handleOpenMessages,
-    messageUnreadCount: 0,
+    messageUnreadCount,
     onOpenLoki: handleOpenLoki,
     onOpenProfile: handleOpenProfile,
     workspaceAction: desktopWorkspaceAvailable ? (
@@ -4987,6 +5010,7 @@ export function UserApp() {
     handleOpenRewards,
     handleOpenNearby,
     unreadCount,
+    messageUnreadCount,
     openNotifications,
     desktopOverviewHero?.title,
     desktopOverviewHero?.name,
@@ -6063,7 +6087,7 @@ export function UserApp() {
           />
           {splashDone && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && (
             <Suspense fallback={null}>
-              <LokiAssistant desktopMode={desktopDevice} onOpenMessages={handleOpenMessages} messageUnreadCount={0} hideMessagesButton={activePanel === 'dialogs'} />
+              <LokiAssistant desktopMode={desktopDevice} onOpenMessages={handleOpenMessages} messageUnreadCount={messageUnreadCount} hideMessagesButton={activePanel === 'dialogs'} />
             </Suspense>
           )}
           </LokiProvider>
