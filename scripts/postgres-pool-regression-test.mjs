@@ -41,6 +41,7 @@ assert.match(userApp, /partnerId: data\.partnerId \|\| u\.partnerId \|\| null/);
 assert.match(userApp, /requestId === balanceRequestIdRef\.current/);
 assert.match(userApp, /activeBalanceUserIdRef\.current === userId/);
 assert.match(userApp, /if \(result\?\.dailyBonusAwarded\)/);
+assert.match(userActions, /timeZone:\s*'Europe\/Moscow'/);
 assert.match(economyRepository, /daily_bonus:\$\{cleanUserId\}:\$\{cleanDateKey\}/);
 assert.match(profileRepository, /\(user_id = \$1\) DESC/);
 assert.match(cabinetCore, /shareEntity\(\{/);

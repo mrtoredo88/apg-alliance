@@ -31,7 +31,12 @@ function safeEqual(a, b) {
 }
 
 function todayKey(now = new Date()) {
-  return now.toLocaleDateString('sv');
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Moscow',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
 }
 
 function monthKeyFromToday(key) {

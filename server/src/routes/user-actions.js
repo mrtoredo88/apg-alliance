@@ -623,7 +623,12 @@ async function actionIdentityDiagnostics(db, req, actor) {
 
 async function actionProfileSync(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
-  const todayKey = new Date().toLocaleDateString('sv');
+  const todayKey = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Moscow',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
   const profile = stripUndefined(sanitizePublicProfile(req.body?.profile || {}));
   if (profile.email) {
     const normalizedEmail = safeString(profile.email, 200).toLowerCase();

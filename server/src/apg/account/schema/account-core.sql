@@ -458,6 +458,73 @@ VALUES (
 )
 ON CONFLICT (version) DO NOTHING;
 
+-- Some migrated ownership links live only on partner/expert cards rather than
+-- the user document. Resolve those records by owner id or verified owner email
+-- and materialize them in the same authoritative cabinet table.
+WITH owned_entities AS (
+  SELECT
+    document_id AS entity_id,
+    'partner'::text AS cabinet_type,
+    NULLIF(COALESCE(data->>'ownerUserId', data->>'ownerId'), '') AS owner_id,
+    lower(NULLIF(COALESCE(data->>'ownerEmail', data->>'connectionEmail'), '')) AS owner_email
+  FROM apg_app_documents
+  WHERE collection_name = 'partners' AND parent_path = ''
+  UNION ALL
+  SELECT
+    document_id,
+    'expert',
+    NULLIF(COALESCE(data->>'ownerUserId', data->>'ownerId'), ''),
+    lower(NULLIF(COALESCE(data->>'ownerEmail', data->>'connectionEmail'), ''))
+  FROM apg_app_documents
+  WHERE collection_name = 'experts' AND parent_path = ''
+),
+resolved_owned_entities AS (
+  SELECT DISTINCT account.user_id, entity.cabinet_type, entity.entity_id
+  FROM owned_entities entity
+  JOIN apg_account_profiles account ON (
+    entity.owner_id = account.user_id
+    OR entity.owner_id = account.canonical_user_id
+    OR (
+      entity.owner_email IS NOT NULL
+      AND (
+        entity.owner_email = lower(COALESCE(account.email, ''))
+        OR account.user_id IN (
+          SELECT user_id FROM apg_identity_email_index
+          WHERE lower(email) = entity.owner_email
+        )
+        OR account.canonical_user_id IN (
+          SELECT user_id FROM apg_identity_email_index
+          WHERE lower(email) = entity.owner_email
+        )
+      )
+    )
+  )
+  WHERE entity.entity_id IS NOT NULL
+)
+INSERT INTO apg_account_cabinets (id, user_id, type, role, entity_id, status, metadata, updated_at)
+SELECT
+  cabinet_type || ':' || entity_id || ':' || user_id,
+  user_id,
+  cabinet_type,
+  'owner',
+  entity_id,
+  'active',
+  '{"source":"entity-owner-migration","migrated":true}'::jsonb,
+  now()
+FROM resolved_owned_entities
+ON CONFLICT (id) DO UPDATE SET
+  status = 'active',
+  metadata = apg_account_cabinets.metadata || EXCLUDED.metadata,
+  updated_at = now();
+
+INSERT INTO apg_account_schema_versions (version, checksum, description)
+VALUES (
+  'account-cabinet-entity-owners-migration-2026-07-28',
+  'account-cabinet-entity-owners-migration-v1',
+  'Materialize partner and expert card ownership in Account Core'
+)
+ON CONFLICT (version) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_email ON apg_account_profiles(email);
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_firebase_uid ON apg_account_profiles(firebase_uid);
 CREATE INDEX IF NOT EXISTS idx_apg_account_profiles_telegram_id ON apg_account_profiles(telegram_id);
