@@ -52,7 +52,7 @@ if [[ "${APG_SKIP_IMAGE_BUILD:-0}" != "1" ]]; then
     --output "type=oci,dest=$OCI_ARCHIVE" \
     "$ROOT_DIR"
 
-  IMAGE_DIGEST="$(node -e "const m=require(process.argv[1]);process.stdout.write(m['containerimage.digest']||'')" "$METADATA_FILE")"
+  IMAGE_DIGEST="$(node -e "const fs=require('fs');const m=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));process.stdout.write(m['containerimage.digest']||'')" "$METADATA_FILE")"
 
   COMPARISON="$(yc serverless container revision list --container-name apg-api --format json \
     | node "$ROOT_DIR/scripts/backend-image-decision.mjs" "$IMAGE_DIGEST")"
@@ -75,7 +75,7 @@ if [[ "${APG_SKIP_IMAGE_BUILD:-0}" != "1" ]]; then
     --push \
     "$ROOT_DIR"
 
-  PUBLISHED_DIGEST="$(node -e "const m=require(process.argv[1]);process.stdout.write(m['containerimage.digest']||'')" "$PUBLISH_METADATA_FILE")"
+  PUBLISHED_DIGEST="$(node -e "const fs=require('fs');const m=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));process.stdout.write(m['containerimage.digest']||'')" "$PUBLISH_METADATA_FILE")"
   if [[ "$PUBLISHED_DIGEST" != "$IMAGE_DIGEST" ]]; then
     echo "Published digest differs from the verified candidate digest." >&2
     exit 1
