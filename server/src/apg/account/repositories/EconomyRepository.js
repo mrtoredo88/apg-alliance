@@ -161,7 +161,18 @@ export class EconomyRepository {
         'SELECT * FROM apg_economy_operations WHERE idempotency_key = $1 LIMIT 1',
         [idempotencyKey],
       );
-      if (previous.rows[0]) return { operation: mapOperation(previous.rows[0]), replayed: true };
+      if (previous.rows[0]) {
+        const currentProfile = await client.query(
+          'SELECT profile FROM apg_account_profiles WHERE user_id = $1 LIMIT 1',
+          [cleanUserId],
+        );
+        const operation = mapOperation(previous.rows[0]);
+        const currentBalance = integer(currentProfile.rows[0]?.profile?.keys, operation.balanceAfter);
+        return {
+          operation: { ...operation, balanceAfter: currentBalance },
+          replayed: true,
+        };
+      }
 
       const profileResult = await client.query(
         'SELECT * FROM apg_account_profiles WHERE user_id = $1 FOR UPDATE',

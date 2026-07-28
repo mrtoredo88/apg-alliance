@@ -47,6 +47,7 @@ assert.match(userActions, /if \(accountCoreWriteEnabled\(\)\) \{\s*const dailyRe
 assert.match(userActions, /migratedDocuments\.flatMap\(row => \[row\.partnerId/);
 assert.match(userApp, /\[data-horizontal-gesture-boundary="true"\], \[data-apg-horizontal-scroll="true"\]/);
 assert.match(economyRepository, /daily_bonus:\$\{cleanUserId\}:\$\{cleanDateKey\}/);
+assert.match(economyRepository, /currentProfile\.rows\[0\]\?\.profile\?\.keys/);
 assert.match(profileRepository, /\(user_id = \$1\) DESC/);
 assert.match(cabinetCore, /shareEntity\(\{/);
 assert.doesNotMatch(cabinetCore, /window\.open\(shareLink\([^)]*\), '_blank'\)/);
