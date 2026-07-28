@@ -322,6 +322,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
   const [reviews, setReviews]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [activeTab, setActiveTab] = useState('launch');
+  const [showNewsFeed, setShowNewsFeed] = useState(false);
   const [uploading, setUploading] = useState(false);
   const logoInputRef              = useRef(null);
 
@@ -524,6 +525,26 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
     onPartnerUpdate?.(updated.id, { aiProfile });
   };
 
+  useEffect(() => {
+    if (!showNewsFeed) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = event => {
+      if (event.key === 'Escape') setShowNewsFeed(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [showNewsFeed]);
+
+  useEffect(() => {
+    if (activeTab !== 'publications') return;
+    setShowNewsFeed(true);
+    setActiveTab('launch');
+  }, [activeTab]);
+
   if (!partner) return null;
 
   const totalVisits    = partner.totalVisits ?? 0;
@@ -687,7 +708,7 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
 
           {/* Навигация по вкладкам */}
           <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginTop: 12 }}>
-            {[['launch', 'Старт'], ['ai', 'AI-помощник'], ['ai-profile', 'AI Profile'], ['calendar', 'Календарь'], ['stats', 'Аналитика'], ['edit', 'Карточка'], ['locations', 'Филиалы'], ['qr', 'QR'], ['publications', 'Контент'], ['reviews', 'Отзывы'], ['docs', 'Документы']].map(([id, label]) => (
+            {[['launch', 'Старт'], ['ai', 'AI-помощник'], ['ai-profile', 'AI Profile'], ['calendar', 'Календарь'], ['stats', 'Аналитика'], ['edit', 'Карточка'], ['locations', 'Филиалы'], ['qr', 'QR'], ['publications', 'Новостная лента'], ['reviews', 'Отзывы'], ['docs', 'Документы']].map(([id, label]) => (
               <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
             ))}
           </GlassCard>
@@ -944,9 +965,33 @@ export function PartnerCabinetPage({ nav = 'partner-cabinet', variant = 'v2', pa
             </GlassSection>
           )}
 
-          {/* ── Контент ── */}
-          {activeTab === 'publications' && (
-            <ContentStudio profile={partner} role="partner" events={events} onToast={onToast} />
+          {showNewsFeed && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Новостная лента"
+              onClick={event => {
+                if (event.target === event.currentTarget) setShowNewsFeed(false);
+              }}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 1200,
+                background: 'rgba(0,0,0,0.72)',
+                backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+                display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+                overflowY: 'auto', padding: 'max(16px, env(safe-area-inset-top)) 12px max(24px, env(safe-area-inset-bottom))',
+              }}
+            >
+              <div style={{ width: '100%', maxWidth: 920, minHeight: 'min(720px, calc(100dvh - 32px))', borderRadius: 30, ...APG2_PROFILE.glass, padding: 12, boxSizing: 'border-box' }}>
+                <div style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '4px 4px 10px', background: APG2_PROFILE.bg }}>
+                  <div>
+                    <div style={{ color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, textTransform: 'uppercase', letterSpacing: 0.8 }}>Кабинет партнёра</div>
+                    <div style={{ color: APG2_PROFILE.text, fontSize: 20, fontWeight: 900, marginTop: 2 }}>Новостная лента</div>
+                  </div>
+                  <GlassButton aria-label="Закрыть новостную ленту" onClick={() => setShowNewsFeed(false)} style={{ width: 42, minHeight: 42, padding: 0, borderRadius: 17 }}>✕</GlassButton>
+                </div>
+                <ContentStudio profile={partner} role="partner" events={events} onToast={onToast} />
+              </div>
+            </div>
           )}
 
           {/* ── Отзывы ── */}

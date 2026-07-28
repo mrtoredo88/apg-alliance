@@ -2434,37 +2434,16 @@ export function UserApp() {
                   if (isMounted.current) showToast('🎁 +2 ключа — ты пришёл по реферальной ссылке!', 'success');
                 }, 1200);
               };
-              const handleDailySyncResult = result => {
+              const handleProfileSyncResult = result => {
                 if (!isMounted.current) return result;
-                if (result?.dailyBonusAwarded) {
-                  const confirmedBalance = Number(result?.accountBalance);
-                  setUserKeys(prev => Number.isFinite(confirmedBalance) ? confirmedBalance : prev + 1);
-                  setUserReputation(prev => prev + 1);
-                  if (!needsLegalConsent) {
-                    setTimeout(() => {
-                      if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success');
-                    }, 1500);
-                  }
-                }
                 handleReferralSyncResult(result);
                 return result;
               };
 
-              // Ежедневный бонус: +1 ключ за первый вход каждый день
-              if (data.lastBonusDate !== todayKey) {
-                if (isAuthLoadAborted(runId, 'before_daily_sync')) return;
-                userAction('profile:sync', syncExistingPayload)
-                  .then(handleDailySyncResult)
-                  .catch(e => {
-                    if (existingRefId) refLog('retry after reconnect', { stage: 'existing_profile_sync_daily', referrerId: existingRefId, userId: userData.id, reason: e?.message || String(e) });
-                    logError(e, 'UserApp.profileSync.dailyBonus');
-                  });
-              } else {
-                userAction('profile:sync', syncExistingPayload).then(handleDailySyncResult).catch(e => {
-                  if (existingRefId) refLog('retry after reconnect', { stage: 'existing_profile_sync_lastSeen', referrerId: existingRefId, userId: userData.id, reason: e?.message || String(e) });
-                  logError(e, 'UserApp.profileSync.lastSeen');
-                });
-              }
+              userAction('profile:sync', syncExistingPayload).then(handleProfileSyncResult).catch(e => {
+                if (existingRefId) refLog('retry after reconnect', { stage: 'existing_profile_sync_lastSeen', referrerId: existingRefId, userId: userData.id, reason: e?.message || String(e) });
+                logError(e, 'UserApp.profileSync.lastSeen');
+              });
             } else {
               // Новый пользователь
               if (isAuthLoadAborted(runId, 'before_new_user_profile_sync')) return;

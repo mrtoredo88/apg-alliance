@@ -1651,7 +1651,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   ].filter(Boolean), [userEmail, user?.phone, user?.telegram, user?.telegramUsername, user?.vk, user?.vkUrl, user?.linkedTelegram]);
   const quickActions = useMemo(() => [
     { id: 'activity', label: 'Активность', icon: '◷', onClick: onOpenActivity },
-    { id: 'referral', label: 'Рефералы', icon: '↗', onClick: onOpenReferral },
+    { id: 'referral', label: 'Поделиться', icon: '↗', onClick: onOpenReferral },
     { id: 'rewards', label: 'Подарки', icon: '🎁', onClick: onOpenRewards },
     { id: 'notifications', label: notificationsEnabled ? 'Уведомления вкл' : 'Уведомления', icon: notificationsEnabled ? '✓' : '🔔', onClick: onEnableNotifications },
     { id: 'theme', label: isDark ? 'Светлая тема' : 'Тёмная тема', icon: isDark ? '☀' : '☾', onClick: onToggleTheme },
@@ -1929,7 +1929,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     const nextLabel = nextLevel ? `До ${nextLevel.label}: ${toNext} ключей` : 'Максимальный уровень';
     const primaryActions = [
       { label: 'Активность', icon: '◷', onClick: onOpenActivity },
-      { label: 'Рефералы', icon: '↗', onClick: onOpenReferral },
+      { label: 'Поделиться', icon: '↗', onClick: onOpenReferral },
       { label: 'Подарки', icon: '🎁', onClick: onOpenRewards },
       ownedPartner && { label: 'Кабинет партнера', icon: '◆', onClick: onOpenPartnerCabinet },
       ownedExpert && { label: 'Кабинет эксперта', icon: '✦', onClick: onOpenExpertCabinet },
@@ -2240,7 +2240,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 72% 12%, ${level.color}33, transparent 34%), radial-gradient(circle at 20% 0%, rgba(215,184,106,0.2), transparent 28%)` }} />
           <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14 }}>
             <GlassBadge tone="gold">{level.emoji} {level.label}</GlassBadge>
-            <GlassButton onClick={() => setShowShareModal(true)} style={{ minHeight: 38, borderRadius: 17, padding: '8px 12px' }}>↗</GlassButton>
           </div>
           <div style={{ position: 'relative', zIndex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -2264,7 +2263,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 8, marginTop: 10 }}>
               <GlassButton onClick={onToggleTheme} style={{ minHeight: 40 }}><span>{isDark ? '☀️' : '🌙'}</span>{isDark ? 'Светлая тема' : 'Тёмная тема'}</GlassButton>
-              {!notificationsEnabled && <GlassButton onClick={onEnableNotifications} style={{ minHeight: 40 }}><span>🔔</span>Уведомления</GlassButton>}
+              <GlassButton onClick={onEnableNotifications} style={{ minHeight: 40 }}><span>{notificationsEnabled ? '✓' : '🔔'}</span>{notificationsEnabled ? 'Уведомления вкл' : 'Уведомления'}</GlassButton>
               {primaryActions.map(action => (
                 <GlassButton
                   key={action.label}
@@ -3295,22 +3294,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           ))}
         </div>
       </div>
-
-      {/* ── Ежедневный бонус ── */}
-      {(() => {
-        const todayKey = new Date().toISOString().slice(0, 10);
-        const received = lastBonusDate === todayKey;
-        return (
-          <div style={{ padding: '12px 16px 0' }}>
-            <div style={{ ...APG2.glass, borderRadius: 16, padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 16 }}>🗝️</span>
-              <span style={{ fontSize: 13, color: received ? '#4BB34B' : APG2.textSoft, fontWeight: received ? 600 : 400 }}>
-                {received ? '+1 ключ за вход · Сегодня получен ✓' : '+1 ключ за вход · Зайди завтра'}
-              </span>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ── Путь участника ── */}
       <div style={{ padding: '16px 16px 0' }}>

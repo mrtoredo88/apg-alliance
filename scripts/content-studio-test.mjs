@@ -22,6 +22,11 @@ assert.match(studio, /beforeunload/, 'Unsaved draft guard must be present');
 
 assert.match(partner, /import \{ ContentStudio \}/, 'Partner cabinet must import ContentStudio');
 assert.match(partner, /<ContentStudio profile=\{partner\} role="partner"/, 'Partner content tab must render ContentStudio');
+assert.match(partner, /Новостная лента/, 'Partner content entry must be named News feed');
+assert.match(partner, /role="dialog"/, 'Partner Content Studio must open in a modal');
+assert.match(partner, /event\.key === 'Escape'/, 'Partner Content Studio modal must close with Escape');
+assert.match(partner, /event\.target === event\.currentTarget/, 'Partner Content Studio modal must close on backdrop click');
+assert.match(partner, /setShowNewsFeed\(false\)/, 'Partner Content Studio modal must expose an explicit close action');
 assert.match(expert, /import \{ ContentStudio \}/, 'Expert cabinet must import ContentStudio');
 assert.match(expert, /<ContentStudio profile=\{expert\} role="expert"/, 'Expert content tab must render ContentStudio');
 

@@ -673,12 +673,6 @@ async function actionIdentityDiagnostics(db, req, actor) {
 
 async function actionProfileSync(db, req, actor) {
   const userId = assertOwn(actor, req.body?.userId || actor.userId);
-  const todayKey = new Intl.DateTimeFormat('sv-SE', {
-    timeZone: 'Europe/Moscow',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
   const profile = stripUndefined(sanitizePublicProfile(req.body?.profile || {}));
   if (profile.email) {
     const normalizedEmail = safeString(profile.email, 200).toLowerCase();
@@ -755,13 +749,6 @@ async function actionProfileSync(db, req, actor) {
       const consentMigration = buildConsentMigrationPatch(consentStatus);
       if (consentMigration) Object.assign(patch, consentMigration);
       Object.assign(patch, economyMigrationPatch(before));
-      if (before.lastBonusDate !== todayKey) {
-        const reward = getEconomyReward('daily_activity');
-        keyIncrement += reward.keys;
-        reputationIncrement += reward.reputation;
-        patch.lastBonusDate = todayKey;
-        dailyBonusAwarded = true;
-      }
       if (referralDecision.markInvitedRewarded) {
         const reward = getEconomyReward('referral');
         referralBonusAwarded = referralDecision.grantReferrerReward;
@@ -858,7 +845,7 @@ async function actionProfileSync(db, req, actor) {
       streak: 0,
       onboardingDone: false,
       scanDates: [],
-      lastBonusDate: todayKey,
+      lastBonusDate: null,
       referredBy: shouldGrantReferral ? referralDecision.effectiveReferrerId : null,
       referralBonusGranted: shouldGrantReferral,
       referralBonusGrantedTo: shouldGrantReferral ? referralDecision.effectiveReferrerId : null,
@@ -925,20 +912,7 @@ async function actionProfileSync(db, req, actor) {
       return null;
     })));
   }
-  let accountBalance = null;
-  if (accountCoreWriteEnabled()) {
-    const dailyResult = await serverFoundation.account.awardDailyBonus({
-      userId,
-      dateKey: todayKey,
-      keys: 1,
-    }).catch(error => {
-      serverFoundation.account.metrics.recordError(error);
-      return null;
-    });
-    accountBalance = Number(dailyResult?.operation?.balanceAfter);
-    if (!Number.isFinite(accountBalance)) accountBalance = null;
-    if (dailyResult) dailyBonusAwarded = dailyResult.replayed !== true;
-  }
+  const accountBalance = null;
   if (hasReferralObservability) {
     const effectiveReferrerId = userDoc?.referredBy || userDoc?.referralBonusGrantedTo || refId || referralContext.referralCode;
     recordReferralEventAsync(db, {
