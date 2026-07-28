@@ -527,6 +527,7 @@ async function actionIdentityDiagnostics(db, req, actor) {
   const normalizedRequested = requestedUserId || actor.userId;
   const normalizeRoles = (roles = []) => Array.from(new Set((Array.isArray(roles) ? roles : [roles || 'user']).map((value) => safeString(value, 80)).filter(Boolean)));
   const documents = [];
+  const migratedDocuments = [];
   const addDoc = (doc = {}) => {
     const id = safeString(doc.id, 260);
     if (!id || documents.some(item => item.id === id)) return;
@@ -552,6 +553,26 @@ async function actionIdentityDiagnostics(db, req, actor) {
     const doc = identity.user || identity;
     const userId = doc.id || doc.userId || fallbackId;
     if (userId) addDoc({ ...doc, id: safeUserId(userId) });
+  };
+  const addMigratedDoc = (snapshot) => {
+    if (!snapshot?.exists) return;
+    const data = snapshot.data() || {};
+    const id = safeString(snapshot.id, 260);
+    if (!id || migratedDocuments.some(item => item.id === id)) return;
+    migratedDocuments.push({
+      id,
+      canonicalUserId: safeString(data.canonicalUserId || id, 260),
+      role: safeString(data.role || data.userRole || 'user', 80),
+      roles: normalizeRoles(data.roles || [data.role || data.userRole || 'user']),
+      email: safeString(data.email || data.linkedEmail, 220).toLowerCase(),
+      partnerId: safeString(data.partnerId || data.ownerPartnerId, 220),
+      partnerCabinetIds: (Array.isArray(data.partnerCabinetIds) ? data.partnerCabinetIds : [])
+        .map(item => safeString(item, 220)).filter(Boolean),
+      expertId: safeString(data.expertId, 220),
+      expertCabinetIds: (Array.isArray(data.expertCabinetIds) ? data.expertCabinetIds : [])
+        .map(item => safeString(item, 220)).filter(Boolean),
+      source: 'migrated-app-profile',
+    });
   };
 
   const actorUser = requestedUserId ? await serverFoundation.identityV2.getUser(requestedUserId).catch(() => null) : null;
@@ -587,6 +608,27 @@ async function actionIdentityDiagnostics(db, req, actor) {
     await collectFromUser(actor, actor.userId);
   }
 
+  // Identity V2 intentionally contains authentication identity only. Cabinet
+  // ownership was migrated with the application profile, so merge those
+  // fields from PostgreSQL-backed user documents without allowing them to
+  // change which authentication identity is canonical.
+  const migratedIds = Array.from(new Set([
+    normalizedRequested,
+    actor.userId,
+    actor.uid,
+    ...documents.flatMap(row => [row.id, row.canonicalUserId]),
+  ].map(item => safeString(item, 260)).filter(Boolean)));
+  await Promise.all(migratedIds.map(async id => {
+    addMigratedDoc(await db.collection('users').doc(id).get().catch(() => null));
+  }));
+  if (normalizedEmail) {
+    const [emailRows, linkedEmailRows] = await Promise.all([
+      db.collection('users').where('email', '==', normalizedEmail).limit(20).get().catch(() => null),
+      db.collection('users').where('linkedEmail', '==', normalizedEmail).limit(20).get().catch(() => null),
+    ]);
+    for (const snapshot of [...(emailRows?.docs || []), ...(linkedEmailRows?.docs || [])]) addMigratedDoc(snapshot);
+  }
+
   const canonical = documents.length ? documents.sort((left, right) => right.score - left.score)[0] : null;
   const actorCanonical = safeUserId(canonical?.canonicalUserId || actor.user?.canonicalUserId || requestedUserId || actor.userId);
   const openedUserId = safeUserId(requestedUserId || actor.userId || actor.uid);
@@ -595,11 +637,18 @@ async function actionIdentityDiagnostics(db, req, actor) {
   const relatedDocs = documents.filter(row => row.id === canonicalUserId || row.canonicalUserId === canonicalUserId);
   const roles = normalizeRoles([
     ...relatedDocs.flatMap(row => row.roles || []),
+    ...migratedDocuments.flatMap(row => row.roles || []),
     ...(canonicalDoc?.roles || []),
     ...(Array.isArray(actor.user?.roles) ? actor.user.roles : [actor.user?.role || 'user']),
   ]);
-  const partnerCabinetIds = relatedDocs.flatMap(row => [row.partnerId, ...(row.partnerCabinetIds || [])]);
-  const expertCabinetIds = relatedDocs.flatMap(row => [row.expertId, ...(row.expertCabinetIds || [])]);
+  const partnerCabinetIds = [
+    ...relatedDocs.flatMap(row => [row.partnerId, ...(row.partnerCabinetIds || [])]),
+    ...migratedDocuments.flatMap(row => [row.partnerId, ...(row.partnerCabinetIds || [])]),
+  ];
+  const expertCabinetIds = [
+    ...relatedDocs.flatMap(row => [row.expertId, ...(row.expertCabinetIds || [])]),
+    ...migratedDocuments.flatMap(row => [row.expertId, ...(row.expertCabinetIds || [])]),
+  ];
   const cabinets = {
     partnerCabinetIds: Array.from(new Set(partnerCabinetIds.map(item => safeString(item, 220)).filter(Boolean))),
     expertCabinetIds: Array.from(new Set(expertCabinetIds.map(item => safeString(item, 220)).filter(Boolean))),
@@ -607,7 +656,7 @@ async function actionIdentityDiagnostics(db, req, actor) {
   const reason = canonicalUserId
     ? `Identity V2 выбрал ${canonicalUserId} по identity users.` 
     : 'Canonical User не найден.';
-  await audit(db, req, actor, 'identity:diagnostics', 'identity', canonicalUserId || openedUserId, 'success', { documents: documents.length });
+  await audit(db, req, actor, 'identity:diagnostics', 'identity', canonicalUserId || openedUserId, 'success', { documents: documents.length, migratedDocuments: migratedDocuments.length });
   return {
     ok: true,
     canonicalUserId,
@@ -617,6 +666,7 @@ async function actionIdentityDiagnostics(db, req, actor) {
     roles,
     cabinets,
     documents,
+    migratedDocuments,
     reason,
   };
 }
@@ -876,7 +926,7 @@ async function actionProfileSync(db, req, actor) {
     })));
   }
   let accountBalance = null;
-  if (dailyBonusAwarded && accountCoreWriteEnabled()) {
+  if (accountCoreWriteEnabled()) {
     const dailyResult = await serverFoundation.account.awardDailyBonus({
       userId,
       dateKey: todayKey,
@@ -887,6 +937,7 @@ async function actionProfileSync(db, req, actor) {
     });
     accountBalance = Number(dailyResult?.operation?.balanceAfter);
     if (!Number.isFinite(accountBalance)) accountBalance = null;
+    if (dailyResult) dailyBonusAwarded = dailyResult.replayed !== true;
   }
   if (hasReferralObservability) {
     const effectiveReferrerId = userDoc?.referredBy || userDoc?.referralBonusGrantedTo || refId || referralContext.referralCode;

@@ -2362,17 +2362,21 @@ export function UserApp() {
                 const ptOwned = freshPartners.find(p => profileOwnedByUser(p, identityUser, fsEmail));
                 if (ptOwned) setOwnedPartner(ptOwned);
                 else if (identityUser.partnerId || safeStringList(identityUser.partnerCabinetIds).length) {
-                  const wantedPartner = String(identityUser.partnerId || safeStringList(identityUser.partnerCabinetIds)[0]);
-                  getDoc(doc(db, 'partners', wantedPartner))
-                    .then(snap => {
-                      if (snap.exists() && isMounted.current) {
-                        const partner = { id: snap.id, ...snap.data() };
-                        if (isNotArchived(partner) || privateArchivedProfileOwnedByUser(partner, identityUser, fsEmail)) {
-                          setOwnedPartner(partner);
-                        }
-                      }
-                    })
-                    .catch(() => {});
+                  const wantedPartners = [...new Set([
+                    identityUser.partnerId,
+                    ...safeStringList(identityUser.partnerCabinetIds),
+                  ].map(value => String(value || '').trim()).filter(Boolean))];
+                  Promise.all(wantedPartners.map(async wantedPartner => {
+                    const snap = await getDoc(doc(db, 'partners', wantedPartner)).catch(() => null);
+                    if (!snap?.exists()) return null;
+                    const partner = { id: snap.id, ...snap.data() };
+                    return isNotArchived(partner) || privateArchivedProfileOwnedByUser(partner, identityUser, fsEmail)
+                      ? partner
+                      : null;
+                  })).then(partners => {
+                    const partner = partners.find(Boolean);
+                    if (partner && isMounted.current) setOwnedPartner(partner);
+                  }).catch(() => {});
                 }
               }
 
@@ -2430,28 +2434,33 @@ export function UserApp() {
                   if (isMounted.current) showToast('🎁 +2 ключа — ты пришёл по реферальной ссылке!', 'success');
                 }, 1200);
               };
+              const handleDailySyncResult = result => {
+                if (!isMounted.current) return result;
+                if (result?.dailyBonusAwarded) {
+                  const confirmedBalance = Number(result?.accountBalance);
+                  setUserKeys(prev => Number.isFinite(confirmedBalance) ? confirmedBalance : prev + 1);
+                  setUserReputation(prev => prev + 1);
+                  if (!needsLegalConsent) {
+                    setTimeout(() => {
+                      if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success');
+                    }, 1500);
+                  }
+                }
+                handleReferralSyncResult(result);
+                return result;
+              };
 
               // Ежедневный бонус: +1 ключ за первый вход каждый день
               if (data.lastBonusDate !== todayKey) {
                 if (isAuthLoadAborted(runId, 'before_daily_sync')) return;
                 userAction('profile:sync', syncExistingPayload)
-                  .then(result => {
-                    if (!isMounted.current) return;
-                    if (result?.dailyBonusAwarded) {
-                      const confirmedBalance = Number(result?.accountBalance);
-                      setUserKeys(prev => Number.isFinite(confirmedBalance) ? confirmedBalance : prev + 1);
-                      setUserReputation(prev => prev + 1);
-                      if (!needsLegalConsent) setTimeout(() => { if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success'); }, 1500);
-                    }
-                    return result;
-                  })
-                  .then(handleReferralSyncResult)
+                  .then(handleDailySyncResult)
                   .catch(e => {
                     if (existingRefId) refLog('retry after reconnect', { stage: 'existing_profile_sync_daily', referrerId: existingRefId, userId: userData.id, reason: e?.message || String(e) });
                     logError(e, 'UserApp.profileSync.dailyBonus');
                   });
               } else {
-                userAction('profile:sync', syncExistingPayload).then(handleReferralSyncResult).catch(e => {
+                userAction('profile:sync', syncExistingPayload).then(handleDailySyncResult).catch(e => {
                   if (existingRefId) refLog('retry after reconnect', { stage: 'existing_profile_sync_lastSeen', referrerId: existingRefId, userId: userData.id, reason: e?.message || String(e) });
                   logError(e, 'UserApp.profileSync.lastSeen');
                 });
@@ -4110,7 +4119,7 @@ export function UserApp() {
 
   const handleSwipeStart = useCallback((e) => {
     const touch = e.touches[0];
-    const gestureBoundary = e.target?.closest?.('[data-horizontal-gesture-boundary="true"]');
+    const gestureBoundary = e.target?.closest?.('[data-horizontal-gesture-boundary="true"], [data-apg-horizontal-scroll="true"]');
     const pullState = getPullStartState(e, activePanel, pullRefreshing);
     setPullDistance(0);
     swipeTouchX.current = gestureBoundary ? null : touch.clientX;

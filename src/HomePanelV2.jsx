@@ -2550,7 +2550,12 @@ function NewsWidget({ news = [], onOpenNews, onOpenNewsItem }) {
             </button>
           </div>
 
-          <div data-apg-horizontal-scroll="true" style={{ ...horizontalSnapTrack, gap: 12, paddingBottom: 2, margin: '0 -16px', paddingLeft: 16, paddingRight: 16, scrollPaddingLeft: 16 }}>
+          <div
+            data-apg-horizontal-scroll="true"
+            data-horizontal-gesture-boundary="true"
+            onTouchStart={event => event.stopPropagation()}
+            style={{ ...horizontalSnapTrack, gap: 12, paddingBottom: 2, margin: '0 -16px', paddingLeft: 16, paddingRight: 16, scrollPaddingLeft: 16 }}
+          >
             {items.map((item, index) => {
               const image = getNewsImage(item);
               const photo = getNewsPhotoItems(item)[0];
