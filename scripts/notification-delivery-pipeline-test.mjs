@@ -25,6 +25,8 @@ const pushRoute = read('server/src/routes/send-push.js');
 const adminActions = read('server/src/routes/admin-actions.js');
 const userActions = read('server/src/routes/user-actions.js');
 const userApp = read('src/UserApp.jsx');
+const constants = read('src/constants.js');
+const pushDiagnostics = read('src/pushDiagnostics.js');
 const pkg = JSON.parse(read('package.json'));
 
 for (const category of ['news', 'events', 'partners', 'experts']) {
@@ -44,6 +46,9 @@ assert.match(userActions, /sendDialogVkPush/, 'message notifications support VK 
 assert.match(userActions, /deadFcmTokens[\s\S]*deadWebSubscriptions/, 'message delivery cleans broken subscriptions');
 assert.match(userApp, /browser's current PushManager[\s\S]*subscription is authoritative/, 'installed PWA uses its actual device subscription as the notification source');
 assert.doesNotMatch(userApp, /hasStoredPushChannel[\s\S]{0,800}setNotifEnabled\(false\)/, 'a lagging server profile cannot disable a working PWA subscription');
+assert.match(constants, /WEB_PUSH_VAPID_PUBLIC_KEY = 'BIY6fBBaGoouByjJosD9BKLXBRVoChXSpwgkXTwDJZs_gykj9gr8Fe5LVnTKCs8hseG5iJGLR-rqprfbS3Y3YLs'/, 'frontend uses the active backend VAPID public key');
+assert.match(pushDiagnostics, /registeredVapidKey !== WEB_PUSH_VAPID_PUBLIC_KEY[\s\S]*?subscription\.unsubscribe\(\)[\s\S]*?subscription rotated/, 'stale subscriptions are rotated after a VAPID key change');
+assert.match(userApp, /UserApp\.requestWebPushPermission[\s\S]*?localStorage\.removeItem\('apg_notif_enabled'\);[\s\S]*?setNotifEnabled\(false\)/, 'failed registration clears the optimistic notification state');
 assert.equal(pkg.scripts['test:notification-delivery'], 'node scripts/notification-delivery-pipeline-test.mjs');
 
 console.log('notification delivery pipeline PASS');

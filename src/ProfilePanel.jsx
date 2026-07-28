@@ -901,10 +901,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
   useEffect(() => {
     const query = peopleSearch.trim();
-    if (!user?.id || isGuest || query.length < 2) {
+    if (!user?.id || isGuest) {
       setPeopleSearchResults([]);
       return undefined;
     }
+    if (query.length === 1) return undefined;
     let cancelled = false;
     const timer = setTimeout(() => {
       setPeopleSearchLoading(true);

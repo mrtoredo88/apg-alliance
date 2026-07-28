@@ -2105,30 +2105,36 @@ export function UserApp() {
       if (isAuthLoadAborted(runId, 'after_critical_loads')) return;
 
       if (!isMounted.current || isAuthLoadAborted(runId, 'before_critical_state_sync')) return;
-      const freshPartners = pSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
+      const loadedPartners = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const freshPartners = loadedPartners
         .filter(item => item.catalogPublished !== false && isNotArchived(item));
       setIfChanged(setPartners, freshPartners);
       refreshHomeCacheSection(HOME_CACHE_SECTIONS.PARTNERS, freshPartners);
       if (userData && isMounted.current) {
-        const owned = freshPartners.find(p => profileOwnedByUser(p, userData));
+        const owned = loadedPartners.find(p => (
+          profileOwnedByUser(p, userData)
+          && (isNotArchived(p) || privateArchivedProfileOwnedByUser(p, userData))
+        ));
         if (owned) {
           setOwnedPartner(owned);
-        } else if (userData.partnerId) {
-          getDoc(doc(db, 'partners', String(userData.partnerId)))
-            .then(snap => {
-              if (snap.exists() && isMounted.current) {
-                const partner = { id: snap.id, ...snap.data() };
-                setOwnedPartner(
-                  isNotArchived(partner) || privateArchivedProfileOwnedByUser(partner, userData)
-                    ? partner
-                    : null,
-                );
-              }
-            })
-            .catch(() => setOwnedPartner(null));
         } else {
-          setOwnedPartner(null);
+          const linkedPartnerIds = [...new Set([
+            userData.partnerId,
+            ...safeStringList(userData.partnerCabinetIds),
+          ].map(value => String(value || '').trim()).filter(Boolean))];
+          if (!linkedPartnerIds.length) {
+            setOwnedPartner(null);
+          } else {
+            Promise.all(linkedPartnerIds.map(partnerId => getDoc(doc(db, 'partners', partnerId)).catch(() => null)))
+              .then(snaps => {
+                if (!isMounted.current) return;
+                const partner = snaps
+                  .filter(snap => snap?.exists?.())
+                  .map(snap => ({ id: snap.id, ...snap.data() }))
+                  .find(item => isNotArchived(item) || privateArchivedProfileOwnedByUser(item, userData));
+                setOwnedPartner(partner || null);
+              });
+          }
         }
       }
 
@@ -4215,6 +4221,13 @@ export function UserApp() {
       if (!silent) showToast('🔔 Уведомления включены!', 'success');
     } catch (e) {
       logError(e, 'UserApp.requestWebPushPermission');
+      localStorage.removeItem('apg_notif_enabled');
+      setNotifEnabled(false);
+      setUser(prev => prev ? ({
+        ...prev,
+        notificationsEnabled: false,
+        notificationProvider: null,
+      }) : prev);
       if (!silent) showToast('❌ Не удалось включить уведомления', 'error');
     }
   }, [user, showToast]);

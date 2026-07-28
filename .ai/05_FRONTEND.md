@@ -592,3 +592,13 @@ export const openUrl = (url) => {
   }
 };
 ```
+# 2026-07-28 — Workspace ownership and People directory
+
+Desktop Workspace resolves an owned private demo partner before applying public
+catalog filters. If the profile is outside the first catalog page, every linked
+`partnerCabinetIds` entry is checked directly, so an archived owner-only demo profile
+remains available without becoming visible in the public directory.
+
+The Profile `Люди` sheet loads the canonical participant directory when the search
+field is empty. Text search switches to server-side filtering from two characters;
+a one-character query filters the already loaded directory locally.

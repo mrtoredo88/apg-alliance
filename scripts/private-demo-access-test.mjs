@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { privateArchivedProfileOwnedByUser } from '../src/utils/profileOwnership.js';
 
 const demoPartner = {
@@ -28,6 +29,18 @@ assert.equal(
   privateArchivedProfileOwnedByUser({ ...demoPartner, privateDemoAccess: false }, { id: 'owner-user' }),
   false,
   'ordinary archived partners stay unavailable',
+);
+
+const userApp = readFileSync(new URL('../src/UserApp.jsx', import.meta.url), 'utf8');
+assert.match(
+  userApp,
+  /const loadedPartners = pSnap\.docs[\s\S]*?privateArchivedProfileOwnedByUser\(p, userData\)/,
+  'private demo partner is resolved before public catalog filtering',
+);
+assert.match(
+  userApp,
+  /userData\.partnerId,[\s\S]*?safeStringList\(userData\.partnerCabinetIds\)[\s\S]*?Promise\.all\(linkedPartnerIds\.map/,
+  'all linked partner cabinets are checked when the demo partner is outside the public page',
 );
 
 console.log('Private demo partner access regression test passed');

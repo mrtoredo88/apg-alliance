@@ -5084,7 +5084,14 @@ async function searchAccountProfilesForConnections(query = '', actorUserId = '')
   const adapter = serverFoundation.account?.profiles?.adapter;
   if (!adapter?.available) return null;
   const normalized = safeString(query, 120).toLowerCase().replace(/ё/g, 'е');
-  if (normalized.length < 2) return [];
+  const accountWhere = normalized
+    ? "WHERE lower(replace(concat_ws(' ', p.user_id, p.canonical_user_id, p.email, p.display_name, p.first_name, p.last_name, p.city, p.profile::text), 'ё', 'е')) LIKE $1"
+    : '';
+  const migratedWhere = normalized
+    ? "AND lower(replace(concat_ws(' ', d.document_id, d.data::text), 'ё', 'е')) LIKE $1"
+    : '';
+  const params = normalized ? [`%${normalized}%`] : [];
+  const resultLimit = normalized ? 120 : 700;
   const [accountResult, migratedUsersResult] = await Promise.all([
     adapter.query(`
     SELECT
@@ -5101,10 +5108,10 @@ async function searchAccountProfilesForConnections(query = '', actorUserId = '')
       r.roles
     FROM apg_account_profiles p
     LEFT JOIN apg_account_roles r ON r.user_id = p.user_id
-    WHERE lower(replace(concat_ws(' ', p.user_id, p.canonical_user_id, p.email, p.display_name, p.first_name, p.last_name, p.city, p.profile::text), 'ё', 'е')) LIKE $1
+    ${accountWhere}
     ORDER BY p.updated_at DESC NULLS LAST
-    LIMIT 120
-  `, [`%${normalized}%`]),
+    LIMIT ${resultLimit}
+  `, params),
     adapter.query(`
       SELECT
         d.document_id AS user_id,
@@ -5121,14 +5128,14 @@ async function searchAccountProfilesForConnections(query = '', actorUserId = '')
       FROM apg_app_documents d
       WHERE d.collection_name = 'users'
         AND d.parent_path = ''
-        AND lower(replace(concat_ws(' ', d.document_id, d.data::text), 'ё', 'е')) LIKE $1
+        ${migratedWhere}
       ORDER BY d.updated_at DESC NULLS LAST
-      LIMIT 160
-    `, [`%${normalized}%`]),
+      LIMIT ${normalized ? 160 : 700}
+    `, params),
   ]);
   return mergeAccountSearchRows([...(accountResult.rows || []), ...(migratedUsersResult.rows || [])])
     .filter(row => row.id !== actorUserId && !isArchivedUser(row))
-    .slice(0, 80);
+    .slice(0, normalized ? 80 : 700);
 }
 
 async function dedupeSocialSearchRows(db, rows = []) {
@@ -5205,14 +5212,14 @@ async function dedupeSocialSearchRows(db, rows = []) {
 
 async function actionConnectionsSearch(db, req, actor) {
   const query = safeString(req.body?.query, 120).toLowerCase().replace(/ё/g, 'е');
-  if (query.length < 2) return { ok: true, people: [] };
+  if (query.length === 1) return { ok: true, people: [] };
   const adapter = postgresSocialAdapter();
   if (adapter) {
     const [accountRows, requests] = await Promise.all([
       searchAccountProfilesForConnections(query, actor.userId),
       postgresConnectionsForUser(adapter, actor.userId),
     ]);
-    const people = (accountRows || []).slice(0, 40).map(row => {
+    const people = (accountRows || []).slice(0, query ? 40 : 700).map(row => {
       const aliases = Array.from(new Set([row.id, row.canonicalUserId, ...(row.identityAliases || [])].map(cleanSocialId).filter(Boolean)));
       const request = requests.find(item => {
         const otherId = item.senderId === actor.userId ? item.recipientId : item.senderId;
@@ -5269,7 +5276,7 @@ async function actionConnectionsSearch(db, req, actor) {
       .filter(row => !isLegacyOwnerPlaceholder(row))
       .filter(row => publicUserSearchText(row, row.id).includes(query))
       .filter(row => !(row.identityAliases || []).some(id => blocked.has(String(id))))
-      .slice(0, 80);
+      .slice(0, query ? 80 : 700);
   const matchedRows = [
     ...accountMatches,
     ...usersMatches,
@@ -5277,7 +5284,7 @@ async function actionConnectionsSearch(db, req, actor) {
   const dedupedRows = await dedupeSocialSearchRows(db, matchedRows);
   const people = dedupedRows
     .filter(({ canonicalId, aliases }) => canonicalId !== actor.userId && !(aliases || []).includes(actor.userId))
-    .slice(0, 40)
+    .slice(0, query ? 40 : 700)
     .map(({ row, canonicalId, aliases }) => {
     const aliasSet = new Set(aliases.map(String));
     const pending = aliases.map(id => pendingByUser.get(String(id))).find(Boolean);

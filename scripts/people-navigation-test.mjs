@@ -16,6 +16,7 @@ assert.doesNotMatch(profile, /data-my-contacts-button[\s\S]{0,180}onPointerDown=
 assert.doesNotMatch(profile, /data-people-panel[\s\S]{0,12000}data-digital-business-card/, 'People summary does not duplicate the nearby referral and QR actions');
 
 assert.match(profile, /showConnectionsModal && createPortal\([\s\S]*?title="Люди"[\s\S]*?data-people-list/, 'Open People renders the People modal portal');
+assert.match(profile, /if \(query\.length === 1\) return undefined;[\s\S]*?userAction\('connections:search', \{ query \}\)/, 'People loads the full catalog for an empty query and uses server search from two characters');
 const v2Start = profile.indexOf("if (variant === 'v2')");
 const legacyStart = profile.indexOf("\n  return (\n    <div style={{ background: 'transparent'", v2Start);
 const v2Source = profile.slice(v2Start, legacyStart);

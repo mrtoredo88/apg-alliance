@@ -4716,3 +4716,12 @@
 - AdminGuard разрешает native APG session через канонический Identity id.
 - В Desktop Workspace восстановлен полный постоянный sidebar вместо мобильной группировки из шести плиток; новые рабочие разделы и ролевой переключатель сохранены.
 - Регрессионные тесты фиксируют каноническую admin-auth цепочку и полный desktop-набор разделов.
+# 2026-07-28 — Workspace demo partner, mobile push and People directory
+
+- Desktop Workspace now resolves private archived demo partners from the unfiltered
+  partner response and checks every linked partner cabinet directly.
+- Mobile Web Push now uses the active production VAPID public key, rotates stale
+  browser subscriptions and clears a false enabled state after registration errors.
+- Profile `Люди → Все` now loads the canonical active-user directory instead of
+  showing only existing contacts, requests and dialogs.
+- Added regression coverage for all three fixes.

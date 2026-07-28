@@ -846,3 +846,8 @@ score =
 | `POSTBOX_SECRET` | email-auth.js |
 | `YANDEX_EMAIL` | email-auth.js (fallback SMTP) |
 | `YANDEX_EMAIL_PASS` | email-auth.js (fallback SMTP) |
+# 2026-07-28 — People directory
+
+`connections:search` accepts an empty `query` to return the canonical, deduplicated
+participant directory (up to 700 active profiles). Queries of two or more characters
+use PostgreSQL/account-profile filtering and return a compact search result.

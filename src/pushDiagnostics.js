@@ -141,6 +141,13 @@ export async function registerCurrentPushDevice(user = {}, { requestPermission =
   logPushStage('service worker ready', { ready: Boolean(registration) });
   if (!registration?.pushManager) throw new Error('Service Worker is not ready for push');
   let subscription = await registration.pushManager.getSubscription();
+  const vapidStorageKey = 'apg_webpush_vapid_public_key';
+  const registeredVapidKey = localStorage.getItem(vapidStorageKey);
+  if (subscription && registeredVapidKey !== WEB_PUSH_VAPID_PUBLIC_KEY) {
+    await subscription.unsubscribe().catch(() => false);
+    subscription = null;
+    logPushStage('subscription rotated', { reason: 'vapid_key_changed' });
+  }
   logPushStage('subscription exists', { exists: Boolean(subscription) });
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
@@ -149,6 +156,7 @@ export async function registerCurrentPushDevice(user = {}, { requestPermission =
     });
     logPushStage('subscription created', endpointInfo(subscription.toJSON()?.endpoint));
   }
+  localStorage.setItem(vapidStorageKey, WEB_PUSH_VAPID_PUBLIC_KEY);
   const diagnostics = await collectPushDiagnostics(user);
   const result = await userAction('push:register', {
     userId: String(user?.id || ''),
