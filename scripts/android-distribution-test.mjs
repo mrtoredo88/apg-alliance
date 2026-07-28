@@ -20,11 +20,15 @@ const properties = readFileSync('android/release.properties', 'utf8');
 const landing = readFileSync('public/android', 'utf8');
 const deploy = readFileSync('deploy-frontend.sh', 'utf8');
 const userApp = readFileSync('src/UserApp.jsx', 'utf8');
+const androidManifest = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
+const mainActivity = readFileSync('android/app/src/main/java/ru/myapg/app/MainActivity.java', 'utf8');
 
-assert.match(properties, /VERSION_CODE=10300/);
-assert.match(properties, /VERSION_NAME=1\.3\.0/);
+assert.match(properties, /VERSION_CODE=10301/);
+assert.match(properties, /VERSION_NAME=1\.3\.1/);
 assert.match(gradle, /versionCode apgVersionCode/);
 assert.match(gradle, /versionName apgVersionName/);
+assert.doesNotMatch(androidManifest, /REQUEST_INSTALL_PACKAGES/);
+assert.doesNotMatch(mainActivity, /NativeUpdaterPlugin/);
 assert.match(landing, /Скачать APK для Android/);
 assert.match(landing, /android-release\.json/);
 assert.match(deploy, /--exclude "downloads\/\*"/);
