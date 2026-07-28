@@ -786,6 +786,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const [peopleSearchLoading, setPeopleSearchLoading] = useState(false);
   const [peopleDialogs, setPeopleDialogs] = useState([]);
   const [peopleSheet, setPeopleSheet] = useState(null);
+  const [peopleAction, setPeopleAction] = useState({ targetId: '', status: '', message: '' });
   const [pinnedPeopleIds, setPinnedPeopleIds] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(`apg_people_pins_${String(user?.id || 'guest')}`) || '[]');
@@ -1794,8 +1795,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   }, [saveSocialMessagingState, socialBlockedIds]);
   const requestConnection = useCallback((targetId, source = 'manual') => {
     const id = String(targetId || '').trim();
-    if (!id) return;
+    if (!id || (peopleAction.targetId === id && peopleAction.status === 'loading')) return;
     setConnectionError('');
+    setPeopleAction({ targetId: id, status: 'loading', message: 'Отправляем заявку…' });
     userAction('connections:request', { targetUserId: id, source })
       .then(data => {
         const request = data.request || null;
@@ -1812,16 +1814,27 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         if (request?.shared || data.connection?.shared || data.target?.shared) patch.shared = request?.shared || data.connection?.shared || data.target?.shared;
         if (request) setConnectionRequests(prev => [request, ...prev.filter(item => String(item.id) !== String(request.id))]);
         patchPeoplePerson(id, patch);
+        setPeopleAction({
+          targetId: id,
+          status: 'success',
+          message: relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Контакт уже добавлен.' : 'Заявка отправлена.',
+        });
         if (data.dialogId) onOpenDialog?.(data.dialogId);
         if (connectionTarget?.target?.id === id) setConnectionTarget(prev => ({ ...(prev || {}), ...data, ...patch, action: data.dialogId ? 'message' : 'pending' }));
       })
-      .catch(e => setConnectionError(e?.message || 'Не удалось отправить запрос на знакомство.'));
-  }, [connectionTarget?.target?.id, onOpenDialog, patchPeoplePerson]);
+      .catch(e => {
+        const message = e?.message || 'Не удалось отправить запрос на знакомство.';
+        setConnectionError(message);
+        setPeopleAction({ targetId: id, status: 'error', message });
+      });
+  }, [connectionTarget?.target?.id, onOpenDialog, patchPeoplePerson, peopleAction.status, peopleAction.targetId]);
   const updateConnectionRequest = useCallback((requestId, status) => {
     const action = status === 'accepted' ? 'connections:accept' : status === 'cancelled' ? 'connections:cancel' : 'connections:decline';
     const currentRequest = connectionRequests.find(item => String(item.id) === String(requestId));
     const targetId = String(currentRequest?.senderId || '') === String(user?.id || '') ? currentRequest?.recipientId : currentRequest?.senderId;
+    if (targetId && peopleAction.targetId === String(targetId) && peopleAction.status === 'loading') return;
     setConnectionError('');
+    if (targetId) setPeopleAction({ targetId: String(targetId), status: 'loading', message: status === 'accepted' ? 'Принимаем заявку…' : 'Обновляем заявку…' });
     userAction(action, { requestId })
       .then(data => {
         if (data.request) setConnectionRequests(prev => prev.map(item => String(item.id) === String(requestId) ? data.request : item));
@@ -1839,10 +1852,21 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             shared: data.connection?.shared || data.request?.shared || currentRequest?.shared || null,
           });
         }
+        if (targetId) {
+          setPeopleAction({
+            targetId: String(targetId),
+            status: 'success',
+            message: status === 'accepted' ? 'Заявка принята.' : status === 'cancelled' ? 'Заявка отозвана.' : 'Заявка отклонена.',
+          });
+        }
         if (data.dialogId) onOpenDialog?.(data.dialogId);
       })
-      .catch(e => setConnectionError(e?.message || 'Не удалось обновить знакомство.'));
-  }, [connectionRequests, onOpenDialog, patchPeoplePerson, user?.id]);
+      .catch(e => {
+        const message = e?.message || 'Не удалось обновить знакомство.';
+        setConnectionError(message);
+        if (targetId) setPeopleAction({ targetId: String(targetId), status: 'error', message });
+      });
+  }, [connectionRequests, onOpenDialog, patchPeoplePerson, peopleAction.status, peopleAction.targetId, user?.id]);
   const openConnectionDialog = useCallback((item) => {
     const dialogId = item?.dialogId || '';
     if (dialogId) onOpenDialog?.(dialogId);
@@ -1892,6 +1916,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   }, [user?.id]);
   const runPersonPrimaryAction = useCallback((person) => {
     if (!person?.id) return;
+    if (peopleAction.targetId === String(person.id) && peopleAction.status === 'loading') return;
     if (person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND) {
       if (person.dialogId) onOpenDialog?.(person.dialogId);
       else openPersonDialog(person);
@@ -1908,7 +1933,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     if (person.relationStatus === PEOPLE_RELATION_STATUS.STRANGER) {
       requestConnection(person.id, 'people');
     }
-  }, [onOpenDialog, openPersonDialog, requestConnection, updateConnectionRequest]);
+  }, [onOpenDialog, openPersonDialog, peopleAction.status, peopleAction.targetId, requestConnection, updateConnectionRequest]);
   const handleDesktopReschedule = useCallback((item) => {
     const startAt = prompt('Новая дата и время в формате YYYY-MM-DD HH:mm');
     if (!startAt) return;
@@ -2964,17 +2989,22 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 <span style={peopleStatusChipStyle(peopleSheet.relationStatus)}>{peopleStatusLabel(peopleSheet.relationStatus)}</span>
                 {(peopleSheet.about || peopleSheet.city || peopleSuggestionReason(peopleSheet)) && <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>{peopleSheet.about || peopleSuggestionReason(peopleSheet) || peopleSheet.city}</div>}
               </div>
+              {peopleAction.targetId === String(peopleSheet.id) && peopleAction.message && (
+                <div role={peopleAction.status === 'error' ? 'alert' : 'status'} style={{ color: peopleAction.status === 'error' ? '#E64646' : peopleAction.status === 'success' ? '#65C466' : APG2.textSoft, borderRadius: 16, border: `1px solid ${peopleAction.status === 'error' ? 'rgba(230,70,70,0.24)' : peopleAction.status === 'success' ? 'rgba(101,196,102,0.26)' : 'rgba(var(--apg2-glass-a,255,255,255),0.12)'}`, background: peopleAction.status === 'error' ? 'rgba(230,70,70,0.08)' : peopleAction.status === 'success' ? 'rgba(101,196,102,0.09)' : 'rgba(var(--apg2-glass-a,255,255,255),0.055)', padding: 10, fontSize: 12.5, lineHeight: '18px', fontWeight: 780 }}>
+                  {peopleAction.message}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <GlassButton
                   tone="gold"
-                  disabled={peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED}
+                  disabled={peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED || (peopleAction.targetId === String(peopleSheet.id) && peopleAction.status === 'loading')}
                   onClick={() => {
                     runPersonPrimaryAction(peopleSheet);
                     if (peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND) setPeopleSheet(null);
                   }}
                   style={{ flex: 1 }}
                 >
-                  {peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отозвать заявку' : 'Добавить'}
+                  {peopleAction.targetId === String(peopleSheet.id) && peopleAction.status === 'loading' ? 'Отправляем…' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отозвать заявку' : 'Добавить'}
                 </GlassButton>
                 <GlassButton onClick={() => { setPeopleSheet(null); setShowConnectionsModal(true); }} style={{ flex: 1 }}>К списку</GlassButton>
               </div>
@@ -4027,9 +4057,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               </div>
             </div>
             {peopleSearchLoading && <div style={{ color: APG2.textMuted, fontSize: 13, lineHeight: '19px', textAlign: 'center', padding: 8 }}>Ищем участников...</div>}
+            {connectionError && <div role="alert" style={{ color: '#E64646', fontSize: 12.5, lineHeight: '18px', borderRadius: 16, border: '1px solid rgba(230,70,70,0.24)', background: 'rgba(230,70,70,0.08)', padding: 10 }}>{connectionError}</div>}
             {visiblePeopleRows.length ? visiblePeopleRows.map(person => {
               const primaryLabel = person.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : person.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : person.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отозвать' : person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED ? 'Недоступно' : 'Добавить в друзья';
-              const primaryDisabled = person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED;
+              const actionLoading = peopleAction.targetId === String(person.id) && peopleAction.status === 'loading';
+              const primaryDisabled = person.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED || actionLoading;
               const sharedSummary = peopleSharedSummary(person);
               const suggestionReason = peopleSuggestionReason(person);
               return (
@@ -4047,7 +4079,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <GlassButton onClick={() => runPersonPrimaryAction(person)} disabled={primaryDisabled} tone="gold" style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 12 }}>{primaryLabel}</GlassButton>
+                    <GlassButton onClick={() => runPersonPrimaryAction(person)} disabled={primaryDisabled} tone="gold" style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 12 }}>{actionLoading ? 'Отправляем…' : primaryLabel}</GlassButton>
                     {person.phone && <GlassButton onClick={() => openUrl(`tel:${String(person.phone).replace(/[^\d+]/g, '')}`)} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 12 }}>Позвонить</GlassButton>}
                   </div>
                 </div>
@@ -4120,14 +4152,19 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 {personInterestTags(peopleSheet).map(tag => <span key={tag} style={{ color: APG2.textSoft, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.11)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.065)', borderRadius: 999, padding: '5px 9px', fontSize: 11.5, lineHeight: '14px', fontWeight: 720 }}>{tag}</span>)}
               </div>
             )}
+            {peopleAction.targetId === String(peopleSheet.id) && peopleAction.message && (
+              <div role={peopleAction.status === 'error' ? 'alert' : 'status'} style={{ color: peopleAction.status === 'error' ? '#E64646' : peopleAction.status === 'success' ? '#65C466' : APG2.textSoft, borderRadius: 16, border: `1px solid ${peopleAction.status === 'error' ? 'rgba(230,70,70,0.24)' : peopleAction.status === 'success' ? 'rgba(101,196,102,0.26)' : 'rgba(var(--apg2-glass-a,255,255,255),0.12)'}`, background: peopleAction.status === 'error' ? 'rgba(230,70,70,0.08)' : peopleAction.status === 'success' ? 'rgba(101,196,102,0.09)' : 'rgba(var(--apg2-glass-a,255,255,255),0.055)', padding: 10, fontSize: 12.5, lineHeight: '18px', fontWeight: 780 }}>
+                {peopleAction.message}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <GlassButton
                 onClick={() => { runPersonPrimaryAction(peopleSheet); if (peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND && peopleSheet.dialogId) setPeopleSheet(null); }}
-                disabled={peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED}
+                disabled={peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.BLOCKED || (peopleAction.targetId === String(peopleSheet.id) && peopleAction.status === 'loading')}
                 tone="gold"
                 style={{ flex: 1, minHeight: 44, borderRadius: 16, fontSize: 13 }}
               >
-                {peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отозвать заявку' : 'Добавить'}
+                {peopleAction.targetId === String(peopleSheet.id) && peopleAction.status === 'loading' ? 'Отправляем…' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.FRIEND ? 'Написать' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.INCOMING ? 'Принять' : peopleSheet.relationStatus === PEOPLE_RELATION_STATUS.OUTGOING ? 'Отозвать заявку' : 'Добавить'}
               </GlassButton>
               <GlassButton onClick={() => { setPeopleSheet(null); setShowConnectionsModal(true); }} style={{ flex: 1, minHeight: 44, borderRadius: 16, fontSize: 13 }}>К списку людей</GlassButton>
             </div>

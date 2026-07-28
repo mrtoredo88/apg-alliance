@@ -15,6 +15,13 @@
 
 ---
 
+## [2026-07-28] fix: видимый результат действия «Добавить» в разделе «Люди»
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/ProfilePanel.jsx`, `scripts/people-actions-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** на desktop и mobile добавлены состояния «Отправляем…», «Заявка отправлена» и видимая ошибка внутри карточки пользователя; повторное нажатие блокируется до ответа API, а успешный ответ сразу обновляет статус человека.
+**Почему:** прежняя реализация показывала ошибку за модальным окном и не имела progress/success feedback, поэтому действие визуально выглядело неработающим.
+
 ## [2026-07-27] fix: мобильный UX, PWA-онбординг и история ключей
 **Коммит:** `локально, без коммита`
 **Файлы:** `src/UserApp.jsx`, `src/HomePanelV2.jsx`, `src/ProfilePanel.jsx`, `src/OffersPage.jsx`, `src/RewardsPage.jsx`, `src/TasksPage.jsx`, `src/components/KeyHistoryModal.jsx`, `src/components/onboarding/PwaInstallGuide.jsx`, `src/loki/LokiAssistant.jsx`, `server/src/routes/user-actions.js`, `server-shared/reward-service.js`, `scripts/key-history-regression-test.mjs`, `scripts/home-profile-dashboard-test.mjs`, `scripts/pwa-user-mode-regression.mjs`, `.ai/04_API.md`, `.ai/17_CHANGELOG_AI.md`

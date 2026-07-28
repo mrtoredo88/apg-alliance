@@ -46,6 +46,11 @@ assert.doesNotMatch(profile, /PEOPLE_RELATION_STATUS\.FRIEND && !person\.dialogI
 assert.match(profile, /role="button" tabIndex=\{0\} onClick=\{\(\) => openPersonProfile\(person\)\}/, 'suggestion card is clickable without nesting a button inside a button');
 assert.match(profile, /status === 'cancelled' \? null : data\.request \|\| currentRequest \|\| null/, 'cancelled outgoing request clears local request state');
 assert.match(profile, /peopleSheet\.relationStatus === PEOPLE_RELATION_STATUS\.OUTGOING \? 'Отозвать заявку'/, 'bottom sheet allows outgoing request recall');
+assert.match(profile, /setPeopleAction\(\{ targetId: id, status: 'loading', message: 'Отправляем заявку…' \}\)/, 'connection request immediately exposes progress');
+assert.match(profile, /status: 'success',[\s\S]*message: relationStatus === PEOPLE_RELATION_STATUS\.FRIEND \? 'Контакт уже добавлен\.' : 'Заявка отправлена\.'/, 'successful connection request confirms the result');
+assert.match(profile, /role=\{peopleAction\.status === 'error' \? 'alert' : 'status'\}/, 'person sheet exposes success and error feedback accessibly');
+assert.match(profile, /peopleAction\.targetId === String\(peopleSheet\.id\) && peopleAction\.status === 'loading'/, 'repeat person action is disabled while the request is pending');
+assert.match(profile, /message: status === 'accepted' \? 'Заявка принята\.' : status === 'cancelled' \? 'Заявка отозвана\.' : 'Заявка отклонена\.'/, 'accept and cancel actions confirm the updated request state');
 assert.match(profile, /data-people-card/, 'people cards remain available');
 assert.match(profile, /data-people-bottom-sheet/, 'people bottom sheet remains available');
 
