@@ -73,6 +73,10 @@ assert.ok(desktopWorkspaceSource.includes('EventPosterCard'), 'Desktop Workspace
 assert.ok(desktopWorkspaceSource.includes('data-workspace-shell="theme-aware-saas"'), 'Desktop Workspace shell must be theme-aware');
 assert.ok(desktopWorkspaceSource.includes("background: 'var(--apg-workspace-root-bg)'"), 'Desktop Workspace root must use theme workspace background token');
 assert.ok(!desktopWorkspaceSource.includes('data-workspace-shell="light-saas"'), 'Desktop Workspace must not force the light shell');
+assert.ok(!desktopWorkspaceSource.includes('WORKSPACE_NAV_GROUPS'), 'Desktop sidebar must not collapse full navigation into mobile-style groups.');
+for (const section of ['Сегодня', 'Профиль и витрина', 'Мероприятия', 'Встречи', 'Диалоги', 'Публикации', 'Акции', 'Подарки', 'Аналитика', 'Настройки']) {
+  assert.ok(desktopWorkspaceSource.includes(`label: '${section}'`), `Desktop sidebar must keep the ${section} section visible.`);
+}
 const indexCssSource = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
 assert.ok(indexCssSource.includes('--apg-workspace-root-bg'), 'Theme CSS must expose Workspace background tokens');
 assert.ok(indexCssSource.includes('[data-theme="dark"]') && indexCssSource.includes('--apg-workspace-page: #0F0F0F'), 'Dark theme must define Workspace palette');

@@ -90,7 +90,7 @@ function isOwner(userId) {
 - `partner`, `expert`, `user` — без административных прав.
 
 **Endpoints:**
-- `/api/admin-login` — публичная точка входа администратора, проверяет scrypt-хеш в `adminCredentials/{uid}` и выдаёт Firebase custom token;
+- `/api/admin-login` — публичная точка входа администратора, проверяет scrypt-хеш в PostgreSQL `apg_admin_credentials` (с legacy lookup по `firebaseUid/authUid`) и выдаёт native APG session token с каноническим Identity user id;
 - `/api/admin-actions` — защищённые news admin actions;
 - `/api/admin-security` — вход в админку, матрица прав, создание администраторов через Firebase Auth, обязательная смена временного пароля, управление администраторами, журнал безопасности;
 - `/api/system-status` — защищённый health/status для админки;

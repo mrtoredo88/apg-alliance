@@ -45,22 +45,37 @@ export default async function adminLoginRoutes(fastify) {
         return reply.code(401).send({ ok: false, code: 'INVALID_CREDENTIALS', error: 'Неверный email или пароль администратора.' });
       }
       const persistedUser = userDoc?.exists ? userDoc.data() || {} : {};
-      const combinedUser = { ...persistedUser, ...user };
-      const role = getPrimaryRole(user);
-      const status = String(user.adminStatus || user.status || 'active').toLowerCase();
-      if (!hasCapability(user, CAPABILITIES.canOpenAdminPanel) || status !== 'active') {
+      const combinedUser = { ...persistedUser, ...user, id: userId || user.id || persistedUser.id };
+      const role = getPrimaryRole(combinedUser);
+      const status = String(combinedUser.adminStatus || combinedUser.status || 'active').toLowerCase();
+      if (!hasCapability(combinedUser, CAPABILITIES.canOpenAdminPanel) || status !== 'active') {
         await log('error', { code: 'FORBIDDEN_ROLE', role, status });
         return reply.code(403).send({ ok: false, code: 'FORBIDDEN_ROLE', error: 'Доступ администратора отключён.' });
       }
-      const uid = String(combinedUser.firebaseUid || combinedUser.authUid || userId || userDoc?.id || email);
-      const pgCredential = await getPgAdminCredential(serverFoundation.account, uid).catch(() => null);
-      const credentialSnap = pgCredential ? null : await db.collection('adminCredentials').doc(uid).get().catch(() => null);
+      const uid = String(userId || combinedUser.id || userDoc?.id || email);
+      const credentialIds = Array.from(new Set([
+        uid,
+        combinedUser.firebaseUid,
+        combinedUser.authUid,
+      ].filter(Boolean).map(String)));
+      let pgCredential = null;
+      for (const credentialId of credentialIds) {
+        pgCredential = await getPgAdminCredential(serverFoundation.account, credentialId).catch(() => null);
+        if (pgCredential) break;
+      }
+      let credentialSnap = null;
+      if (!pgCredential) {
+        for (const credentialId of credentialIds) {
+          credentialSnap = await db.collection('adminCredentials').doc(credentialId).get().catch(() => null);
+          if (credentialSnap?.exists) break;
+        }
+      }
       const credential = pgCredential || (credentialSnap?.exists ? credentialSnap.data() || {} : {});
       if (!verifyPasswordRecord(password, credential.password)) {
         await log('error', { code: 'INVALID_CREDENTIALS', role });
         return reply.code(401).send({ ok: false, code: 'INVALID_CREDENTIALS', error: 'Неверный email или пароль администратора.' });
       }
-      const owner = hasRole(user, ROLES.owner);
+      const owner = hasRole(combinedUser, ROLES.owner);
       const customToken = await serverFoundation.identityV2.createCustomToken(uid, {
         ...combinedUser,
         role,

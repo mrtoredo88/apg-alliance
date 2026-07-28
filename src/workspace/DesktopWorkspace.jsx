@@ -73,15 +73,6 @@ const NAV_ITEMS = [
   { id: 'settings', label: 'Настройки', icon: '⚙', description: 'Кабинет и команда' },
 ];
 
-const WORKSPACE_NAV_GROUPS = [
-  { id: 'home', label: 'Главная', icon: '⌂', sections: ['dashboard', 'notifications'] },
-  { id: 'showcase', label: 'Витрина', icon: '◇', sections: ['profile'] },
-  { id: 'clients', label: 'Клиенты', icon: '◎', sections: ['booking', 'dialogs', 'reviews'] },
-  { id: 'content', label: 'Контент', icon: '✎', sections: ['content', 'events'] },
-  { id: 'promotion', label: 'Продвижение', icon: '↗', sections: ['growth', 'offers', 'rewards', 'analytics'] },
-  { id: 'more', label: 'Ещё', icon: '•••', sections: ['finance', 'settings'] },
-];
-
 const WORKSPACE_ROLE_VIEWS = {
   partner: {
     id: 'partner',
@@ -406,10 +397,8 @@ function WorkspaceProfileProgressCard({ completion, onClick }) {
 }
 
 function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeChange, availableViews, activeViewId, onViewChange, profileCompletion, onCompleteProfile }) {
-  const groups = WORKSPACE_NAV_GROUPS
-    .map(group => ({ ...group, items: group.sections.map(id => items.find(item => item.id === id)).filter(Boolean) }))
-    .filter(group => group.items.length);
-  const activeGroup = groups.find(group => group.sections.includes(activeSection)) || groups[0];
+  const main = items.filter(item => !['finance', 'notifications', 'settings'].includes(item.id));
+  const settings = items.filter(item => ['finance', 'notifications', 'settings'].includes(item.id));
   const initial = String(user?.firstName || user?.name || user?.displayName || 'A').slice(0, 1).toUpperCase();
   return (
     <aside data-workspace-v2-sidebar style={cardStyle({ height: 'calc(100dvh - 94px - env(safe-area-inset-bottom, 0px))', minHeight: 0, position: 'sticky', top: 80, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' })}>
@@ -431,19 +420,10 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
         )}
       </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0 0 8px', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6, padding: '0 12px 10px' }}>
-          {groups.map(group => {
-            const active = activeGroup?.id === group.id;
-            return (
-              <button key={group.id} type="button" onClick={() => onSelect(group.items[0])} style={{ border: active ? '1px solid rgba(201,155,60,0.34)' : `1px solid ${WS.line}`, minHeight: 54, borderRadius: 15, background: active ? 'rgba(241,206,128,0.22)' : WS.controlSoft, color: active ? '#8A6422' : WS.soft, display: 'grid', gridTemplateColumns: '24px minmax(0,1fr)', alignItems: 'center', gap: 7, padding: '8px 9px', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
-                <span style={{ fontSize: 16, textAlign: 'center' }}>{group.icon}</span>
-                <span style={{ fontSize: 11.5, lineHeight: '14px', fontWeight: 880 }}>{group.label}</span>
-              </button>
-            );
-          })}
-        </div>
         <div style={{ display: 'grid', gap: 1 }}>
-            {activeGroup?.items.map(item => {
+          {[main, settings].map((group, groupIndex) => (
+            <div key={groupIndex} style={{ display: 'grid', gap: 1 }}>
+            {group.map(item => {
               const active = activeSection === item.id;
               const badge = typeof item.badge === 'function' ? item.badge(data) : item.badge;
               return (
@@ -457,6 +437,9 @@ function WorkspaceSidebar({ items, activeSection, onSelect, user, data, onModeCh
                 </button>
               );
             })}
+            {groupIndex === 0 && <div style={{ height: 4 }} />}
+            </div>
+          ))}
         </div>
       </div>
       <div style={{ marginTop: 'auto', padding: 14, display: 'grid', gap: 8 }}>

@@ -37,7 +37,7 @@ function getBearerToken(request) {
   return match?.[1] || '';
 }
 
-async function findUserByFirebaseUid(db, uid) {
+async function findUserByIdentityUid(db, uid) {
   const identity = await serverFoundation.identityV2.getUser(uid).catch(() => null);
   if (identity?.id) return { id: identity.id, data: identity, source: 'identity_v2' };
   return null;
@@ -53,7 +53,7 @@ export async function requireAdminPermission(request, permission) {
   }
 
   const decoded = await serverFoundation.identity.verifySession({ token });
-  const userRecord = await findUserByFirebaseUid(db, decoded.uid);
+  const userRecord = await findUserByIdentityUid(db, decoded.uid);
   if (!userRecord) {
     const error = new Error('Пользователь Identity не найден.');
     error.statusCode = 401;
