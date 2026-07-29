@@ -25,6 +25,7 @@ import {
 } from '../../../server-shared/referral-observability.js';
 import { buildReferralMonitoring, referralAlertsToCsv } from '../../../server-shared/referral-monitoring.js';
 import { buildReferralRecoveryScanPlan, summarizeReferralRecoveryPlan } from '../../../server-shared/referral-state-recovery.js';
+import { buildDuplicateGroups, mergeUserProfiles } from '../../../server-shared/admin-user-duplicates.js';
 
 const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'publicationType', 'timelineType', 'distributionMode', 'visibility', 'publishScope', 'apgPublication', 'profileOnly', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
 
@@ -115,6 +116,8 @@ const PARTNER_STATUS_LABELS = {
 };
 const PARTNER_PUBLICATION_MIN_PERCENT = 80;
 const AUTOMATION_SOURCE_LIMIT = 30;
+const USER_REFERENCE_FIELDS = ['userId', 'uid', 'ownerId', 'ownerUserId', 'createdBy', 'updatedBy', 'targetUserId', 'profileUserId', 'canonicalUserId', 'senderId', 'recipientId', 'fromUserId', 'toUserId'];
+const USER_REFERENCE_COLLECTIONS = ['partners', 'experts', 'events', 'scans', 'expertScans', 'raffleEntries', 'prizeClaims', 'expertReviews', 'conversationRequests', 'contextDialogs', 'notifications', 'guestSessions', 'telegramAuthSessions'];
 
 function adminMillis(value) {
   if (!value) return 0;
@@ -126,6 +129,113 @@ function adminMillis(value) {
 function avgNumber(rows, field) {
   if (!rows.length) return 0;
   return Math.round(rows.reduce((sum, row) => sum + Number(row[field] || 0), 0) / rows.length * 10) / 10;
+}
+
+async function findUserReferences(db, userIds) {
+  const ids = [...new Set((Array.isArray(userIds) ? userIds : []).map(String).filter(Boolean))];
+  const references = [];
+  for (const collectionName of USER_REFERENCE_COLLECTIONS) {
+    for (const field of USER_REFERENCE_FIELDS) {
+      for (const userId of ids) {
+        const snap = await db.collection(collectionName).where(field, '==', userId).limit(200).get().catch(() => null);
+        snap?.docs?.forEach(doc => {
+          const key = `${collectionName}:${doc.id}:${field}`;
+          if (!references.some(item => item.key === key)) references.push({ key, collection: collectionName, id: doc.id, field, userId });
+        });
+      }
+    }
+  }
+  return references;
+}
+
+async function handleUserAccountsAction(db, request, actor) {
+  const action = String(request.body?.action || '');
+  if (action === 'user-accounts:duplicates') {
+    await requireAdminPermission(request, 'users:read');
+    const minimumScore = Math.max(55, Math.min(100, Number(request.body?.minimumScore || 70)));
+    const snap = await db.collection('users').limit(2000).get();
+    const users = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+    return { ok: true, groups: buildDuplicateGroups(users, minimumScore), totalUsers: users.length, minimumScore };
+  }
+
+  const userIds = [...new Set((request.body?.userIds || []).map(String).filter(Boolean))];
+  if (action === 'user-accounts:bulk-update' || action === 'user-accounts:archive' || action === 'user-accounts:restore') {
+    await requireAdminPermission(request, 'users:update');
+    if (!userIds.length || userIds.length > 100) throw Object.assign(new Error('Выберите от 1 до 100 пользователей.'), { statusCode: 400 });
+    const patch = action === 'user-accounts:archive'
+      ? { archived: true, accountStatus: 'archived', archivedAt: FieldValue.serverTimestamp(), archivedBy: actor.userId || actor.uid }
+      : action === 'user-accounts:restore'
+        ? { archived: false, accountStatus: 'active', archivedAt: null, archivedBy: null }
+        : cleanEntityPatch(request.body?.patch);
+    const batch = db.batch();
+    userIds.forEach(id => batch.set(db.collection('users').doc(id), { ...patch, updatedAt: FieldValue.serverTimestamp() }, { merge: true }));
+    await batch.commit();
+    await writeAuditLog(db, request, actor, action, 'users', userIds.join(','), { label: `${action === 'user-accounts:archive' ? 'Архивировано' : action === 'user-accounts:restore' ? 'Восстановлено' : 'Массово обновлено'} аккаунтов: ${userIds.length}`, userIds, fields: Object.keys(patch) });
+    return { ok: true, userIds, patch: cleanEntityPatch(patch) };
+  }
+
+  if (action === 'user-accounts:merge-preview' || action === 'user-accounts:merge') {
+    await requireAdminPermission(request, action.endsWith('preview') ? 'users:read' : 'users:update');
+    const targetId = String(request.body?.targetId || '').trim();
+    const sourceIds = [...new Set((request.body?.sourceIds || []).map(String).filter(id => id && id !== targetId))];
+    if (!targetId || !sourceIds.length || sourceIds.length > 10) throw Object.assign(new Error('Выберите основной аккаунт и от 1 до 10 дублей.'), { statusCode: 400 });
+    const snaps = await Promise.all([targetId, ...sourceIds].map(id => db.collection('users').doc(id).get()));
+    if (snaps.some(snap => !snap.exists)) throw Object.assign(new Error('Один из выбранных аккаунтов не найден.'), { statusCode: 404 });
+    const target = { id: targetId, ...(snaps[0].data() || {}) };
+    const sources = snaps.slice(1).map((snap, index) => ({ id: sourceIds[index], ...(snap.data() || {}) }));
+    const references = await findUserReferences(db, sourceIds);
+    if (references.length + sourceIds.length + 1 > 480) throw Object.assign(new Error(`Слишком много связанных записей для одного безопасного объединения: ${references.length}. Обратитесь к разработчику для пакетного переноса.`), { statusCode: 409 });
+    const mergedPatch = mergeUserProfiles(target, sources);
+    const preview = {
+      targetId,
+      sourceIds,
+      references,
+      referenceCount: references.length,
+      mergedFields: Object.keys(mergedPatch),
+      totals: { keys: mergedPatch.keys, tickets: mergedPatch.tickets, aliases: mergedPatch.identityAliases?.length || 0 },
+    };
+    if (action.endsWith('preview')) return { ok: true, preview };
+
+    const idempotencyKey = String(request.headers['x-idempotency-key'] || request.body?.idempotencyKey || '').trim();
+    return runIdempotent(db, actor, idempotencyKey, async () => {
+      const batch = db.batch();
+      batch.set(db.collection('users').doc(targetId), { ...mergedPatch, updatedAt: FieldValue.serverTimestamp(), mergedAt: FieldValue.serverTimestamp(), mergedBy: actor.userId || actor.uid }, { merge: true });
+      references.forEach(item => batch.set(db.collection(item.collection).doc(item.id), { [item.field]: targetId, updatedAt: FieldValue.serverTimestamp() }, { merge: true }));
+      sources.forEach(source => {
+        batch.set(db.collection('users').doc(source.id), {
+          archived: true,
+          accountStatus: 'merged',
+          identityStatus: 'legacy_linked',
+          canonicalUserId: targetId,
+          mergedInto: targetId,
+          dataMigratedInto: targetId,
+          mergedAt: FieldValue.serverTimestamp(),
+          mergedBy: actor.userId || actor.uid,
+          keys: 0,
+          tickets: 0,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      });
+      await batch.commit();
+      await writeAuditLog(db, request, actor, action, 'users', targetId, { label: `Объединены аккаунты в ${targetId}`, ...preview });
+      return { ok: true, preview };
+    });
+  }
+
+  if (action === 'user-accounts:delete') {
+    await requireAdminPermission(request, 'users:delete');
+    if (String(actor?.role || '').toLowerCase() !== 'owner') throw Object.assign(new Error('Окончательное удаление пользователей доступно только owner.'), { statusCode: 403 });
+    if (!userIds.length || userIds.length > 20) throw Object.assign(new Error('Выберите от 1 до 20 пользователей.'), { statusCode: 400 });
+    const references = await findUserReferences(db, userIds);
+    if (references.length) throw Object.assign(new Error(`Удаление остановлено: найдено связанных записей — ${references.length}. Сначала архивируйте или объедините аккаунты.`), { statusCode: 409 });
+    const batch = db.batch();
+    userIds.forEach(id => batch.delete(db.collection('users').doc(id)));
+    await batch.commit();
+    await writeAuditLog(db, request, actor, action, 'users', userIds.join(','), { label: `Окончательно удалено аккаунтов: ${userIds.length}`, userIds });
+    return { ok: true, userIds };
+  }
+
+  throw Object.assign(new Error('Неизвестное действие с аккаунтами пользователей.'), { statusCode: 400 });
 }
 
 async function handleEconomyAction(db, request, actor) {
@@ -2031,6 +2141,8 @@ export default async function adminActionsRoutes(fastify) {
       const action = String(request.body?.action || '');
       return action.startsWith('entity:')
         ? await handleEntityAction(db, request, actor)
+        : action.startsWith('user-accounts:')
+          ? await handleUserAccountsAction(db, request, actor)
         : action.startsWith('lifecycle:')
           ? await handleLifecycleAction(db, request, actor)
         : action.startsWith('referrals:')

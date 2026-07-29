@@ -143,6 +143,16 @@ Frontend всегда строит backend URL через `API_BASE_URL`. По �
 - `entity:delete`
 - `entity:set`
 
+**Actions управления аккаунтами пользователей:**
+- `user-accounts:duplicates` — группы вероятных дублей с причинами и confidence
+- `user-accounts:merge-preview` — безопасный предварительный расчёт объединения и связанных записей
+- `user-accounts:merge` — перенос профиля и ссылок в основной аккаунт, архивирование источников как identity aliases
+- `user-accounts:bulk-update` — массовое изменение выбранных профилей
+- `user-accounts:archive`, `user-accounts:restore` — обратимое выключение и восстановление аккаунтов
+- `user-accounts:delete` — окончательное удаление только для `owner`; операция запрещена, пока существуют ссылки на аккаунт
+
+Merge ограничен десятью исходными аккаунтами и одним Firestore batch. Если найдено более 480 операций, endpoint останавливается до записи и требует отдельного пакетного переноса. Все действия пишутся в `adminActivity`.
+
 **Actions Content Lifecycle Engine V1:**
 - `lifecycle:overview` — сводка, строки и рекомендации жизненного цикла для выбранного ресурса
 - `lifecycle:transition` — сменить статус одного объекта

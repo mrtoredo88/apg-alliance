@@ -1846,7 +1846,7 @@ function ModerationPanel({ news, comments, requests = [], onOpenNews, onOpenComm
   );
 }
 
-function AdminUsersPanel({ users, onAuthAction }) {
+function AdminUsersLegacyPanel({ users, onAuthAction }) {
   const [queryText, setQueryText] = useState('');
   const [consentFilter, setConsentFilter] = useState('all');
   const [authDiagnostics, setAuthDiagnostics] = useState({});
@@ -2003,6 +2003,260 @@ function AdminUsersPanel({ users, onAuthAction }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function AdminUsersPanel({ users, onAction, onRefresh }) {
+  const [queryText, setQueryText] = useState('');
+  const [view, setView] = useState('active');
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [duplicateGroups, setDuplicateGroups] = useState([]);
+  const [duplicateLoading, setDuplicateLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [mergeGroup, setMergeGroup] = useState(null);
+  const [mergeTargetId, setMergeTargetId] = useState('');
+  const [mergePreview, setMergePreview] = useState(null);
+  const [notice, setNotice] = useState('');
+
+  const activeUsers = users.filter(user => !user.archived && !user.mergedInto && user.accountStatus !== 'archived');
+  const archivedUsers = users.filter(user => user.archived || user.mergedInto || ['archived', 'merged'].includes(user.accountStatus));
+  const duplicateIds = new Set(duplicateGroups.flatMap(group => group.users.map(user => user.id)));
+  const source = view === 'archive' ? archivedUsers : view === 'duplicates' ? users.filter(user => duplicateIds.has(user.id)) : activeUsers;
+  const q = queryText.trim().toLowerCase();
+  const filtered = source.filter(user => !q || [
+    userDisplayName(user), user.email, user.linkedEmail, user.phone, user.phoneNumber,
+    user.telegramId, user.tgId, user.telegramUsername, user.firebaseUid, user.authUid, user.id,
+  ].filter(Boolean).join(' ').toLowerCase().includes(q));
+  const visibleIds = filtered.map(user => user.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
+
+  const run = async (action, payload, successMessage) => {
+    setBusy(true);
+    setNotice('');
+    try {
+      const result = await onAction(action, payload);
+      setNotice(successMessage);
+      setSelectedIds([]);
+      await onRefresh?.();
+      return result;
+    } catch (error) {
+      setNotice(error.message || 'Действие не выполнено.');
+      throw error;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const findDuplicates = async () => {
+    setDuplicateLoading(true);
+    setNotice('');
+    try {
+      const result = await onAction('user-accounts:duplicates', { minimumScore: 70 });
+      setDuplicateGroups(result.groups || []);
+      setView('duplicates');
+      setNotice(result.groups?.length ? `Найдено групп: ${result.groups.length}` : 'Вероятные дубли не найдены.');
+    } catch (error) {
+      setNotice(error.message || 'Не удалось проверить дубли.');
+    } finally {
+      setDuplicateLoading(false);
+    }
+  };
+
+  const openEdit = user => {
+    setEditingUser(user);
+    setEditForm({
+      name: user.displayName || user.name || '',
+      email: user.email || '',
+      phone: user.phone || user.phoneNumber || '',
+      telegramUsername: user.telegramUsername || user.tgUsername || '',
+      role: user.role || user.userRole || 'user',
+      adminNote: user.adminNote || '',
+    });
+  };
+
+  const saveEdit = async () => {
+    await run('user-accounts:bulk-update', { userIds: [editingUser.id], patch: editForm }, `Аккаунт ${editingUser.id} обновлён.`);
+    setEditingUser(null);
+  };
+
+  const openMerge = group => {
+    const preferred = [...group.users].sort((a, b) => {
+      const canonical = Number(b.canonicalUserId === b.id) - Number(a.canonicalUserId === a.id);
+      if (canonical) return canonical;
+      return Number(b.keys || 0) - Number(a.keys || 0);
+    })[0];
+    setMergeGroup(group);
+    setMergeTargetId(preferred?.id || group.users[0]?.id || '');
+    setMergePreview(null);
+  };
+
+  const previewMerge = async () => {
+    const sourceIds = mergeGroup.users.map(user => user.id).filter(id => id !== mergeTargetId);
+    const result = await onAction('user-accounts:merge-preview', { targetId: mergeTargetId, sourceIds });
+    setMergePreview(result.preview);
+  };
+
+  const executeMerge = async () => {
+    const sourceIds = mergeGroup.users.map(user => user.id).filter(id => id !== mergeTargetId);
+    await run('user-accounts:merge', { targetId: mergeTargetId, sourceIds, idempotencyKey: `merge_${mergeTargetId}_${sourceIds.sort().join('_')}` }, `Аккаунты объединены в ${mergeTargetId}.`);
+    setMergeGroup(null);
+    setMergePreview(null);
+    await findDuplicates();
+  };
+
+  const archiveSelected = async () => {
+    if (!confirm(`Отправить в архив аккаунты (${selectedIds.length})? Вход и активные действия будут недоступны.`)) return;
+    await run('user-accounts:archive', { userIds: selectedIds }, `Архивировано аккаунтов: ${selectedIds.length}.`);
+  };
+
+  const restoreSelected = async () => {
+    await run('user-accounts:restore', { userIds: selectedIds }, `Восстановлено аккаунтов: ${selectedIds.length}.`);
+  };
+
+  const deleteSelected = async () => {
+    const check = prompt(`Окончательное удаление необратимо. Введите УДАЛИТЬ ${selectedIds.length}, чтобы продолжить.`);
+    if (check !== `УДАЛИТЬ ${selectedIds.length}`) return;
+    await run('user-accounts:delete', { userIds: selectedIds, idempotencyKey: `delete_users_${selectedIds.slice().sort().join('_')}` }, `Удалено аккаунтов: ${selectedIds.length}.`);
+  };
+
+  const tabs = [
+    ['active', 'Активные', activeUsers.length],
+    ['duplicates', 'Вероятные дубли', duplicateGroups.length],
+    ['archive', 'Архив', archivedUsers.length],
+  ];
+
+  return (
+    <div>
+      <div style={{ ...s.card, position: 'sticky', top: 70, zIndex: 30 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ ...s.h2, marginBottom: 4 }}>Пользователи</h2>
+            <div style={{ color: A.textSec, fontSize: 12 }}>Поиск, проверка дублей и безопасное управление аккаунтами</div>
+          </div>
+          <button type="button" onClick={findDuplicates} disabled={duplicateLoading || busy} style={{ ...s.btn, ...s.btnPri }}>
+            {duplicateLoading ? 'Проверяем...' : 'Найти дубли'}
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 14 }}>
+          {tabs.map(([id, label, count]) => (
+            <button key={id} type="button" onClick={() => { setView(id); setSelectedIds([]); }} style={{ ...s.btn, ...(view === id ? s.btnPri : s.btnGray), padding: '7px 11px', fontSize: 12 }}>
+              {label} · {count}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) auto', gap: 8, marginTop: 12 }}>
+          <input value={queryText} onChange={event => setQueryText(event.target.value)} placeholder="Имя, email, телефон, Telegram или ID" style={{ ...s.input, margin: 0 }} />
+          <button type="button" onClick={() => setSelectedIds(allVisibleSelected ? selectedIds.filter(id => !visibleIds.includes(id)) : [...new Set([...selectedIds, ...visibleIds])])} style={{ ...s.btn, ...s.btnGray }}>
+            {allVisibleSelected ? 'Снять выбор' : 'Выбрать все'}
+          </button>
+        </div>
+        {(selectedIds.length > 0 || notice) && (
+          <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {selectedIds.length > 0 && <span style={{ color: A.gold, fontSize: 12, fontWeight: 850 }}>Выбрано: {selectedIds.length}</span>}
+            {selectedIds.length > 0 && view !== 'archive' && <button type="button" disabled={busy} onClick={archiveSelected} style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }}>В архив</button>}
+            {selectedIds.length > 0 && view === 'archive' && <button type="button" disabled={busy} onClick={restoreSelected} style={{ ...s.btn, ...s.btnPri, padding: '6px 10px', fontSize: 12 }}>Восстановить</button>}
+            {selectedIds.length > 0 && view === 'archive' && <button type="button" disabled={busy} onClick={deleteSelected} style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }}>Удалить навсегда</button>}
+            {notice && <span style={{ color: A.textSec, fontSize: 12 }}>{notice}</span>}
+          </div>
+        )}
+      </div>
+
+      {view === 'duplicates' && duplicateGroups.length > 0 && (
+        <div style={{ display: 'grid', gap: 12 }}>
+          {duplicateGroups.map(group => (
+            <div key={group.id} style={{ ...s.card, marginBottom: 0, border: `1px solid ${group.confidence === 'high' ? 'rgba(230,70,70,0.38)' : 'rgba(201,168,76,0.34)'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ color: A.text, fontWeight: 900 }}>{group.users.length} аккаунта · совпадение {group.score}%</div>
+                  <div style={{ color: A.textSec, fontSize: 11, marginTop: 4 }}>{group.reasons.map(reason => reason.label).join(' · ')}</div>
+                </div>
+                <button type="button" onClick={() => openMerge(group)} style={{ ...s.btn, ...s.btnPri }}>Разобрать группу</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 8, marginTop: 12 }}>
+                {group.users.map(user => (
+                  <div key={user.id} style={{ background: A.chip, borderRadius: 13, padding: 11 }}>
+                    <div style={{ color: A.text, fontWeight: 850 }}>{userDisplayName(user)}</div>
+                    <div style={{ color: A.textSec, fontSize: 11, marginTop: 4, lineHeight: '16px', wordBreak: 'break-word' }}>
+                      {user.email || user.linkedEmail || 'без email'}<br />{user.telegramId || user.tgId || user.telegramUsername || 'без Telegram'}<br />{user.id}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {view !== 'duplicates' && (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {filtered.map(user => {
+            const checked = selectedIds.includes(user.id);
+            return (
+              <div key={user.id} style={{ ...s.card, marginBottom: 0, display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: 12, alignItems: 'center', border: checked ? `1px solid ${A.gold}` : `1px solid ${A.border}` }}>
+                <input type="checkbox" checked={checked} onChange={() => setSelectedIds(prev => prev.includes(user.id) ? prev.filter(id => id !== user.id) : [...prev, user.id])} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: A.text, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis' }}>{userDisplayName(user)}</div>
+                  <div style={{ color: A.textSec, fontSize: 11, marginTop: 4, wordBreak: 'break-word' }}>
+                    {[user.email || user.linkedEmail, user.phone || user.phoneNumber, user.telegramId || user.tgId || user.telegramUsername, user.id].filter(Boolean).join(' · ')}
+                  </div>
+                  {user.mergedInto && <div style={{ color: A.gold, fontSize: 11, marginTop: 4 }}>Объединён с {user.mergedInto}</div>}
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ color: A.gold, fontWeight: 900, whiteSpace: 'nowrap' }}>{Number(user.keys || 0)} 🗝</span>
+                  <button type="button" onClick={() => openEdit(user)} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 12 }}>Изменить</button>
+                </div>
+              </div>
+            );
+          })}
+          {!filtered.length && <div style={{ ...s.card, color: A.textSec, textAlign: 'center' }}>Нет аккаунтов по выбранным условиям.</div>}
+        </div>
+      )}
+
+      {editingUser && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 16px 48px' }} onClick={event => { if (event.target === event.currentTarget) setEditingUser(null); }}>
+          <div style={{ ...s.card, width: '100%', maxWidth: 620 }}>
+            <h2 style={s.h2}>Редактирование аккаунта</h2>
+            {[['name', 'Имя'], ['email', 'Email'], ['phone', 'Телефон'], ['telegramUsername', 'Telegram username'], ['role', 'Роль']].map(([key, label]) => (
+              <label key={key} style={{ display: 'block', marginBottom: 10, color: A.textSec, fontSize: 12 }}>{label}<input value={editForm[key] || ''} onChange={event => setEditForm(prev => ({ ...prev, [key]: event.target.value }))} style={{ ...s.input, marginTop: 5 }} /></label>
+            ))}
+            <label style={{ display: 'block', color: A.textSec, fontSize: 12 }}>Заметка администратора<textarea value={editForm.adminNote || ''} onChange={event => setEditForm(prev => ({ ...prev, adminNote: event.target.value }))} style={{ ...s.input, minHeight: 90, marginTop: 5 }} /></label>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <button type="button" onClick={() => setEditingUser(null)} style={{ ...s.btn, ...s.btnGray }}>Отмена</button>
+              <button type="button" disabled={busy} onClick={saveEdit} style={{ ...s.btn, ...s.btnPri }}>{busy ? 'Сохраняем...' : 'Сохранить'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mergeGroup && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 16px 48px' }} onClick={event => { if (event.target === event.currentTarget) setMergeGroup(null); }}>
+          <div style={{ ...s.card, width: '100%', maxWidth: 700 }}>
+            <h2 style={s.h2}>Разбор дублирующихся аккаунтов</h2>
+            <div style={{ color: A.textSec, fontSize: 12, lineHeight: '18px', marginBottom: 12 }}>Выберите основной аккаунт. Данные и связи дублей будут перенесены в него, а исходные аккаунты останутся в архиве с указателем на основной.</div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {mergeGroup.users.map(user => (
+                <label key={user.id} style={{ padding: 11, borderRadius: 13, background: mergeTargetId === user.id ? 'rgba(201,168,76,0.12)' : A.chip, border: `1px solid ${mergeTargetId === user.id ? A.gold : A.border}`, cursor: 'pointer' }}>
+                  <input type="radio" name="mergeTarget" checked={mergeTargetId === user.id} onChange={() => { setMergeTargetId(user.id); setMergePreview(null); }} /> <span style={{ color: A.text, fontWeight: 850 }}>{userDisplayName(user)}</span>
+                  <div style={{ color: A.textSec, fontSize: 11, margin: '4px 0 0 22px' }}>{user.email || 'без email'} · {Number(user.keys || 0)} ключей · {user.id}</div>
+                </label>
+              ))}
+            </div>
+            {mergePreview && (
+              <div style={{ marginTop: 12, padding: 12, borderRadius: 13, background: 'rgba(75,179,75,0.09)', border: '1px solid rgba(75,179,75,0.28)', color: A.text, fontSize: 12, lineHeight: '18px' }}>
+                Будет перенесено связанных записей: {mergePreview.referenceCount}. Итог: {mergePreview.totals.keys} ключей, {mergePreview.totals.tickets} билетов, {mergePreview.totals.aliases} идентификаторов.
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+              <button type="button" onClick={() => setMergeGroup(null)} style={{ ...s.btn, ...s.btnGray }}>Отмена</button>
+              <button type="button" disabled={busy} onClick={previewMerge} style={{ ...s.btn, ...s.btnGray }}>Проверить перенос</button>
+              <button type="button" disabled={busy || !mergePreview} onClick={executeMerge} style={{ ...s.btn, ...s.btnPri }}>{busy ? 'Объединяем...' : 'Объединить'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -8030,7 +8284,7 @@ export const AdminPanel = () => {
       )}
 
       {activeTab === 'users' && (
-        <AdminUsersPanel users={adminMetrics.users} onAuthAction={runAdminAction} />
+        <AdminUsersPanel users={adminMetrics.users} onAction={runAdminAction} onRefresh={fetchData} />
       )}
 
       {activeTab === 'referrals' && (
