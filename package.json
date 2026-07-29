@@ -107,6 +107,7 @@
     "test:social-messaging": "node scripts/social-messaging-test.mjs",
     "test:social-messaging-server": "node scripts/social-messaging-server-test.mjs",
     "test:connections": "node scripts/connections-test.mjs",
+    "test:partner-post-push-connections": "node scripts/partner-post-push-connections-regression.mjs",
     "test:social-platform-v2": "node scripts/social-platform-v2-test.mjs",
     "test:people-actions": "node scripts/people-actions-test.mjs",
     "test:people-navigation": "node scripts/people-navigation-test.mjs",

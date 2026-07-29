@@ -4202,7 +4202,7 @@ export function UserApp() {
 
   const requestWebPushPermission = useCallback(async ({ silent = false } = {}) => {
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-      if (!silent) showToast('❌ Push не поддерживается в этом браузере', 'error');
+      if (!silent) showToast('Уведомления не поддерживаются этим браузером или режимом просмотра. Откройте АПГ в обычном браузере или установленном приложении.', 'info');
       return;
     }
     try {
@@ -4221,14 +4221,17 @@ export function UserApp() {
       if (!silent) showToast('🔔 Уведомления включены!', 'success');
     } catch (e) {
       logError(e, 'UserApp.requestWebPushPermission');
-      localStorage.removeItem('apg_notif_enabled');
-      setNotifEnabled(false);
-      setUser(prev => prev ? ({
-        ...prev,
-        notificationsEnabled: false,
-        notificationProvider: null,
-      }) : prev);
-      if (!silent) showToast('❌ Не удалось включить уведомления', 'error');
+      const message = String(e?.message || '');
+      const explanation = /permission:\s*denied/i.test(message)
+        ? 'Разрешение на уведомления заблокировано. Включите его в настройках сайта в браузере.'
+        : /permission:\s*default/i.test(message)
+          ? 'Разрешение не было предоставлено. Нажмите ещё раз и подтвердите запрос браузера.'
+          : /service worker/i.test(message)
+            ? 'Сервис уведомлений ещё загружается. Обновите страницу и повторите попытку.'
+            : /pushmanager|notification api|unsupported/i.test(message)
+              ? 'Push-уведомления недоступны в этом браузере или режиме просмотра.'
+              : `Не удалось зарегистрировать это устройство: ${message || 'неизвестная ошибка'}`;
+      if (!silent) showToast(explanation, 'error');
     }
   }, [user, showToast]);
 
@@ -4295,6 +4298,14 @@ export function UserApp() {
     requestWebPushPermission();
   }, [user, showToast, requestWebPushPermission]);
 
+  useEffect(() => {
+    if (!user?.notificationsEnabled) return;
+    if (isVK() || (typeof Notification !== 'undefined' && Notification.permission === 'granted')) {
+      setNotifEnabled(true);
+      localStorage.setItem('apg_notif_enabled', '1');
+    }
+  }, [user?.id, user?.notificationsEnabled]);
+
   const handleNotificationPreferencesChange = useCallback(async (preferences) => {
     if (!user?.id) return;
     setUser(prev => prev ? ({ ...prev, notificationPreferences: preferences }) : prev);
@@ -4314,8 +4325,13 @@ export function UserApp() {
   useEffect(() => {
     if (!user || localStorage.getItem('apg_request_notification_after_login') !== '1') return;
     localStorage.removeItem('apg_request_notification_after_login');
+    if (
+      notifEnabled
+      || user.notificationsEnabled
+      || (typeof Notification !== 'undefined' && Notification.permission === 'granted')
+    ) return;
     handleEnableNotifications();
-  }, [user, handleEnableNotifications]);
+  }, [user, notifEnabled, handleEnableNotifications]);
 
   const VK_GROUP_ID = 229980067;
   const handleJoinGroup = useCallback(async () => {

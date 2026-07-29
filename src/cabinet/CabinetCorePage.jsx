@@ -31,7 +31,7 @@ const MODULES = [
   ['analytics', 'Аналитика'],
   ['media', 'Галерея'],
   ['contacts', 'Контакты'],
-  ['content', 'Контент'],
+  ['content', 'Создать пост'],
   ['reviews', 'Отзывы'],
   ['notifications', 'Уведомления'],
   ['loki', 'Локи'],
@@ -52,7 +52,7 @@ const CABINET_NAV_GROUPS = [
   { id: 'home', label: 'Главная', icon: '⌂', modules: ['dashboard', 'tasks', 'notifications'] },
   { id: 'showcase', label: 'Витрина', icon: '◇', modules: ['showcase-builder'] },
   { id: 'clients', label: 'Клиенты', icon: '◎', modules: ['booking', 'dialogs', 'reviews'] },
-  { id: 'content', label: 'Контент', icon: '✎', modules: ['content', 'events'] },
+  { id: 'content', label: 'Создать пост', icon: '✎', modules: ['content', 'events'] },
   { id: 'promotion', label: 'Продвижение', icon: '↗', modules: ['promotions', 'qr', 'analytics'] },
   { id: 'more', label: 'Ещё', icon: '•••', modules: ['loki', 'settings', 'history'] },
 ];
@@ -370,12 +370,10 @@ function ContactsModule({ role, profile, onSaved, onToast }) {
 
 function ContentModule({ snapshot, events, onEventCreated, onToast }) {
   return (
-    <GlassSection title="Контент">
+    <GlassSection title="Создать пост">
       <div style={{ display: 'grid', gap: 10 }}>
-        <SectionCard tone="gold" title="Моя лента" text="Публикуйте новости, фото, советы, кейсы и анонсы в ленте своего профиля. Для общей ленты АПГ отправляйте материал на модерацию." />
-        <WorkspaceNewsCenter role={{ id: snapshot.roleId }} profile={snapshot.profile} events={events} compact onOpenPanel={() => {}} onToast={onToast} />
+        <WorkspaceNewsCenter role={{ id: snapshot.roleId }} profile={snapshot.profile} events={events} compact openCreateOnMount onOpenPanel={() => {}} onToast={onToast} />
         <SectionCard title={snapshot.roleId === 'expert' ? 'Предложение для АПГ' : 'Акции'} text={snapshot.profile?.offer || 'Добавьте скидку, бонус, подарок или спецусловие для пользователей АПГ.'} tone={snapshot.profile?.offer ? 'gold' : 'glass'} />
-        <CabinetEventsBlock type={snapshot.roleId === 'expert' ? 'expert' : 'partner'} profile={snapshot.profile} events={events} onEventCreated={onEventCreated} onToast={onToast} />
       </div>
     </GlassSection>
   );

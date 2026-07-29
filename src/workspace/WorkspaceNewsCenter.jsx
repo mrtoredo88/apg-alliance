@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { API_BASE_URL } from '../constants.js';
 import { GalleryUpload, PhotoUpload } from '../PhotoUpload.jsx';
 import { userAction } from '../userApi.js';
@@ -218,7 +219,9 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
   });
   const [status, setStatus] = useState('Готово');
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(false);
   const dirtyRef = useRef(false);
+  const textRef = useRef(null);
 
   useEffect(() => {
     const saved = readLocalNewsDraft(storageKey);
@@ -306,6 +309,21 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
     if (type === 'social') patch({ text: `${draft.text || draft.summary || draft.title}\n\nКоротко: ${draft.summary || draft.subtitle || draft.title}`.trim() });
   };
 
+  const formatSelection = (before, after = before, fallback = 'текст') => {
+    const field = textRef.current;
+    if (!field) return;
+    const start = field.selectionStart ?? 0;
+    const end = field.selectionEnd ?? start;
+    const source = draft.text || draft.fullText || '';
+    const selected = source.slice(start, end) || fallback;
+    const next = `${source.slice(0, start)}${before}${selected}${after}${source.slice(end)}`;
+    patch({ text: next, fullText: next });
+    requestAnimationFrame(() => {
+      field.focus();
+      field.setSelectionRange(start + before.length, start + before.length + selected.length);
+    });
+  };
+
   return (
     <div style={card({ padding: 14, display: 'grid', gap: 12, background: UI.strong })}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'start' }}>
@@ -324,7 +342,15 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
       <input value={draft.title || ''} onChange={event => patch({ title: event.target.value })} placeholder="Заголовок" style={input({ fontSize: 18, fontWeight: 850 })} />
       <input value={draft.subtitle || ''} onChange={event => patch({ subtitle: event.target.value })} placeholder="Подзаголовок" style={input()} />
       <textarea value={draft.summary || ''} onChange={event => patch({ summary: event.target.value })} placeholder="Краткое описание" style={input({ minHeight: 74, padding: 11, lineHeight: '19px', resize: 'vertical' })} />
-      <textarea value={draft.text || draft.fullText || ''} onChange={event => patch({ text: event.target.value, fullText: event.target.value })} placeholder="Текст новости, markdown, цитаты и блоки" style={input({ minHeight: 220, padding: 12, lineHeight: '20px', resize: 'vertical' })} />
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <button type="button" onClick={() => formatSelection('**')} style={button('light', { minHeight: 32, padding: '5px 9px' })}><b>Ж</b></button>
+        <button type="button" onClick={() => formatSelection('_')} style={button('light', { minHeight: 32, padding: '5px 9px' })}><i>К</i></button>
+        <button type="button" onClick={() => formatSelection('- ', '', 'пункт списка')} style={button('light', { minHeight: 32, padding: '5px 9px' })}>Список</button>
+        <button type="button" onClick={() => formatSelection('[', '](https://)', 'ссылка')} style={button('light', { minHeight: 32, padding: '5px 9px' })}>Ссылка</button>
+        <button type="button" onClick={() => setPreview(value => !value)} style={button(preview ? 'primary' : 'light', { minHeight: 32, padding: '5px 9px' })}>Предпросмотр</button>
+      </div>
+      <textarea ref={textRef} value={draft.text || draft.fullText || ''} onChange={event => patch({ text: event.target.value, fullText: event.target.value })} placeholder="Напишите текст публикации" style={input({ minHeight: 220, padding: 12, lineHeight: '20px', resize: 'vertical' })} />
+      {preview && <div style={card({ padding: 14, boxShadow: 'none', background: UI.control })}><div style={{ color: UI.gold, fontSize: 11, fontWeight: 900, textTransform: 'uppercase' }}>Предпросмотр</div><div style={{ color: UI.text, fontSize: 18, lineHeight: '24px', fontWeight: 920, marginTop: 8 }}>{draft.title || 'Без заголовка'}</div><div style={{ color: UI.soft, fontSize: 13.5, lineHeight: '21px', whiteSpace: 'pre-wrap', marginTop: 8 }}>{draft.text || 'Начните писать — предпросмотр появится здесь.'}</div></div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8 }}>
         <select value={draft.category || 'partners'} onChange={event => patch({ category: event.target.value })} style={button('light')}>{NEWS_CATEGORIES.filter(item => item.id !== 'all').map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
@@ -333,6 +359,12 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
         <input value={draft.linkUrl || ''} onChange={event => patch({ linkUrl: event.target.value })} placeholder="Ссылка" style={input()} />
         <input value={draft.linkLabel || ''} onChange={event => patch({ linkLabel: event.target.value })} placeholder="Текст кнопки" style={input()} />
       </div>
+      <textarea value={(draft.videos || []).join('\n')} onChange={event => patch({ videos: event.target.value.split(/\n|,/).map(value => value.trim()).filter(Boolean).slice(0, 8) })} placeholder="Ссылки на YouTube, VK Видео, Rutube — по одной в строке" style={input({ minHeight: 84, padding: 11, lineHeight: '19px', resize: 'vertical' })} />
+      <label style={card({ padding: 11, boxShadow: 'none', display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr)', gap: 10, alignItems: 'center' })}>
+        <input type="checkbox" checked={Boolean(draft.scheduledAt)} onChange={event => patch({ scheduledAt: event.target.checked ? new Date(Date.now() + 3600000).toISOString().slice(0, 16) : '' })} />
+        <span style={{ color: UI.text, fontSize: 13, fontWeight: 820 }}>Добавить публикацию в свой календарь</span>
+        {draft.scheduledAt && <input type="datetime-local" value={String(draft.scheduledAt).slice(0, 16)} onChange={event => patch({ scheduledAt: event.target.value })} style={input({ gridColumn: '1 / -1' })} />}
+      </label>
 
       <div style={card({ padding: 12, boxShadow: 'none', background: 'rgba(200,155,60,0.08)' })}>
         <div style={{ color: UI.text, fontSize: 14, fontWeight: 900 }}>Локи помогает</div>
@@ -344,18 +376,10 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
         </div>
       </div>
 
-      <div style={card({ padding: 12, boxShadow: 'none' })}>
-        <div style={{ color: UI.text, fontSize: 14, fontWeight: 900 }}>Создать из мероприятия</div>
-        <div style={{ display: 'grid', gap: 7, marginTop: 8 }}>
-          {events.slice(0, 5).map(event => <button key={event.id} onClick={() => onCreatedFromEvent(event.id)} style={{ ...button('light'), textAlign: 'left' }}>{event.title || event.name || 'Мероприятие'} · {dateText(event.startAt || event.eventDate || event.date)}</button>)}
-          {!events.length && <div style={{ color: UI.muted, fontSize: 12 }}>Нет доступных мероприятий для черновика.</div>}
-        </div>
-      </div>
-
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-        <button disabled={busy} onClick={saveLocal} style={button('light', { opacity: busy ? 0.62 : 1 })}>Сохранить черновик</button>
-        <button disabled={busy} onClick={() => save()} style={button('light', { opacity: busy ? 0.62 : 1 })}>{busy ? 'Публикуем...' : 'Опубликовать в профиле'}</button>
-        <button disabled={busy} onClick={() => save({ submit: true })} style={button('primary', { opacity: busy ? 0.62 : 1 })}>{busy ? 'Отправляем...' : 'Отправить в АПГ'}</button>
+        <button disabled={busy} onClick={() => { if (dirtyRef.current) saveLocal(); onClose?.(); }} style={button('light', { opacity: busy ? 0.62 : 1 })}>Отмена</button>
+        <button disabled={busy} onClick={saveLocal} style={button('light', { opacity: busy ? 0.62 : 1 })}>Черновик</button>
+        <button disabled={busy} onClick={() => save()} style={button('primary', { opacity: busy ? 0.62 : 1 })}>{busy ? 'Публикуем...' : 'Опубликовать'}</button>
       </div>
     </div>
   );
@@ -376,7 +400,7 @@ function Preview({ item }) {
   );
 }
 
-export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpenPanel, onToast, compact = false }) {
+export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpenPanel, onToast, compact = false, openCreateOnMount = false }) {
   const initialIntent = useMemo(() => readWorkspaceLinkIntent('content') || {}, []);
   const [items, setItems] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -388,6 +412,7 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [comments, setComments] = useState([]);
+  const openedCreateRef = useRef(false);
 
   const load = async () => {
     if (!profile?.id || !['partner', 'expert'].includes(role?.id)) return;
@@ -406,6 +431,12 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
   };
 
   useEffect(() => { load(); }, [profile?.id, role?.id]);
+
+  useEffect(() => {
+    if (!openCreateOnMount || openedCreateRef.current || !profile?.id) return;
+    openedCreateRef.current = true;
+    setSelected({ ...defaultDraft(profile, role?.id), id: '' });
+  }, [openCreateOnMount, profile?.id, role?.id]);
 
   useEffect(() => {
     if (!selected?.id) {
@@ -497,7 +528,12 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
 
       {error && <div style={card({ padding: 12, color: UI.red, background: 'rgba(217,93,84,0.10)', boxShadow: 'none' })}>{error}</div>}
 
-      {compact && editor}
+      {compact && editor && createPortal(
+        <div onClick={event => { if (event.target === event.currentTarget) setSelected(null); }} style={{ position: 'fixed', inset: 0, zIndex: 1400, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', overflowY: 'auto', padding: '24px 12px 56px' }}>
+          <div style={{ width: '100%', maxWidth: 760 }}>{editor}</div>
+        </div>,
+        document.body
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: compact ? 'minmax(0,1fr)' : 'minmax(360px,1fr) minmax(380px,0.78fr)', gap: compact ? 10 : 14, alignItems: 'start' }}>
         <div style={{ display: 'grid', gap: 10 }}>

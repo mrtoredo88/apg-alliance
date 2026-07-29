@@ -5345,9 +5345,11 @@ async function actionConnectionsRequest(db, req, actor) {
       postgresConnectionProfile(adapter, recipientId),
     ]);
     if (!recipient) throw Object.assign(new Error('Получатель не найден.'), { statusCode: 404, code: 'RECIPIENT_NOT_FOUND' });
-    const normalizedSenderId = cleanSocialId(sender?.canonicalUserId || sender?.id || senderId);
-    const normalizedRecipientId = cleanSocialId(recipient.canonicalUserId || recipient.id);
-    if (normalizedSenderId === normalizedRecipientId) throw Object.assign(new Error('Нельзя добавить в друзья собственный профиль.'), { statusCode: 400, code: 'INVALID_RECIPIENT' });
+    const normalizedSenderId = cleanSocialId(sender?.id || senderId);
+    const normalizedRecipientId = cleanSocialId(recipient.id);
+    const senderCanonicalId = cleanSocialId(sender?.canonicalUserId || normalizedSenderId);
+    const recipientCanonicalId = cleanSocialId(recipient.canonicalUserId || normalizedRecipientId);
+    if (normalizedSenderId === normalizedRecipientId || senderCanonicalId === recipientCanonicalId) throw Object.assign(new Error('Нельзя добавить в друзья собственный профиль.'), { statusCode: 400, code: 'INVALID_RECIPIENT' });
     const pairKey = [normalizedSenderId, normalizedRecipientId].sort().join('::');
     const existingResult = await adapter.query('SELECT * FROM apg_social_connection_requests WHERE pair_key = $1 LIMIT 1', [pairKey]);
     const existing = existingResult.rows?.[0] ? postgresConnectionRecord(existingResult.rows[0]) : null;
@@ -5474,9 +5476,11 @@ async function actionConnectionsRequest(db, req, actor) {
 async function actionConnectionsResolve(db, req, actor, status) {
   const adapter = postgresSocialAdapter();
   if (adapter) {
+    const actorProfile = await postgresConnectionProfile(adapter, actor.userId);
+    const actorConnectionId = cleanSocialId(actorProfile?.id || actor.userId);
     const requestId = safeString(req.body?.requestId, 260);
     const targetId = cleanSocialId(req.body?.targetUserId || req.body?.recipientId || req.body?.userId);
-    const params = requestId ? [requestId] : [actor.userId, targetId];
+    const params = requestId ? [requestId] : [actorConnectionId, targetId];
     const result = requestId
       ? await adapter.query('SELECT * FROM apg_social_connection_requests WHERE id = $1 LIMIT 1', params)
       : await adapter.query(`
@@ -5488,15 +5492,15 @@ async function actionConnectionsResolve(db, req, actor, status) {
         `, params);
     const request = result.rows?.[0] ? postgresConnectionRecord(result.rows[0]) : null;
     if (!request) throw Object.assign(new Error('Запрос не найден.'), { statusCode: 404, code: 'REQUEST_NOT_FOUND' });
-    if (status === SOCIAL_REQUEST_STATUS.CANCELLED && request.senderId !== actor.userId) {
+    if (status === SOCIAL_REQUEST_STATUS.CANCELLED && request.senderId !== actorConnectionId) {
       throw Object.assign(new Error('Нельзя отменить чужой запрос.'), { statusCode: 403, code: 'REQUEST_FORBIDDEN' });
     }
-    if ([SOCIAL_REQUEST_STATUS.ACCEPTED, SOCIAL_REQUEST_STATUS.DECLINED].includes(status) && request.recipientId !== actor.userId) {
+    if ([SOCIAL_REQUEST_STATUS.ACCEPTED, SOCIAL_REQUEST_STATUS.DECLINED].includes(status) && request.recipientId !== actorConnectionId) {
       throw Object.assign(new Error('Нельзя отвечать на чужой запрос.'), { statusCode: 403, code: 'REQUEST_FORBIDDEN' });
     }
     if (request.status !== SOCIAL_REQUEST_STATUS.PENDING) {
       if (request.status === status) {
-        return { ok: true, request: socialRequestMirror(request, actor.userId), status, dialogId: request.dialogId || '', connectionStatus: status === SOCIAL_REQUEST_STATUS.ACCEPTED ? CONNECTION_STATUS.CONNECTED : CONNECTION_STATUS.DECLINED, connection: connectionSnapshot(request, actor.userId) };
+        return { ok: true, request: socialRequestMirror(request, actorConnectionId), status, dialogId: request.dialogId || '', connectionStatus: status === SOCIAL_REQUEST_STATUS.ACCEPTED ? CONNECTION_STATUS.CONNECTED : CONNECTION_STATUS.DECLINED, connection: connectionSnapshot(request, actorConnectionId) };
       }
       throw Object.assign(new Error('Запрос уже обработан.'), { statusCode: 409, code: 'REQUEST_ALREADY_RESOLVED' });
     }
@@ -5513,7 +5517,7 @@ async function actionConnectionsResolve(db, req, actor, status) {
       connectedAt: status === SOCIAL_REQUEST_STATUS.ACCEPTED ? now.toISOString() : request.connectedAt || null,
       history: [
         ...(Array.isArray(request.history) ? request.history.slice(-10) : []),
-        connectionHistoryEntry(status === SOCIAL_REQUEST_STATUS.ACCEPTED ? 'connected' : status, actor.userId, {
+        connectionHistoryEntry(status === SOCIAL_REQUEST_STATUS.ACCEPTED ? 'connected' : status, actorConnectionId, {
           source: request.connectionSource,
           sourceLabel: request.connectionSourceLabel,
           sourceId: request.connectionSourceId,
@@ -5529,11 +5533,11 @@ async function actionConnectionsResolve(db, req, actor, status) {
     `, [request.id, status, JSON.stringify(mirrored), now]);
     return {
       ok: true,
-      request: socialRequestMirror(mirrored, actor.userId),
+      request: socialRequestMirror(mirrored, actorConnectionId),
       status,
       dialogId: mirrored.dialogId || '',
       connectionStatus,
-      connection: connectionSnapshot(mirrored, actor.userId),
+      connection: connectionSnapshot(mirrored, actorConnectionId),
     };
   }
   const result = await actionSocialResolveRequest(db, req, actor, status);
