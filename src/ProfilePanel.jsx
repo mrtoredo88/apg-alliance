@@ -2280,22 +2280,35 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         )}
 
         <section style={{ position: 'relative', minHeight: 216, borderRadius: 32, overflow: 'hidden', ...APG2.glass, padding: 14, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 72% 12%, ${level.color}33, transparent 34%), radial-gradient(circle at 20% 0%, rgba(215,184,106,0.2), transparent 28%)` }} />
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: `radial-gradient(circle at 72% 12%, ${level.color}33, transparent 34%), radial-gradient(circle at 20% 0%, rgba(215,184,106,0.2), transparent 28%)` }} />
           <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14 }}>
             <GlassBadge tone="gold">{level.emoji} {level.label}</GlassBadge>
           </div>
           <div style={{ position: 'relative', zIndex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <div data-testid="profile-identity-edit-target" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <button
+                type="button"
+                data-testid="profile-name-edit"
+                onClick={() => setShowProfileEditor(true)}
+                aria-label="Редактировать имя, фамилию и дату рождения"
+                style={{
+                  position: 'absolute',
+                  inset: -4,
+                  zIndex: 5,
+                  border: 0,
+                  borderRadius: 22,
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              />
               {profileAvatarUrl
                 ? <img src={profileAvatarUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: 56, height: 56, borderRadius: 21, objectFit: 'cover', border: '2px solid rgba(215,184,106,0.48)', boxShadow: '0 14px 34px rgba(0,0,0,0.30)' }} />
                 : <div style={{ width: 56, height: 56, borderRadius: 21, background: 'linear-gradient(145deg,rgba(215,184,106,0.3),rgba(255,255,255,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: APG2.text, fontSize: 23, fontWeight: 850 }}>{displayName[0]}</div>
               }
               <div style={{ flex: 1, minWidth: 0 }}>
-                <button
-                  type="button"
-                  data-testid="profile-name-edit"
-                  onClick={() => setShowProfileEditor(true)}
-                  aria-label="Редактировать имя, фамилию и дату рождения"
+                <div
                   style={{
                     width: '100%',
                     minHeight: 44,
@@ -2319,7 +2332,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 >
                   <span>{displayName}</span>
                   <span aria-hidden="true" style={{ width: 30, height: 30, borderRadius: 11, flexShrink: 0, display: 'grid', placeItems: 'center', color: APG2.gold, background: APG2.goldSoft, fontSize: 14 }}>✎</span>
-                </button>
+                </div>
                 <div style={{ color: APG2.textSoft, fontSize: 13, marginTop: 5 }}>Ваш прогресс в городе</div>
               </div>
             </div>

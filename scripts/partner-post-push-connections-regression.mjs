@@ -22,8 +22,10 @@ assert.match(editor, /var\(--apg-vv-bottom, 0px\)\) \+ 10px/, 'news editor actio
 assert.match(editor, /position: 'sticky'/);
 
 assert.match(profile, /data-testid="profile-name-edit"/);
+assert.match(profile, /data-testid="profile-identity-edit-target"/);
 assert.match(profile, /aria-label="Редактировать имя, фамилию и дату рождения"/);
 assert.match(profile, /minHeight: 44/);
+assert.match(profile, /position: 'absolute',\s+inset: -4,\s+zIndex: 5/);
 assert.match(profile, /user\?\.id \|\| user\?\.userId \|\| user\?\.canonicalUserId \|\| user\?\.uid/, 'profile editor should support every authenticated id shape');
 assert.match(profile, /label: 'Настройки профиля',\s+action: \(\) => setShowProfileEditor\(true\)/, 'profile settings should open the editor');
 assert.match(profile, /placeholder="Имя"/);
