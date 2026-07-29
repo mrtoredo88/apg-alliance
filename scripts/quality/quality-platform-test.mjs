@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { CRITICAL_USER_JOURNEYS, QUALITY_ROLES, QUALITY_ROUTES, QUALITY_VIEWPORTS } from './catalog.mjs';
 import { createQualityReport, groupRootCauses } from './core.mjs';
 import { discoverEndpoints } from './api-scanner.mjs';
@@ -21,4 +22,7 @@ const rootCauses = groupRootCauses([
 assert.equal(rootCauses.length, 1);
 assert.equal(rootCauses[0].occurrences, 2);
 assert.equal(createQualityReport({ scans: [{ id: 'contract', status: 'PASS', findings: [] }] }).status, 'PASS');
+const deploy = fs.readFileSync('deploy-frontend.sh', 'utf8');
+assert.match(deploy, /\.quality\/latest\.json/, 'frontend deploy publishes the latest local quality report');
+assert.match(deploy, /no-cache, no-store, must-revalidate/, 'quality report is published without cache');
 console.log(`APG Quality Platform v1 contract passed: ${CRITICAL_USER_JOURNEYS.length} critical journeys`);

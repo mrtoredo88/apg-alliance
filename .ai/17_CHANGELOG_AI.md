@@ -4749,3 +4749,4 @@
 - Создан каталог из 36 Critical User Journeys и контракт, не позволяющий уменьшить его ниже 30 сценариев.
 - APG Health получил вкладку Quality со статусом release gate, сканерами, ошибками и сгруппированными первопричинами.
 - `release:changed` теперь блокирует deploy при FAIL локального quality gate или build; GitHub Actions запускает тот же контур и браузерный scan.
+- Frontend deploy повторно подкладывает последний PASS-отчёт после production build и публикует его без кэша, чтобы APG Health не показывал стартовый `NOT_RUN`.

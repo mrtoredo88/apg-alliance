@@ -21,6 +21,10 @@ if [ "${APG_SKIP_FRONTEND_BUILD:-0}" != "1" ]; then
 else
   echo "Using existing dist/ build."
 fi
+if [ -f .quality/latest.json ]; then
+  mkdir -p dist/quality
+  cp .quality/latest.json dist/quality/latest.json
+fi
 
 # Hashed assets — immutable, 1 year cache
 echo "Uploading assets/..."
@@ -45,6 +49,12 @@ aws s3 cp dist/version.json "s3://$BUCKET/version.json" $S3 \
   --content-type "application/json" \
   --cache-control "no-cache, no-store, must-revalidate"
 
+if [ -f dist/quality/latest.json ]; then
+  aws s3 cp dist/quality/latest.json "s3://$BUCKET/quality/latest.json" $S3 \
+    --content-type "application/json" \
+    --cache-control "no-cache, no-store, must-revalidate"
+fi
+
 if [ -f dist/network-diagnostics-lite ]; then
   aws s3 cp dist/network-diagnostics-lite "s3://$BUCKET/network-diagnostics-lite" $S3 \
     --content-type "text/html; charset=utf-8" \
@@ -62,6 +72,7 @@ aws s3 sync dist/ "s3://$BUCKET/" $S3 \
   --exclude "sw.js" \
   --exclude "manifest.json" \
   --exclude "version.json" \
+  --exclude "quality/latest.json" \
   --exclude "network-diagnostics-lite" \
   --cache-control "public, max-age=86400" \
   --delete
