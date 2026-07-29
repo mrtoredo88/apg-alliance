@@ -46,6 +46,8 @@ assert.match(source, /setMergeError\('Укажите причину объеди
 assert.match(source, /onClick=\{requestMerge\}/);
 assert.match(source, /selectedIds\.length >= 2 && view === 'active'/);
 assert.match(source, /onClick=\{openSelectedMerge\}/);
+assert.match(source, />\s*Количество ключей\s*<input type="number"/);
+assert.match(source, /keys: normalizedKeys/);
 assert.match(source, /\.sort\(compareUsersAlphabetically\)/);
 assert.match(source, /canDeleteUsers=\{String\(adminSession\?\.role \|\| adminSecurity\?\.actor\?\.role \|\| ''\)\.toLowerCase\(\) === 'owner'\}/);
 assert.match(source, />Карточка<\/button>/);

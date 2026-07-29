@@ -219,8 +219,18 @@ async function handleUserAccountsAction(db, request, actor) {
     await requireAdminPermission(request, 'users:update');
     if (!userIds.length || userIds.length > 100) throw Object.assign(new Error('Выберите от 1 до 100 пользователей.'), { statusCode: 400 });
     const requestedPatch = cleanEntityPatch(request.body?.patch);
-    if (action === 'user-accounts:bulk-update' && ['role', 'userRole'].some(field => Object.hasOwn(requestedPatch, field)) && String(actor?.role || '').toLowerCase() !== 'owner') {
-      throw Object.assign(new Error('Изменять роли пользователей может только owner.'), { statusCode: 403 });
+    if (action === 'user-accounts:bulk-update') {
+      const ownerOnlyFields = ['role', 'userRole', 'keys'].filter(field => Object.hasOwn(requestedPatch, field));
+      if (ownerOnlyFields.length && String(actor?.role || '').toLowerCase() !== 'owner') {
+        throw Object.assign(new Error('Изменять роли и количество ключей пользователей может только owner.'), { statusCode: 403 });
+      }
+      if (Object.hasOwn(requestedPatch, 'keys')) {
+        const keys = Number(requestedPatch.keys);
+        if (!Number.isSafeInteger(keys) || keys < 0 || keys > 1000000) {
+          throw Object.assign(new Error('Количество ключей должно быть целым числом от 0 до 1 000 000.'), { statusCode: 400 });
+        }
+        requestedPatch.keys = keys;
+      }
     }
     if (action === 'user-accounts:restore') {
       const restoreSnaps = await Promise.all(userIds.map(id => db.collection('users').doc(id).get()));

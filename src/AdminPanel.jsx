@@ -2104,12 +2104,20 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
       phone: user.phone || user.phoneNumber || '',
       telegramUsername: user.telegramUsername || user.tgUsername || '',
       role: user.role || user.userRole || 'user',
+      keys: Number(user.keys || 0),
       adminNote: user.adminNote || '',
     });
   };
 
   const saveEdit = async () => {
-    const patch = canManageRoles ? editForm : Object.fromEntries(Object.entries(editForm).filter(([key]) => key !== 'role'));
+    const normalizedKeys = Number(editForm.keys);
+    if (canManageRoles && (!Number.isSafeInteger(normalizedKeys) || normalizedKeys < 0 || normalizedKeys > 1000000)) {
+      setNotice('Количество ключей должно быть целым числом от 0 до 1 000 000.');
+      return;
+    }
+    const patch = canManageRoles
+      ? { ...editForm, keys: normalizedKeys }
+      : Object.fromEntries(Object.entries(editForm).filter(([key]) => !['role', 'keys'].includes(key)));
     await run('user-accounts:bulk-update', { userIds: [editingUser.id], patch }, `Аккаунт ${editingUser.id} обновлён.`);
     setEditingUser(null);
   };
@@ -2328,6 +2336,10 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
             {[['name', 'Имя'], ['email', 'Email'], ['phone', 'Телефон'], ['telegramUsername', 'Telegram username'], ['role', 'Роль']].map(([key, label]) => (
               <label key={key} style={{ display: 'block', marginBottom: 10, color: A.textSec, fontSize: 12 }}>{label}<input value={editForm[key] || ''} disabled={key === 'role' && !canManageRoles} title={key === 'role' && !canManageRoles ? 'Изменять роли может только owner' : ''} onChange={event => setEditForm(prev => ({ ...prev, [key]: event.target.value }))} style={{ ...s.input, marginTop: 5, opacity: key === 'role' && !canManageRoles ? 0.6 : 1 }} /></label>
             ))}
+            <label style={{ display: 'block', marginBottom: 10, color: A.textSec, fontSize: 12 }}>
+              Количество ключей
+              <input type="number" min="0" max="1000000" step="1" value={editForm.keys ?? 0} disabled={!canManageRoles} title={!canManageRoles ? 'Изменять количество ключей может только owner' : ''} onChange={event => setEditForm(prev => ({ ...prev, keys: event.target.value }))} style={{ ...s.input, marginTop: 5, opacity: !canManageRoles ? 0.6 : 1 }} />
+            </label>
             <label style={{ display: 'block', color: A.textSec, fontSize: 12 }}>Заметка администратора<textarea value={editForm.adminNote || ''} onChange={event => setEditForm(prev => ({ ...prev, adminNote: event.target.value }))} style={{ ...s.input, minHeight: 90, marginTop: 5 }} /></label>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
               <button type="button" onClick={() => setEditingUser(null)} style={{ ...s.btn, ...s.btnGray }}>Отмена</button>

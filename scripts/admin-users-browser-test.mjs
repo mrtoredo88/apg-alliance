@@ -38,6 +38,7 @@ try {
   await page.getByRole('button', { name: 'Карточка' }).first().click();
   await page.getByRole('button', { name: 'Закрыть' }).click();
   await page.getByRole('button', { name: 'Изменить' }).first().click();
+  await page.getByLabel('Количество ключей').fill('12');
   await page.getByRole('button', { name: 'Сохранить' }).click();
   await page.getByRole('button', { name: 'Выбрать все' }).click();
   dialogAnswers.push(true, 'Плановая проверка тестового аккаунта');
@@ -63,6 +64,8 @@ try {
     'user-accounts:bulk-update', 'user-accounts:archive', 'user-accounts:restore',
     'user-accounts:delete', 'user-accounts:not-duplicate', 'user-accounts:split-duplicate',
   ]) assert.ok(actions.includes(expected), `Не вызвано действие ${expected}`);
+  const profileUpdate = await page.evaluate(() => window.__adminHarnessActions.find(item => item.action === 'user-accounts:bulk-update'));
+  assert.equal(profileUpdate.payload.patch.keys, 12, 'Количество ключей не передано при редактировании аккаунта');
   assert.equal(dialogAnswers.length, 0, 'Не все подтверждения были обработаны');
   console.log(`Admin users browser test passed: ${actions.length} actions, all controls clickable`);
 } finally {

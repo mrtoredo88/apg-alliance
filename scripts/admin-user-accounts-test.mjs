@@ -84,7 +84,9 @@ assert.match(adminPanelSource, /canDeleteUsers && <button/);
 assert.match(adminPanelSource, /Изменять роли может только owner/);
 
 const adminActionsSource = await import('node:fs/promises').then(fs => fs.readFile(new URL('../server/src/routes/admin-actions.js', import.meta.url), 'utf8'));
-assert.match(adminActionsSource, /Изменять роли пользователей может только owner/);
+assert.match(adminActionsSource, /Изменять роли и количество ключей пользователей может только owner/);
+assert.match(adminActionsSource, /Number\.isSafeInteger\(keys\)/);
+assert.match(adminActionsSource, /keys < 0 \|\| keys > 1000000/);
 assert.match(adminActionsSource, /Объединённые aliases нельзя восстанавливать отдельно/);
 assert.match(adminActionsSource, /Аккаунты изменились после предварительной проверки/);
 assert.match(adminActionsSource, /user-accounts:not-duplicate/);
