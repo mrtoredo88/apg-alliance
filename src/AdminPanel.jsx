@@ -2128,6 +2128,19 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
     setConfirmPrivilegedMerge(false);
   };
 
+  const openSelectedMerge = () => {
+    const selectedUsers = activeUsers.filter(user => selectedIds.includes(user.id));
+    if (selectedUsers.length < 2) {
+      setNotice('Для объединения выберите минимум два активных аккаунта.');
+      return;
+    }
+    openMerge({
+      id: `selected_${selectedUsers.map(user => user.id).sort().join('_')}`,
+      users: selectedUsers,
+      manuallySelected: true,
+    });
+  };
+
   const previewMerge = async () => {
     setMergeBusyAction('preview');
     setMergeError('');
@@ -2243,6 +2256,7 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
         {(selectedIds.length > 0 || notice) && (
           <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             {selectedIds.length > 0 && <span style={{ color: A.gold, fontSize: 12, fontWeight: 850 }}>Выбрано: {selectedIds.length}</span>}
+            {selectedIds.length >= 2 && view === 'active' && <button type="button" disabled={busy} onClick={openSelectedMerge} style={{ ...s.btn, ...s.btnPri, padding: '6px 10px', fontSize: 12 }}>Объединить</button>}
             {selectedIds.length > 0 && view !== 'archive' && <button type="button" disabled={busy} onClick={archiveSelected} style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }}>В архив</button>}
             {selectedIds.length > 0 && view === 'archive' && <button type="button" disabled={busy} onClick={restoreSelected} style={{ ...s.btn, ...s.btnPri, padding: '6px 10px', fontSize: 12 }}>Восстановить</button>}
             {selectedIds.length > 0 && view === 'archive' && canDeleteUsers && <button type="button" disabled={busy} onClick={deleteSelected} style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }}>Удалить навсегда</button>}

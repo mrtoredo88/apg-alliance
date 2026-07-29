@@ -44,6 +44,8 @@ for (const action of [
 assert.match(source, /setMergeError\('Сначала нажмите «Проверить перенос»\.'\)/);
 assert.match(source, /setMergeError\('Укажите причину объединения — минимум 3 символа\.'\)/);
 assert.match(source, /onClick=\{requestMerge\}/);
+assert.match(source, /selectedIds\.length >= 2 && view === 'active'/);
+assert.match(source, /onClick=\{openSelectedMerge\}/);
 assert.match(source, /\.sort\(compareUsersAlphabetically\)/);
 assert.match(source, /canDeleteUsers=\{String\(adminSession\?\.role \|\| adminSecurity\?\.actor\?\.role \|\| ''\)\.toLowerCase\(\) === 'owner'\}/);
 assert.match(source, />Карточка<\/button>/);

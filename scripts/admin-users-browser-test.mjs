@@ -14,6 +14,14 @@ page.on('dialog', async dialog => {
 
 try {
   await page.goto(url, { waitUntil: 'networkidle' });
+  const activeRows = page.getByTestId('admin-user-row');
+  await activeRows.nth(0).locator('input[type="checkbox"]').check();
+  await activeRows.nth(1).locator('input[type="checkbox"]').check();
+  await page.getByRole('button', { name: 'Объединить', exact: true }).last().click();
+  await page.getByRole('button', { name: 'Проверить перенос' }).click();
+  await page.getByPlaceholder('Например: один пользователь зарегистрировался через email и Telegram').fill('Выбраны вручную в списке активных');
+  await page.getByRole('button', { name: 'Объединить', exact: true }).last().click();
+
   await page.getByRole('button', { name: 'Найти дубли' }).click();
   await page.getByRole('button', { name: 'Разобрать группу' }).click();
   await page.getByRole('button', { name: 'Объединить' }).click();
