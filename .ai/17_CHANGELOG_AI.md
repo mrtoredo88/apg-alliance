@@ -15,6 +15,13 @@
 
 ---
 
+## [2026-07-29] fix: надёжная обработка очереди Telegram `/start`
+**Коммит:** `локально, без коммита`
+**Файлы:** `server/src/lib/telegramUpdates.js`, `scripts/telegram-auth-production-path-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** блокировка `getUpdates` покрывает полное окно серверного запроса, а offset сохраняется после каждого отдельного обновления. Параллельный auth-check или cron больше не должен повторно забирать один пакет, а уже обработанная команда не возвращается в очередь после обрыва следующей.
+**Почему:** две команды `/start` оставались в Telegram-очереди; пакетный poller обрывал запрос до общего финального сохранения offset, поэтому бот визуально не реагировал.
+
 ## [2026-07-29] fix: Telegram-привязка объединённого профиля и явный вход после выхода
 **Коммит:** `локально, без коммита`
 **Файлы:** `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `server/src/apg/identity/repositories/IdentityRepository.js`, `scripts/auth-bugfix-regression.mjs`, `.ai/17_CHANGELOG_AI.md`

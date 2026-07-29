@@ -15,6 +15,8 @@ assert.match(updates, /await ref\.update\(\{[\s\S]*status:\s*'done'[\s\S]*comple
 assert.match(updates, /timeoutMs = TELEGRAM_FETCH_TIMEOUT_MS[\s\S]*AbortSignal\.timeout\(timeoutMs\)/, 'Telegram API calls have a bounded timeout');
 assert.match(updates, /TELEGRAM_POLL_ATTEMPTS = 3[\s\S]*telegramPollFetch[\s\S]*get_updates', TELEGRAM_POLL_TIMEOUT_MS/, 'getUpdates retries within a separate container-safe timeout');
 assert.match(updates, /telegram_poll_fetch_failed[\s\S]*errorCode[\s\S]*lastErrorCode/, 'poll failures expose actionable diagnostics');
+assert.match(updates, /const POLL_LOCK_MS = 30000;/, 'poll lock covers the full server request window');
+assert.match(updates, /lastCheckpointAt: FieldValue\.serverTimestamp\(\)/, 'each processed Telegram update checkpoints its offset');
 assert.match(updates, /conflict:\s*res\.error_code === 409/, 'webhook and polling conflict is detected');
 assert.match(check, /status:\s*'expired'[\s\S]*stage:\s*'done_expired'/, 'expired sessions return a clear status and diagnostic stage');
 assert.match(deployment, /Webhook НЕ устанавливать:[\s\S]*getUpdates возвращает 409/, 'production delivery contract remains polling-only');

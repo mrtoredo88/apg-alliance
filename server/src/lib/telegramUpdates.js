@@ -567,7 +567,7 @@ export async function processTelegramUpdate(db, update, log = console) {
 
 // Poll-модель вместо webhook: входящий путь Telegram → Yandex Cloud ненадёжен
 // (getWebhookInfo: connection timed out; доставка с опозданием в десятки минут).
-const POLL_LOCK_MS = 5000;
+const POLL_LOCK_MS = 30000;
 const POLL_STATE_REF = db => db.collection('config').doc('telegramPolling');
 
 export async function pollTelegramUpdates(db, log = console) {
@@ -620,16 +620,23 @@ export async function pollTelegramUpdates(db, log = console) {
     }, 'telegram-poll-forensic');
 
     let processed = 0;
+    let nextOffset = offset;
     for (const update of updates) {
       try {
         await processTelegramUpdate(db, update, log);
         processed += 1;
       } catch (error) {
         log.warn?.({ message: error?.message || String(error), updateId: update?.update_id }, 'telegram update processing failed');
+      } finally {
+        nextOffset = Number(update?.update_id || 0) + 1 || nextOffset;
+        await stateRef.set({
+          offset: nextOffset,
+          lockUntil: Date.now() + POLL_LOCK_MS,
+          lastCheckpointAt: FieldValue.serverTimestamp(),
+        }, { merge: true }).catch(() => {});
       }
     }
 
-    const nextOffset = updates.length ? updates[updates.length - 1].update_id + 1 : offset;
     await stateRef.set({
       lockUntil: 0,
       offset: nextOffset,
