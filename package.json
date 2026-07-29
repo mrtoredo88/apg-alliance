@@ -43,6 +43,7 @@
     "test:admin-assistant": "node scripts/admin-assistant-v1-test.mjs",
     "test:admin-loading": "node scripts/admin-loading-test.mjs",
     "test:admin-users": "node scripts/admin-user-accounts-test.mjs",
+    "test:admin-interactions": "node scripts/admin-interaction-contract-test.mjs",
     "test:loki-personality": "node scripts/loki-personality-v1-test.mjs",
     "test:expert-questionnaire": "node scripts/expert-questionnaire-v2-test.mjs",
     "test:workspace-layout": "node scripts/desktop-workspace-layout-regression.mjs",

@@ -26,6 +26,7 @@ import {
 import { buildReferralMonitoring, referralAlertsToCsv } from '../../../server-shared/referral-monitoring.js';
 import { buildReferralRecoveryScanPlan, summarizeReferralRecoveryPlan } from '../../../server-shared/referral-state-recovery.js';
 import { buildDuplicateGroups, mergeUserProfiles } from '../../../server-shared/admin-user-duplicates.js';
+import { findUserReferences } from '../../../server-shared/admin-user-references.js';
 
 const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'publicationType', 'timelineType', 'distributionMode', 'visibility', 'publishScope', 'apgPublication', 'profileOnly', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
 
@@ -116,8 +117,6 @@ const PARTNER_STATUS_LABELS = {
 };
 const PARTNER_PUBLICATION_MIN_PERCENT = 80;
 const AUTOMATION_SOURCE_LIMIT = 30;
-const USER_REFERENCE_FIELDS = ['userId', 'uid', 'ownerId', 'ownerUserId', 'createdBy', 'updatedBy', 'targetUserId', 'profileUserId', 'canonicalUserId', 'senderId', 'recipientId', 'fromUserId', 'toUserId'];
-const USER_REFERENCE_COLLECTIONS = ['partners', 'experts', 'events', 'scans', 'expertScans', 'raffleEntries', 'prizeClaims', 'expertReviews', 'conversationRequests', 'contextDialogs', 'notifications', 'guestSessions', 'telegramAuthSessions'];
 
 function adminMillis(value) {
   if (!value) return 0;
@@ -129,23 +128,6 @@ function adminMillis(value) {
 function avgNumber(rows, field) {
   if (!rows.length) return 0;
   return Math.round(rows.reduce((sum, row) => sum + Number(row[field] || 0), 0) / rows.length * 10) / 10;
-}
-
-async function findUserReferences(db, userIds) {
-  const ids = [...new Set((Array.isArray(userIds) ? userIds : []).map(String).filter(Boolean))];
-  const references = [];
-  for (const collectionName of USER_REFERENCE_COLLECTIONS) {
-    for (const field of USER_REFERENCE_FIELDS) {
-      for (const userId of ids) {
-        const snap = await db.collection(collectionName).where(field, '==', userId).limit(200).get().catch(() => null);
-        snap?.docs?.forEach(doc => {
-          const key = `${collectionName}:${doc.id}:${field}`;
-          if (!references.some(item => item.key === key)) references.push({ key, collection: collectionName, id: doc.id, field, userId });
-        });
-      }
-    }
-  }
-  return references;
 }
 
 async function handleUserAccountsAction(db, request, actor) {
@@ -162,11 +144,23 @@ async function handleUserAccountsAction(db, request, actor) {
   if (action === 'user-accounts:bulk-update' || action === 'user-accounts:archive' || action === 'user-accounts:restore') {
     await requireAdminPermission(request, 'users:update');
     if (!userIds.length || userIds.length > 100) throw Object.assign(new Error('Выберите от 1 до 100 пользователей.'), { statusCode: 400 });
+    const requestedPatch = cleanEntityPatch(request.body?.patch);
+    if (action === 'user-accounts:bulk-update' && ['role', 'userRole'].some(field => Object.hasOwn(requestedPatch, field)) && String(actor?.role || '').toLowerCase() !== 'owner') {
+      throw Object.assign(new Error('Изменять роли пользователей может только owner.'), { statusCode: 403 });
+    }
+    if (action === 'user-accounts:restore') {
+      const restoreSnaps = await Promise.all(userIds.map(id => db.collection('users').doc(id).get()));
+      const mergedIds = restoreSnaps
+        .map((snap, index) => ({ id: userIds[index], data: snap.data() || {} }))
+        .filter(item => item.data.mergedInto || item.data.accountStatus === 'merged')
+        .map(item => item.id);
+      if (mergedIds.length) throw Object.assign(new Error('Объединённые aliases нельзя восстанавливать отдельно. Восстановите или измените основной аккаунт.'), { statusCode: 409 });
+    }
     const patch = action === 'user-accounts:archive'
       ? { archived: true, accountStatus: 'archived', archivedAt: FieldValue.serverTimestamp(), archivedBy: actor.userId || actor.uid }
       : action === 'user-accounts:restore'
         ? { archived: false, accountStatus: 'active', archivedAt: null, archivedBy: null }
-        : cleanEntityPatch(request.body?.patch);
+        : requestedPatch;
     const batch = db.batch();
     userIds.forEach(id => batch.set(db.collection('users').doc(id), { ...patch, updatedAt: FieldValue.serverTimestamp() }, { merge: true }));
     await batch.commit();

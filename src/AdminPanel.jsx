@@ -2007,7 +2007,7 @@ function AdminUsersLegacyPanel({ users, onAuthAction }) {
   );
 }
 
-function AdminUsersPanel({ users, onAction, onRefresh }) {
+function AdminUsersPanel({ users, onAction, onRefresh, canDeleteUsers = false, canManageRoles = false }) {
   const [queryText, setQueryText] = useState('');
   const [view, setView] = useState('active');
   const [selectedIds, setSelectedIds] = useState([]);
@@ -2019,6 +2019,8 @@ function AdminUsersPanel({ users, onAction, onRefresh }) {
   const [mergeGroup, setMergeGroup] = useState(null);
   const [mergeTargetId, setMergeTargetId] = useState('');
   const [mergePreview, setMergePreview] = useState(null);
+  const [mergeBusyAction, setMergeBusyAction] = useState('');
+  const [mergeError, setMergeError] = useState('');
   const [notice, setNotice] = useState('');
 
   const activeUsers = users.filter(user => !user.archived && !user.mergedInto && user.accountStatus !== 'archived');
@@ -2078,7 +2080,8 @@ function AdminUsersPanel({ users, onAction, onRefresh }) {
   };
 
   const saveEdit = async () => {
-    await run('user-accounts:bulk-update', { userIds: [editingUser.id], patch: editForm }, `Аккаунт ${editingUser.id} обновлён.`);
+    const patch = canManageRoles ? editForm : Object.fromEntries(Object.entries(editForm).filter(([key]) => key !== 'role'));
+    await run('user-accounts:bulk-update', { userIds: [editingUser.id], patch }, `Аккаунт ${editingUser.id} обновлён.`);
     setEditingUser(null);
   };
 
@@ -2091,20 +2094,39 @@ function AdminUsersPanel({ users, onAction, onRefresh }) {
     setMergeGroup(group);
     setMergeTargetId(preferred?.id || group.users[0]?.id || '');
     setMergePreview(null);
+    setMergeError('');
   };
 
   const previewMerge = async () => {
-    const sourceIds = mergeGroup.users.map(user => user.id).filter(id => id !== mergeTargetId);
-    const result = await onAction('user-accounts:merge-preview', { targetId: mergeTargetId, sourceIds });
-    setMergePreview(result.preview);
+    setMergeBusyAction('preview');
+    setMergeError('');
+    try {
+      const sourceIds = mergeGroup.users.map(user => user.id).filter(id => id !== mergeTargetId);
+      const result = await onAction('user-accounts:merge-preview', { targetId: mergeTargetId, sourceIds });
+      if (!result?.preview) throw new Error('Сервер не вернул результат проверки переноса.');
+      setMergePreview(result.preview);
+    } catch (error) {
+      setMergePreview(null);
+      setMergeError(error.message || 'Не удалось проверить перенос. Повторите попытку.');
+    } finally {
+      setMergeBusyAction('');
+    }
   };
 
   const executeMerge = async () => {
-    const sourceIds = mergeGroup.users.map(user => user.id).filter(id => id !== mergeTargetId);
-    await run('user-accounts:merge', { targetId: mergeTargetId, sourceIds, idempotencyKey: `merge_${mergeTargetId}_${sourceIds.sort().join('_')}` }, `Аккаунты объединены в ${mergeTargetId}.`);
-    setMergeGroup(null);
-    setMergePreview(null);
-    await findDuplicates();
+    setMergeBusyAction('merge');
+    setMergeError('');
+    try {
+      const sourceIds = mergeGroup.users.map(user => user.id).filter(id => id !== mergeTargetId);
+      await run('user-accounts:merge', { targetId: mergeTargetId, sourceIds, idempotencyKey: `merge_${mergeTargetId}_${[...sourceIds].sort().join('_')}` }, `Аккаунты объединены в ${mergeTargetId}.`);
+      setMergeGroup(null);
+      setMergePreview(null);
+      await findDuplicates();
+    } catch (error) {
+      setMergeError(error.message || 'Не удалось объединить аккаунты. Данные не изменены.');
+    } finally {
+      setMergeBusyAction('');
+    }
   };
 
   const archiveSelected = async () => {
@@ -2158,7 +2180,7 @@ function AdminUsersPanel({ users, onAction, onRefresh }) {
             {selectedIds.length > 0 && <span style={{ color: A.gold, fontSize: 12, fontWeight: 850 }}>Выбрано: {selectedIds.length}</span>}
             {selectedIds.length > 0 && view !== 'archive' && <button type="button" disabled={busy} onClick={archiveSelected} style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }}>В архив</button>}
             {selectedIds.length > 0 && view === 'archive' && <button type="button" disabled={busy} onClick={restoreSelected} style={{ ...s.btn, ...s.btnPri, padding: '6px 10px', fontSize: 12 }}>Восстановить</button>}
-            {selectedIds.length > 0 && view === 'archive' && <button type="button" disabled={busy} onClick={deleteSelected} style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }}>Удалить навсегда</button>}
+            {selectedIds.length > 0 && view === 'archive' && canDeleteUsers && <button type="button" disabled={busy} onClick={deleteSelected} style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }}>Удалить навсегда</button>}
             {notice && <span style={{ color: A.textSec, fontSize: 12 }}>{notice}</span>}
           </div>
         )}
@@ -2220,7 +2242,7 @@ function AdminUsersPanel({ users, onAction, onRefresh }) {
           <div style={{ ...s.card, width: '100%', maxWidth: 620 }}>
             <h2 style={s.h2}>Редактирование аккаунта</h2>
             {[['name', 'Имя'], ['email', 'Email'], ['phone', 'Телефон'], ['telegramUsername', 'Telegram username'], ['role', 'Роль']].map(([key, label]) => (
-              <label key={key} style={{ display: 'block', marginBottom: 10, color: A.textSec, fontSize: 12 }}>{label}<input value={editForm[key] || ''} onChange={event => setEditForm(prev => ({ ...prev, [key]: event.target.value }))} style={{ ...s.input, marginTop: 5 }} /></label>
+              <label key={key} style={{ display: 'block', marginBottom: 10, color: A.textSec, fontSize: 12 }}>{label}<input value={editForm[key] || ''} disabled={key === 'role' && !canManageRoles} title={key === 'role' && !canManageRoles ? 'Изменять роли может только owner' : ''} onChange={event => setEditForm(prev => ({ ...prev, [key]: event.target.value }))} style={{ ...s.input, marginTop: 5, opacity: key === 'role' && !canManageRoles ? 0.6 : 1 }} /></label>
             ))}
             <label style={{ display: 'block', color: A.textSec, fontSize: 12 }}>Заметка администратора<textarea value={editForm.adminNote || ''} onChange={event => setEditForm(prev => ({ ...prev, adminNote: event.target.value }))} style={{ ...s.input, minHeight: 90, marginTop: 5 }} /></label>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
@@ -2239,7 +2261,7 @@ function AdminUsersPanel({ users, onAction, onRefresh }) {
             <div style={{ display: 'grid', gap: 8 }}>
               {mergeGroup.users.map(user => (
                 <label key={user.id} style={{ padding: 11, borderRadius: 13, background: mergeTargetId === user.id ? 'rgba(201,168,76,0.12)' : A.chip, border: `1px solid ${mergeTargetId === user.id ? A.gold : A.border}`, cursor: 'pointer' }}>
-                  <input type="radio" name="mergeTarget" checked={mergeTargetId === user.id} onChange={() => { setMergeTargetId(user.id); setMergePreview(null); }} /> <span style={{ color: A.text, fontWeight: 850 }}>{userDisplayName(user)}</span>
+                  <input type="radio" name="mergeTarget" checked={mergeTargetId === user.id} disabled={Boolean(mergeBusyAction)} onChange={() => { setMergeTargetId(user.id); setMergePreview(null); setMergeError(''); }} /> <span style={{ color: A.text, fontWeight: 850 }}>{userDisplayName(user)}</span>
                   <div style={{ color: A.textSec, fontSize: 11, margin: '4px 0 0 22px' }}>{user.email || 'без email'} · {Number(user.keys || 0)} ключей · {user.id}</div>
                 </label>
               ))}
@@ -2249,10 +2271,20 @@ function AdminUsersPanel({ users, onAction, onRefresh }) {
                 Будет перенесено связанных записей: {mergePreview.referenceCount}. Итог: {mergePreview.totals.keys} ключей, {mergePreview.totals.tickets} билетов, {mergePreview.totals.aliases} идентификаторов.
               </div>
             )}
+            {mergeError && (
+              <div role="alert" style={{ marginTop: 12, padding: 12, borderRadius: 13, background: 'rgba(230,70,70,0.09)', border: '1px solid rgba(230,70,70,0.3)', color: A.red, fontSize: 12, lineHeight: '18px' }}>
+                {mergeError}
+              </div>
+            )}
+            {!mergePreview && !mergeError && (
+              <div style={{ marginTop: 12, color: A.textSec, fontSize: 11, lineHeight: '16px' }}>
+                Сначала нажмите «Проверить перенос». После успешной проверки станет доступно безопасное объединение.
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-              <button type="button" onClick={() => setMergeGroup(null)} style={{ ...s.btn, ...s.btnGray }}>Отмена</button>
-              <button type="button" disabled={busy} onClick={previewMerge} style={{ ...s.btn, ...s.btnGray }}>Проверить перенос</button>
-              <button type="button" disabled={busy || !mergePreview} onClick={executeMerge} style={{ ...s.btn, ...s.btnPri }}>{busy ? 'Объединяем...' : 'Объединить'}</button>
+              <button type="button" disabled={Boolean(mergeBusyAction)} onClick={() => setMergeGroup(null)} style={{ ...s.btn, ...s.btnGray }}>Отмена</button>
+              <button type="button" disabled={Boolean(mergeBusyAction)} onClick={previewMerge} style={{ ...s.btn, ...s.btnGray }}>{mergeBusyAction === 'preview' ? 'Проверяем связи...' : mergeError ? 'Повторить проверку' : 'Проверить перенос'}</button>
+              <button type="button" title={!mergePreview ? 'Сначала выполните проверку переноса' : ''} disabled={Boolean(mergeBusyAction) || !mergePreview} onClick={executeMerge} style={{ ...s.btn, ...s.btnPri }}>{mergeBusyAction === 'merge' ? 'Объединяем...' : 'Объединить'}</button>
             </div>
           </div>
         </div>
@@ -8284,7 +8316,7 @@ export const AdminPanel = () => {
       )}
 
       {activeTab === 'users' && (
-        <AdminUsersPanel users={adminMetrics.users} onAction={runAdminAction} onRefresh={fetchData} />
+        <AdminUsersPanel users={adminMetrics.users} onAction={runAdminAction} onRefresh={fetchData} canDeleteUsers={String(adminSession?.role || adminSecurity?.actor?.role || '').toLowerCase() === 'owner'} canManageRoles={String(adminSession?.role || adminSecurity?.actor?.role || '').toLowerCase() === 'owner'} />
       )}
 
       {activeTab === 'referrals' && (
