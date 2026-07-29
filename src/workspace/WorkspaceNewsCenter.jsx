@@ -376,7 +376,7 @@ function NewsEditor({ item, profile, role, events, onSaved, onCreatedFromEvent, 
         </div>
       </div>
 
-      <div style={{ position: 'sticky', bottom: 'calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 76px)', zIndex: 4, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', padding: 10, margin: '0 -4px -4px', borderRadius: 12, background: 'var(--apg-workspace-card-strong, rgba(255,255,255,0.96))', border: `1px solid ${UI.line}`, boxShadow: '0 -12px 32px rgba(31,26,20,0.14)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>
+      <div style={{ position: 'sticky', bottom: 'calc(max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)) + 10px)', zIndex: 4, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', padding: 10, margin: '0 -4px -4px', borderRadius: 12, background: 'var(--apg-workspace-card-strong, rgba(255,255,255,0.96))', border: `1px solid ${UI.line}`, boxShadow: '0 -12px 32px rgba(31,26,20,0.14)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>
         <button disabled={busy} onClick={() => { if (dirtyRef.current) saveLocal(); onClose?.(); }} style={button('light', { opacity: busy ? 0.62 : 1 })}>Отмена</button>
         <button disabled={busy} onClick={saveLocal} style={button('light', { opacity: busy ? 0.62 : 1 })}>Черновик</button>
         <button disabled={busy} onClick={() => save()} style={button('primary', { opacity: busy ? 0.62 : 1 })}>{busy ? 'Публикуем...' : 'Опубликовать'}</button>
@@ -529,7 +529,7 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
       {error && <div style={card({ padding: 12, color: UI.red, background: 'rgba(217,93,84,0.10)', boxShadow: 'none' })}>{error}</div>}
 
       {compact && editor && createPortal(
-        <div onClick={event => { if (event.target === event.currentTarget) setSelected(null); }} style={{ position: 'fixed', inset: 0, zIndex: 1400, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', overflowY: 'auto', padding: '24px 12px calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 156px)' }}>
+        <div onClick={event => { if (event.target === event.currentTarget) setSelected(null); }} style={{ position: 'fixed', inset: 0, zIndex: 1400, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', overflowY: 'auto', padding: '24px 12px calc(max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)) + 32px)' }}>
           <div style={{ width: '100%', maxWidth: 760 }}>{editor}</div>
         </div>,
         document.body

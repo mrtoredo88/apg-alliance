@@ -18,9 +18,12 @@ assert.match(editor, />Отмена</);
 assert.match(editor, />Черновик</);
 assert.match(editor, /Опубликовать/);
 assert.match(editor, /safe-area-inset-bottom/);
+assert.match(editor, /var\(--apg-vv-bottom, 0px\)\) \+ 10px/, 'news editor actions should not duplicate the full island offset');
 assert.match(editor, /position: 'sticky'/);
 
 assert.match(profile, /aria-label="Редактировать имя и дату рождения"/);
+assert.match(profile, /user\?\.id \|\| user\?\.userId \|\| user\?\.canonicalUserId \|\| user\?\.uid/, 'profile editor should support every authenticated id shape');
+assert.match(profile, /label: 'Настройки профиля',\s+action: \(\) => setShowProfileEditor\(true\)/, 'profile settings should open the editor');
 assert.match(profile, /placeholder="Имя"/);
 assert.match(profile, /placeholder="Фамилия"/);
 assert.match(profile, /type="date"/);

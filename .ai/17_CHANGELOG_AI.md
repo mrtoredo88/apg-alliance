@@ -15,6 +15,13 @@
 
 ---
 
+## [2026-07-29] fix: точное положение действий публикации и сохранение имени профиля
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/workspace/WorkspaceNewsCenter.jsx`, `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `server/src/routes/user-actions.js`, `scripts/partner-post-push-connections-regression.mjs`, `scripts/profile-visit-idempotency-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** панель «Отмена / Черновик / Опубликовать» больше не получает двойной отступ от нижнего острова и остаётся у безопасного края экрана. Редактор профиля определяет аккаунт по `id`, `userId`, `canonicalUserId` или `uid`; пункт «Настройки профиля» открывает тот же редактор. Ежедневный `+1 ключ` снова выдаётся Account Core один раз за московский календарный день и сразу отражается в интерфейсе.
+**Почему:** на iPhone действия публикации располагались слишком высоко, сохранение имени молча не запускалось для аккаунтов без поля `id`, а вызов сохранившегося идемпотентного механизма ежедневных ключей был удалён при рефакторинге наград за визиты.
+
 ## [2026-07-29] feat: центр управления пользовательскими аккаунтами и дублями
 **Коммит:** `локально, без коммита`
 **Файлы:** `src/AdminPanel.jsx`, `server/src/routes/admin-actions.js`, `server-shared/admin-user-duplicates.js`, `scripts/admin-user-accounts-test.mjs`, `package.json`, `.ai/03_DATABASE.md`, `.ai/04_API.md`, `.ai/07_ADMIN_PANEL.md`, `.ai/17_CHANGELOG_AI.md`

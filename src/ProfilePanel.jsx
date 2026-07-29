@@ -451,6 +451,7 @@ const DesktopNewsRow = memo(function DesktopNewsRow({ item, onOpen }) {
 });
 
 function DesktopProfileEditor({ user, onClose, onSaved }) {
+  const userId = dpText(user?.id || user?.userId || user?.canonicalUserId || user?.uid);
   const [form, setForm] = useState(() => ({
     firstName: dpText(user?.firstName || user?.first_name || String(user?.displayName || '').split(/\s+/)[0]),
     lastName: dpText(user?.lastName || user?.last_name || String(user?.displayName || '').split(/\s+/).slice(1).join(' ')),
@@ -464,7 +465,10 @@ function DesktopProfileEditor({ user, onClose, onSaved }) {
   const [error, setError] = useState('');
   const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
   const save = async () => {
-    if (!user?.id || saving) return;
+    if (!userId || saving) {
+      if (!userId) setError('Не удалось определить аккаунт. Перезайдите в приложение и повторите.');
+      return;
+    }
     setSaving(true);
     setError('');
     const patch = {
@@ -478,7 +482,7 @@ function DesktopProfileEditor({ user, onClose, onSaved }) {
       vk: form.vk.trim(),
     };
     try {
-      await userAction('profile:update', { userId: String(user.id), patch });
+      await userAction('profile:update', { userId, patch });
       onSaved?.(patch);
       onClose?.();
     } catch (err) {
@@ -3628,7 +3632,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             { icon: '🧭', label: 'Диагностика профиля', action: () => setShowDiagnostics(true), right: null },
             showIdentityDiagnosticButton && { icon: '🪪', label: 'Диагностика Identity', action: openIdentityDiagnostics, right: user?.canonicalUserId ? 'core' : null },
             showWorkspaceDiagnosticButton && { icon: '🖥', label: 'Диагностика Workspace', action: () => setShowWorkspaceDiagnostics(true), right: workspaceDiagnostics?.currentMode },
-            { icon: '⚙️', label: 'Настройки профиля',  action: () => {},               right: null },
+            { icon: '⚙️', label: 'Настройки профиля',  action: () => setShowProfileEditor(true), right: null },
           ].filter(item => typeof item.action === 'function').map((item, i, arr) => (
             <button key={item.label} onClick={item.action} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
               <span style={{ fontSize: 20 }}>{item.icon}</span>

@@ -12,9 +12,10 @@ const profileSync = actions.slice(
 );
 
 assert.doesNotMatch(profileSync, /getEconomyReward\('daily_activity'\)/, 'profile sync must not award a launch key');
-assert.doesNotMatch(profileSync, /awardDailyBonus/, 'Account Core must not award a launch key during profile sync');
+assert.match(profileSync, /awardDailyBonus/, 'Account Core should award the daily activity key during authenticated profile sync');
+assert.match(profileSync, /timeZone:\s*'Europe\/Moscow'/, 'daily activity day should use the Moscow calendar date');
 assert.doesNotMatch(profile, /\+1 ключ за вход/, 'profile must not advertise keys for launching the app');
-assert.doesNotMatch(userApp, /Ежедневный бонус — \+1 ключ/, 'startup must not show a launch reward');
+assert.match(userApp, /Ежедневный бонус — \+1 ключ/, 'startup should confirm a newly awarded daily key');
 assert.match(economy, /WHERE idempotency_key = \$1 LIMIT 1/, 'visit rewards must replay by idempotency key');
 assert.match(economy, /apg_economy_visit_rewards/, 'visit rewards must keep a durable uniqueness record');
 assert.match(profile, /label: 'Поделиться'/, 'Referrals entry must be renamed without changing its handler');

@@ -2440,13 +2440,28 @@ export function UserApp() {
                   if (isMounted.current) showToast('🎁 +2 ключа — ты пришёл по реферальной ссылке!', 'success');
                 }, 1200);
               };
-              const handleProfileSyncResult = result => {
+              const handleDailySyncResult = result => {
                 if (!isMounted.current) return result;
+                if (result?.dailyBonusAwarded) {
+                  const confirmedBalance = Number(result?.accountBalance);
+                  if (Number.isFinite(confirmedBalance)) {
+                    setUserKeys(confirmedBalance);
+                    try { localStorage.setItem('apg_canonical_key_balance', String(confirmedBalance)); } catch {}
+                  } else {
+                    refreshKeyBalance();
+                  }
+                  setLastBonusDate(todayKey);
+                  if (!needsLegalConsent) {
+                    setTimeout(() => {
+                      if (isMounted.current) showToast('🎁 Ежедневный бонус — +1 ключ!', 'success');
+                    }, 1200);
+                  }
+                }
                 handleReferralSyncResult(result);
                 return result;
               };
 
-              userAction('profile:sync', syncExistingPayload).then(handleProfileSyncResult).catch(e => {
+              userAction('profile:sync', syncExistingPayload).then(handleDailySyncResult).catch(e => {
                 if (existingRefId) refLog('retry after reconnect', { stage: 'existing_profile_sync_lastSeen', referrerId: existingRefId, userId: userData.id, reason: e?.message || String(e) });
                 logError(e, 'UserApp.profileSync.lastSeen');
               });
