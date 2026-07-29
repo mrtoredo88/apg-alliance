@@ -2291,7 +2291,35 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 : <div style={{ width: 56, height: 56, borderRadius: 21, background: 'linear-gradient(145deg,rgba(215,184,106,0.3),rgba(255,255,255,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: APG2.text, fontSize: 23, fontWeight: 850 }}>{displayName[0]}</div>
               }
               <div style={{ flex: 1, minWidth: 0 }}>
-                <button type="button" onClick={() => setShowProfileEditor(true)} aria-label="Редактировать имя и дату рождения" style={{ border: 0, background: 'transparent', color: APG2.text, fontSize: 21, lineHeight: '25px', fontWeight: 850, overflowWrap: 'anywhere', padding: 0, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>{displayName}</button>
+                <button
+                  type="button"
+                  data-testid="profile-name-edit"
+                  onClick={() => setShowProfileEditor(true)}
+                  aria-label="Редактировать имя, фамилию и дату рождения"
+                  style={{
+                    width: '100%',
+                    minHeight: 44,
+                    border: 0,
+                    borderRadius: 14,
+                    background: 'transparent',
+                    color: APG2.text,
+                    fontSize: 21,
+                    lineHeight: '25px',
+                    fontWeight: 850,
+                    overflowWrap: 'anywhere',
+                    padding: '6px 4px 6px 0',
+                    fontFamily: 'inherit',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                  }}
+                >
+                  <span>{displayName}</span>
+                  <span aria-hidden="true" style={{ width: 30, height: 30, borderRadius: 11, flexShrink: 0, display: 'grid', placeItems: 'center', color: APG2.gold, background: APG2.goldSoft, fontSize: 14 }}>✎</span>
+                </button>
                 <div style={{ color: APG2.textSoft, fontSize: 13, marginTop: 5 }}>Ваш прогресс в городе</div>
               </div>
             </div>
