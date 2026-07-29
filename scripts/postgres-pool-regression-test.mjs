@@ -48,6 +48,10 @@ assert.match(userActions, /migratedDocuments\.flatMap\(row => \[row\.partnerId/)
 assert.match(userApp, /\[data-horizontal-gesture-boundary="true"\], \[data-apg-horizontal-scroll="true"\]/);
 assert.match(economyRepository, /daily_bonus:\$\{cleanUserId\}:\$\{cleanDateKey\}/);
 assert.match(economyRepository, /currentProfile\.rows\[0\]\?\.profile\?\.keys/);
+assert.match(economyRepository, /lostDailyBonus/);
+assert.match(economyRepository, /created_at > \$2/);
+assert.match(userActions, /accountProfileForSync/);
+assert.match(userActions, /delete accountProfileForSync\[field\]/);
 assert.match(profileRepository, /\(user_id = \$1\) DESC/);
 assert.match(cabinetCore, /shareEntity\(\{/);
 assert.doesNotMatch(cabinetCore, /window\.open\(shareLink\([^)]*\), '_blank'\)/);

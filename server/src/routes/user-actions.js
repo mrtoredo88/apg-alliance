@@ -933,7 +933,21 @@ async function actionProfileSync(db, req, actor) {
 
   consentStatus = getConsentStatus(userDoc);
   await audit(db, req, actor, created ? 'profile:create' : 'profile:sync', 'users', userId, 'success', { dailyBonusAwarded, referralBonusAwarded, referralRecoveryStatus, referralRecoveryReason, consentRequired: consentStatus.consentRequired, consentReason: consentStatus.reason, consentFormatVersion: consentStatus.formatVersion });
-  await writeAccountProfileBestEffort(userId, userDoc, { bootstrap: { profileSync: true, created } });
+  // Account Core owns the economy balance. An existing Firestore profile can
+  // lag behind it, so profile sync must not copy stale economy fields back
+  // into Postgres before the daily bonus is replayed.
+  const accountProfileForSync = created ? userDoc : { ...userDoc };
+  if (!created) {
+    [
+      'keys',
+      'tickets',
+      'reputation',
+      'reputationStatus',
+      'reputationStatusLabel',
+      'lastBonusDate',
+    ].forEach(field => delete accountProfileForSync[field]);
+  }
+  await writeAccountProfileBestEffort(userId, accountProfileForSync, { bootstrap: { profileSync: true, created } });
   if (accountCoreWriteEnabled()) {
     const cabinetLinks = [
       ...Array.from(new Set([

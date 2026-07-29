@@ -163,14 +163,35 @@ export class EconomyRepository {
       );
       if (previous.rows[0]) {
         const currentProfile = await client.query(
-          'SELECT profile FROM apg_account_profiles WHERE user_id = $1 LIMIT 1',
+          'SELECT profile FROM apg_account_profiles WHERE user_id = $1 FOR UPDATE',
           [cleanUserId],
         );
         const operation = mapOperation(previous.rows[0]);
-        const currentBalance = integer(currentProfile.rows[0]?.profile?.keys, operation.balanceAfter);
+        let currentBalance = integer(currentProfile.rows[0]?.profile?.keys, operation.balanceAfter);
+        const laterOperations = await client.query(
+          `SELECT 1 FROM apg_economy_operations
+           WHERE user_id = $1 AND created_at > $2
+           LIMIT 1`,
+          [cleanUserId, previous.rows[0].created_at],
+        );
+        const lostDailyBonus = laterOperations.rowCount === 0
+          && currentBalance === operation.balanceAfter - operation.delta;
+        if (lostDailyBonus) {
+          currentBalance = operation.balanceAfter;
+          const repairedProfile = {
+            ...(currentProfile.rows[0]?.profile || {}),
+            keys: currentBalance,
+            lastBonusDate: cleanDateKey,
+          };
+          await client.query(
+            'UPDATE apg_account_profiles SET profile = $2::jsonb, updated_at = now() WHERE user_id = $1',
+            [cleanUserId, JSON.stringify(repairedProfile)],
+          );
+        }
         return {
           operation: { ...operation, balanceAfter: currentBalance },
           replayed: true,
+          repaired: lostDailyBonus,
         };
       }
 
