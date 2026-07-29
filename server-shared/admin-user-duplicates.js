@@ -65,7 +65,9 @@ export const compareUsersForDuplicates = (left, right) => {
   return { score, reasons };
 };
 
-export const buildDuplicateGroups = (users, minimumScore = 70) => {
+const duplicatePairKey = (leftId, rightId) => [String(leftId), String(rightId)].sort().join('|');
+
+export const buildDuplicateGroups = (users, minimumScore = 70, excludedPairs = new Set()) => {
   const rows = (Array.isArray(users) ? users : []).filter(user => user && !user.mergedInto && user.identityStatus !== 'legacy_linked');
   const parent = rows.map((_, index) => index);
   const find = index => {
@@ -83,6 +85,7 @@ export const buildDuplicateGroups = (users, minimumScore = 70) => {
   const comparisons = new Map();
   for (let i = 0; i < rows.length; i += 1) {
     for (let j = i + 1; j < rows.length; j += 1) {
+      if (excludedPairs.has(duplicatePairKey(rows[i].id, rows[j].id))) continue;
       const comparison = compareUsersForDuplicates(rows[i], rows[j]);
       if (comparison.score < minimumScore) continue;
       union(i, j);

@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { FieldValue } from '../lib/documentValues.js';
 import { getDb } from '../lib/documentStore.js';
@@ -130,14 +130,88 @@ function avgNumber(rows, field) {
   return Math.round(rows.reduce((sum, row) => sum + Number(row[field] || 0), 0) / rows.length * 10) / 10;
 }
 
+function duplicateGroupFingerprint(userIds = []) {
+  return [...new Set(userIds.map(String).filter(Boolean))].sort().join('|');
+}
+
+function duplicatePairFingerprints(userIds = []) {
+  const ids = [...new Set(userIds.map(String).filter(Boolean))].sort();
+  return ids.flatMap((left, index) => ids.slice(index + 1).map(right => `${left}|${right}`));
+}
+
+function mergeStateToken(users = []) {
+  const state = users.map(user => ({
+    id: user.id,
+    updatedAt: adminMillis(user.updatedAt),
+    accountStatus: user.accountStatus || '',
+    mergedInto: user.mergedInto || '',
+    keys: Number(user.keys || 0),
+    tickets: Number(user.tickets || 0),
+  })).sort((left, right) => left.id.localeCompare(right.id));
+  return createHash('sha256').update(JSON.stringify(state)).digest('hex');
+}
+
 async function handleUserAccountsAction(db, request, actor) {
   const action = String(request.body?.action || '');
   if (action === 'user-accounts:duplicates') {
     await requireAdminPermission(request, 'users:read');
     const minimumScore = Math.max(55, Math.min(100, Number(request.body?.minimumScore || 70)));
-    const snap = await db.collection('users').limit(2000).get();
+    const [snap, reviewsSnap] = await Promise.all([
+      db.collection('users').limit(2000).get(),
+      db.collection('duplicateReviews').where('status', '==', 'not_duplicate').limit(1000).get().catch(() => ({ docs: [] })),
+    ]);
     const users = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
-    return { ok: true, groups: buildDuplicateGroups(users, minimumScore), totalUsers: users.length, minimumScore };
+    const reviews = reviewsSnap.docs.map(doc => doc.data() || {});
+    const excludedPairs = new Set(reviews.flatMap(review => review.pairs || []));
+    const ignored = new Set(reviews.map(review => review.fingerprint).filter(Boolean));
+    const groups = buildDuplicateGroups(users, minimumScore, excludedPairs).filter(group => !ignored.has(duplicateGroupFingerprint(group.users.map(user => user.id))));
+    return { ok: true, groups, totalUsers: users.length, minimumScore };
+  }
+
+  if (action === 'user-accounts:not-duplicate') {
+    await requireAdminPermission(request, 'users:update');
+    const reviewedIds = [...new Set((request.body?.userIds || []).map(String).filter(Boolean))];
+    const reason = String(request.body?.reason || '').trim();
+    if (reviewedIds.length < 2 || reviewedIds.length > 20) throw Object.assign(new Error('Для проверки выберите от 2 до 20 аккаунтов.'), { statusCode: 400 });
+    if (reason.length < 3) throw Object.assign(new Error('Укажите причину решения «Не дубли».'), { statusCode: 400 });
+    const fingerprint = duplicateGroupFingerprint(reviewedIds);
+    const pairs = duplicatePairFingerprints(reviewedIds);
+    const reviewId = createHash('sha256').update(fingerprint).digest('hex').slice(0, 32);
+    await db.collection('duplicateReviews').doc(reviewId).set({
+      fingerprint,
+      pairs,
+      userIds: reviewedIds.sort(),
+      status: 'not_duplicate',
+      reason,
+      reviewedAt: FieldValue.serverTimestamp(),
+      reviewedBy: actor.userId || actor.uid,
+    }, { merge: true });
+    await writeAuditLog(db, request, actor, action, 'users', reviewedIds.join(','), { label: `Группа отмечена как «Не дубли»: ${reviewedIds.length} аккаунта`, userIds: reviewedIds, reason, fingerprint });
+    return { ok: true, userIds: reviewedIds, fingerprint };
+  }
+
+  if (action === 'user-accounts:split-duplicate') {
+    await requireAdminPermission(request, 'users:update');
+    const groupIds = [...new Set((request.body?.userIds || []).map(String).filter(Boolean))];
+    const separatedId = String(request.body?.separatedId || '').trim();
+    const reason = String(request.body?.reason || '').trim();
+    if (!separatedId || !groupIds.includes(separatedId) || groupIds.length < 3) throw Object.assign(new Error('Выберите аккаунт внутри группы минимум из трёх кандидатов.'), { statusCode: 400 });
+    if (reason.length < 3) throw Object.assign(new Error('Укажите причину разделения группы.'), { statusCode: 400 });
+    const otherIds = groupIds.filter(id => id !== separatedId);
+    const pairs = otherIds.map(id => [separatedId, id].sort().join('|'));
+    const reviewId = createHash('sha256').update(`split:${pairs.sort().join(',')}`).digest('hex').slice(0, 32);
+    await db.collection('duplicateReviews').doc(reviewId).set({
+      fingerprint: `split:${duplicateGroupFingerprint(groupIds)}:${separatedId}`,
+      pairs,
+      userIds: groupIds.sort(),
+      separatedId,
+      status: 'not_duplicate',
+      reason,
+      reviewedAt: FieldValue.serverTimestamp(),
+      reviewedBy: actor.userId || actor.uid,
+    }, { merge: true });
+    await writeAuditLog(db, request, actor, action, 'users', separatedId, { label: `Аккаунт ${separatedId} отделён от группы дублей`, userIds: groupIds, separatedId, reason, pairs });
+    return { ok: true, userIds: groupIds, separatedId, pairs };
   }
 
   const userIds = [...new Set((request.body?.userIds || []).map(String).filter(Boolean))];
@@ -156,15 +230,17 @@ async function handleUserAccountsAction(db, request, actor) {
         .map(item => item.id);
       if (mergedIds.length) throw Object.assign(new Error('Объединённые aliases нельзя восстанавливать отдельно. Восстановите или измените основной аккаунт.'), { statusCode: 409 });
     }
+    const archiveReason = String(request.body?.reason || '').trim();
+    if (action === 'user-accounts:archive' && archiveReason.length < 3) throw Object.assign(new Error('Укажите причину архивирования.'), { statusCode: 400 });
     const patch = action === 'user-accounts:archive'
-      ? { archived: true, accountStatus: 'archived', archivedAt: FieldValue.serverTimestamp(), archivedBy: actor.userId || actor.uid }
+      ? { archived: true, accountStatus: 'archived', archivedAt: FieldValue.serverTimestamp(), archivedBy: actor.userId || actor.uid, adminArchiveReason: archiveReason }
       : action === 'user-accounts:restore'
         ? { archived: false, accountStatus: 'active', archivedAt: null, archivedBy: null }
         : requestedPatch;
     const batch = db.batch();
     userIds.forEach(id => batch.set(db.collection('users').doc(id), { ...patch, updatedAt: FieldValue.serverTimestamp() }, { merge: true }));
     await batch.commit();
-    await writeAuditLog(db, request, actor, action, 'users', userIds.join(','), { label: `${action === 'user-accounts:archive' ? 'Архивировано' : action === 'user-accounts:restore' ? 'Восстановлено' : 'Массово обновлено'} аккаунтов: ${userIds.length}`, userIds, fields: Object.keys(patch) });
+    await writeAuditLog(db, request, actor, action, 'users', userIds.join(','), { label: `${action === 'user-accounts:archive' ? 'Архивировано' : action === 'user-accounts:restore' ? 'Восстановлено' : 'Массово обновлено'} аккаунтов: ${userIds.length}`, userIds, fields: Object.keys(patch), ...(archiveReason ? { reason: archiveReason } : {}) });
     return { ok: true, userIds, patch: cleanEntityPatch(patch) };
   }
 
@@ -187,12 +263,31 @@ async function handleUserAccountsAction(db, request, actor) {
       referenceCount: references.length,
       mergedFields: Object.keys(mergedPatch),
       totals: { keys: mergedPatch.keys, tickets: mergedPatch.tickets, aliases: mergedPatch.identityAliases?.length || 0 },
+      stateToken: mergeStateToken([target, ...sources]),
+      requiresPrivilegedConfirmation: [target, ...sources].some(user => ['owner', 'super_admin', 'admin'].includes(String(user.role || user.userRole || '').toLowerCase())),
     };
     if (action.endsWith('preview')) return { ok: true, preview };
 
+    const previewToken = String(request.body?.previewToken || '').trim();
+    const reason = String(request.body?.reason || '').trim();
+    if (!previewToken || previewToken !== preview.stateToken) throw Object.assign(new Error('Аккаунты изменились после предварительной проверки. Выполните проверку переноса ещё раз.'), { statusCode: 409 });
+    if (reason.length < 3) throw Object.assign(new Error('Укажите причину объединения аккаунтов.'), { statusCode: 400 });
+    if (preview.requiresPrivilegedConfirmation && (String(actor?.role || '').toLowerCase() !== 'owner' || request.body?.confirmPrivileged !== true)) {
+      throw Object.assign(new Error('Объединение привилегированных аккаунтов доступно только owner после отдельного подтверждения.'), { statusCode: 403 });
+    }
     const idempotencyKey = String(request.headers['x-idempotency-key'] || request.body?.idempotencyKey || '').trim();
     return runIdempotent(db, actor, idempotencyKey, async () => {
       const batch = db.batch();
+      const snapshotRef = db.collection('userMergeSnapshots').doc(idempotencyKey || `merge_${Date.now()}_${randomBytes(4).toString('hex')}`);
+      batch.set(snapshotRef, {
+        preview,
+        reason,
+        userIds: [target.id, ...sources.map(source => source.id)],
+        status: 'completed',
+        createdAt: FieldValue.serverTimestamp(),
+        createdBy: actor.userId || actor.uid,
+      });
+      [target, ...sources].forEach(user => batch.set(snapshotRef.collection('users').doc(user.id), { data: user }));
       batch.set(db.collection('users').doc(targetId), { ...mergedPatch, updatedAt: FieldValue.serverTimestamp(), mergedAt: FieldValue.serverTimestamp(), mergedBy: actor.userId || actor.uid }, { merge: true });
       references.forEach(item => batch.set(db.collection(item.collection).doc(item.id), { [item.field]: targetId, updatedAt: FieldValue.serverTimestamp() }, { merge: true }));
       sources.forEach(source => {
@@ -211,8 +306,8 @@ async function handleUserAccountsAction(db, request, actor) {
         }, { merge: true });
       });
       await batch.commit();
-      await writeAuditLog(db, request, actor, action, 'users', targetId, { label: `Объединены аккаунты в ${targetId}`, ...preview });
-      return { ok: true, preview };
+      await writeAuditLog(db, request, actor, action, 'users', targetId, { label: `Объединены аккаунты в ${targetId}`, reason, snapshotId: snapshotRef.id, ...preview });
+      return { ok: true, preview, snapshotId: snapshotRef.id };
     });
   }
 
@@ -220,12 +315,14 @@ async function handleUserAccountsAction(db, request, actor) {
     await requireAdminPermission(request, 'users:delete');
     if (String(actor?.role || '').toLowerCase() !== 'owner') throw Object.assign(new Error('Окончательное удаление пользователей доступно только owner.'), { statusCode: 403 });
     if (!userIds.length || userIds.length > 20) throw Object.assign(new Error('Выберите от 1 до 20 пользователей.'), { statusCode: 400 });
+    const reason = String(request.body?.reason || '').trim();
+    if (reason.length < 3) throw Object.assign(new Error('Укажите причину окончательного удаления.'), { statusCode: 400 });
     const references = await findUserReferences(db, userIds);
     if (references.length) throw Object.assign(new Error(`Удаление остановлено: найдено связанных записей — ${references.length}. Сначала архивируйте или объедините аккаунты.`), { statusCode: 409 });
     const batch = db.batch();
     userIds.forEach(id => batch.delete(db.collection('users').doc(id)));
     await batch.commit();
-    await writeAuditLog(db, request, actor, action, 'users', userIds.join(','), { label: `Окончательно удалено аккаунтов: ${userIds.length}`, userIds });
+    await writeAuditLog(db, request, actor, action, 'users', userIds.join(','), { label: `Окончательно удалено аккаунтов: ${userIds.length}`, userIds, reason });
     return { ok: true, userIds };
   }
 

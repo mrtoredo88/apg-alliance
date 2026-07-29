@@ -1563,6 +1563,8 @@ function MigrationCenterPanel({ data, loading, busy, lastResult, onRefresh, onAc
 
 function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
   const [queryText, setQueryText] = useState('');
+  const [auditQuery, setAuditQuery] = useState('');
+  const [auditResult, setAuditResult] = useState('all');
   const [selectedRole, setSelectedRole] = useState('owner');
   const [showCreate, setShowCreate] = useState(false);
   const [adminForm, setAdminForm] = useState({
@@ -1577,6 +1579,11 @@ function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
     return [admin.name, admin.email, admin.login, admin.role, admin.position].some(value => String(value || '').toLowerCase().includes(q));
   });
   const selectedPermissions = roles[selectedRole] || [];
+  const filteredAudit = audit.filter(item => {
+    if (auditResult !== 'all' && (auditResult === 'error') !== (item.result === 'error')) return false;
+    const q = auditQuery.trim().toLowerCase();
+    return !q || [item.label, item.action, item.actorName, item.actorId, item.targetId, item.reason].some(value => String(value || '').toLowerCase().includes(q));
+  });
   const canManage = ['owner', 'super_admin'].includes(security?.actor?.role);
   const setAdminField = (key, value) => setAdminForm(prev => ({ ...prev, [key]: value }));
   const submitAdmin = async () => {
@@ -1703,7 +1710,15 @@ function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
 
       <div style={s.card}>
         <h2 style={s.h2}>Журнал безопасности</h2>
-        {audit.slice(0, 80).map(item => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 180px', gap: 8, marginBottom: 10 }}>
+          <input value={auditQuery} onChange={event => setAuditQuery(event.target.value)} placeholder="Администратор, действие, пользователь или причина" style={{ ...s.input, marginBottom: 0 }} />
+          <select value={auditResult} onChange={event => setAuditResult(event.target.value)} style={{ ...s.select, marginBottom: 0 }}>
+            <option value="all">Все результаты</option>
+            <option value="success">Успешные</option>
+            <option value="error">Ошибки и отказы</option>
+          </select>
+        </div>
+        {filteredAudit.slice(0, 80).map(item => (
           <div key={item.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, padding: '10px 0', borderBottom: `1px solid ${A.rowBrd}` }}>
             <div style={{ minWidth: 0 }}>
               <div style={{ color: A.text, fontSize: 13, fontWeight: 820 }}>{item.label || item.action || 'security-event'}</div>
@@ -1712,6 +1727,7 @@ function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
             <div style={{ color: item.result === 'error' ? A.red : A.gold, fontSize: 11, fontWeight: 850, textAlign: 'right' }}>{item.createdAt ? new Date(item.createdAt).toLocaleString('ru-RU') : '—'}</div>
           </div>
         ))}
+        {!filteredAudit.length && <div style={{ color: A.textSec, fontSize: 12, textAlign: 'center', padding: 16 }}>В журнале нет записей по выбранным условиям.</div>}
       </div>
     </div>
   );
@@ -2007,7 +2023,7 @@ function AdminUsersLegacyPanel({ users, onAuthAction }) {
   );
 }
 
-function AdminUsersPanel({ users, onAction, onRefresh, canDeleteUsers = false, canManageRoles = false }) {
+export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, canDeleteUsers = false, canManageRoles = false }) {
   const [queryText, setQueryText] = useState('');
   const [view, setView] = useState('active');
   const [selectedIds, setSelectedIds] = useState([]);
@@ -2021,6 +2037,9 @@ function AdminUsersPanel({ users, onAction, onRefresh, canDeleteUsers = false, c
   const [mergePreview, setMergePreview] = useState(null);
   const [mergeBusyAction, setMergeBusyAction] = useState('');
   const [mergeError, setMergeError] = useState('');
+  const [mergeReason, setMergeReason] = useState('');
+  const [confirmPrivilegedMerge, setConfirmPrivilegedMerge] = useState(false);
+  const [profileUser, setProfileUser] = useState(null);
   const [notice, setNotice] = useState('');
 
   const activeUsers = users.filter(user => !user.archived && !user.mergedInto && user.accountStatus !== 'archived');
@@ -2095,6 +2114,8 @@ function AdminUsersPanel({ users, onAction, onRefresh, canDeleteUsers = false, c
     setMergeTargetId(preferred?.id || group.users[0]?.id || '');
     setMergePreview(null);
     setMergeError('');
+    setMergeReason('');
+    setConfirmPrivilegedMerge(false);
   };
 
   const previewMerge = async () => {
@@ -2118,7 +2139,7 @@ function AdminUsersPanel({ users, onAction, onRefresh, canDeleteUsers = false, c
     setMergeError('');
     try {
       const sourceIds = mergeGroup.users.map(user => user.id).filter(id => id !== mergeTargetId);
-      await run('user-accounts:merge', { targetId: mergeTargetId, sourceIds, idempotencyKey: `merge_${mergeTargetId}_${[...sourceIds].sort().join('_')}` }, `Аккаунты объединены в ${mergeTargetId}.`);
+      await run('user-accounts:merge', { targetId: mergeTargetId, sourceIds, previewToken: mergePreview?.stateToken, reason: mergeReason.trim(), confirmPrivileged: confirmPrivilegedMerge, idempotencyKey: `merge_${mergeTargetId}_${[...sourceIds].sort().join('_')}` }, `Аккаунты объединены в ${mergeTargetId}.`);
       setMergeGroup(null);
       setMergePreview(null);
       await findDuplicates();
@@ -2131,7 +2152,9 @@ function AdminUsersPanel({ users, onAction, onRefresh, canDeleteUsers = false, c
 
   const archiveSelected = async () => {
     if (!confirm(`Отправить в архив аккаунты (${selectedIds.length})? Вход и активные действия будут недоступны.`)) return;
-    await run('user-accounts:archive', { userIds: selectedIds }, `Архивировано аккаунтов: ${selectedIds.length}.`);
+    const reason = prompt('Укажите причину архивирования.');
+    if (!reason?.trim()) return;
+    await run('user-accounts:archive', { userIds: selectedIds, reason: reason.trim() }, `Архивировано аккаунтов: ${selectedIds.length}.`);
   };
 
   const restoreSelected = async () => {
@@ -2141,7 +2164,23 @@ function AdminUsersPanel({ users, onAction, onRefresh, canDeleteUsers = false, c
   const deleteSelected = async () => {
     const check = prompt(`Окончательное удаление необратимо. Введите УДАЛИТЬ ${selectedIds.length}, чтобы продолжить.`);
     if (check !== `УДАЛИТЬ ${selectedIds.length}`) return;
-    await run('user-accounts:delete', { userIds: selectedIds, idempotencyKey: `delete_users_${selectedIds.slice().sort().join('_')}` }, `Удалено аккаунтов: ${selectedIds.length}.`);
+    const reason = prompt('Укажите причину окончательного удаления.');
+    if (!reason?.trim()) return;
+    await run('user-accounts:delete', { userIds: selectedIds, reason: reason.trim(), idempotencyKey: `delete_users_${selectedIds.slice().sort().join('_')}` }, `Удалено аккаунтов: ${selectedIds.length}.`);
+  };
+
+  const markNotDuplicate = async group => {
+    const reason = prompt('Почему эти аккаунты не являются дублями?');
+    if (!reason?.trim()) return;
+    await run('user-accounts:not-duplicate', { userIds: group.users.map(user => user.id), reason: reason.trim() }, 'Группа проверена и скрыта из вероятных дублей.');
+    setDuplicateGroups(prev => prev.filter(item => item.id !== group.id));
+  };
+
+  const splitDuplicateGroup = async (group, user) => {
+    const reason = prompt(`Почему аккаунт «${userDisplayName(user)}» нужно отделить от этой группы?`);
+    if (!reason?.trim()) return;
+    await run('user-accounts:split-duplicate', { userIds: group.users.map(item => item.id), separatedId: user.id, reason: reason.trim() }, 'Аккаунт отделён от группы. Остальные кандидаты сохранены.');
+    await findDuplicates();
   };
 
   const tabs = [
@@ -2189,13 +2228,16 @@ function AdminUsersPanel({ users, onAction, onRefresh, canDeleteUsers = false, c
       {view === 'duplicates' && duplicateGroups.length > 0 && (
         <div style={{ display: 'grid', gap: 12 }}>
           {duplicateGroups.map(group => (
-            <div key={group.id} style={{ ...s.card, marginBottom: 0, border: `1px solid ${group.confidence === 'high' ? 'rgba(230,70,70,0.38)' : 'rgba(201,168,76,0.34)'}` }}>
+            <div key={group.id} style={{ ...s.card, marginBottom: 0, scrollMarginTop: 250, border: `1px solid ${group.confidence === 'high' ? 'rgba(230,70,70,0.38)' : 'rgba(201,168,76,0.34)'}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ color: A.text, fontWeight: 900 }}>{group.users.length} аккаунта · совпадение {group.score}%</div>
                   <div style={{ color: A.textSec, fontSize: 11, marginTop: 4 }}>{group.reasons.map(reason => reason.label).join(' · ')}</div>
                 </div>
-                <button type="button" onClick={() => openMerge(group)} style={{ ...s.btn, ...s.btnPri }}>Разобрать группу</button>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button type="button" disabled={busy} onClick={() => markNotDuplicate(group)} style={{ ...s.btn, ...s.btnGray }}>Не дубли</button>
+                  <button type="button" disabled={busy} onClick={() => openMerge(group)} style={{ ...s.btn, ...s.btnPri }}>Разобрать группу</button>
+                </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 8, marginTop: 12 }}>
                 {group.users.map(user => (
@@ -2204,6 +2246,7 @@ function AdminUsersPanel({ users, onAction, onRefresh, canDeleteUsers = false, c
                     <div style={{ color: A.textSec, fontSize: 11, marginTop: 4, lineHeight: '16px', wordBreak: 'break-word' }}>
                       {user.email || user.linkedEmail || 'без email'}<br />{user.telegramId || user.tgId || user.telegramUsername || 'без Telegram'}<br />{user.id}
                     </div>
+                    {group.users.length > 2 && <button type="button" disabled={busy} onClick={() => splitDuplicateGroup(group, user)} style={{ ...s.btn, ...s.btnGray, padding: '6px 9px', fontSize: 11, marginTop: 8 }}>Отделить от группы</button>}
                   </div>
                 ))}
               </div>
@@ -2217,7 +2260,7 @@ function AdminUsersPanel({ users, onAction, onRefresh, canDeleteUsers = false, c
           {filtered.map(user => {
             const checked = selectedIds.includes(user.id);
             return (
-              <div key={user.id} style={{ ...s.card, marginBottom: 0, display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: 12, alignItems: 'center', border: checked ? `1px solid ${A.gold}` : `1px solid ${A.border}` }}>
+              <div key={user.id} style={{ ...s.card, marginBottom: 0, scrollMarginTop: 250, display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: 12, alignItems: 'center', border: checked ? `1px solid ${A.gold}` : `1px solid ${A.border}` }}>
                 <input type="checkbox" checked={checked} onChange={() => setSelectedIds(prev => prev.includes(user.id) ? prev.filter(id => id !== user.id) : [...prev, user.id])} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ color: A.text, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis' }}>{userDisplayName(user)}</div>
@@ -2228,6 +2271,7 @@ function AdminUsersPanel({ users, onAction, onRefresh, canDeleteUsers = false, c
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <span style={{ color: A.gold, fontWeight: 900, whiteSpace: 'nowrap' }}>{Number(user.keys || 0)} 🗝</span>
+                  <button type="button" onClick={() => setProfileUser(user)} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 12 }}>Карточка</button>
                   <button type="button" onClick={() => openEdit(user)} style={{ ...s.btn, ...s.btnGray, padding: '7px 10px', fontSize: 12 }}>Изменить</button>
                 </div>
               </div>
@@ -2271,6 +2315,16 @@ function AdminUsersPanel({ users, onAction, onRefresh, canDeleteUsers = false, c
                 Будет перенесено связанных записей: {mergePreview.referenceCount}. Итог: {mergePreview.totals.keys} ключей, {mergePreview.totals.tickets} билетов, {mergePreview.totals.aliases} идентификаторов.
               </div>
             )}
+            {mergePreview?.requiresPrivilegedConfirmation && (
+              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 12, padding: 11, borderRadius: 12, background: 'rgba(230,70,70,0.09)', border: '1px solid rgba(230,70,70,0.3)', color: A.text, fontSize: 12 }}>
+                <input type="checkbox" checked={confirmPrivilegedMerge} onChange={event => setConfirmPrivilegedMerge(event.target.checked)} />
+                Подтверждаю объединение аккаунта с административной ролью и проверил основной аккаунт.
+              </label>
+            )}
+            <label style={{ display: 'block', marginTop: 12, color: A.textSec, fontSize: 12 }}>
+              Причина объединения
+              <textarea value={mergeReason} onChange={event => setMergeReason(event.target.value)} placeholder="Например: один пользователь зарегистрировался через email и Telegram" style={{ ...s.input, minHeight: 72, marginTop: 5 }} />
+            </label>
             {mergeError && (
               <div role="alert" style={{ marginTop: 12, padding: 12, borderRadius: 13, background: 'rgba(230,70,70,0.09)', border: '1px solid rgba(230,70,70,0.3)', color: A.red, fontSize: 12, lineHeight: '18px' }}>
                 {mergeError}
@@ -2284,7 +2338,39 @@ function AdminUsersPanel({ users, onAction, onRefresh, canDeleteUsers = false, c
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
               <button type="button" disabled={Boolean(mergeBusyAction)} onClick={() => setMergeGroup(null)} style={{ ...s.btn, ...s.btnGray }}>Отмена</button>
               <button type="button" disabled={Boolean(mergeBusyAction)} onClick={previewMerge} style={{ ...s.btn, ...s.btnGray }}>{mergeBusyAction === 'preview' ? 'Проверяем связи...' : mergeError ? 'Повторить проверку' : 'Проверить перенос'}</button>
-              <button type="button" title={!mergePreview ? 'Сначала выполните проверку переноса' : ''} disabled={Boolean(mergeBusyAction) || !mergePreview} onClick={executeMerge} style={{ ...s.btn, ...s.btnPri }}>{mergeBusyAction === 'merge' ? 'Объединяем...' : 'Объединить'}</button>
+              <button type="button" title={!mergePreview ? 'Сначала выполните проверку переноса' : !mergeReason.trim() ? 'Укажите причину объединения' : mergePreview.requiresPrivilegedConfirmation && !confirmPrivilegedMerge ? 'Подтвердите объединение административного аккаунта' : ''} disabled={Boolean(mergeBusyAction) || !mergePreview || mergeReason.trim().length < 3 || (mergePreview.requiresPrivilegedConfirmation && !confirmPrivilegedMerge)} onClick={executeMerge} style={{ ...s.btn, ...s.btnPri }}>{mergeBusyAction === 'merge' ? 'Объединяем...' : 'Объединить'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {profileUser && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 16px 48px' }} onClick={event => { if (event.target === event.currentTarget) setProfileUser(null); }}>
+          <div style={{ ...s.card, width: '100%', maxWidth: 760 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <div><h2 style={{ ...s.h2, marginBottom: 4 }}>{userDisplayName(profileUser)}</h2><div style={{ color: A.textSec, fontSize: 11 }}>{profileUser.id}</div></div>
+              <button type="button" onClick={() => setProfileUser(null)} style={{ ...s.btn, ...s.btnGray }}>Закрыть</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginTop: 14 }}>
+              {[
+                ['Email', profileUser.email || profileUser.linkedEmail],
+                ['Телефон', profileUser.phone || profileUser.phoneNumber],
+                ['Telegram', profileUser.telegramUsername || profileUser.telegramId || profileUser.tgId],
+                ['Роль', profileUser.role || profileUser.userRole || 'user'],
+                ['Статус', profileUser.accountStatus || (profileUser.archived ? 'archived' : 'active')],
+                ['Основной аккаунт', profileUser.mergedInto || profileUser.canonicalUserId],
+                ['Ключи', profileUser.keys || 0],
+                ['Билеты', profileUser.tickets || 0],
+              ].map(([label, value]) => <div key={label} style={{ background: A.chip, borderRadius: 11, padding: 10 }}><div style={{ color: A.textSec, fontSize: 10 }}>{label}</div><div style={{ color: A.text, fontSize: 12, fontWeight: 800, marginTop: 4, wordBreak: 'break-word' }}>{String(value || '—')}</div></div>)}
+            </div>
+            <h3 style={{ color: A.text, fontSize: 14, margin: '18px 0 8px' }}>Последние действия</h3>
+            <div style={{ display: 'grid', gap: 6 }}>
+              {activity.filter(item => item.targetId === profileUser.id || String(item.targetId || '').split(',').includes(profileUser.id) || item.userIds?.includes?.(profileUser.id)).slice(0, 20).map(item => (
+                <div key={item.id} style={{ background: A.chip, borderRadius: 10, padding: 9, color: A.textSec, fontSize: 11 }}>
+                  <span style={{ color: A.text, fontWeight: 800 }}>{item.label || item.action}</span>{item.actorName || item.actorId ? ` · ${item.actorName || item.actorId}` : ''}
+                </div>
+              ))}
+              {!activity.some(item => item.targetId === profileUser.id || String(item.targetId || '').split(',').includes(profileUser.id) || item.userIds?.includes?.(profileUser.id)) && <div style={{ color: A.textSec, fontSize: 12 }}>Административных действий пока нет.</div>}
             </div>
           </div>
         </div>
@@ -8316,7 +8402,7 @@ export const AdminPanel = () => {
       )}
 
       {activeTab === 'users' && (
-        <AdminUsersPanel users={adminMetrics.users} onAction={runAdminAction} onRefresh={fetchData} canDeleteUsers={String(adminSession?.role || adminSecurity?.actor?.role || '').toLowerCase() === 'owner'} canManageRoles={String(adminSession?.role || adminSecurity?.actor?.role || '').toLowerCase() === 'owner'} />
+        <AdminUsersPanel users={adminMetrics.users} activity={adminMetrics.adminActivity} onAction={runAdminAction} onRefresh={fetchData} canDeleteUsers={String(adminSession?.role || adminSecurity?.actor?.role || '').toLowerCase() === 'owner'} canManageRoles={String(adminSession?.role || adminSecurity?.actor?.role || '').toLowerCase() === 'owner'} />
       )}
 
       {activeTab === 'referrals' && (

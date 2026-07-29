@@ -17,7 +17,9 @@ traverse(ast, {
       .filter(attribute => attribute.type === 'JSXAttribute')
       .map(attribute => attribute.name.name);
     const hasAction = attributes.some(name => ['onClick', 'onMouseDown'].includes(name));
-    const submitsForm = attributes.includes('type') && !attributes.includes('onClick');
+    const typeAttribute = path.node.attributes.find(attribute => attribute.type === 'JSXAttribute' && attribute.name.name === 'type');
+    const buttonType = typeAttribute?.value?.type === 'StringLiteral' ? typeAttribute.value.value : '';
+    const submitsForm = buttonType === 'submit';
     if (!hasAction && !submitsForm) buttonsWithoutAction.push(path.node.loc.start.line);
   },
 });
@@ -27,6 +29,8 @@ assert.deepEqual(buttonsWithoutAction, [], `Кнопки без действия
 
 for (const action of [
   'user-accounts:duplicates',
+  'user-accounts:not-duplicate',
+  'user-accounts:split-duplicate',
   'user-accounts:bulk-update',
   'user-accounts:merge-preview',
   'user-accounts:merge',
@@ -37,7 +41,10 @@ for (const action of [
   assert.ok(source.includes(`'${action}'`), `В интерфейсе отсутствует действие ${action}.`);
 }
 
-assert.match(source, /disabled=\{Boolean\(mergeBusyAction\) \|\| !mergePreview\}/);
+assert.match(source, /mergePreview\.requiresPrivilegedConfirmation && !confirmPrivilegedMerge/);
 assert.match(source, /canDeleteUsers=\{String\(adminSession\?\.role \|\| adminSecurity\?\.actor\?\.role \|\| ''\)\.toLowerCase\(\) === 'owner'\}/);
+assert.match(source, />Карточка<\/button>/);
+assert.match(source, />Не дубли<\/button>/);
+assert.match(source, />Отделить от группы<\/button>/);
 
 console.log(`Admin interaction contract passed: ${buttonCount} buttons and all user-account actions checked`);
