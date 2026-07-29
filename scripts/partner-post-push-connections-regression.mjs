@@ -5,6 +5,7 @@ const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'
 const cabinet = read('src/cabinet/CabinetCorePage.jsx');
 const editor = read('src/workspace/WorkspaceNewsCenter.jsx');
 const userApp = read('src/UserApp.jsx');
+const profile = read('src/ProfilePanel.jsx');
 const server = read('server/src/routes/user-actions.js');
 
 assert.match(cabinet, /label: 'Создать пост'/);
@@ -16,6 +17,16 @@ assert.match(editor, /Добавить публикацию в свой кале
 assert.match(editor, />Отмена</);
 assert.match(editor, />Черновик</);
 assert.match(editor, /Опубликовать/);
+assert.match(editor, /safe-area-inset-bottom/);
+assert.match(editor, /position: 'sticky'/);
+
+assert.match(profile, /aria-label="Редактировать имя и дату рождения"/);
+assert.match(profile, /placeholder="Имя"/);
+assert.match(profile, /placeholder="Фамилия"/);
+assert.match(profile, /type="date"/);
+assert.match(profile, /birthDate: form\.birthDate/);
+assert.match(server, /'birthDate'/);
+assert.match(server, /INVALID_BIRTH_DATE/);
 
 assert.match(userApp, /user\.notificationsEnabled/);
 assert.match(userApp, /Разрешение на уведомления заблокировано/);

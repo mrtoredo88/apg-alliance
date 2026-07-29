@@ -452,7 +452,9 @@ const DesktopNewsRow = memo(function DesktopNewsRow({ item, onOpen }) {
 
 function DesktopProfileEditor({ user, onClose, onSaved }) {
   const [form, setForm] = useState(() => ({
-    displayName: dpText(user?.displayName || [user?.first_name, user?.last_name].filter(Boolean).join(' ')),
+    firstName: dpText(user?.firstName || user?.first_name || String(user?.displayName || '').split(/\s+/)[0]),
+    lastName: dpText(user?.lastName || user?.last_name || String(user?.displayName || '').split(/\s+/).slice(1).join(' ')),
+    birthDate: dpText(user?.birthDate || user?.birthday || user?.dateOfBirth),
     about: dpText(user?.about || user?.bio || user?.description),
     phone: dpText(user?.phone),
     telegram: dpText(user?.telegram || user?.telegramUsername),
@@ -466,7 +468,10 @@ function DesktopProfileEditor({ user, onClose, onSaved }) {
     setSaving(true);
     setError('');
     const patch = {
-      displayName: form.displayName.trim(),
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
+      displayName: [form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(' '),
+      birthDate: form.birthDate,
       about: form.about.trim(),
       phone: form.phone.trim(),
       telegram: form.telegram.trim(),
@@ -486,7 +491,12 @@ function DesktopProfileEditor({ user, onClose, onSaved }) {
   return (
     <ApgModal title="Редактировать профиль" subtitle="Личные данные обычного профиля АПГ." onClose={onClose} maxWidth={520}>
       <div style={{ display: 'grid', gap: 11 }}>
-        <input value={form.displayName} onChange={event => update('displayName', event.target.value)} placeholder="Имя" style={inputStyle} />
+        <input value={form.firstName} onChange={event => update('firstName', event.target.value)} placeholder="Имя" autoComplete="given-name" style={inputStyle} />
+        <input value={form.lastName} onChange={event => update('lastName', event.target.value)} placeholder="Фамилия" autoComplete="family-name" style={inputStyle} />
+        <label style={{ display: 'grid', gap: 6 }}>
+          <span style={{ color: DP.soft, fontSize: 12, fontWeight: 760 }}>Дата рождения</span>
+          <input type="date" value={form.birthDate} onChange={event => update('birthDate', event.target.value)} max={new Date().toISOString().slice(0, 10)} style={inputStyle} />
+        </label>
         <textarea value={form.about} onChange={event => update('about', event.target.value)} placeholder="Кратко о себе" style={{ ...inputStyle, minHeight: 96, resize: 'vertical', padding: 11, lineHeight: '19px' }} />
         <input value={form.phone} onChange={event => update('phone', event.target.value)} placeholder="Телефон" style={inputStyle} />
         <input value={form.telegram} onChange={event => update('telegram', event.target.value)} placeholder="Telegram" style={inputStyle} />
@@ -494,7 +504,7 @@ function DesktopProfileEditor({ user, onClose, onSaved }) {
         {error && <div style={{ color: DP.red, fontSize: 12.5, lineHeight: '18px' }}>{error}</div>}
         <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.2fr', gap: 9 }}>
           <button onClick={onClose} style={dpButton('light', { width: '100%' })}>Отмена</button>
-          <button onClick={save} disabled={saving || !form.displayName.trim()} style={dpButton('primary', { width: '100%', opacity: saving || !form.displayName.trim() ? 0.58 : 1 })}>{saving ? 'Сохраняем...' : 'Сохранить'}</button>
+          <button onClick={save} disabled={saving || !form.firstName.trim()} style={dpButton('primary', { width: '100%', opacity: saving || !form.firstName.trim() ? 0.58 : 1 })}>{saving ? 'Сохраняем...' : 'Сохранить'}</button>
         </div>
       </div>
     </ApgModal>
@@ -1133,7 +1143,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               await apgIdentity.authenticate({
                 provider: 'native-apg',
                 token: data.token,
-                uid: data.user?.id || data.userId || expected,
+                uid: data.user?.id || data.userId || data.tgId || '',
                 email: data.user?.email || '',
               });
               const expectedUid = safeTraceString(data.user?.id || data.tgId || '', 220);
@@ -2056,7 +2066,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: '#4BB34B', fontSize: 10.5, lineHeight: '13px', fontWeight: 850, letterSpacing: 0.7, textTransform: 'uppercase' }}><span aria-hidden="true">●</span> Активный участник</div>
-                    <h1 style={{ margin: '7px 0 0', color: DP.text, fontSize: 36, lineHeight: '41px', fontWeight: 950, letterSpacing: -0.8, overflowWrap: 'anywhere' }}>{displayName}</h1>
+                    <button type="button" onClick={() => setShowProfileEditor(true)} aria-label="Редактировать имя и дату рождения" style={{ display: 'block', margin: '7px 0 0', border: 0, background: 'transparent', color: DP.text, fontSize: 36, lineHeight: '41px', fontWeight: 950, letterSpacing: -0.8, overflowWrap: 'anywhere', padding: 0, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>{displayName}</button>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 9 }}>
                       <span style={{ borderRadius: 999, background: DP.goldSoft, color: DP.gold, padding: '6px 10px', fontSize: 11.5, lineHeight: '14px', fontWeight: 850 }}>{roleLabel}</span>
                       <span style={{ color: DP.soft, fontSize: 12, lineHeight: '16px', fontWeight: 760 }}>{level.label} · {userKeys} ключей</span>
@@ -2274,7 +2284,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 : <div style={{ width: 56, height: 56, borderRadius: 21, background: 'linear-gradient(145deg,rgba(215,184,106,0.3),rgba(255,255,255,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: APG2.text, fontSize: 23, fontWeight: 850 }}>{displayName[0]}</div>
               }
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: APG2.text, fontSize: 21, lineHeight: '25px', fontWeight: 850, overflowWrap: 'anywhere' }}>{displayName}</div>
+                <button type="button" onClick={() => setShowProfileEditor(true)} aria-label="Редактировать имя и дату рождения" style={{ border: 0, background: 'transparent', color: APG2.text, fontSize: 21, lineHeight: '25px', fontWeight: 850, overflowWrap: 'anywhere', padding: 0, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>{displayName}</button>
                 <div style={{ color: APG2.textSoft, fontSize: 13, marginTop: 5 }}>Ваш прогресс в городе</div>
               </div>
             </div>
@@ -4174,6 +4184,15 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             </div>
           </div>
         </div>,
+        document.body
+      )}
+
+      {showProfileEditor && createPortal(
+        <DesktopProfileEditor
+          user={user}
+          onClose={() => setShowProfileEditor(false)}
+          onSaved={(patch) => onUserUpdate?.(patch)}
+        />,
         document.body
       )}
 

@@ -1051,10 +1051,18 @@ async function actionProfileSync(db, req, actor) {
 
 async function actionProfilePatch(db, req, actor) {
   const userId = await assertOwn(actor, req.body?.userId || actor.userId);
-  const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'notificationPreferences', 'displayName', 'firstName', 'lastName', 'photo', 'joinedGroup', 'webPushUpdatedAt', 'interestProfile', 'learningProgress', 'learningHintsEnabled', 'learningAnalytics', 'messagingPrivacy']);
+  const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'notificationPreferences', 'displayName', 'firstName', 'lastName', 'birthDate', 'photo', 'joinedGroup', 'webPushUpdatedAt', 'interestProfile', 'learningProgress', 'learningHintsEnabled', 'learningAnalytics', 'messagingPrivacy']);
   const patch = {};
   Object.entries(req.body?.patch || {}).forEach(([key, value]) => {
-    if (allowed.has(key)) patch[key] = key === 'messagingPrivacy' ? normalizeSocialPrivacy(value) : value;
+    if (!allowed.has(key)) return;
+    if (key === 'messagingPrivacy') patch[key] = normalizeSocialPrivacy(value);
+    else if (key === 'birthDate') {
+      const normalized = safeString(value, 10);
+      if (normalized && (!/^\d{4}-\d{2}-\d{2}$/.test(normalized) || Number.isNaN(new Date(`${normalized}T00:00:00Z`).getTime()) || normalized > new Date().toISOString().slice(0, 10))) {
+        throw Object.assign(new Error('Проверьте дату рождения.'), { statusCode: 400, code: 'INVALID_BIRTH_DATE' });
+      }
+      patch[key] = normalized;
+    } else patch[key] = value;
   });
   if (req.body?.serverConsentAt && patch.consents) {
     patch.consents = { ...patch.consents, acceptedAt: FieldValue.serverTimestamp() };
