@@ -16,11 +16,17 @@ try {
   await page.goto(url, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'Найти дубли' }).click();
   await page.getByRole('button', { name: 'Разобрать группу' }).click();
+  await page.getByRole('button', { name: 'Объединить' }).click();
+  await page.getByRole('alert').getByText('Сначала нажмите «Проверить перенос».').waitFor();
   await page.getByRole('button', { name: 'Проверить перенос' }).click();
+  await page.getByRole('button', { name: 'Объединить' }).click();
+  await page.getByRole('alert').getByText('Укажите причину объединения — минимум 3 символа.').waitFor();
   await page.getByPlaceholder('Например: один пользователь зарегистрировался через email и Telegram').fill('Один пользователь, разные способы входа');
   await page.getByRole('button', { name: 'Объединить' }).click();
 
   await page.getByRole('button', { name: 'Активные · 3' }).click();
+  const alphabeticalNames = await page.getByTestId('admin-user-row').evaluateAll(rows => rows.map(row => row.dataset.userName));
+  assert.deepEqual(alphabeticalNames, ['Анна Петрова', 'Борис Петров', 'Яков Петров']);
   await page.getByRole('button', { name: 'Карточка' }).first().click();
   await page.getByRole('button', { name: 'Закрыть' }).click();
   await page.getByRole('button', { name: 'Изменить' }).first().click();

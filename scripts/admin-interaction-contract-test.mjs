@@ -41,7 +41,10 @@ for (const action of [
   assert.ok(source.includes(`'${action}'`), `В интерфейсе отсутствует действие ${action}.`);
 }
 
-assert.match(source, /mergePreview\.requiresPrivilegedConfirmation && !confirmPrivilegedMerge/);
+assert.match(source, /setMergeError\('Сначала нажмите «Проверить перенос»\.'\)/);
+assert.match(source, /setMergeError\('Укажите причину объединения — минимум 3 символа\.'\)/);
+assert.match(source, /onClick=\{requestMerge\}/);
+assert.match(source, /\.sort\(compareUsersAlphabetically\)/);
 assert.match(source, /canDeleteUsers=\{String\(adminSession\?\.role \|\| adminSecurity\?\.actor\?\.role \|\| ''\)\.toLowerCase\(\) === 'owner'\}/);
 assert.match(source, />Карточка<\/button>/);
 assert.match(source, />Не дубли<\/button>/);

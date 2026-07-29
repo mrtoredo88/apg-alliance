@@ -3,9 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { AdminUsersPanel } from '../src/AdminPanel.jsx';
 
 const users = [
-  { id: 'user-a', name: 'Иван Петров', email: 'same@example.com', keys: 5, role: 'user', accountStatus: 'active' },
-  { id: 'user-b', name: 'Иван Петров', linkedEmail: 'same@example.com', keys: 2, role: 'user', accountStatus: 'active' },
-  { id: 'user-c', name: 'Иван Петров', phone: '+79990000000', keys: 1, role: 'user', accountStatus: 'active' },
+  { id: 'user-a', name: 'Яков Петров', email: 'same@example.com', keys: 5, role: 'user', accountStatus: 'active' },
+  { id: 'user-b', name: 'Анна Петрова', linkedEmail: 'same@example.com', keys: 2, role: 'user', accountStatus: 'active' },
+  { id: 'user-c', name: 'Борис Петров', phone: '+79990000000', keys: 1, role: 'user', accountStatus: 'active' },
   { id: 'user-archived', name: 'Архивный Пользователь', email: 'archive@example.com', archived: true, accountStatus: 'archived' },
 ];
 const group = { id: 'group-1', score: 100, confidence: 'high', reasons: [{ label: 'Email' }], users: users.slice(0, 3) };

@@ -633,6 +633,7 @@ function withinDays(value, days) {
 function userDisplayName(user) {
   return [user?.firstName ?? user?.first_name, user?.lastName ?? user?.last_name].filter(Boolean).join(' ')
     || user?.displayName
+    || user?.name
     || user?.email
     || `#${String(user?.id ?? '').slice(0, 6)}`;
 }
@@ -2047,10 +2048,19 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
   const duplicateIds = new Set(duplicateGroups.flatMap(group => group.users.map(user => user.id)));
   const source = view === 'archive' ? archivedUsers : view === 'duplicates' ? users.filter(user => duplicateIds.has(user.id)) : activeUsers;
   const q = queryText.trim().toLowerCase();
+  const compareUsersAlphabetically = (left, right) => {
+    const leftName = userDisplayName(left).trim();
+    const rightName = userDisplayName(right).trim();
+    const leftHasName = leftName && leftName !== left.id;
+    const rightHasName = rightName && rightName !== right.id;
+    if (leftHasName !== rightHasName) return leftHasName ? -1 : 1;
+    return leftName.localeCompare(rightName, 'ru', { sensitivity: 'base', numeric: true })
+      || String(left.id || '').localeCompare(String(right.id || ''), 'ru', { sensitivity: 'base', numeric: true });
+  };
   const filtered = source.filter(user => !q || [
     userDisplayName(user), user.email, user.linkedEmail, user.phone, user.phoneNumber,
     user.telegramId, user.tgId, user.telegramUsername, user.firebaseUid, user.authUid, user.id,
-  ].filter(Boolean).join(' ').toLowerCase().includes(q));
+  ].filter(Boolean).join(' ').toLowerCase().includes(q)).sort(compareUsersAlphabetically);
   const visibleIds = filtered.map(user => user.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
 
@@ -2150,6 +2160,22 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
     }
   };
 
+  const requestMerge = () => {
+    if (!mergePreview) {
+      setMergeError('Сначала нажмите «Проверить перенос».');
+      return;
+    }
+    if (mergeReason.trim().length < 3) {
+      setMergeError('Укажите причину объединения — минимум 3 символа.');
+      return;
+    }
+    if (mergePreview.requiresPrivilegedConfirmation && !confirmPrivilegedMerge) {
+      setMergeError('Подтвердите объединение аккаунта с административной ролью.');
+      return;
+    }
+    executeMerge();
+  };
+
   const archiveSelected = async () => {
     if (!confirm(`Отправить в архив аккаунты (${selectedIds.length})? Вход и активные действия будут недоступны.`)) return;
     const reason = prompt('Укажите причину архивирования.');
@@ -2240,7 +2266,7 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 8, marginTop: 12 }}>
-                {group.users.map(user => (
+                {[...group.users].sort(compareUsersAlphabetically).map(user => (
                   <div key={user.id} style={{ background: A.chip, borderRadius: 13, padding: 11 }}>
                     <div style={{ color: A.text, fontWeight: 850 }}>{userDisplayName(user)}</div>
                     <div style={{ color: A.textSec, fontSize: 11, marginTop: 4, lineHeight: '16px', wordBreak: 'break-word' }}>
@@ -2260,7 +2286,7 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
           {filtered.map(user => {
             const checked = selectedIds.includes(user.id);
             return (
-              <div key={user.id} style={{ ...s.card, marginBottom: 0, scrollMarginTop: 250, display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: 12, alignItems: 'center', border: checked ? `1px solid ${A.gold}` : `1px solid ${A.border}` }}>
+              <div key={user.id} data-testid="admin-user-row" data-user-name={userDisplayName(user)} style={{ ...s.card, marginBottom: 0, scrollMarginTop: 250, display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: 12, alignItems: 'center', border: checked ? `1px solid ${A.gold}` : `1px solid ${A.border}` }}>
                 <input type="checkbox" checked={checked} onChange={() => setSelectedIds(prev => prev.includes(user.id) ? prev.filter(id => id !== user.id) : [...prev, user.id])} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ color: A.text, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis' }}>{userDisplayName(user)}</div>
@@ -2303,7 +2329,7 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
             <h2 style={s.h2}>Разбор дублирующихся аккаунтов</h2>
             <div style={{ color: A.textSec, fontSize: 12, lineHeight: '18px', marginBottom: 12 }}>Выберите основной аккаунт. Данные и связи дублей будут перенесены в него, а исходные аккаунты останутся в архиве с указателем на основной.</div>
             <div style={{ display: 'grid', gap: 8 }}>
-              {mergeGroup.users.map(user => (
+              {[...mergeGroup.users].sort(compareUsersAlphabetically).map(user => (
                 <label key={user.id} style={{ padding: 11, borderRadius: 13, background: mergeTargetId === user.id ? 'rgba(201,168,76,0.12)' : A.chip, border: `1px solid ${mergeTargetId === user.id ? A.gold : A.border}`, cursor: 'pointer' }}>
                   <input type="radio" name="mergeTarget" checked={mergeTargetId === user.id} disabled={Boolean(mergeBusyAction)} onChange={() => { setMergeTargetId(user.id); setMergePreview(null); setMergeError(''); }} /> <span style={{ color: A.text, fontWeight: 850 }}>{userDisplayName(user)}</span>
                   <div style={{ color: A.textSec, fontSize: 11, margin: '4px 0 0 22px' }}>{user.email || 'без email'} · {Number(user.keys || 0)} ключей · {user.id}</div>
@@ -2337,8 +2363,8 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
               <button type="button" disabled={Boolean(mergeBusyAction)} onClick={() => setMergeGroup(null)} style={{ ...s.btn, ...s.btnGray }}>Отмена</button>
-              <button type="button" disabled={Boolean(mergeBusyAction)} onClick={previewMerge} style={{ ...s.btn, ...s.btnGray }}>{mergeBusyAction === 'preview' ? 'Проверяем связи...' : mergeError ? 'Повторить проверку' : 'Проверить перенос'}</button>
-              <button type="button" title={!mergePreview ? 'Сначала выполните проверку переноса' : !mergeReason.trim() ? 'Укажите причину объединения' : mergePreview.requiresPrivilegedConfirmation && !confirmPrivilegedMerge ? 'Подтвердите объединение административного аккаунта' : ''} disabled={Boolean(mergeBusyAction) || !mergePreview || mergeReason.trim().length < 3 || (mergePreview.requiresPrivilegedConfirmation && !confirmPrivilegedMerge)} onClick={executeMerge} style={{ ...s.btn, ...s.btnPri }}>{mergeBusyAction === 'merge' ? 'Объединяем...' : 'Объединить'}</button>
+              <button type="button" disabled={Boolean(mergeBusyAction)} onClick={previewMerge} style={{ ...s.btn, ...s.btnGray }}>{mergeBusyAction === 'preview' ? 'Проверяем связи...' : 'Проверить перенос'}</button>
+              <button type="button" disabled={Boolean(mergeBusyAction)} onClick={requestMerge} style={{ ...s.btn, ...s.btnPri }}>{mergeBusyAction === 'merge' ? 'Объединяем...' : 'Объединить'}</button>
             </div>
           </div>
         </div>
