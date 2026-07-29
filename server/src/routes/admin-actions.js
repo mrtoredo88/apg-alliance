@@ -151,6 +151,33 @@ function mergeStateToken(users = []) {
   return createHash('sha256').update(JSON.stringify(state)).digest('hex');
 }
 
+async function syncUserProfileMirrors(userId, patch = {}) {
+  const mirrorPatch = Object.fromEntries(
+    Object.entries(patch).filter(([key]) => ['displayName', 'firstName', 'lastName', 'photo', 'email'].includes(key)),
+  );
+  if (!Object.keys(mirrorPatch).length) return;
+  const [accountProfile, identityUser] = await Promise.all([
+    serverFoundation.account.getProfile(userId).catch(() => null),
+    serverFoundation.identityV2.getUser(userId).catch(() => null),
+  ]);
+  await Promise.all([
+    serverFoundation.account.upsertProfile({
+      ...(accountProfile || {}),
+      ...mirrorPatch,
+      id: userId,
+      userId,
+      canonicalUserId: accountProfile?.canonicalUserId || identityUser?.canonicalUserId || userId,
+    }).catch(error => serverFoundation.account.metrics.recordError(error)),
+    serverFoundation.identityV2.repository.users.upsert({
+      ...(identityUser || {}),
+      ...mirrorPatch,
+      id: userId,
+      userId,
+      canonicalUserId: identityUser?.canonicalUserId || accountProfile?.canonicalUserId || userId,
+    }).catch(error => serverFoundation.account.metrics.recordError(error)),
+  ]);
+}
+
 async function handleUserAccountsAction(db, request, actor) {
   const action = String(request.body?.action || '');
   if (action === 'user-accounts:duplicates') {
@@ -220,6 +247,13 @@ async function handleUserAccountsAction(db, request, actor) {
     if (!userIds.length || userIds.length > 100) throw Object.assign(new Error('Выберите от 1 до 100 пользователей.'), { statusCode: 400 });
     const requestedPatch = cleanEntityPatch(request.body?.patch);
     if (action === 'user-accounts:bulk-update') {
+      if (Object.hasOwn(requestedPatch, 'name') && !Object.hasOwn(requestedPatch, 'displayName')) {
+        requestedPatch.displayName = String(requestedPatch.name || '').trim();
+      }
+      if (Object.hasOwn(requestedPatch, 'firstName') || Object.hasOwn(requestedPatch, 'lastName')) {
+        requestedPatch.displayName = [requestedPatch.firstName, requestedPatch.lastName].map(value => String(value || '').trim()).filter(Boolean).join(' ');
+        requestedPatch.name = requestedPatch.displayName;
+      }
       const ownerOnlyFields = ['role', 'userRole', 'keys'].filter(field => Object.hasOwn(requestedPatch, field));
       if (ownerOnlyFields.length && String(actor?.role || '').toLowerCase() !== 'owner') {
         throw Object.assign(new Error('Изменять роли и количество ключей пользователей может только owner.'), { statusCode: 403 });
@@ -250,6 +284,7 @@ async function handleUserAccountsAction(db, request, actor) {
     const batch = db.batch();
     userIds.forEach(id => batch.set(db.collection('users').doc(id), { ...patch, updatedAt: FieldValue.serverTimestamp() }, { merge: true }));
     await batch.commit();
+    if (action === 'user-accounts:bulk-update') await Promise.all(userIds.map(id => syncUserProfileMirrors(id, patch)));
     await writeAuditLog(db, request, actor, action, 'users', userIds.join(','), { label: `${action === 'user-accounts:archive' ? 'Архивировано' : action === 'user-accounts:restore' ? 'Восстановлено' : 'Массово обновлено'} аккаунтов: ${userIds.length}`, userIds, fields: Object.keys(patch), ...(archiveReason ? { reason: archiveReason } : {}) });
     return { ok: true, userIds, patch: cleanEntityPatch(patch) };
   }
@@ -298,7 +333,16 @@ async function handleUserAccountsAction(db, request, actor) {
         createdBy: actor.userId || actor.uid,
       });
       [target, ...sources].forEach(user => batch.set(snapshotRef.collection('users').doc(user.id), { data: user }));
-      batch.set(db.collection('users').doc(targetId), { ...mergedPatch, updatedAt: FieldValue.serverTimestamp(), mergedAt: FieldValue.serverTimestamp(), mergedBy: actor.userId || actor.uid }, { merge: true });
+      batch.set(db.collection('users').doc(targetId), {
+        ...mergedPatch,
+        archived: false,
+        accountStatus: 'active',
+        mergedInto: FieldValue.delete(),
+        dataMigratedInto: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+        mergedAt: FieldValue.serverTimestamp(),
+        mergedBy: actor.userId || actor.uid,
+      }, { merge: true });
       references.forEach(item => batch.set(db.collection(item.collection).doc(item.id), { [item.field]: targetId, updatedAt: FieldValue.serverTimestamp() }, { merge: true }));
       sources.forEach(source => {
         batch.set(db.collection('users').doc(source.id), {

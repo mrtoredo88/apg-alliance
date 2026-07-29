@@ -150,6 +150,21 @@ async function writeAccountProfileBestEffort(userId, profile = {}, extra = {}) {
   });
 }
 
+async function writeIdentityProfileBestEffort(userId, patch = {}) {
+  const identityFields = Object.fromEntries(
+    Object.entries(patch).filter(([key]) => ['displayName', 'firstName', 'lastName', 'photo', 'email'].includes(key)),
+  );
+  if (!Object.keys(identityFields).length) return null;
+  const existing = await serverFoundation.identityV2.getUser(userId).catch(() => null);
+  return serverFoundation.identityV2.repository.users.upsert({
+    ...(existing || {}),
+    ...identityFields,
+    id: userId,
+    userId,
+    canonicalUserId: existing?.canonicalUserId || userId,
+  }).catch(() => null);
+}
+
 function safeString(value, max = 300) {
   return String(value ?? '').trim().slice(0, max);
 }
@@ -449,7 +464,7 @@ async function requireActor(req) {
 async function assertOwn(actor, userId) {
   const target = safeUserId(userId);
   if (!target || target.startsWith('guest_')) throw Object.assign(new Error('Действие доступно только авторизованному пользователю.'), { statusCode: 401 });
-  if (actor.userId === target || actor.uid === target) return actor.userId;
+  if (actor.userId === target || actor.uid === target) return target;
 
   let identity = await serverFoundation.identityV2.getUser(target).catch(() => null);
   if (!identity && target.startsWith('email:')) {
@@ -472,7 +487,7 @@ async function assertOwn(actor, userId) {
     || identity?.user?.canonicalUserId
     || identity?.user?.id,
   );
-  if (resolved === actor.userId || resolved === actor.uid) return actor.userId;
+  if (resolved === actor.userId || resolved === actor.uid) return target;
 
   throw Object.assign(new Error('Нельзя менять данные другого пользователя.'), { statusCode: 403 });
 }
@@ -1107,6 +1122,7 @@ async function actionProfilePatch(db, req, actor) {
   patch.updatedAt = FieldValue.serverTimestamp();
   await db.collection('users').doc(userId).set(patch, { merge: true });
   await writeAccountProfileBestEffort(userId, patch, { bootstrap: { profileUpdate: true } });
+  await writeIdentityProfileBestEffort(userId, patch);
   await audit(db, req, actor, 'profile:update', 'users', userId, 'success', { fields: Object.keys(patch) });
   return { ok: true, userId, patch: req.body?.patch || {} };
 }

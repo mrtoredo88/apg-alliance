@@ -15,6 +15,13 @@
 
 ---
 
+## [2026-07-29] fix: сохранение основной карточки пользователя через aliases
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/AdminPanel.jsx`, `server/src/routes/user-actions.js`, `server/src/routes/admin-actions.js`, `scripts/profile-save-access-test.mjs`, `scripts/admin-user-accounts-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** редактирование профиля через архивный способ входа теперь записывает данные в выбранный основной профиль; имя и фамилия в админке сохраняются раздельно и синхронизируются с Account Core и Identity. При объединении основная карточка очищается от ошибочных ссылок `mergedInto` на саму себя.
+**Почему:** изменения имени Татьяны визуально не сохранялись: запрос мог попадать в архивный Telegram-alias, админка обновляла вторичное поле `name`, а основная запись оставалась помеченной как объединённая сама с собой.
+
 ## [2026-07-29] fix: точное положение действий публикации и сохранение имени профиля
 **Коммит:** `локально, без коммита`
 **Файлы:** `src/workspace/WorkspaceNewsCenter.jsx`, `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `server/src/routes/user-actions.js`, `scripts/partner-post-push-connections-regression.mjs`, `scripts/profile-visit-idempotency-test.mjs`, `.ai/17_CHANGELOG_AI.md`

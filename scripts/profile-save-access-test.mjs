@@ -61,5 +61,15 @@ assert.match(
   /hasRole\(actor\.user \|\| \{\}, ROLES\.admin\)/,
   'shared owned-profile guard must keep admin access for recovery saves',
 );
+assert.match(
+  userActions,
+  /if \(resolved === actor\.userId \|\| resolved === actor\.uid\) return target;/,
+  'editing through an archived login alias must persist to the requested canonical profile',
+);
+assert.match(
+  userActions,
+  /await writeIdentityProfileBestEffort\(userId, patch\);/,
+  'profile edits must keep the identity mirror in sync',
+);
 
 console.log('Profile save access regression test passed');

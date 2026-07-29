@@ -82,6 +82,8 @@ assert.match(adminPanelSource, /role="alert"/);
 assert.match(adminPanelSource, /Сначала нажмите «Проверить перенос»/);
 assert.match(adminPanelSource, /canDeleteUsers && <button/);
 assert.match(adminPanelSource, /Изменять роли может только owner/);
+assert.match(adminPanelSource, /\['firstName', 'Имя'\], \['lastName', 'Фамилия'\]/);
+assert.match(adminPanelSource, /const patch = \{ \.\.\.rawPatch, displayName, name: displayName \};/);
 
 const adminActionsSource = await import('node:fs/promises').then(fs => fs.readFile(new URL('../server/src/routes/admin-actions.js', import.meta.url), 'utf8'));
 assert.match(adminActionsSource, /Изменять роли и количество ключей пользователей может только owner/);
@@ -95,5 +97,8 @@ assert.match(adminActionsSource, /userMergeSnapshots/);
 assert.match(adminActionsSource, /Укажите причину архивирования/);
 assert.match(adminActionsSource, /Укажите причину окончательного удаления/);
 assert.match(adminActionsSource, /Объединение привилегированных аккаунтов доступно только owner/);
+assert.match(adminActionsSource, /syncUserProfileMirrors\(id, patch\)/);
+assert.match(adminActionsSource, /mergedInto: FieldValue\.delete\(\)/);
+assert.match(adminActionsSource, /dataMigratedInto: FieldValue\.delete\(\)/);
 
 console.log('admin user accounts tests passed');

@@ -2099,7 +2099,8 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
   const openEdit = user => {
     setEditingUser(user);
     setEditForm({
-      name: user.displayName || user.name || '',
+      firstName: user.firstName || user.first_name || String(user.displayName || user.name || '').trim().split(/\s+/)[0] || '',
+      lastName: user.lastName || user.last_name || String(user.displayName || user.name || '').trim().split(/\s+/).slice(1).join(' '),
       email: user.email || '',
       phone: user.phone || user.phoneNumber || '',
       telegramUsername: user.telegramUsername || user.tgUsername || '',
@@ -2115,9 +2116,11 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
       setNotice('Количество ключей должно быть целым числом от 0 до 1 000 000.');
       return;
     }
-    const patch = canManageRoles
+    const rawPatch = canManageRoles
       ? { ...editForm, keys: normalizedKeys }
       : Object.fromEntries(Object.entries(editForm).filter(([key]) => !['role', 'keys'].includes(key)));
+    const displayName = [rawPatch.firstName, rawPatch.lastName].map(value => String(value || '').trim()).filter(Boolean).join(' ');
+    const patch = { ...rawPatch, displayName, name: displayName };
     await run('user-accounts:bulk-update', { userIds: [editingUser.id], patch }, `Аккаунт ${editingUser.id} обновлён.`);
     setEditingUser(null);
   };
@@ -2333,7 +2336,7 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
         <div style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 16px 48px' }} onClick={event => { if (event.target === event.currentTarget) setEditingUser(null); }}>
           <div style={{ ...s.card, width: '100%', maxWidth: 620 }}>
             <h2 style={s.h2}>Редактирование аккаунта</h2>
-            {[['name', 'Имя'], ['email', 'Email'], ['phone', 'Телефон'], ['telegramUsername', 'Telegram username'], ['role', 'Роль']].map(([key, label]) => (
+            {[['firstName', 'Имя'], ['lastName', 'Фамилия'], ['email', 'Email'], ['phone', 'Телефон'], ['telegramUsername', 'Telegram username'], ['role', 'Роль']].map(([key, label]) => (
               <label key={key} style={{ display: 'block', marginBottom: 10, color: A.textSec, fontSize: 12 }}>{label}<input value={editForm[key] || ''} disabled={key === 'role' && !canManageRoles} title={key === 'role' && !canManageRoles ? 'Изменять роли может только owner' : ''} onChange={event => setEditForm(prev => ({ ...prev, [key]: event.target.value }))} style={{ ...s.input, marginTop: 5, opacity: key === 'role' && !canManageRoles ? 0.6 : 1 }} /></label>
             ))}
             <label style={{ display: 'block', marginBottom: 10, color: A.textSec, fontSize: 12 }}>
