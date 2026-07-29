@@ -110,6 +110,7 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
   const [emailLoginDiagnostics, setEmailLoginDiagnostics] = useState(() => readEmailLoginDiagnostics());
   const [architectureStatus, setArchitectureStatus] = useState(null);
   const [releaseStatus, setReleaseStatus] = useState(null);
+  const [qualityReport, setQualityReport] = useState(null);
 
   const runChecks = useCallback(async () => {
     setChecking(true);
@@ -164,16 +165,24 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
     return result;
   }, []);
 
+  const refreshQualityReport = useCallback(async () => {
+    const response = await fetch(`/quality/latest.json?_=${Date.now()}`, { cache: 'no-store' }).catch(() => null);
+    const result = response?.ok ? await response.json().catch(() => null) : null;
+    setQualityReport(result);
+    return result;
+  }, []);
+
   useEffect(() => {
     runChecks();
     refreshPushDiagnostics();
     refreshArchitectureStatus();
     refreshReleaseStatus();
+    refreshQualityReport();
     getDocs(query(collection(db, 'errorLogs'), orderBy('createdAt', 'desc'), limit(20)))
       .then(snap => setErrorLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
       .catch(() => {})
       .finally(() => setLoadingLogs(false));
-  }, [refreshArchitectureStatus, refreshPushDiagnostics, refreshReleaseStatus, runChecks]);
+  }, [refreshArchitectureStatus, refreshPushDiagnostics, refreshQualityReport, refreshReleaseStatus, runChecks]);
 
   const refreshPerformance = useCallback(() => {
     const report = forcePerformanceSnapshot('health_refresh');
@@ -312,7 +321,7 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
         <ScreenHeader title="APG Health" subtitle="Диагностика системы" kicker="OWNER" onBack={onBack} />
 
         <GlassCard style={{ borderRadius: 28, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))', gap: 6, marginTop: 0 }}>
-          {[['overview', 'Обзор'], ['runtime', 'Runtime'], ['entities', 'Данные'], ['activity', 'Активность'], ['push', 'Push'], ['email', 'Email'], ['architecture', 'Arch'], ['performance', 'Perf']].map(([id, label]) => (
+          {[['overview', 'Обзор'], ['quality', 'Quality'], ['runtime', 'Runtime'], ['entities', 'Данные'], ['activity', 'Активность'], ['push', 'Push'], ['email', 'Email'], ['architecture', 'Arch'], ['performance', 'Perf']].map(([id, label]) => (
             <GlassButton key={id} onClick={() => setActiveTab(id)} tone={activeTab === id ? 'gold' : 'glass'} style={{ minHeight: 44, borderRadius: 20, color: activeTab === id ? '#17120a' : APG2_PROFILE.text }}>{label}</GlassButton>
           ))}
         </GlassCard>
@@ -408,6 +417,57 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                 <GlassButton onClick={runChecks} disabled={checking} style={{ borderRadius: 20, minHeight: 48 }}>↻ Сервисы</GlassButton>
               </div>
             </GlassSection>
+          </>
+        )}
+
+        {activeTab === 'quality' && (
+          <>
+            <GlassSection title="APG Quality Platform v1">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Release Gate" value={qualityReport?.status || 'NOT RUN'} tone={qualityReport?.status === 'PASS' ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Последний запуск" value={formatDateTime(qualityReport?.generatedAt)} />
+                <DiagnosticLine label="Сканеры" value={`${qualityReport?.summary?.passed ?? 0} / ${qualityReport?.summary?.scanners ?? 0}`} tone={qualityReport?.status === 'PASS' ? 'ok' : 'default'} />
+                <DiagnosticLine label="Critical User Journeys" value={qualityReport?.metadata?.criticalJourneys ?? 36} />
+                <DiagnosticLine label="Критические ошибки" value={qualityReport?.summary?.critical ?? 0} tone={(qualityReport?.summary?.critical ?? 0) === 0 ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Ошибки" value={qualityReport?.summary?.errors ?? 0} tone={(qualityReport?.summary?.errors ?? 0) === 0 ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Предупреждения" value={qualityReport?.summary?.warnings ?? 0} />
+                <DiagnosticLine label="Первопричины" value={qualityReport?.summary?.rootCauses ?? 0} tone={(qualityReport?.summary?.rootCauses ?? 0) === 0 ? 'ok' : 'bad'} />
+              </GlassCard>
+              <GlassButton onClick={refreshQualityReport} style={{ width: '100%', marginTop: 10 }}>↻ Обновить Quality Report</GlassButton>
+            </GlassSection>
+
+            <GlassSection title="Проверки">
+              {(qualityReport?.scans || []).length === 0 ? (
+                <EmptyStateV2 icon="🧪" title="Локальный прогон ещё не опубликован" text={qualityReport?.metadata?.message || 'Выполните release gate перед публикацией.'} />
+              ) : (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {qualityReport.scans.map(scan => (
+                    <GlassCard key={scan.id} style={{ borderRadius: 20, padding: '12px 14px', border: `1px solid ${scan.status === 'PASS' ? 'rgba(74,222,128,0.28)' : 'rgba(248,113,113,0.34)'}` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                        <span style={{ color: APG2_PROFILE.text, fontSize: 13, fontWeight: 850 }}>{scan.id}</span>
+                        <span style={{ color: scan.status === 'PASS' ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: 900 }}>{scan.status}</span>
+                      </div>
+                      <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, marginTop: 4 }}>
+                        {Object.entries(scan.metrics || {}).map(([key, value]) => `${key}: ${value}`).join(' · ') || 'contract check'}
+                      </div>
+                    </GlassCard>
+                  ))}
+                </div>
+              )}
+            </GlassSection>
+
+            {(qualityReport?.rootCauses || []).length > 0 && (
+              <GlassSection title="Вероятные первопричины">
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {qualityReport.rootCauses.map(cause => (
+                    <GlassCard key={cause.fingerprint} style={{ borderRadius: 20, padding: '12px 14px', border: '1px solid rgba(248,113,113,0.34)' }}>
+                      <div style={{ color: '#f87171', fontSize: 12, fontWeight: 900 }}>{cause.occurrences} симптомов · {cause.category}</div>
+                      <div style={{ color: APG2_PROFILE.text, fontSize: 12, lineHeight: '18px', marginTop: 5 }}>{cause.probableRootCause}</div>
+                    </GlassCard>
+                  ))}
+                </div>
+              </GlassSection>
+            )}
           </>
         )}
 

@@ -5,6 +5,7 @@ node_modules/
 dist/
 .local-https/
 .release-backups/
+.quality/
 .backup/
 .tmp*
 build.zip

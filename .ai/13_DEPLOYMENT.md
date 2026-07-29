@@ -309,7 +309,30 @@ npm run deploy   # vite build + vk-miniapps-deploy
 
 ## Мониторинг
 
-Нет автоматизированного мониторинга. Вручную:
+### APG Quality Platform v1
+
+Перед production deploy `release:changed` автоматически запускает `release:gate`.
+Gate проверяет lint только изменённых JS/JSX/MJS-файлов, единый локальный набор
+unit/integration/regression/smoke-проверок и production build. При любом FAIL deploy
+останавливается. Обход gate допускается только явным аварийным флагом
+`--skip-quality-gate`.
+
+Полезные локальные команды:
+
+```bash
+npm run quality:local
+npm run quality:browser
+npm run quality:root-causes
+npm run release:gate
+```
+
+`quality:browser` требует локальный preview на `127.0.0.1:4175`. Сводный отчёт
+создаётся в `.quality/latest.json`; release gate копирует его в
+`dist/quality/latest.json`, откуда отчёт читает вкладка APG Health → Quality.
+GitHub Actions запускает те же проверки, поднимает preview, выполняет браузерный
+обход mobile/desktop и сохраняет отчёт как artifact.
+
+Runtime-мониторинг внешних сервисов пока выполняется вручную:
 - Vercel Dashboard — функция логи, cron статус
 - Firebase Console — Firestore, Auth, FCM
 - Yandex Cloud Console — Container логи, S3 статистика

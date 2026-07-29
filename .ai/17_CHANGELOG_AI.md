@@ -4739,3 +4739,13 @@
 - Profile `Люди → Все` now loads the canonical active-user directory instead of
   showing only existing contacts, requests and dialogs.
 - Added regression coverage for all three fixes.
+
+# 2026-07-29 — APG Quality Platform v1
+
+- Добавлен единый локальный Quality Runner для unit, integration, regression, auth smoke, API, permissions, navigation и Playwright UI-проверок.
+- UI Scanner проходит 13 маршрутов в mobile/desktop, проверяет рендер, консоль, 5xx, ссылки и доступность активных безопасных контролов без выполнения опасных действий.
+- API Scanner автоматически собирает endpoint-контракты из `api/` и Fastify routes; Permission Scanner контролирует Owner, Admin, Moderator, Partner, Expert и User.
+- Root Cause Analyzer группирует повторяющиеся симптомы по fingerprint и выводит вероятные первопричины.
+- Создан каталог из 36 Critical User Journeys и контракт, не позволяющий уменьшить его ниже 30 сценариев.
+- APG Health получил вкладку Quality со статусом release gate, сканерами, ошибками и сгруппированными первопричинами.
+- `release:changed` теперь блокирует deploy при FAIL локального quality gate или build; GitHub Actions запускает тот же контур и браузерный scan.

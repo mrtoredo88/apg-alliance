@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import process from 'node:process';
 import { createReleasePlan } from './release-change-plan.mjs';
 import { createAnalysis, formatAnalysis, STATUS } from './release-report.mjs';
 
@@ -7,6 +8,7 @@ const dryRun = args.has('--dry-run');
 const explain = args.has('--explain') || args.has('--why');
 const deployMigrationOperator = args.has('--deploy-migration-operator');
 const startedAt = Date.now();
+const skipQualityGate = args.has('--skip-quality-gate');
 
 function valueAfter(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -47,6 +49,8 @@ if (!plan.frontend && !plan.backend && !plan.migrationOperator) {
 }
 
 if (dryRun || explain) process.exit(0);
+
+if (!skipQualityGate) run('npm', ['run', 'release:gate']);
 
 if (plan.frontend) {
   run('bash', ['./deploy-frontend.sh']);

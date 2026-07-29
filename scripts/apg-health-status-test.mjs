@@ -5,6 +5,9 @@ const health = fs.readFileSync('src/ApgHealthPage.jsx', 'utf8');
 const systemStatus = fs.readFileSync('server/src/routes/system-status.js', 'utf8');
 
 assert.match(health, /\['runtime', 'Runtime'\]/, 'APG Health exposes Runtime tab');
+assert.match(health, /\['quality', 'Quality'\]/, 'APG Health exposes Quality tab');
+assert.match(health, /\/quality\/latest\.json/, 'APG Health reads the release quality report');
+assert.match(health, /Вероятные первопричины/, 'APG Health shows grouped root causes');
 assert.match(health, /Frontend version/, 'APG Health renders frontend version');
 assert.match(health, /Backend version/, 'APG Health renders backend version');
 assert.match(health, /Release parity/, 'APG Health renders release parity');
