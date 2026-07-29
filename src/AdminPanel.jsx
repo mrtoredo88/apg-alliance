@@ -2270,7 +2270,7 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
             {selectedIds.length >= 2 && view === 'active' && <button type="button" disabled={busy} onClick={openSelectedMerge} style={{ ...s.btn, ...s.btnPri, padding: '6px 10px', fontSize: 12 }}>Объединить</button>}
             {selectedIds.length > 0 && view !== 'archive' && <button type="button" disabled={busy} onClick={archiveSelected} style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12 }}>В архив</button>}
             {selectedIds.length > 0 && view === 'archive' && <button type="button" disabled={busy} onClick={restoreSelected} style={{ ...s.btn, ...s.btnPri, padding: '6px 10px', fontSize: 12 }}>Восстановить</button>}
-            {selectedIds.length > 0 && view === 'archive' && canDeleteUsers && <button type="button" disabled={busy} onClick={deleteSelected} style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }}>Удалить навсегда</button>}
+            {selectedIds.length > 0 && canDeleteUsers && <button type="button" data-testid="delete-selected-users" disabled={busy} onClick={deleteSelected} style={{ ...s.btn, ...s.btnDanger, padding: '6px 10px', fontSize: 12 }}>Удалить выбранные</button>}
             {notice && <span style={{ color: A.textSec, fontSize: 12 }}>{notice}</span>}
           </div>
         )}

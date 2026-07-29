@@ -168,16 +168,17 @@ export class EconomyRepository {
         );
         const operation = mapOperation(previous.rows[0]);
         let currentBalance = integer(currentProfile.rows[0]?.profile?.keys, operation.balanceAfter);
-        const laterOperations = await client.query(
-          `SELECT 1 FROM apg_economy_operations
-           WHERE user_id = $1 AND created_at > $2
+        const latestOperation = await client.query(
+          `SELECT balance_after FROM apg_economy_operations
+           WHERE user_id = $1 AND status = 'completed'
+           ORDER BY created_at DESC
            LIMIT 1`,
-          [cleanUserId, previous.rows[0].created_at],
+          [cleanUserId],
         );
-        const lostDailyBonus = laterOperations.rowCount === 0
-          && currentBalance === operation.balanceAfter - operation.delta;
-        if (lostDailyBonus) {
-          currentBalance = operation.balanceAfter;
+        const ledgerBalance = integer(latestOperation.rows[0]?.balance_after, currentBalance);
+        const balanceReconciled = currentBalance !== ledgerBalance;
+        if (balanceReconciled) {
+          currentBalance = ledgerBalance;
           const repairedProfile = {
             ...(currentProfile.rows[0]?.profile || {}),
             keys: currentBalance,
@@ -191,7 +192,7 @@ export class EconomyRepository {
         return {
           operation: { ...operation, balanceAfter: currentBalance },
           replayed: true,
-          repaired: lostDailyBonus,
+          repaired: balanceReconciled,
         };
       }
 

@@ -46,6 +46,8 @@ assert.match(source, /setMergeError\('Укажите причину объеди
 assert.match(source, /onClick=\{requestMerge\}/);
 assert.match(source, /selectedIds\.length >= 2 && view === 'active'/);
 assert.match(source, /onClick=\{openSelectedMerge\}/);
+assert.match(source, /data-testid="delete-selected-users"/);
+assert.doesNotMatch(source, /view === 'archive' && canDeleteUsers/);
 assert.match(source, />\s*Количество ключей\s*<input type="number"/);
 assert.match(source, /keys: normalizedKeys/);
 assert.match(source, /\.sort\(compareUsersAlphabetically\)/);

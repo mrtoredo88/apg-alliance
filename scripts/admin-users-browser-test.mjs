@@ -49,7 +49,7 @@ try {
   await page.getByRole('button', { name: 'Восстановить' }).click();
   await page.getByRole('button', { name: 'Выбрать все' }).click();
   dialogAnswers.push('УДАЛИТЬ 1', 'Удаление тестового аккаунта');
-  await page.getByRole('button', { name: 'Удалить навсегда' }).click();
+  await page.getByRole('button', { name: 'Удалить выбранные' }).click();
 
   await page.getByRole('button', { name: 'Найти дубли' }).click();
   dialogAnswers.push('Это разные люди');

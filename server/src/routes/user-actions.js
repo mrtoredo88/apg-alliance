@@ -315,6 +315,7 @@ export function buildSafeProfileSyncPatch(current = {}, incoming = {}, context =
   const patch = {};
   for (const [key, value] of Object.entries(incoming || {})) {
     if (['keys', 'reputation', 'completedTasks', 'roles', 'role', 'friends', 'friendIds', 'connectionIds', 'socialConnectionIds', 'linkedTelegram', 'linkedAccounts', 'identityAliases', 'canonicalUserId', 'partnerId', 'partnerCabinetIds', 'ownerPartnerId'].includes(key)) continue;
+    if (current.profileNameEditedAt && ['displayName', 'firstName', 'lastName'].includes(key)) continue;
     if (key === 'email') {
       if (value && (!current.email || safeString(current.email, 300).toLowerCase() === safeString(value, 300).toLowerCase())) patch.email = value;
       continue;
@@ -1133,6 +1134,10 @@ async function actionProfilePatch(db, req, actor) {
     if (subscriptions.length) patch.webPushSubscriptions = FieldValue.arrayUnion(...subscriptions);
   }
   if (!Object.keys(patch).length) throw Object.assign(new Error('Нет данных для сохранения.'), { statusCode: 400 });
+  if (['displayName', 'firstName', 'lastName'].some(field => Object.hasOwn(patch, field))) {
+    patch.profileNameEditedAt = FieldValue.serverTimestamp();
+    patch.profileNameSource = 'user';
+  }
   patch.updatedAt = FieldValue.serverTimestamp();
   await db.collection('users').doc(userId).set(patch, { merge: true });
   await writeAccountProfileBestEffort(userId, patch, { bootstrap: { profileUpdate: true } });
