@@ -505,10 +505,10 @@ function DesktopProfileEditor({ user, onClose, onSaved }) {
         <input value={form.phone} onChange={event => update('phone', event.target.value)} placeholder="Телефон" style={inputStyle} />
         <input value={form.telegram} onChange={event => update('telegram', event.target.value)} placeholder="Telegram" style={inputStyle} />
         <input value={form.vk} onChange={event => update('vk', event.target.value)} placeholder="VK" style={inputStyle} />
-        {error && <div style={{ color: DP.red, fontSize: 12.5, lineHeight: '18px' }}>{error}</div>}
+        {error && <div role="alert" aria-live="polite" style={{ color: DP.red, fontSize: 12.5, lineHeight: '18px' }}>{error}</div>}
         <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.2fr', gap: 9 }}>
-          <button onClick={onClose} style={dpButton('light', { width: '100%' })}>Отмена</button>
-          <button onClick={save} disabled={saving || !form.firstName.trim()} style={dpButton('primary', { width: '100%', opacity: saving || !form.firstName.trim() ? 0.58 : 1 })}>{saving ? 'Сохраняем...' : 'Сохранить'}</button>
+          <button type="button" onClick={onClose} style={dpButton('light', { width: '100%' })}>Отмена</button>
+          <button type="button" onClick={save} disabled={saving || !form.firstName.trim()} style={dpButton('primary', { width: '100%', opacity: saving || !form.firstName.trim() ? 0.58 : 1 })}>{saving ? 'Сохраняем...' : 'Сохранить'}</button>
         </div>
       </div>
     </ApgModal>
@@ -1420,6 +1420,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const [showIosHint, setShowIosHint] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
+  const [profileEditInteraction, setProfileEditInteraction] = useState('');
 
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -2069,11 +2070,37 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                   <div style={{ position: 'relative', width: 152, height: 152 }}>
                     <div style={{ position: 'absolute', inset: 0, borderRadius: 44, background: 'linear-gradient(145deg,rgba(200,155,60,0.22),rgba(255,255,255,0.46))', border: '1px solid rgba(200,155,60,0.28)', display: 'grid', placeItems: 'center', color: DP.gold, fontSize: 48, fontWeight: 950, boxShadow: '0 24px 58px rgba(31,26,20,0.14), inset 0 1px 0 rgba(255,255,255,0.62)' }}>{displayName[0] || 'А'}</div>
                     {profileAvatarUrl && <img src={profileAvatarUrl} alt="" loading="eager" referrerPolicy="no-referrer" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', borderRadius: 44, objectFit: 'cover', border: '3px solid rgba(200,155,60,0.32)', boxSizing: 'border-box', boxShadow: '0 24px 58px rgba(31,26,20,0.16)' }} />}
-                    <button type="button" onClick={() => setShowProfileEditor(true)} aria-label="Изменить фотографию" style={{ position: 'absolute', right: -5, bottom: 8, width: 42, height: 42, borderRadius: 16, border: `1px solid ${DP.border}`, background: DP.controlStrong, color: DP.text, boxShadow: '0 12px 28px var(--apg2-elev-shadow, rgba(31,26,20,0.15))', cursor: 'pointer', fontSize: 15 }}>✎</button>
+                    <button
+                      type="button"
+                      data-testid="desktop-profile-pencil-edit"
+                      onClick={() => setShowProfileEditor(true)}
+                      onPointerDown={() => setProfileEditInteraction('desktop-pencil-pressed')}
+                      onPointerUp={() => { setProfileEditInteraction('desktop-pencil-hover'); setShowProfileEditor(true); }}
+                      onPointerCancel={() => setProfileEditInteraction('')}
+                      onPointerEnter={() => setProfileEditInteraction('desktop-pencil-hover')}
+                      onPointerLeave={() => setProfileEditInteraction('')}
+                      onFocus={() => setProfileEditInteraction('desktop-pencil-focus')}
+                      onBlur={() => setProfileEditInteraction('')}
+                      aria-label="Редактировать профиль"
+                      style={{ position: 'absolute', right: -5, bottom: 8, width: 42, height: 42, borderRadius: 16, border: `1px solid ${profileEditInteraction === 'desktop-pencil-focus' ? DP.gold : DP.border}`, background: profileEditInteraction === 'desktop-pencil-pressed' ? DP.goldSoft : DP.controlStrong, color: DP.text, boxShadow: profileEditInteraction === 'desktop-pencil-focus' ? `0 0 0 3px ${DP.goldSoft}, 0 12px 28px var(--apg2-elev-shadow, rgba(31,26,20,0.15))` : '0 12px 28px var(--apg2-elev-shadow, rgba(31,26,20,0.15))', cursor: 'pointer', fontSize: 15, transform: profileEditInteraction === 'desktop-pencil-pressed' ? 'scale(0.96)' : 'none', transition: 'background 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 100ms ease', touchAction: 'manipulation' }}
+                    >✎</button>
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: '#4BB34B', fontSize: 10.5, lineHeight: '13px', fontWeight: 850, letterSpacing: 0.7, textTransform: 'uppercase' }}><span aria-hidden="true">●</span> Активный участник</div>
-                    <button type="button" onClick={() => setShowProfileEditor(true)} aria-label="Редактировать имя и дату рождения" style={{ display: 'block', margin: '7px 0 0', border: 0, background: 'transparent', color: DP.text, fontSize: 36, lineHeight: '41px', fontWeight: 950, letterSpacing: -0.8, overflowWrap: 'anywhere', padding: 0, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>{displayName}</button>
+                    <button
+                      type="button"
+                      data-testid="desktop-profile-name-edit"
+                      onClick={() => setShowProfileEditor(true)}
+                      onPointerDown={() => setProfileEditInteraction('desktop-name-pressed')}
+                      onPointerUp={() => { setProfileEditInteraction('desktop-name-hover'); setShowProfileEditor(true); }}
+                      onPointerCancel={() => setProfileEditInteraction('')}
+                      onPointerEnter={() => setProfileEditInteraction('desktop-name-hover')}
+                      onPointerLeave={() => setProfileEditInteraction('')}
+                      onFocus={() => setProfileEditInteraction('desktop-name-focus')}
+                      onBlur={() => setProfileEditInteraction('')}
+                      aria-label="Редактировать имя и дату рождения"
+                      style={{ display: 'block', margin: '7px 0 0', border: 0, borderRadius: 10, background: profileEditInteraction === 'desktop-name-pressed' ? DP.goldSoft : profileEditInteraction === 'desktop-name-hover' ? DP.controlSoft : 'transparent', color: DP.text, fontSize: 36, lineHeight: '41px', fontWeight: 950, letterSpacing: -0.8, overflowWrap: 'anywhere', padding: '2px 5px', marginLeft: -5, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer', outline: 'none', boxShadow: profileEditInteraction === 'desktop-name-focus' ? `0 0 0 3px ${DP.goldSoft}` : 'none', transform: profileEditInteraction === 'desktop-name-pressed' ? 'translateY(1px)' : 'none', transition: 'background 150ms ease, box-shadow 150ms ease, transform 100ms ease', touchAction: 'manipulation' }}
+                    >{displayName}</button>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 9 }}>
                       <span style={{ borderRadius: 999, background: DP.goldSoft, color: DP.gold, padding: '6px 10px', fontSize: 11.5, lineHeight: '14px', fontWeight: 850 }}>{roleLabel}</span>
                       <span style={{ color: DP.soft, fontSize: 12, lineHeight: '16px', fontWeight: 760 }}>{level.label} · {userKeys} ключей</span>
@@ -2285,30 +2312,49 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             <GlassBadge tone="gold">{level.emoji} {level.label}</GlassBadge>
           </div>
           <div style={{ position: 'relative', zIndex: 1 }}>
-            <div data-testid="profile-identity-edit-target" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <button
-                type="button"
-                data-testid="profile-name-edit"
-                onClick={() => setShowProfileEditor(true)}
-                aria-label="Редактировать имя, фамилию и дату рождения"
-                style={{
-                  position: 'absolute',
-                  inset: -4,
-                  zIndex: 5,
-                  border: 0,
-                  borderRadius: 22,
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              />
+            <button
+              type="button"
+              data-testid="profile-identity-edit-target"
+              onClick={() => setShowProfileEditor(true)}
+              onPointerDown={() => setProfileEditInteraction('mobile-pressed')}
+              onPointerUp={() => { setProfileEditInteraction('mobile-hover'); setShowProfileEditor(true); }}
+              onPointerCancel={() => setProfileEditInteraction('')}
+              onPointerEnter={() => setProfileEditInteraction('mobile-hover')}
+              onPointerLeave={() => setProfileEditInteraction('')}
+              onFocus={() => setProfileEditInteraction('mobile-focus')}
+              onBlur={() => setProfileEditInteraction('')}
+              aria-label="Редактировать имя, фамилию и дату рождения"
+              style={{
+                position: 'relative',
+                zIndex: 2,
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                margin: '0 0 12px',
+                padding: 4,
+                border: `1px solid ${profileEditInteraction === 'mobile-focus' ? APG2.gold : 'transparent'}`,
+                borderRadius: 22,
+                background: profileEditInteraction === 'mobile-pressed' ? APG2.goldSoft : profileEditInteraction === 'mobile-hover' ? 'rgba(var(--apg2-glass-a,255,255,255),0.07)' : 'transparent',
+                color: 'inherit',
+                fontFamily: 'inherit',
+                textAlign: 'left',
+                cursor: 'pointer',
+                outline: 'none',
+                boxShadow: profileEditInteraction === 'mobile-focus' ? `0 0 0 3px ${APG2.goldSoft}` : 'none',
+                transform: profileEditInteraction === 'mobile-pressed' ? 'scale(0.99)' : 'none',
+                transition: 'background 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 100ms ease',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
               {profileAvatarUrl
                 ? <img src={profileAvatarUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={event => { event.currentTarget.style.display = 'none'; }} style={{ width: 56, height: 56, borderRadius: 21, objectFit: 'cover', border: '2px solid rgba(215,184,106,0.48)', boxShadow: '0 14px 34px rgba(0,0,0,0.30)' }} />
                 : <div style={{ width: 56, height: 56, borderRadius: 21, background: 'linear-gradient(145deg,rgba(215,184,106,0.3),rgba(255,255,255,0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: APG2.text, fontSize: 23, fontWeight: 850 }}>{displayName[0]}</div>
               }
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div
+                  data-testid="profile-name-edit"
                   style={{
                     width: '100%',
                     minHeight: 44,
@@ -2335,7 +2381,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 </div>
                 <div style={{ color: APG2.textSoft, fontSize: 13, marginTop: 5 }}>Ваш прогресс в городе</div>
               </div>
-            </div>
+            </button>
             <div style={{ ...APG2.glass, borderRadius: 22, padding: 11 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: APG2.textSoft, fontSize: 12, marginBottom: 8 }}>
                 <button type="button" onClick={onOpenKeyHistory} style={{ border: 0, background: 'transparent', padding: 0, color: APG2.gold, font: 'inherit', fontWeight: 850, cursor: 'pointer' }}>{userKeys} ключей</button>
@@ -3079,6 +3125,15 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           >
             <EmailAuth onCancel={() => setShowEmailAuth(false)} onSuccess={handleEmailAuthSuccess} />
           </ApgModal>,
+          document.body
+        )}
+
+        {showProfileEditor && createPortal(
+          <DesktopProfileEditor
+            user={user}
+            onClose={() => setShowProfileEditor(false)}
+            onSaved={(patch) => onUserUpdate?.(patch)}
+          />,
           document.body
         )}
 
