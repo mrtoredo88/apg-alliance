@@ -15,6 +15,13 @@
 
 ---
 
+## [2026-07-29] fix: Telegram-привязка объединённого профиля и явный вход после выхода
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/ProfilePanel.jsx`, `src/UserApp.jsx`, `server/src/apg/identity/repositories/IdentityRepository.js`, `scripts/auth-bugfix-regression.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** Telegram-связь, оставшаяся на архивном alias того же canonical-профиля, безопасно переносится на основную запись. Ошибка привязки прекращает опрос и показывает понятное повторяемое действие; кнопка «Войти» после выхода сразу открывает раздел выбора способа авторизации.
+**Почему:** у Татьяны бот получал `/start`, но связь с архивным Telegram-alias воспринималась как чужая, а клиент оставался в бесконечном ожидании. После выхода пользователь возвращался в приложение как гость на прежний экран без явного предложения авторизоваться.
+
 ## [2026-07-29] fix: сохранение основной карточки пользователя через aliases
 **Коммит:** `локально, без коммита`
 **Файлы:** `src/AdminPanel.jsx`, `server/src/routes/user-actions.js`, `server/src/routes/admin-actions.js`, `scripts/profile-save-access-test.mjs`, `scripts/admin-user-accounts-test.mjs`, `.ai/17_CHANGELOG_AI.md`

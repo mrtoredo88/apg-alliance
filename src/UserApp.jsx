@@ -4089,6 +4089,8 @@ export function UserApp() {
     setError(null);
     setNetworkError(false);
     setLoggedOut(false);
+    panelHistoryRef.current = ['profile'];
+    setActivePanel('profile');
     setErrorLoggerUser(null);
     setLoading(true);
     loadData(mountedRef);

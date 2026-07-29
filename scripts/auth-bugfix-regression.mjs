@@ -54,6 +54,8 @@ assertContains(userApp, 'traceAuthStage(\'loadData_aborted\'', 'logout lifecycle
 assertContains(userApp, 'isAuthLoadAborted', 'logout lifecycle: runtime abort helper');
 assertNo(userApp, "setError('Не удалось выйти. Проверьте подключение и попробуйте ещё раз.'", 'logout lifecycle: no hard error message');
 assertContains(userApp, "traceAuthStage('auth_session_restart'", 'logout restart trace');
+assertContains(userApp, "panelHistoryRef.current = ['profile'];", 'login after logout opens the authentication section');
+assertContains(userApp, "setActivePanel('profile');", 'login after logout does not silently return to the home screen');
 assertContains(userApp, 'waitForInitialFirebaseAuth(4500)', 'email restore: extended restore wait for strong identities');
 assertContains(userApp, 'loadData_strong_identity_required', 'strong identity mismatch handled via guest-state fallback');
 assertNo(userApp, 'window.location.reload();', 'email bootstrap path does not force full-page reload');
@@ -93,18 +95,21 @@ assertContains(identityRepository, 'TELEGRAM_LINK_PERSISTENCE_FAILED', 'email li
 assertContains(userApp, "localStorage.setItem('apg_email_user', JSON.stringify(emailUser));", 'complete email auth persists full user payload');
 assertContains(profile, 'linking,', 'profile: link telegram passes linking flag');
 assertContains(profile, "ownerUserId: linking ? String(user?.id || '') : ''", 'profile: link telegram uses current user id');
+assertContains(profile, 'setTgError(errorText);', 'profile: Telegram linking failure is shown instead of polling forever');
+assertContains(profile, "setTgStep('idle');", 'profile: Telegram linking failure returns the action to a retryable state');
 assertContains(telegramUpdates, 'identityV2.linkTelegram.return', 'telegram update link flow traces Identity V2 return');
 assertContains(profile, "action: 'link-email', email: linkEmailValue, userId: String(user.id)", 'profile: link email uses current user id');
 assertContains(identityLinkRepository, 'async getByUserProvider', 'identity consistency: links can be resolved by Identity V2 user and provider');
 assertContains(identityRepository, 'async decorateUserWithLinks', 'identity consistency: user read model is derived from identity links');
 assertContains(identityRepository, 'linkedTelegram: linkedTelegramFromIdentityLink(telegramLink)', 'identity consistency: missing Identity V2 Telegram link returns null');
+assertContains(identityRepository, "apg_identity_links.canonical_user_id = EXCLUDED.canonical_user_id", 'identity consistency: an archived alias Telegram link can be migrated to the same canonical profile');
 assertContains(accountRoute, 'syncProfileIdentityLinks', 'identity consistency: account bootstrap synchronizes profile links from Identity V2');
 assertContains(accountRoute, 'const linkedTelegram = identityUser.linkedTelegram || null', 'identity consistency: stale accountProfile linkedTelegram is overridden');
 
 assertContains(telegramAuthStart, "const ownerUserId = safeString(body.ownerUserId", 'telegram auth start: ownerUserId from client is passed');
 assertContains(telegramUpdates, 'resolveTelegramLinkOwner', 'telegram updates: owner resolver exists');
 assertContains(telegramUpdates, "await serverFoundation.identityV2.getUser(rawOwnerUserId)", 'telegram updates: owner checks identity store first');
-assertContains(telegramUpdates, "linkError = \'owner_not_found\'", 'telegram updates: owner missing handled as owner_not_found');
+assertContains(telegramUpdates, "linkError = 'owner_not_found'", 'telegram updates: owner missing handled as owner_not_found');
 
 console.log('AUTH_REGRESSION_CONTRACT_OK');
 console.log(JSON.stringify({

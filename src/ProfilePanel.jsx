@@ -1078,7 +1078,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           tgStateRef.current = null;
           localStorage.removeItem('apg_tg_pending');
           if (hasLinkState && (user?.id || responseHasLinkOwner)) {
-            tgLinkingRef.current = false;
             if (data.linkError) {
               const errorText = {
                 owner_not_found: 'Не удалось подтвердить владельца аккаунта.',
@@ -1086,8 +1085,12 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 session_stale: 'Ссылка устарела, создайте новую.',
                 link_failed: 'Не удалось привязать Telegram. Попробуйте ещё раз.',
               }[data.linkError] || 'Не удалось привязать Telegram. Попробуйте ещё раз.';
-              throw new Error(errorText);
+              tgLinkingRef.current = false;
+              setTgError(errorText);
+              setTgStep('idle');
+              return;
             }
+            tgLinkingRef.current = false;
             const linkedTelegramFromServer = data.linkedTelegram;
             const tgPayload = linkedTelegramFromServer ? {
               tgId: linkedTelegramFromServer.tgId || data.tgId || null,

@@ -229,14 +229,23 @@ export class IdentityRepository {
            VALUES ($1, $2, $3, $4, $5, $6::jsonb, now(), now())
            ON CONFLICT (id) DO UPDATE SET
              metadata = CASE
-               WHEN apg_identity_links.user_id = EXCLUDED.user_id THEN apg_identity_links.metadata || EXCLUDED.metadata
+               WHEN apg_identity_links.user_id = EXCLUDED.user_id
+                 OR apg_identity_links.canonical_user_id = EXCLUDED.canonical_user_id
+               THEN apg_identity_links.metadata || EXCLUDED.metadata
                ELSE apg_identity_links.metadata
              END,
              canonical_user_id = CASE
-               WHEN apg_identity_links.user_id = EXCLUDED.user_id THEN COALESCE(NULLIF(EXCLUDED.canonical_user_id, ''), apg_identity_links.canonical_user_id)
+               WHEN apg_identity_links.user_id = EXCLUDED.user_id
+                 OR apg_identity_links.canonical_user_id = EXCLUDED.canonical_user_id
+               THEN COALESCE(NULLIF(EXCLUDED.canonical_user_id, ''), apg_identity_links.canonical_user_id)
                ELSE apg_identity_links.canonical_user_id
              END,
-             user_id = apg_identity_links.user_id,
+             user_id = CASE
+               WHEN apg_identity_links.user_id = EXCLUDED.user_id
+                 OR apg_identity_links.canonical_user_id = EXCLUDED.canonical_user_id
+               THEN EXCLUDED.user_id
+               ELSE apg_identity_links.user_id
+             END,
              updated_at = now()
            RETURNING id, user_id, canonical_user_id, metadata
            `,
