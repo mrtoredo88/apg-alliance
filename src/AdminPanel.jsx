@@ -5993,10 +5993,11 @@ export const AdminPanel = () => {
           return { name, label, optional, ok: true, docs: docsToItems(snap), count: snap.docs.length, attempts: attempt, durationMs: Math.round(performance.now() - startedAt) };
         } catch (error) {
           lastError = error;
-          if (name !== 'errorLogs' && !isExpectedAdminAccessError(error)) {
+          const isFinalAttempt = !isTransientFirestoreError(error) || attempt > ADMIN_LOAD_RETRIES;
+          if (isFinalAttempt && name !== 'errorLogs' && !isExpectedAdminAccessError(error)) {
             logError(error, `AdminPanel.fetchData.${name}.attempt${attempt}`);
           }
-          if (!isTransientFirestoreError(error) || attempt > ADMIN_LOAD_RETRIES) break;
+          if (isFinalAttempt) break;
           await sleep(450 * attempt);
         }
       }
@@ -6048,7 +6049,15 @@ export const AdminPanel = () => {
         { name: 'aiImportRequests', label: 'ИИ-импорт заявок', load: () => fetchAdminEntityList('aiImportRequests', 300), optional: true },
         { name: 'publicFormLinks', label: 'Публичные формы', load: () => fetchAdminEntityList('publicFormLinks', 300), optional: true },
       ];
-      const results = await Promise.all(specs.map(readCollection));
+      const results = new Array(specs.length);
+      let nextSpecIndex = 0;
+      const workers = Array.from({ length: Math.min(3, specs.length) }, async () => {
+        while (nextSpecIndex < specs.length) {
+          const index = nextSpecIndex++;
+          results[index] = await readCollection(specs[index]);
+        }
+      });
+      await Promise.all(workers);
       const commentsResult = await fetchAdminNewsComments()
         .then(rows => ({ name: 'newsComments', label: 'Комментарии новостей', optional: true, ok: true, docs: rows, count: rows.length, attempts: 1 }))
         .catch(error => {

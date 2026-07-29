@@ -446,11 +446,35 @@ async function requireActor(req) {
   return resolveActor(getDb(), decoded);
 }
 
-function assertOwn(actor, userId) {
+async function assertOwn(actor, userId) {
   const target = safeUserId(userId);
   if (!target || target.startsWith('guest_')) throw Object.assign(new Error('Действие доступно только авторизованному пользователю.'), { statusCode: 401 });
-  if (actor.userId !== target && actor.uid !== target) throw Object.assign(new Error('Нельзя менять данные другого пользователя.'), { statusCode: 403 });
-  return target;
+  if (actor.userId === target || actor.uid === target) return actor.userId;
+
+  let identity = await serverFoundation.identityV2.getUser(target).catch(() => null);
+  if (!identity && target.startsWith('email:')) {
+    identity = await serverFoundation.identityV2.resolveEmailIdentity({
+      email: safeString(target.slice(6), 220).toLowerCase(),
+      createIfMissing: false,
+    }).catch(() => null);
+  } else if (!identity && target.startsWith('tg_')) {
+    identity = await serverFoundation.identityV2.resolveTelegramIdentity({
+      telegramId: safeString(target, 220),
+      createIfMissing: false,
+    }).catch(() => null);
+  }
+
+  const resolved = safeUserId(
+    identity?.canonicalUserId
+    || identity?.canonical_user_id
+    || identity?.userId
+    || identity?.id
+    || identity?.user?.canonicalUserId
+    || identity?.user?.id,
+  );
+  if (resolved === actor.userId || resolved === actor.uid) return actor.userId;
+
+  throw Object.assign(new Error('Нельзя менять данные другого пользователя.'), { statusCode: 403 });
 }
 
 function assertOwner(actor) {
@@ -672,7 +696,7 @@ async function actionIdentityDiagnostics(db, req, actor) {
 }
 
 async function actionProfileSync(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const profile = stripUndefined(sanitizePublicProfile(req.body?.profile || {}));
   if (profile.email) {
     const normalizedEmail = safeString(profile.email, 200).toLowerCase();
@@ -1026,7 +1050,7 @@ async function actionProfileSync(db, req, actor) {
 }
 
 async function actionProfilePatch(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'notificationPreferences', 'displayName', 'firstName', 'lastName', 'photo', 'joinedGroup', 'webPushUpdatedAt', 'interestProfile', 'learningProgress', 'learningHintsEnabled', 'learningAnalytics', 'messagingPrivacy']);
   const patch = {};
   Object.entries(req.body?.patch || {}).forEach(([key, value]) => {
@@ -1054,7 +1078,7 @@ async function actionProfilePatch(db, req, actor) {
 }
 
 async function actionTelegramAvatarRefresh(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const userRef = db.collection('users').doc(userId);
   const userSnap = await userRef.get();
   const user = userSnap.data() || {};
@@ -1086,7 +1110,7 @@ async function actionTelegramAvatarRefresh(db, req, actor) {
 }
 
 async function actionProfileAcceptConsent(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const consent = req.body?.consent || {};
   if (!consent.termsAccepted || !consent.privacyAccepted) {
     throw Object.assign(new Error('Не приняты обязательные документы.'), { statusCode: 400, code: 'CONSENT_REQUIRED' });
@@ -1200,7 +1224,7 @@ async function actionProfileForceAcceptConsent(db, req, actor) {
 }
 
 async function actionProfileDelete(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   await db.collection('users').doc(userId).delete();
   await audit(db, req, actor, 'profile:delete', 'users', userId);
   return { ok: true };
@@ -1261,7 +1285,7 @@ async function assertOwnedProfile(db, actor, type = 'partner', id = '') {
 }
 
 async function actionFavoritesToggle(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const partnerId = safeString(req.body?.partnerId, 160);
   if (!partnerId) throw Object.assign(new Error('Не указан партнёр.'), { statusCode: 400 });
   const partner = await assertPublicProfileAvailable(db, 'partners', partnerId, 'Партнёр');
@@ -1289,7 +1313,7 @@ async function actionFavoritesToggle(db, req, actor) {
 }
 
 async function actionUserListSet(db, req, actor, field, action) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const values = Array.isArray(req.body?.values) ? req.body.values.map(String).slice(0, 500) : [];
   await db.collection('users').doc(userId).set({ [field]: values, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   await audit(db, req, actor, action, 'users', userId, 'success', { count: values.length });
@@ -1297,7 +1321,7 @@ async function actionUserListSet(db, req, actor, field, action) {
 }
 
 async function actionNewsReaction(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const newsId = safeString(req.body?.newsId, 180);
   const reaction = safeString(req.body?.reaction, 40);
   const previousReaction = safeString(req.body?.previousReaction, 40);
@@ -1318,7 +1342,7 @@ async function actionNewsReaction(db, req, actor) {
 }
 
 async function actionNewsSubscriptions(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const subscriptions = req.body?.subscriptions && typeof req.body.subscriptions === 'object' ? req.body.subscriptions : {};
   const clean = {
     categories: Array.isArray(subscriptions.categories) ? subscriptions.categories.map(String).slice(0, 100) : [],
@@ -1342,7 +1366,7 @@ async function actionPublicQrView(db, req, actor) {
 }
 
 async function actionTaskClaim(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const taskId = safeString(req.body?.taskId, 120);
   const reward = Math.max(0, Math.min(1000, Number(req.body?.reward || 0)));
   if (!taskId || !reward) throw Object.assign(new Error('Некорректное задание.'), { statusCode: 400 });
@@ -1376,7 +1400,7 @@ async function actionTaskClaim(db, req, actor) {
 }
 
 async function actionPrizeClaim(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const prize = req.body?.prize || {};
   const prizeId = safeString(prize.id, 160);
   const cost = Math.max(0, Number(prize.cost || 0));
@@ -1425,7 +1449,7 @@ async function actionPrizeClaim(db, req, actor) {
 }
 
 async function actionRaffleEnter(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const prize = req.body?.prize || {};
   const prizeId = safeString(prize.id, 160);
   const ticketCount = Math.max(1, Math.min(100, Number(req.body?.ticketCount || 1)));
@@ -1460,7 +1484,7 @@ async function actionRaffleEnter(db, req, actor) {
 }
 
 async function actionEconomyExchangeTickets(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const exchange = calculateTicketExchange(req.body?.ticketCount || req.body?.tickets || 1);
   const userRef = db.collection('users').doc(userId);
   await db.runTransaction(async tx => {
@@ -1488,7 +1512,7 @@ async function actionEconomyExchangeTickets(db, req, actor) {
 }
 
 async function actionEventToggle(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const event = req.body?.event || {};
   const eventId = safeString(event.id, 160);
   const register = Boolean(req.body?.register);
@@ -1805,7 +1829,7 @@ async function actionPartnerAiDraft(db, req, actor) {
 }
 
 async function actionReviewPartner(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const partnerId = safeString(req.body?.partnerId, 160);
   const stars = Math.max(1, Math.min(5, Number(req.body?.stars || 0)));
   const text = safeString(req.body?.text, MAX_TEXT);
@@ -1868,7 +1892,7 @@ async function actionReviewPartner(db, req, actor) {
 }
 
 async function actionReviewExpert(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const expertId = safeString(req.body?.expertId, 160);
   const rating = Math.max(1, Math.min(5, Number(req.body?.rating || 0)));
   if (!expertId || !rating) throw Object.assign(new Error('Некорректный отзыв.'), { statusCode: 400 });
@@ -2457,7 +2481,7 @@ async function actionWorkspaceAnalyticsSnapshot(db, req, actor) {
 }
 
 async function actionLokiSettings(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const settings = req.body?.settings && typeof req.body.settings === 'object' ? req.body.settings : {};
   await db.collection('users').doc(userId).set({
     lokiSettings: settings,
@@ -5648,7 +5672,7 @@ async function actionDialogListPostgres(req, actor) {
 }
 
 async function actionPushRegister(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const deviceId = safeString(req.body?.deviceId, 120);
   const subscription = sanitizeWebPushSubscription(req.body?.subscription || {});
   if (!deviceId || !subscription) throw Object.assign(new Error('Не удалось зарегистрировать push-устройство.'), { statusCode: 400, code: 'BAD_PUSH_DEVICE' });
@@ -5691,7 +5715,7 @@ async function actionPushRegister(db, req, actor) {
 }
 
 async function actionPushCleanupSubscriptions(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const deviceId = safeString(req.body?.deviceId, 120);
   const subscription = sanitizeWebPushSubscription(req.body?.subscription || {});
   const userRef = db.collection('users').doc(userId);
@@ -5714,7 +5738,7 @@ async function actionPushCleanupSubscriptions(db, req, actor) {
 }
 
 async function actionPushTestDevice(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const deviceId = safeString(req.body?.deviceId, 120);
   const subscription = sanitizeWebPushSubscription(req.body?.subscription || {});
   if (!deviceId || !subscription) throw Object.assign(new Error('На этом устройстве нет Web Push подписки.'), { statusCode: 400, code: 'NO_DEVICE_SUBSCRIPTION' });
@@ -5795,7 +5819,7 @@ function economyDelta(item = {}) {
 }
 
 async function actionEconomyHistory(db, req, actor) {
-  const userId = assertOwn(actor, req.body?.userId || actor.userId);
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const requestedLimit = Math.max(1, Math.min(200, Number(req.body?.limit) || 100));
   const [profile, rows] = await Promise.all([
     serverFoundation.account.getProfile(userId),

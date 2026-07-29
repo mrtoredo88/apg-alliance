@@ -11,7 +11,7 @@ const adminSecurity = fs.readFileSync(path.join(root, 'server/src/lib/adminSecur
 
 const bootstrapSlice = adminPanel.slice(
   adminPanel.indexOf('const specs = ['),
-  adminPanel.indexOf('const results = await Promise.all(specs.map(readCollection));'),
+  adminPanel.indexOf('const commentsResult = await fetchAdminNewsComments()'),
 );
 
 for (const resource of ['partners', 'experts', 'events']) {
@@ -31,6 +31,8 @@ for (const resource of ['partners', 'experts', 'events']) {
 }
 
 assert.ok(adminPanel.includes('durationMs: Math.round(performance.now() - startedAt)'), 'Admin loader must record per-source duration diagnostics.');
+assert.ok(adminPanel.includes('Array.from({ length: Math.min(3, specs.length) }'), 'Admin bootstrap must cap parallel reads to protect the database pool.');
+assert.ok(adminPanel.includes('if (isFinalAttempt && name !== \'errorLogs\''), 'Transient retry attempts must not create duplicate admin errors.');
 assert.ok(adminPanel.includes('timings: Object.fromEntries'), 'Admin loader must expose timings in adminLoadInfo.');
 assert.ok(adminPanel.includes('adminTokenCacheRef'), 'Admin API loaders must share a short-lived Firebase token cache.');
 assert.ok(adminPanel.includes("stage: tokenBundle.cached ? 'token_reused' : 'token_received'"), 'Admin auth diagnostics must expose token reuse.');
