@@ -451,7 +451,6 @@ const DesktopNewsRow = memo(function DesktopNewsRow({ item, onOpen }) {
 });
 
 function DesktopProfileEditor({ user, onClose, onSaved }) {
-  const userId = dpText(user?.id || user?.userId || user?.canonicalUserId || user?.uid);
   const [form, setForm] = useState(() => ({
     firstName: dpText(user?.firstName || user?.first_name || String(user?.displayName || '').split(/\s+/)[0]),
     lastName: dpText(user?.lastName || user?.last_name || String(user?.displayName || '').split(/\s+/).slice(1).join(' ')),
@@ -465,10 +464,7 @@ function DesktopProfileEditor({ user, onClose, onSaved }) {
   const [error, setError] = useState('');
   const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
   const save = async () => {
-    if (!userId || saving) {
-      if (!userId) setError('Не удалось определить аккаунт. Перезайдите в приложение и повторите.');
-      return;
-    }
+    if (saving) return;
     setSaving(true);
     setError('');
     const patch = {
@@ -482,7 +478,7 @@ function DesktopProfileEditor({ user, onClose, onSaved }) {
       vk: form.vk.trim(),
     };
     try {
-      await userAction('profile:update', { userId, patch });
+      await userAction('profile:update', { patch });
       onSaved?.(patch);
       onClose?.();
     } catch (err) {

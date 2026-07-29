@@ -31,7 +31,8 @@ assert.match(profile, /data-testid="desktop-profile-pencil-edit"/);
 assert.match(profile, /onPointerDown=\{\(\) => setProfileEditInteraction\('mobile-pressed'\)\}/);
 assert.match(profile, /onFocus=\{\(\) => setProfileEditInteraction\('mobile-focus'\)\}/);
 assert.ok((profile.match(/\{showProfileEditor && createPortal\(/g) || []).length >= 3, 'profile editor must render in desktop, mobile v2 and legacy branches');
-assert.match(profile, /user\?\.id \|\| user\?\.userId \|\| user\?\.canonicalUserId \|\| user\?\.uid/, 'profile editor should support every authenticated id shape');
+assert.match(profile, /await userAction\('profile:update', \{ patch \}\)/, 'self profile editor must derive ownership from the authenticated server session');
+assert.doesNotMatch(profile, /await userAction\('profile:update', \{ userId, patch \}\)/, 'self profile editor must not send a stale or alias user id');
 assert.match(profile, /label: 'Настройки профиля',\s+action: \(\) => setShowProfileEditor\(true\)/, 'profile settings should open the editor');
 assert.match(profile, /placeholder="Имя"/);
 assert.match(profile, /placeholder="Фамилия"/);
@@ -39,6 +40,7 @@ assert.match(profile, /type="date"/);
 assert.match(profile, /birthDate: form\.birthDate/);
 assert.match(server, /'birthDate'/);
 assert.match(server, /INVALID_BIRTH_DATE/);
+assert.match(server, /'birthDate', 'about', 'phone', 'telegram', 'vk'/, 'every editable profile field must be persisted');
 
 assert.match(userApp, /user\.notificationsEnabled/);
 assert.match(userApp, /Разрешение на уведомления заблокировано/);

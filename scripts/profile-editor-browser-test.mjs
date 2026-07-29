@@ -19,6 +19,9 @@ async function openProfile(viewport, mobile = false) {
     const request = route.request();
     const payload = request.method() === 'POST' ? request.postDataJSON() : {};
     if (payload?.action !== 'profile:update') return route.continue();
+    if (payload?.patch?.firstName === 'Новое') {
+      assert.equal(payload.userId, undefined, 'self profile update must use the authenticated session owner');
+    }
     profileUpdateAttempts += 1;
     if (failNextProfileUpdate) {
       failNextProfileUpdate = false;

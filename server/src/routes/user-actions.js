@@ -1110,7 +1110,7 @@ async function actionProfilePatch(db, req, actor) {
   const accountProfile = await serverFoundation.account.getProfile(userId).catch(() => null);
   const accountUserId = safeUserId(accountProfile?.userId || actor.userId || userId);
   const identityUserId = safeUserId(actor.userId || accountUserId || userId);
-  const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'notificationPreferences', 'displayName', 'firstName', 'lastName', 'birthDate', 'photo', 'joinedGroup', 'webPushUpdatedAt', 'interestProfile', 'learningProgress', 'learningHintsEnabled', 'learningAnalytics', 'messagingPrivacy']);
+  const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'notificationPreferences', 'displayName', 'firstName', 'lastName', 'birthDate', 'about', 'phone', 'telegram', 'vk', 'photo', 'joinedGroup', 'webPushUpdatedAt', 'interestProfile', 'learningProgress', 'learningHintsEnabled', 'learningAnalytics', 'messagingPrivacy']);
   const patch = {};
   Object.entries(req.body?.patch || {}).forEach(([key, value]) => {
     if (!allowed.has(key)) return;
