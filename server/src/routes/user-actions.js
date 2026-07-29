@@ -1107,6 +1107,9 @@ async function actionProfileSync(db, req, actor) {
 
 async function actionProfilePatch(db, req, actor) {
   const userId = await assertOwn(actor, req.body?.userId || actor.userId);
+  const accountProfile = await serverFoundation.account.getProfile(userId).catch(() => null);
+  const accountUserId = safeUserId(accountProfile?.userId || actor.userId || userId);
+  const identityUserId = safeUserId(actor.userId || accountUserId || userId);
   const allowed = new Set(['onboardingDone', 'consents', 'consentAcceptedAt', 'consentDocsVersion', 'consentLegalVersion', 'legalVersion', 'notificationConsent', 'notificationsRequestedAt', 'notificationsEnabled', 'notificationProvider', 'notificationPreferences', 'displayName', 'firstName', 'lastName', 'birthDate', 'photo', 'joinedGroup', 'webPushUpdatedAt', 'interestProfile', 'learningProgress', 'learningHintsEnabled', 'learningAnalytics', 'messagingPrivacy']);
   const patch = {};
   Object.entries(req.body?.patch || {}).forEach(([key, value]) => {
@@ -1140,8 +1143,8 @@ async function actionProfilePatch(db, req, actor) {
   }
   patch.updatedAt = FieldValue.serverTimestamp();
   await db.collection('users').doc(userId).set(patch, { merge: true });
-  await writeAccountProfileBestEffort(userId, patch, { bootstrap: { profileUpdate: true } });
-  await writeIdentityProfileBestEffort(userId, patch);
+  await writeAccountProfileBestEffort(accountUserId, patch, { bootstrap: { profileUpdate: true, requestedUserId: userId } });
+  await writeIdentityProfileBestEffort(identityUserId, patch);
   await audit(db, req, actor, 'profile:update', 'users', userId, 'success', { fields: Object.keys(patch) });
   return { ok: true, userId, patch: req.body?.patch || {} };
 }
@@ -5894,10 +5897,8 @@ function economyDelta(item = {}) {
 async function actionEconomyHistory(db, req, actor) {
   const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const requestedLimit = Math.max(1, Math.min(200, Number(req.body?.limit) || 100));
-  const [profile, rows] = await Promise.all([
-    serverFoundation.account.getProfile(userId),
-    serverFoundation.account.economyHistory(userId, requestedLimit),
-  ]);
+  const rows = await serverFoundation.account.economyHistory(userId, requestedLimit);
+  const profile = await serverFoundation.account.getProfile(userId);
   if (!profile) throw Object.assign(new Error('Пользователь не найден.'), { statusCode: 404, code: 'USER_NOT_FOUND' });
   const operations = rows.map(item => ({
     id: item.id,

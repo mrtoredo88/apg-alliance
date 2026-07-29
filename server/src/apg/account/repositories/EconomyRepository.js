@@ -223,11 +223,31 @@ export class EconomyRepository {
 
   async history(userId, limit = 100) {
     const cleanUserId = safeString(userId, 260);
-    const result = await this.adapter.query(
-      `SELECT * FROM apg_economy_operations
-       WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
-      [cleanUserId, Math.max(1, Math.min(200, integer(limit, 100)))],
-    );
-    return result.rows.map(mapOperation);
+    return this.adapter.transaction(async client => {
+      const profileResult = await client.query(
+        `SELECT * FROM apg_account_profiles
+         WHERE user_id = $1 OR canonical_user_id = $1
+         ORDER BY (user_id = $1) DESC, updated_at DESC
+         LIMIT 1 FOR UPDATE`,
+        [cleanUserId],
+      );
+      const resolvedUserId = profileResult.rows[0]?.user_id || cleanUserId;
+      const result = await client.query(
+        `SELECT * FROM apg_economy_operations
+         WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
+        [resolvedUserId, Math.max(1, Math.min(200, integer(limit, 100)))],
+      );
+      const latestCompleted = result.rows.find(row => row.status === 'completed');
+      const currentProfile = profileResult.rows[0]?.profile || {};
+      const currentBalance = integer(currentProfile.keys);
+      const ledgerBalance = integer(latestCompleted?.balance_after, currentBalance);
+      if (profileResult.rows[0] && currentBalance !== ledgerBalance) {
+        await client.query(
+          'UPDATE apg_account_profiles SET profile = $2::jsonb, updated_at = now() WHERE user_id = $1',
+          [resolvedUserId, JSON.stringify({ ...currentProfile, keys: ledgerBalance })],
+        );
+      }
+      return result.rows.map(mapOperation);
+    });
   }
 }
