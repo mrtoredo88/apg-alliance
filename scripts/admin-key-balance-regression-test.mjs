@@ -72,6 +72,9 @@ assert.match(adminActions, /delete increments\.keys/);
 assert.match(adminActions, /Изменять баланс ключей может только owner/);
 assert.match(adminActions, /keyBalanceMismatch: legacyKeys !== canonicalKeys/);
 assert.match(adminActions, /keys: canonicalKeys/);
+assert.match(adminActions, /bulk_economy:\$\{actor\.uid\}:\$\{id\}/);
+assert.match(adminActions, /balance: patch\.keys/);
+assert.match(adminActions, /keys: economy\.balance/);
 assert.match(adminPanel, /Показан фактический баланс Account Core/);
 
 console.log('Admin key balance regression: Account Core, ledger, mirror and idempotency passed');

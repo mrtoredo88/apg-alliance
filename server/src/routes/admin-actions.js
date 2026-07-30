@@ -281,8 +281,37 @@ async function handleUserAccountsAction(db, request, actor) {
       : action === 'user-accounts:restore'
         ? { archived: false, accountStatus: 'active', archivedAt: null, archivedBy: null }
         : requestedPatch;
+    const economyBalances = new Map();
+    if (action === 'user-accounts:bulk-update' && Object.hasOwn(patch, 'keys')) {
+      const balanceIdempotencyKey = String(request.headers['x-idempotency-key'] || request.body?.idempotencyKey || '').trim();
+      const balanceResults = await Promise.all(userIds.map(id => serverFoundation.account.setEconomyBalance({
+        userId: id,
+        balance: patch.keys,
+        reason: String(request.body?.reason || `Корректировка баланса пользователя ${id} через редактор аккаунта`).trim(),
+        actorId: actor.userId || actor.uid,
+        idempotencyKey: balanceIdempotencyKey ? `bulk_economy:${actor.uid}:${id}:${balanceIdempotencyKey}` : '',
+      })));
+      balanceResults.forEach((result, index) => {
+        economyBalances.set(userIds[index], {
+          balance: result.balanceAfter,
+          canonicalUserId: result.userId || userIds[index],
+        });
+      });
+    }
     const batch = db.batch();
-    userIds.forEach(id => batch.set(db.collection('users').doc(id), { ...patch, updatedAt: FieldValue.serverTimestamp() }, { merge: true }));
+    userIds.forEach(id => {
+      const economy = economyBalances.get(id);
+      const userPatch = economy
+        ? { ...patch, keys: economy.balance, canonicalUserId: economy.canonicalUserId }
+        : patch;
+      batch.set(db.collection('users').doc(id), { ...userPatch, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      if (economy?.canonicalUserId && economy.canonicalUserId !== id) {
+        batch.set(db.collection('users').doc(economy.canonicalUserId), {
+          keys: economy.balance,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+    });
     await batch.commit();
     if (action === 'user-accounts:bulk-update') await Promise.all(userIds.map(id => syncUserProfileMirrors(id, patch)));
     await writeAuditLog(db, request, actor, action, 'users', userIds.join(','), { label: `${action === 'user-accounts:archive' ? 'Архивировано' : action === 'user-accounts:restore' ? 'Восстановлено' : 'Массово обновлено'} аккаунтов: ${userIds.length}`, userIds, fields: Object.keys(patch), ...(archiveReason ? { reason: archiveReason } : {}) });
