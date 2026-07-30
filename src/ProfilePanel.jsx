@@ -2595,7 +2595,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                   key={tab.id}
                   type="button"
                   onClick={() => setPeopleTab(tab.id)}
-                  style={{ minHeight: 38, borderRadius: 999, border: `1px solid ${peopleTab === tab.id ? 'rgba(201,168,76,0.48)' : 'rgba(var(--apg2-glass-a,255,255,255),0.13)'}`, background: peopleTab === tab.id ? 'linear-gradient(135deg, rgba(201,168,76,0.24), rgba(201,168,76,0.10))' : 'rgba(var(--apg2-glass-a,255,255,255),0.065)', color: peopleTab === tab.id ? APG2.gold : APG2.textSoft, padding: '8px 12px', fontSize: 12, fontWeight: 850, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: peopleTab === tab.id ? '0 10px 24px rgba(201,168,76,0.12)' : 'none' }}
+                  style={{ minHeight: 38, borderRadius: 999, border: `1px solid ${peopleTab === tab.id ? 'rgba(201,168,76,0.48)' : 'rgba(var(--apg2-glass-a,255,255,255),0.13)'}`, background: peopleTab === tab.id ? 'linear-gradient(135deg, rgba(201,168,76,0.24), rgba(201,168,76,0.10))' : 'rgba(var(--apg2-glass-a,255,255,255),0.065)', color: peopleTab === tab.id ? (isDark ? APG2.gold : '#664700') : APG2.textSoft, padding: '8px 12px', fontSize: 12, fontWeight: 850, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: peopleTab === tab.id ? '0 10px 24px rgba(201,168,76,0.12)' : 'none' }}
                 >
                   {tab.label} {peopleCounts[tab.id] ? peopleCounts[tab.id] : ''}
                 </button>
@@ -3044,7 +3044,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                     key={tab.id}
                     type="button"
                     onClick={() => setPeopleTab(tab.id)}
-                    style={{ minHeight: 38, borderRadius: 999, border: `1px solid ${peopleTab === tab.id ? 'rgba(201,168,76,0.48)' : 'rgba(var(--apg2-glass-a,255,255,255),0.13)'}`, background: peopleTab === tab.id ? 'linear-gradient(135deg, rgba(201,168,76,0.24), rgba(201,168,76,0.10))' : 'rgba(var(--apg2-glass-a,255,255,255),0.065)', color: peopleTab === tab.id ? APG2.gold : APG2.textSoft, padding: '8px 12px', fontSize: 12, fontWeight: 850, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    style={{ minHeight: 38, borderRadius: 999, border: `1px solid ${peopleTab === tab.id ? 'rgba(201,168,76,0.48)' : 'rgba(var(--apg2-glass-a,255,255,255),0.13)'}`, background: peopleTab === tab.id ? 'linear-gradient(135deg, rgba(201,168,76,0.24), rgba(201,168,76,0.10))' : 'rgba(var(--apg2-glass-a,255,255,255),0.065)', color: peopleTab === tab.id ? (isDark ? APG2.gold : '#664700') : APG2.textSoft, padding: '8px 12px', fontSize: 12, fontWeight: 850, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}
                   >
                     {tab.label} {peopleCounts[tab.id] || ''}
                   </button>
@@ -4147,7 +4147,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                   key={tab.id}
                   type="button"
                   onClick={() => setPeopleTab(tab.id)}
-                  style={{ minHeight: 38, borderRadius: 999, border: `1px solid ${peopleTab === tab.id ? 'rgba(201,168,76,0.48)' : 'rgba(var(--apg2-glass-a,255,255,255),0.13)'}`, background: peopleTab === tab.id ? 'linear-gradient(135deg, rgba(201,168,76,0.24), rgba(201,168,76,0.10))' : 'rgba(var(--apg2-glass-a,255,255,255),0.065)', color: peopleTab === tab.id ? APG2.gold : APG2.textSoft, padding: '8px 12px', fontSize: 12, fontWeight: 850, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  style={{ minHeight: 38, borderRadius: 999, border: `1px solid ${peopleTab === tab.id ? 'rgba(201,168,76,0.48)' : 'rgba(var(--apg2-glass-a,255,255,255),0.13)'}`, background: peopleTab === tab.id ? 'linear-gradient(135deg, rgba(201,168,76,0.24), rgba(201,168,76,0.10))' : 'rgba(var(--apg2-glass-a,255,255,255),0.065)', color: peopleTab === tab.id ? (isDark ? APG2.gold : '#664700') : APG2.textSoft, padding: '8px 12px', fontSize: 12, fontWeight: 850, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}
                 >
                   {tab.label} {peopleCounts[tab.id] ? peopleCounts[tab.id] : ''}
                 </button>
