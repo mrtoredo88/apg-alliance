@@ -2319,6 +2319,11 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
                     {[user.email || user.linkedEmail, user.phone || user.phoneNumber, user.telegramId || user.tgId || user.telegramUsername, user.id].filter(Boolean).join(' · ')}
                   </div>
                   {user.mergedInto && <div style={{ color: A.gold, fontSize: 11, marginTop: 4 }}>Объединён с {user.mergedInto}</div>}
+                  {user.keyBalanceMismatch && (
+                    <div style={{ color: '#ffb86b', fontSize: 11, marginTop: 4 }}>
+                      Обнаружено старое значение {Number(user.legacyKeyBalance || 0)}. Показан фактический баланс Account Core.
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <span style={{ color: A.gold, fontWeight: 900, whiteSpace: 'nowrap' }}>{Number(user.keys || 0)} 🗝</span>
@@ -2342,6 +2347,7 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
             <label style={{ display: 'block', marginBottom: 10, color: A.textSec, fontSize: 12 }}>
               Количество ключей
               <input type="number" min="0" max="1000000" step="1" value={editForm.keys ?? 0} disabled={!canManageRoles} title={!canManageRoles ? 'Изменять количество ключей может только owner' : ''} onChange={event => setEditForm(prev => ({ ...prev, keys: event.target.value }))} style={{ ...s.input, marginTop: 5, opacity: !canManageRoles ? 0.6 : 1 }} />
+              {editingUser.keyBalanceMismatch && <span style={{ display: 'block', color: '#ffb86b', marginTop: 5 }}>После сохранения старое значение будет синхронизировано с фактическим балансом.</span>}
             </label>
             <label style={{ display: 'block', color: A.textSec, fontSize: 12 }}>Заметка администратора<textarea value={editForm.adminNote || ''} onChange={event => setEditForm(prev => ({ ...prev, adminNote: event.target.value }))} style={{ ...s.input, minHeight: 90, marginTop: 5 }} /></label>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>

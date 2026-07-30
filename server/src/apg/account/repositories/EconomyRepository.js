@@ -221,6 +221,83 @@ export class EconomyRepository {
     });
   }
 
+  async setBalance({
+    userId,
+    balance,
+    delta,
+    reason = 'Корректировка баланса администратором',
+    actorId = '',
+    idempotencyKey = '',
+  } = {}) {
+    const cleanUserId = safeString(userId, 260);
+    const hasAbsoluteBalance = balance !== undefined && balance !== null;
+    const requestedBalance = integer(balance, -1);
+    const requestedDelta = integer(delta);
+    const cleanIdempotencyKey = safeString(idempotencyKey, 500)
+      || `admin_balance:${cleanUserId}:${hasAbsoluteBalance ? requestedBalance : `delta:${requestedDelta}`}:${Date.now()}`;
+    if (!cleanUserId || (hasAbsoluteBalance && requestedBalance < 0) || (!hasAbsoluteBalance && requestedDelta === 0)) {
+      throw Object.assign(new Error('Valid economy user and balance are required.'), { code: 'ECONOMY_BAD_REQUEST' });
+    }
+
+    return this.adapter.transaction(async client => {
+      const previous = await client.query(
+        'SELECT * FROM apg_economy_operations WHERE idempotency_key = $1 LIMIT 1',
+        [cleanIdempotencyKey],
+      );
+      if (previous.rows[0]) {
+        return { operation: mapOperation(previous.rows[0]), replayed: true };
+      }
+
+      const profileResult = await client.query(
+        `SELECT * FROM apg_account_profiles
+         WHERE user_id = $1 OR canonical_user_id = $1
+         ORDER BY (user_id = $1) DESC, updated_at DESC
+         LIMIT 1 FOR UPDATE`,
+        [cleanUserId],
+      );
+      const row = profileResult.rows[0];
+      if (!row) throw Object.assign(new Error('Пользователь не найден'), { code: 'USER_NOT_FOUND' });
+
+      const resolvedUserId = row.user_id;
+      const profile = mapProfile(row);
+      const balanceBefore = Math.max(0, integer(profile.keys));
+      const targetBalance = hasAbsoluteBalance
+        ? requestedBalance
+        : Math.max(0, balanceBefore + requestedDelta);
+      const operationDelta = targetBalance - balanceBefore;
+      const nextProfile = { ...profile, keys: targetBalance };
+      await client.query(
+        'UPDATE apg_account_profiles SET profile = $2::jsonb, updated_at = now() WHERE user_id = $1',
+        [resolvedUserId, JSON.stringify(nextProfile)],
+      );
+
+      const operationId = randomUUID();
+      const operationResult = await client.query(
+        `INSERT INTO apg_economy_operations
+          (id, idempotency_key, user_id, type, reason, source_type, source_id, source_label, delta, balance_after, status, metadata)
+         VALUES ($1, $2, $3, 'admin_adjustment', $4, 'admin', $5, 'Админка АПГ', $6, $7, 'completed', $8::jsonb)
+         RETURNING *`,
+        [
+          operationId,
+          cleanIdempotencyKey,
+          resolvedUserId,
+          safeString(reason, 500),
+          safeString(actorId, 260),
+          operationDelta,
+          targetBalance,
+          JSON.stringify({ requestedUserId: cleanUserId, actorId: safeString(actorId, 260) }),
+        ],
+      );
+      return {
+        operation: mapOperation(operationResult.rows[0]),
+        replayed: false,
+        userId: resolvedUserId,
+        balanceBefore,
+        balanceAfter: targetBalance,
+      };
+    });
+  }
+
   async history(userId, limit = 100) {
     const cleanUserId = safeString(userId, 260);
     return this.adapter.transaction(async client => {

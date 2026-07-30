@@ -2018,7 +2018,24 @@ async function handleEntityList(db, request, actor) {
   const max = Math.min(Number(request.body?.limit || listConfig.limit || 200), listConfig.limit || 200, 1000);
   if (max > 0) ref = ref.limit(max);
   const snap = await ref.get();
-  const rows = snap.docs.map(doc => ({ id: doc.id, ...serializeAdminValue(doc.data() || {}) }));
+  let rows = snap.docs.map(doc => ({ id: doc.id, ...serializeAdminValue(doc.data() || {}) }));
+  if (resource === 'users' && rows.length) {
+    const accountProfiles = await serverFoundation.account.getProfiles(rows.map(row => row.id));
+    const accountByRequestedId = new Map(accountProfiles.map(item => [String(item.requestedUserId), item.profile]));
+    rows = rows.map(row => {
+      const accountProfile = accountByRequestedId.get(String(row.id));
+      if (!accountProfile) return row;
+      const legacyKeys = Number(row.keys || 0);
+      const canonicalKeys = Number(accountProfile.keys || 0);
+      return {
+        ...row,
+        keys: canonicalKeys,
+        canonicalUserId: accountProfile.canonicalUserId || row.canonicalUserId || row.id,
+        keyBalanceMismatch: legacyKeys !== canonicalKeys,
+        legacyKeyBalance: legacyKeys,
+      };
+    });
+  }
   return {
     ok: true,
     resource,
@@ -2218,6 +2235,31 @@ async function handleEntityAction(db, request, actor) {
       const increments = request.body?.increments || {};
       const patch = withServerTimestamps(cleanEntityPatch(request.body?.patch), request.body?.serverTimestampFields || []);
       assertLegalPatchAllowed(resource, patch, actor);
+      const hasAbsoluteKeyBalance = resource === 'users' && Object.prototype.hasOwnProperty.call(patch, 'keys');
+      const hasKeyIncrement = resource === 'users' && Object.prototype.hasOwnProperty.call(increments, 'keys');
+      if (hasAbsoluteKeyBalance || hasKeyIncrement) {
+        if (String(actor?.role || '').toLowerCase() !== 'owner') {
+          throw Object.assign(new Error('Изменять баланс ключей может только owner.'), { statusCode: 403, code: 'OWNER_REQUIRED' });
+        }
+        const targetBalance = hasAbsoluteKeyBalance ? Number(patch.keys) : null;
+        const keyDelta = hasKeyIncrement ? Number(increments.keys) : null;
+        if (
+          (hasAbsoluteKeyBalance && (!Number.isSafeInteger(targetBalance) || targetBalance < 0 || targetBalance > 1000000))
+          || (hasKeyIncrement && (!Number.isSafeInteger(keyDelta) || keyDelta === 0))
+        ) {
+          throw Object.assign(new Error('Количество ключей должно быть целым числом от 0 до 1 000 000.'), { statusCode: 400, code: 'INVALID_KEY_BALANCE' });
+        }
+        const economyResult = await serverFoundation.account.setEconomyBalance({
+          userId: id,
+          ...(hasAbsoluteKeyBalance ? { balance: targetBalance } : { delta: keyDelta }),
+          reason: String(request.body?.reason || `Корректировка баланса пользователя ${id}`).trim(),
+          actorId: actor.userId || actor.uid,
+          idempotencyKey: idempotencyKey ? `economy:${actor.uid}:${idempotencyKey}` : '',
+        });
+        patch.keys = economyResult.balanceAfter;
+        patch.canonicalUserId = economyResult.userId || patch.canonicalUserId;
+        delete increments.keys;
+      }
       const beforeSnap = ['partners', 'experts', 'events'].includes(resource) ? await ref.get().catch(() => null) : null;
       const before = beforeSnap?.exists ? beforeSnap.data() || {} : {};
       Object.entries(increments).forEach(([key, value]) => {

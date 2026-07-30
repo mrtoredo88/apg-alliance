@@ -26,6 +26,28 @@ export class ProfileRepository {
     return result.rows.map(mapProfile).filter(Boolean);
   }
 
+  async getMany(userIds = []) {
+    const ids = [...new Set(userIds.map(id => safeString(id, 260)).filter(Boolean))];
+    if (!ids.length) return [];
+    const result = await this.adapter.query(`
+      SELECT DISTINCT ON (requested_id) requested_id, profile_row.*
+      FROM unnest($1::text[]) AS requested(requested_id)
+      JOIN LATERAL (
+        SELECT *
+        FROM apg_account_profiles
+        WHERE user_id = requested_id OR canonical_user_id = requested_id
+        ORDER BY
+          (user_id = requested_id) DESC,
+          (user_id = canonical_user_id) DESC,
+          updated_at DESC,
+          user_id ASC
+        LIMIT 1
+      ) AS profile_row ON true
+      ORDER BY requested_id
+    `, [ids]);
+    return result.rows.map(row => ({ requestedUserId: row.requested_id, profile: mapProfile(row) }));
+  }
+
   async upsert(profile = {}) {
     const userId = safeString(profile.userId || profile.id || profile.canonicalUserId, 260);
     if (!userId) throw Object.assign(new Error('Account profile user id is required.'), { code: 'ACCOUNT_PROFILE_ID_REQUIRED' });

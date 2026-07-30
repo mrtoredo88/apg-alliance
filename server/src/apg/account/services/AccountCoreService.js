@@ -73,6 +73,11 @@ export class AccountCoreService {
     );
   }
 
+  async getProfiles(userIds) {
+    this.metrics.increment('accountReads');
+    return this.measure('postgres', () => this.profiles.getMany(userIds));
+  }
+
   async upsertProfile(profile) {
     this.metrics.increment('accountWrites');
     const saved = await this.measure('postgres', () => this.profiles.upsert(profile));
@@ -95,6 +100,11 @@ export class AccountCoreService {
   async economyHistory(userId, limit = 100) {
     this.metrics.increment('accountReads');
     return this.measure('postgres', () => this.economy.history(userId, limit));
+  }
+
+  async setEconomyBalance(payload) {
+    this.metrics.increment('accountWrites');
+    return this.measure('postgres', () => this.economy.setBalance(payload));
   }
 
   async resolveRoles(userId) {
