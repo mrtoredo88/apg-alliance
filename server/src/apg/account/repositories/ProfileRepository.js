@@ -8,12 +8,18 @@ export class ProfileRepository {
 
   async get(userId) {
     const result = await this.adapter.query(`
+      WITH requested AS (
+        SELECT COALESCE(
+          (SELECT canonical_user_id FROM apg_identity_users WHERE id = $1 LIMIT 1),
+          $1
+        ) AS canonical_id
+      )
       SELECT *
-      FROM apg_account_profiles
-      WHERE user_id = $1 OR canonical_user_id = $1
+      FROM apg_account_profiles, requested
+      WHERE user_id = requested.canonical_id OR canonical_user_id = requested.canonical_id
       ORDER BY
-        (user_id = $1) DESC,
         (user_id = canonical_user_id) DESC,
+        (user_id = requested.canonical_id) DESC,
         updated_at DESC,
         user_id ASC
       LIMIT 1
@@ -33,12 +39,18 @@ export class ProfileRepository {
       SELECT DISTINCT ON (requested_id) requested_id, profile_row.*
       FROM unnest($1::text[]) AS requested(requested_id)
       JOIN LATERAL (
+        WITH canonical AS (
+          SELECT COALESCE(
+            (SELECT canonical_user_id FROM apg_identity_users WHERE id = requested_id LIMIT 1),
+            requested_id
+          ) AS canonical_id
+        )
         SELECT *
-        FROM apg_account_profiles
-        WHERE user_id = requested_id OR canonical_user_id = requested_id
+        FROM apg_account_profiles, canonical
+        WHERE user_id = canonical.canonical_id OR canonical_user_id = canonical.canonical_id
         ORDER BY
-          (user_id = requested_id) DESC,
           (user_id = canonical_user_id) DESC,
+          (user_id = canonical.canonical_id) DESC,
           updated_at DESC,
           user_id ASC
         LIMIT 1
@@ -46,6 +58,56 @@ export class ProfileRepository {
       ORDER BY requested_id
     `, [ids]);
     return result.rows.map(row => ({ requestedUserId: row.requested_id, profile: mapProfile(row) }));
+  }
+
+  async linkMergedAliases({ targetId, sourceIds = [], profile = {}, actorId = '' } = {}) {
+    const canonicalId = safeString(targetId, 260);
+    const aliases = [...new Set(sourceIds.map(id => safeString(id, 260)).filter(id => id && id !== canonicalId))];
+    if (!canonicalId || !aliases.length) return { targetId: canonicalId, sourceIds: aliases };
+    await this.adapter.transaction(async client => {
+      const target = await client.query('SELECT id FROM apg_identity_users WHERE id = $1 LIMIT 1', [canonicalId]);
+      if (!target.rows[0]) throw Object.assign(new Error('Основной Identity-аккаунт не найден.'), { code: 'CANONICAL_IDENTITY_NOT_FOUND' });
+      await client.query(`
+        UPDATE apg_identity_users
+        SET canonical_user_id = $1,
+            profile = profile || $3::jsonb,
+            updated_at = now()
+        WHERE id = ANY($2::text[])
+      `, [canonicalId, aliases, JSON.stringify({ archived: true, accountStatus: 'merged', mergedInto: canonicalId, mergedBy: actorId })]);
+      await client.query(`
+        UPDATE apg_identity_links
+        SET canonical_user_id = $1, updated_at = now()
+        WHERE user_id = ANY($2::text[]) OR canonical_user_id = ANY($2::text[])
+      `, [canonicalId, aliases]);
+      await client.query(`
+        UPDATE apg_identity_email_index
+        SET canonical_user_id = $1, updated_at = now()
+        WHERE user_id = ANY($2::text[]) OR canonical_user_id = ANY($2::text[])
+      `, [canonicalId, aliases]);
+      await client.query(`
+        UPDATE apg_account_telegram_links
+        SET canonical_user_id = $1, updated_at = now()
+        WHERE user_id = ANY($2::text[]) OR canonical_user_id = ANY($2::text[])
+      `, [canonicalId, aliases]);
+      await client.query(`
+        UPDATE apg_account_profiles
+        SET canonical_user_id = $1,
+            profile = profile || $3::jsonb,
+            updated_at = now()
+        WHERE user_id = ANY($2::text[])
+      `, [canonicalId, aliases, JSON.stringify({ archived: true, accountStatus: 'merged', mergedInto: canonicalId, mergedBy: actorId })]);
+    });
+    const current = await this.get(canonicalId);
+    const saved = await this.upsert({
+      ...(current || {}),
+      ...profile,
+      id: canonicalId,
+      userId: canonicalId,
+      canonicalUserId: canonicalId,
+      archived: false,
+      accountStatus: 'active',
+    });
+    return { targetId: canonicalId, sourceIds: aliases, profile: saved };
   }
 
   async upsert(profile = {}) {

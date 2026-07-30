@@ -360,6 +360,13 @@ async function handleUserAccountsAction(db, request, actor) {
         }, { merge: true });
       });
       await batch.commit();
+      await serverFoundation.account.linkMergedAccounts({
+        targetId,
+        sourceIds,
+        profile: mergedPatch,
+        actorId: actor.userId || actor.uid,
+        idempotencyKey,
+      });
       await writeAuditLog(db, request, actor, action, 'users', targetId, { label: `Объединены аккаунты в ${targetId}`, reason, snapshotId: snapshotRef.id, ...preview });
       return { ok: true, preview, snapshotId: snapshotRef.id };
     });

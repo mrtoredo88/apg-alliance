@@ -249,9 +249,16 @@ export class EconomyRepository {
       }
 
       const profileResult = await client.query(
-        `SELECT * FROM apg_account_profiles
-         WHERE user_id = $1 OR canonical_user_id = $1
-         ORDER BY (user_id = $1) DESC, updated_at DESC
+        `WITH requested AS (
+           SELECT COALESCE(
+             (SELECT canonical_user_id FROM apg_identity_users WHERE id = $1 LIMIT 1),
+             $1
+           ) AS canonical_id
+         )
+         SELECT *
+         FROM apg_account_profiles, requested
+         WHERE user_id = requested.canonical_id OR canonical_user_id = requested.canonical_id
+         ORDER BY (user_id = canonical_user_id) DESC, (user_id = requested.canonical_id) DESC, updated_at DESC
          LIMIT 1 FOR UPDATE`,
         [cleanUserId],
       );
@@ -302,9 +309,16 @@ export class EconomyRepository {
     const cleanUserId = safeString(userId, 260);
     return this.adapter.transaction(async client => {
       const profileResult = await client.query(
-        `SELECT * FROM apg_account_profiles
-         WHERE user_id = $1 OR canonical_user_id = $1
-         ORDER BY (user_id = $1) DESC, updated_at DESC
+        `WITH requested AS (
+           SELECT COALESCE(
+             (SELECT canonical_user_id FROM apg_identity_users WHERE id = $1 LIMIT 1),
+             $1
+           ) AS canonical_id
+         )
+         SELECT *
+         FROM apg_account_profiles, requested
+         WHERE user_id = requested.canonical_id OR canonical_user_id = requested.canonical_id
+         ORDER BY (user_id = canonical_user_id) DESC, (user_id = requested.canonical_id) DESC, updated_at DESC
          LIMIT 1 FOR UPDATE`,
         [cleanUserId],
       );

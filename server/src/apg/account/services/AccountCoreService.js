@@ -107,6 +107,24 @@ export class AccountCoreService {
     return this.measure('postgres', () => this.economy.setBalance(payload));
   }
 
+  async linkMergedAccounts(payload) {
+    this.metrics.increment('accountWrites');
+    const profile = { ...(payload?.profile || {}) };
+    const targetBalance = Number(profile.keys);
+    delete profile.keys;
+    const linked = await this.measure('postgres', () => this.profiles.linkMergedAliases({ ...payload, profile }));
+    if (Number.isSafeInteger(targetBalance) && targetBalance >= 0) {
+      await this.measure('postgres', () => this.economy.setBalance({
+        userId: payload.targetId,
+        balance: targetBalance,
+        reason: `Объединение аккаунтов: ${payload.sourceIds?.join(', ') || 'aliases'}`,
+        actorId: payload.actorId || '',
+        idempotencyKey: payload.idempotencyKey ? `merge_balance:${payload.idempotencyKey}` : '',
+      }));
+    }
+    return linked;
+  }
+
   async resolveRoles(userId) {
     const profile = await this.getProfile(userId);
     const roleState = await this.readWithFallback(

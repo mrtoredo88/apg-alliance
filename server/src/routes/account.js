@@ -1,4 +1,5 @@
 import { serverFoundation } from '../apg/index.js';
+import { getDb } from '../lib/documentStore.js';
 
 function safeString(value, max = 300) {
   return String(value ?? '').trim().slice(0, max);
@@ -159,13 +160,27 @@ export default async function accountRoutes(fastify) {
     try {
       const decoded = await serverFoundation.identity.verifySession({ token });
       const sessionIdentity = await serverFoundation.identityV2.getUser(decoded.uid).catch(() => null);
-      const userId = safeString(
+      let userId = safeString(
         sessionIdentity?.canonicalUserId
           || sessionIdentity?.canonical_user_id
           || sessionIdentity?.id
           || decoded.uid,
         260,
       );
+      const sessionUserId = safeString(sessionIdentity?.id || decoded.uid, 260);
+      const legacyAccount = sessionUserId ? await getDb().collection('users').doc(sessionUserId).get().catch(() => null) : null;
+      const legacyData = legacyAccount?.exists ? legacyAccount.data() || {} : {};
+      const mergedInto = safeString(legacyData.mergedInto || legacyData.dataMigratedInto || '', 260);
+      if (mergedInto && mergedInto !== sessionUserId) {
+        await serverFoundation.account.linkMergedAccounts({
+          targetId: mergedInto,
+          sourceIds: [sessionUserId],
+          profile: {},
+          actorId: 'account-bootstrap-self-heal',
+          idempotencyKey: `self_heal:${sessionUserId}:${mergedInto}`,
+        });
+        userId = mergedInto;
+      }
       const canary = canaryAllowed(userId);
       if (canaryModeEnabled() && !canary) {
         return reply.code(403).send({ ok: false, code: 'ACCOUNT_CANARY_NOT_ALLOWED', error: 'Account Core canary недоступен для пользователя.' });
