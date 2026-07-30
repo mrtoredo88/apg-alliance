@@ -8,8 +8,11 @@ import { installPerformanceObservatory, markPerformanceStage } from './performan
 import { BOOTSTRAP_PRIORITIES, registerBootstrapTask, startBootstrapScheduler } from './bootstrap/index.js';
 import { API_BASE_URL } from './constants.js';
 import { ensureServerReferralSession } from './referralDiagnostics.js';
+import { installDynamicModuleRecovery } from './pwa/DynamicModuleRecovery.js';
 import './fonts.css';
 import './index.css';
+
+installDynamicModuleRecovery();
 
 // VK OAuth popup: if hash has access_token and window has an opener,
 // relay the token back to the parent and close — skip app render entirely

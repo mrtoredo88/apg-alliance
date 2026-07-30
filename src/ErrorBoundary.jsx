@@ -4,6 +4,7 @@ import { getQrRouteContext, qrError } from './qrDiagnostics.js';
 import { LOKI_EVENTS } from './loki/lokiEvents.js';
 import { showLokiMessage } from './loki/lokiBus.js';
 import { recoverPwaAndReload } from './pwa/PwaUpdateManager.js';
+import { recoverDynamicModuleFailure } from './pwa/DynamicModuleRecovery.js';
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -16,6 +17,7 @@ export class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
+    if (recoverDynamicModuleFailure(error, 'react-error-boundary')) return;
     const source = 'ErrorBoundary:' + (info.componentStack ?? '').slice(0, 220);
     const qrContext = getQrRouteContext({
       componentStack: String(info?.componentStack ?? '').slice(0, 4000),

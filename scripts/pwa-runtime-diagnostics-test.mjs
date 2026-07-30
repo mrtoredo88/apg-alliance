@@ -11,7 +11,8 @@ const swSource = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8
 assert.match(viteSource, /__APG_BUILD_VERSION__/);
 assert.match(viteSource, /__APG_BUILD_TIME__/);
 assert.match(viteSource, /resolveBuildVersion\(\)/);
-assert.match(mainSource, /installPwaRuntimeDiagnostics\(\)/);
+assert.match(mainSource, /run:\s*installPwaRuntimeDiagnostics/);
+assert.match(mainSource, /installDynamicModuleRecovery\(\)/);
 assert.match(diagnosticsSource, /window\.__APG_BUILD_DIAGNOSTICS__/);
 assert.match(diagnosticsSource, /window\.__APG_COLLECT_PWA_DIAGNOSTICS__/);
 assert.match(diagnosticsSource, /Running bundle:/);

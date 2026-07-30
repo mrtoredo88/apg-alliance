@@ -80,6 +80,9 @@ aws s3 sync dist/ "s3://$BUCKET/" $S3 \
 echo ""
 echo "Done: $ENDPOINT/$BUCKET/"
 
+echo "Verifying production asset graph..."
+node scripts/verify-production-assets.mjs "https://myapg.ru/"
+
 # VK Mini App hosting — та же сборка, что и web: расхождение версий каналов недопустимо
 VK_TOKEN="$(grep '^MINI_APPS_ACCESS_TOKEN=' "$SCRIPT_DIR/.env.deploy.local" 2>/dev/null | cut -d'=' -f2-)"
 if [ -n "$VK_TOKEN" ]; then
