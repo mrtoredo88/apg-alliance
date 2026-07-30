@@ -62,7 +62,7 @@ function eventDetail(event) {
   };
 }
 
-export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnreadCount = 0, hideMessagesButton = false }) {
+export function LokiAssistant({ desktopMode = false, onOpenPeople, onOpenMessages, messageUnreadCount = 0, hideCommunicationButtons = false }) {
   const loki = useLoki();
   const [menuOpen, setMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -104,7 +104,8 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
             ? 190
             : 92;
   const safeMessageUnread = Math.max(0, Math.min(99, Number(messageUnreadCount || 0) || 0));
-  const showMessageFab = !desktopMode && !hideMessagesButton && typeof onOpenMessages === 'function';
+  const showPeopleFab = !desktopMode && !hideCommunicationButtons && typeof onOpenPeople === 'function';
+  const showMessageFab = !desktopMode && !hideCommunicationButtons && typeof onOpenMessages === 'function';
   const hasLokiSignal = Boolean(loki.card || (loki.message && loki.canTalk));
   const hitDebug = import.meta.env.DEV && (() => {
     try {
@@ -151,7 +152,7 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
         event.stopPropagation();
         onOpenMessages();
       }}
-      aria-label="Сообщения"
+      aria-label="Диалоги"
       data-floating-messages-button="true"
       style={{
         width: 56,
@@ -184,6 +185,59 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
         </span>
       )}
     </button>
+  ) : null;
+  const peopleFab = showPeopleFab ? (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpenPeople();
+      }}
+      aria-label="Люди"
+      data-floating-people-button="true"
+      style={{
+        width: 56,
+        height: 56,
+        minWidth: 56,
+        minHeight: 56,
+        borderRadius: 22,
+        border: '1px solid rgba(215,184,106,0.34)',
+        background: 'linear-gradient(145deg, rgba(215,184,106,0.24), rgba(var(--apg2-glass-a,255,255,255),0.10))',
+        color: '#FFF8E9',
+        display: 'grid',
+        placeItems: 'center',
+        fontSize: 23,
+        lineHeight: '28px',
+        padding: 0,
+        cursor: 'pointer',
+        touchAction: 'manipulation',
+        pointerEvents: 'auto',
+        WebkitTapHighlightColor: 'transparent',
+        backdropFilter: 'blur(22px) saturate(1.65)',
+        WebkitBackdropFilter: 'blur(22px) saturate(1.65)',
+        boxShadow: '0 18px 44px rgba(0,0,0,0.28), 0 0 28px rgba(215,184,106,0.14), inset 0 1px 0 rgba(255,255,255,0.24)',
+      }}
+    >
+      👥
+    </button>
+  ) : null;
+  const floatingPeopleAndMessages = showPeopleFab || showMessageFab ? (
+    <div
+      data-floating-communication-buttons="true"
+      style={{
+        position: 'fixed',
+        left: 'max(14px, env(safe-area-inset-left, 0px))',
+        bottom: 'calc(112px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))',
+        zIndex: 12520,
+        display: 'grid',
+        gap: 10,
+        justifyItems: 'start',
+        pointerEvents: 'auto',
+      }}
+    >
+      {peopleFab}
+      {messageFab}
+    </div>
   ) : null;
 
   useEffect(() => {
@@ -260,42 +314,13 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
   }
 
   if (loki.settings.dockedToHeader) {
-    return messageFab ? createPortal(
-      <div
-        data-floating-messages-root="independent"
-        style={{
-          position: 'fixed',
-          left: 'max(14px, env(safe-area-inset-left, 0px))',
-          bottom: 'calc(112px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))',
-          zIndex: 10040,
-          display: 'grid',
-          justifyItems: 'start',
-          pointerEvents: 'auto',
-        }}
-      >
-        {messageFab}
-      </div>,
-      document.body
-    ) : null;
+    return floatingPeopleAndMessages ? createPortal(floatingPeopleAndMessages, document.body) : null;
   }
 
   if (shouldShowRestore) {
     return createPortal(
       <>
-        {messageFab && (
-          <div
-            data-floating-messages-root="independent"
-            style={{
-              position: 'fixed',
-              left: 'max(14px, env(safe-area-inset-left, 0px))',
-              bottom: 'calc(112px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))',
-              zIndex: 10041,
-              pointerEvents: 'auto',
-            }}
-          >
-            {messageFab}
-          </div>
-        )}
+        {floatingPeopleAndMessages}
         <div
           data-loki-floating-root="restore"
           style={{
@@ -437,7 +462,7 @@ export function LokiAssistant({ desktopMode = false, onOpenMessages, messageUnre
       )}
 
       <div style={{ position: 'relative', pointerEvents: 'auto' }}>
-        {messageFab && <div style={{ position: 'fixed', left: 'max(14px, env(safe-area-inset-left, 0px))', bottom: 'calc(112px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))', zIndex: 10041, display: 'grid', justifyItems: 'start', gap: 10, pointerEvents: 'auto' }}>{messageFab}</div>}
+        {floatingPeopleAndMessages}
         {hitDebug && (
           <div
             aria-hidden="true"

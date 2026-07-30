@@ -1114,6 +1114,7 @@ export function UserApp() {
   const [pendingLokiNewsTarget, setPendingLokiNewsTarget] = useState(() => initialDeepLink.type === 'news' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
   const [pendingLokiEventTarget, setPendingLokiEventTarget] = useState(() => initialDeepLink.type === 'event' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
   const [pendingPeopleAction, setPendingPeopleAction] = useState(null);
+  const [peopleOverlayOpen, setPeopleOverlayOpen] = useState(false);
   const [initialDialogId, setInitialDialogId] = useState(() => initialDeepLink.type === 'dialogs' ? initialDeepLink.id : '');
   const [pendingDialogRequest, setPendingDialogRequest] = useState(null);
   const [bookingRequest, setBookingRequest] = useState(null);
@@ -4217,6 +4218,16 @@ export function UserApp() {
     navigatePanel('dialogs');
   }, [navigatePanel]);
 
+  const handleOpenPeople = useCallback(() => {
+    setPendingPeopleAction({
+      query: '',
+      tab: 'all',
+      open: true,
+      nonce: Date.now(),
+    });
+    navigatePanel('profile');
+  }, [navigatePanel]);
+
   const requestWebPushPermission = useCallback(async ({ silent = false } = {}) => {
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       if (!silent) showToast('Уведомления не поддерживаются этим браузером или режимом просмотра. Откройте АПГ в обычном браузере или установленном приложении.', 'info');
@@ -4502,7 +4513,7 @@ export function UserApp() {
     icon: tabIconByKey[item.iconKey] || null,
   }));
   const TAB_PANELS = TABS.map(tab => tab.id);
-  const showTabBar = !desktopDevice && !isScannerOpen && (TAB_PANELS.includes(activePanel) || activePanel === 'partner-cabinet');
+  const showTabBar = !desktopDevice && !isScannerOpen && activePanel !== 'dialogs' && !peopleOverlayOpen && (TAB_PANELS.includes(activePanel) || activePanel === 'partner-cabinet');
   const userAppBranch = desktopWorkspaceActive
     ? 'UserApp Branch: DesktopWorkspace'
     : publicSubmitRoute
@@ -5591,6 +5602,7 @@ export function UserApp() {
                     onOpenBookingReview={openBookingReview}
                     initialConnectionTargetId={initialDeepLink.type === 'profile-user' ? initialDeepLink.id : ''}
                     initialPeopleAction={pendingPeopleAction}
+                    onPeopleVisibilityChange={setPeopleOverlayOpen}
                     desktopOverview={desktopOverview}
                     desktopMode={desktopDevice}
                     onBack={() => goPanel('home')}
@@ -6175,7 +6187,13 @@ export function UserApp() {
           />
           {splashDone && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && (
             <Suspense fallback={null}>
-              <LokiAssistant desktopMode={desktopDevice} onOpenMessages={handleOpenMessages} messageUnreadCount={messageUnreadCount} hideMessagesButton={activePanel === 'dialogs'} />
+              <LokiAssistant
+                desktopMode={desktopDevice}
+                onOpenPeople={handleOpenPeople}
+                onOpenMessages={handleOpenMessages}
+                messageUnreadCount={messageUnreadCount}
+                hideCommunicationButtons={activePanel === 'dialogs' || peopleOverlayOpen}
+              />
             </Suspense>
           )}
           </LokiProvider>

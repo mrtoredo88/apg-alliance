@@ -4537,7 +4537,7 @@ async function actionDialogMessage(db, req, actor) {
     pushTargets: pushTargets.length,
     skipReasons: targets.filter(t => t.reason).map(t => t.reason),
   } }, 'dialog message notifications prepared');
-  await Promise.all(pushTargets.map(async target => {
+  void Promise.all(pushTargets.map(async target => {
     try {
       const stats = await sendDialogPush(db, target.userId, target.id, target.title, target.body, dialogId);
       req.log?.info?.({ dialogPush: {
@@ -4559,7 +4559,9 @@ async function actionDialogMessage(db, req, actor) {
         pushSentAt: FieldValue.serverTimestamp(),
       }, { merge: true }).catch(() => {});
     }
-  }));
+  })).catch(error => {
+    req.log?.warn?.({ dialogPush: { stage: 'batch_error', dialogId, message: safeString(error?.message, 200) } }, 'dialog push batch failed');
+  });
   await audit(db, req, actor, 'dialog:message', 'contextDialog', dialogId, 'success', { senderRole, type: dialog.type, objectId: dialog.objectId });
   return { ok: true, dialogId, messageId: message.id, senderRole };
 }

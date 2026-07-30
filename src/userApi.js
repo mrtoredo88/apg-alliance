@@ -156,7 +156,7 @@ export async function userAction(action, payload = {}) {
   try {
     const eventPayload = normalizeEventFromAction(action, payload, data);
     const event = emitAppActionEvent(eventPayload);
-    await routeEventThroughPipeline(event, { action, payload, result: data, type: 'userAction' }).catch(() => {});
+    void routeEventThroughPipeline(event, { action, payload, result: data, type: 'userAction' }).catch(() => {});
   } catch {
     // eventing is non-blocking for compatibility
   }

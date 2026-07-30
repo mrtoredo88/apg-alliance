@@ -646,19 +646,37 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
     const body = String(overrideText || text || '').trim();
     if (!body || !activeDialog || pending) return;
     const autoAnswer = !senderRole && !isOwner ? buildDialogAutoAnswer(activeContext, body) : null;
+    const optimisticId = `local-${uid}-${Date.now()}`;
+    const optimisticMessage = {
+      id: optimisticId,
+      dialogId: activeDialog.id,
+      text: body,
+      attachments: [],
+      senderId: uid,
+      senderRole: senderRole || 'user',
+      senderName: user?.displayName || user?.name || '',
+      status: 'sending',
+      createdAt: new Date(),
+    };
     setPending(true);
     setError('');
     setLastFailedMessage('');
+    setMessages(prev => [...prev, optimisticMessage]);
+    setText('');
+    releaseMobileInputFocus();
     try {
+      let result;
       if (autoAnswer) {
-        await userAction('dialog:message', { dialogId: activeDialog.id, text: body });
+        result = await userAction('dialog:message', { dialogId: activeDialog.id, text: body });
         await userAction('dialog:message', { dialogId: activeDialog.id, text: autoAnswer, senderRole: 'loki' });
       } else {
-        await userAction('dialog:message', { dialogId: activeDialog.id, text: body, senderRole: senderRole || undefined });
+        result = await userAction('dialog:message', { dialogId: activeDialog.id, text: body, senderRole: senderRole || undefined });
       }
-      setText('');
-      releaseMobileInputFocus();
+      setMessages(prev => prev.map(message => message.id === optimisticId
+        ? { ...message, id: result?.messageId || optimisticId, status: 'delivered' }
+        : message));
     } catch (err) {
+      setMessages(prev => prev.filter(message => message.id !== optimisticId));
       setLastFailedMessage(body);
       setError(err?.message || 'Не удалось отправить сообщение.');
     } finally {
