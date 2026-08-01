@@ -7,6 +7,7 @@ const read = file => fs.readFileSync(resolve(file), 'utf8');
 const start = read('server/src/routes/telegram-auth-start.js');
 const check = read('server/src/routes/telegram-auth-check.js');
 const updates = read('server/src/lib/telegramUpdates.js');
+const postgresAdapter = read('server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js');
 const deployment = read('.ai/13_DEPLOYMENT.md');
 
 assert.match(start, /requestId,[\s\S]*loginSessionId: loginSessionId \|\| null,[\s\S]*telegramSessionId: state,[\s\S]*state,/, 'auth-start persists and returns correlation ids');
@@ -18,6 +19,8 @@ assert.match(updates, /telegram_poll_fetch_failed[\s\S]*errorCode[\s\S]*lastErro
 assert.match(updates, /const POLL_LOCK_MS = 30000;/, 'poll lock covers the full server request window');
 assert.match(updates, /lastCheckpointAt: FieldValue\.serverTimestamp\(\)/, 'each processed Telegram update checkpoints its offset');
 assert.match(updates, /conflict:\s*res\.error_code === 409/, 'webhook and polling conflict is detected');
+assert.match(postgresAdapter, /client\.on\('error', onClientError\)/, 'checked-out PostgreSQL clients cannot crash the Telegram poller process');
+assert.match(postgresAdapter, /client\.removeListener\('error', onClientError\)/, 'transaction client listener is cleaned up before release');
 assert.match(check, /status:\s*'expired'[\s\S]*stage:\s*'done_expired'/, 'expired sessions return a clear status and diagnostic stage');
 assert.match(deployment, /Webhook НЕ устанавливать:[\s\S]*getUpdates возвращает 409/, 'production delivery contract remains polling-only');
 

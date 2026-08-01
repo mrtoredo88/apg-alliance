@@ -84,6 +84,14 @@ export class PostgresIdentityAdapter {
   async transaction(fn) {
     await this.ensureSchema();
     const client = await this.client.connect();
+    const onClientError = error => {
+      this.lastPoolError = {
+        code: error?.code || '',
+        message: String(error?.message || error).slice(0, 220),
+        at: new Date().toISOString(),
+      };
+    };
+    client.on('error', onClientError);
     try {
       await client.query('BEGIN');
       const result = await fn(client);
@@ -93,6 +101,7 @@ export class PostgresIdentityAdapter {
       await client.query('ROLLBACK').catch(() => {});
       throw error;
     } finally {
+      client.removeListener('error', onClientError);
       client.release();
     }
   }
