@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { APG2_PROFILE, GlassButton, GlassCard } from '../Apg2ProfileGlass.jsx';
+import { ANDROID_INSTALL_SOURCE } from '../../constants.js';
 
 export const PWA_INSTALL_GUIDE_HIDDEN_KEY = 'apg_mobile_pwa_onboarding_hidden_v2';
 export const PWA_INSTALL_GUIDE_SESSION_KEY = 'apg_mobile_pwa_onboarding_session_closed_v2';
@@ -17,7 +18,7 @@ function getPlatform() {
 
 function isStandaloneMode() {
   if (typeof window === 'undefined') return false;
-  return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true;
+  return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true || window.Capacitor?.isNativePlatform?.() === true;
 }
 
 function isMobileViewport() {
@@ -118,7 +119,7 @@ export function PwaInstallGuide({ open, onClose }) {
     onClose?.();
   };
 
-  const startInstall = async () => {
+  const startPwaInstall = async () => {
     if (canUseInstallPrompt) {
       installPrompt.prompt();
       await installPrompt.userChoice.catch(() => null);
@@ -127,6 +128,15 @@ export function PwaInstallGuide({ open, onClose }) {
       return;
     }
     setShowInstructions(true);
+  };
+
+  const startInstall = async () => {
+    if (platform === 'android' && ANDROID_INSTALL_SOURCE.provider === 'rustore') {
+      window.location.assign(ANDROID_INSTALL_SOURCE.url);
+      close({ remember: true });
+      return;
+    }
+    await startPwaInstall();
   };
 
   return (
@@ -166,8 +176,13 @@ export function PwaInstallGuide({ open, onClose }) {
 
           <div style={{ display: 'grid', gap: 10 }}>
             <GlassButton data-pwa-install-action tone="gold" onClick={startInstall} style={{ minHeight: 54, borderRadius: 22, color: '#17120a', fontSize: 15.5, fontWeight: 880 }}>
-              📲 {canUseInstallPrompt ? 'Установить веб-приложение' : platform === 'ios' ? 'Показать инструкцию установки' : 'Как добавить на главный экран'}
+              📲 {platform === 'android' && ANDROID_INSTALL_SOURCE.provider === 'rustore' ? ANDROID_INSTALL_SOURCE.buttonLabel : canUseInstallPrompt ? 'Установить веб-приложение' : platform === 'ios' ? 'Показать инструкцию установки' : 'Как добавить на главный экран'}
             </GlassButton>
+            {platform === 'android' && ANDROID_INSTALL_SOURCE.provider === 'rustore' && (
+              <GlassButton onClick={startPwaInstall} style={{ minHeight: 46, borderRadius: 18, color: APG2_PROFILE.textSoft }}>
+                Установить веб-версию вместо приложения
+              </GlassButton>
+            )}
             <GlassButton onClick={() => close()} style={{ minHeight: 50, borderRadius: 20, color: APG2_PROFILE.textSoft }}>
               Продолжить в браузере
             </GlassButton>

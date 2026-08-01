@@ -4,9 +4,9 @@ const VITE_ENV = import.meta.env || {};
 
 export const API_BASE_URL = (VITE_ENV.VITE_API_BASE_URL || 'https://bbangqkf2d4pa9855lu0.containers.yandexcloud.net').replace(/\/$/, '');
 
-const ANDROID_INSTALL_PROVIDER = String(VITE_ENV.VITE_ANDROID_INSTALL_PROVIDER || 'apk').trim().toLowerCase();
+const ANDROID_INSTALL_PROVIDER = String(VITE_ENV.VITE_ANDROID_INSTALL_PROVIDER || 'rustore').trim().toLowerCase();
 const ANDROID_INSTALL_URL = String(
-  VITE_ENV.VITE_ANDROID_INSTALL_URL || VITE_ENV.VITE_ANDROID_DOWNLOAD_URL || 'https://myapg.ru/downloads/apg-android.apk',
+  VITE_ENV.VITE_ANDROID_INSTALL_URL || VITE_ENV.VITE_ANDROID_DOWNLOAD_URL || 'https://www.rustore.ru/catalog/app/ru.myapg.app',
 ).trim();
 
 export const ANDROID_INSTALL_SOURCE = {

@@ -8,7 +8,7 @@ import { onAuthStateChanged } from './nativeAuth.js';
 import { LEVELS, getLevel, getNextLevel, getLevelProgress, getKeysToNext } from './levels.js';
 import { collection, onSnapshot } from './postgres/documentApi.js';
 
-import { APP_URL, API_BASE_URL } from './constants.js';
+import { APP_URL, API_BASE_URL, ANDROID_INSTALL_SOURCE } from './constants.js';
 import { auth, db } from './platformDataAuth.js';
 import { apgIdentity } from './apg/index.js';
 import { logError } from './errorLogger.js';
@@ -1426,7 +1426,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const showInstallBtn = !isStandalone && (installPrompt || isIos);
+  const isAndroid = /android/i.test(navigator.userAgent);
+  const isNativeAndroid = window.Capacitor?.isNativePlatform?.() === true;
+  const showInstallBtn = !isStandalone && !isNativeAndroid && (isAndroid || installPrompt || isIos);
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
@@ -1435,6 +1437,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   }, []);
 
   const handleInstall = async () => {
+    if (isAndroid && ANDROID_INSTALL_SOURCE.provider === 'rustore') {
+      window.location.assign(ANDROID_INSTALL_SOURCE.url);
+      return;
+    }
     if (isIos) { setShowIosHint(h => !h); return; }
     if (!installPrompt) return;
     installPrompt.prompt();
@@ -3850,7 +3856,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             onClick={handleInstall}
             style={{ width: '100%', padding: '14px 0', borderRadius: 16, border: '1px solid rgba(75,179,75,0.27)', background: 'rgba(75,179,75,0.08)', color: '#4BB34B', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
           >
-            📲 Добавить на экран телефона
+            📲 {isAndroid && ANDROID_INSTALL_SOURCE.provider === 'rustore' ? ANDROID_INSTALL_SOURCE.buttonLabel : 'Добавить на экран телефона'}
           </button>
           {showIosHint && (
             <div style={{ marginTop: 12, padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)' }}>

@@ -11,6 +11,7 @@ function assert(condition, message) {
 const guide = readFileSync('src/components/onboarding/PwaInstallGuide.jsx', 'utf8');
 const userApp = readFileSync('src/UserApp.jsx', 'utf8');
 const profile = readFileSync('src/ProfilePanel.jsx', 'utf8');
+const constants = readFileSync('src/constants.js', 'utf8');
 
 assert(guide.includes('export function shouldShowPwaInstallGuide'), 'install guide exposes deterministic visibility guard');
 assert(guide.includes('export function shouldShowPwaEmailHint'), 'email hint exposes deterministic visibility guard');
@@ -35,10 +36,14 @@ assert(guide.includes('Нажмите «Поделиться»'), 'iOS Safari in
 assert(guide.includes('Добавить на главный экран'), 'Android manual PWA instructions are present');
 assert(guide.includes('data-pwa-install-action'), 'the cross-platform PWA action has a stable smoke-test selector');
 assert(guide.includes('Установить веб-приложение'), 'native Android prompt uses web-app wording');
-assert(!guide.includes('ANDROID_INSTALL_SOURCE'), 'the install guide has no Android package download branch');
-assert(!guide.includes('data-android-install-option'), 'the Android package option is absent');
-assert(!guide.includes('window.location.assign'), 'the install guide contains no direct download navigation');
+assert(guide.includes('ANDROID_INSTALL_SOURCE'), 'Android install guide uses the configured store source');
+assert(guide.includes('window.location.assign(ANDROID_INSTALL_SOURCE.url)'), 'Android install action opens the configured store page');
+assert(guide.includes('window.Capacitor?.isNativePlatform?.() === true'), 'installed native app does not show the install guide');
+assert(guide.includes('onClick={startPwaInstall}'), 'Android users retain PWA installation as a fallback');
 assert(!/APK|неизвестн(?:ый|ого) источник|сторонн(?:ий|его) источник/i.test(guide), 'package and side-load wording is absent from the install guide');
+
+assert(constants.includes("VITE_ANDROID_INSTALL_PROVIDER || 'rustore'"), 'RuStore is the default Android installation provider');
+assert(constants.includes('https://www.rustore.ru/catalog/app/ru.myapg.app'), 'the verified APG RuStore catalog URL is configured');
 
 assert(userApp.includes("import { EmailAuth } from './EmailAuth.jsx';"), 'UserApp reuses existing EmailAuth');
 assert(userApp.includes('PwaInstallGuide'), 'UserApp renders mobile browser install guide');
@@ -50,5 +55,7 @@ assert(userApp.includes('data-pwa-email-auth'), 'PWA email login opens in a stab
 
 assert(profile.includes('Для первого входа рекомендуем использовать электронную почту'), 'profile guest login recommends email before Telegram');
 assert(profile.includes('Telegram можно привязать к аккаунту'), 'Telegram remains available as a secondary login method');
+assert(profile.includes("ANDROID_INSTALL_SOURCE.buttonLabel"), 'profile shows the configured RuStore install action on Android');
+assert(profile.includes("window.Capacitor?.isNativePlatform?.() === true"), 'profile hides the install action inside the native app');
 
 console.log('PWA first-launch onboarding checks passed.');
