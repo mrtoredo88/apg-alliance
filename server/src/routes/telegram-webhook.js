@@ -14,7 +14,15 @@ function shortHash(value) {
 
 function timerSecret(request) {
   if (request.headers['x-cron-secret']) return request.headers['x-cron-secret'];
-  if (request.body && typeof request.body === 'object' && !Buffer.isBuffer(request.body)) return request.body.secret;
+  if (request.body && typeof request.body === 'object' && !Buffer.isBuffer(request.body)) {
+    if (request.body.secret) return request.body.secret;
+    const timerPayload = request.body?.messages?.[0]?.details?.payload;
+    if (timerPayload && typeof timerPayload === 'object') return timerPayload.secret;
+    if (typeof timerPayload === 'string') {
+      try { return JSON.parse(timerPayload).secret; } catch { return ''; }
+    }
+    return '';
+  }
   try {
     const raw = Buffer.isBuffer(request.body) ? request.body.toString('utf8') : String(request.body || '');
     return raw ? JSON.parse(raw).secret : '';
