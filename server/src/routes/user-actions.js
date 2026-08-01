@@ -3,6 +3,7 @@ import { getDb } from '../lib/documentStore.js';
 import { serverFoundation } from '../apg/index.js';
 import { APP_URL } from '../lib/config.js';
 import webpush from 'web-push';
+import { getFirebaseMessaging, isDeadFcmCode } from '../lib/firebaseMessaging.js';
 import { ECONOMY_CONFIG, ECONOMY_VERSION, calculateTicketExchange, economyMigrationPatch, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
 import { upsertErrorLog } from '../../../server-shared/error-log.js';
 import { hasRole, ROLES } from '../../../server-shared/role-engine.js';
@@ -4345,7 +4346,27 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
   const deadFcmTokens = [];
   const deadWebSubscriptions = [];
 
-  if (fcmTokens.length) deadFcmTokens.push(...fcmTokens);
+  if (fcmTokens.length) {
+    try {
+      const response = await getFirebaseMessaging().sendEachForMulticast({
+        tokens: fcmTokens,
+        notification: { title: 'Новое сообщение', body: 'Откройте АПГ, чтобы прочитать.' },
+        data: { url: '/messages', deepLink: '/messages', category: 'messages', type: 'contextDialogMessage' },
+        android: { priority: 'high', notification: { channelId: 'messages', tag: 'apg-messages', defaultSound: true, defaultVibrateTimings: true } },
+      });
+      sent += response.successCount;
+      failed += response.failureCount;
+      response.responses.forEach((item, index) => {
+        if (item.success) return;
+        const code = item.error?.code || 'messaging/unknown-error';
+        errors.push({ code, message: safeString(item.error?.message, 240) });
+        if (isDeadFcmCode(code)) deadFcmTokens.push(fcmTokens[index]);
+      });
+    } catch (error) {
+      failed += fcmTokens.length;
+      errors.push({ code: error?.code || 'messaging/configuration-error', message: safeString(error?.message, 240) });
+    }
+  }
 
   if (webSubscriptions.length && initDialogWebPush()) {
     await Promise.all(webSubscriptions.map(async subscription => {
@@ -5798,6 +5819,38 @@ async function actionPushRegister(db, req, actor) {
   return { ok: true, userId, deviceId, device, subscriptionCount: subscriptions.length, webPushSubscriptions: subscriptions.map(item => pushEndpointInfo(item)) };
 }
 
+async function actionPushRegisterNative(db, req, actor) {
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
+  const deviceId = safeString(req.body?.deviceId, 120);
+  const token = safeString(req.body?.token, 600);
+  if (!deviceId || !token) throw Object.assign(new Error('Не удалось зарегистрировать Android push.'), { statusCode: 400, code: 'BAD_NATIVE_PUSH_DEVICE' });
+  const ref = db.collection('users').doc(userId);
+  const snap = await ref.get();
+  const user = snap.exists ? snap.data() || {} : {};
+  const devices = user.pushDevices && typeof user.pushDevices === 'object' ? user.pushDevices : {};
+  const previousToken = devices[deviceId]?.fcmToken;
+  const fcmTokens = [...new Set([...(user.fcmTokens || []).filter(item => item && item !== previousToken), token])].slice(-10);
+  const pushDevices = { ...devices, [deviceId]: { ...(devices[deviceId] || {}), deviceId, platform: 'android', fcmToken: token, subscriptionActive: true, lastRegistrationAt: new Date().toISOString(), updatedAt: new Date().toISOString() } };
+  await ref.set({ fcmTokens, pushDevices, notificationProvider: 'webpush', notificationsEnabled: true, notificationConsent: true, nativePushUpdatedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  await audit(db, req, actor, 'push:registerNative', 'users', userId, 'success', { deviceId, tokenLength: token.length });
+  return { ok: true, userId, deviceId, device: { ...pushDevices[deviceId], fcmToken: undefined }, tokenCount: fcmTokens.length };
+}
+
+async function actionPushUnregisterNative(db, req, actor) {
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
+  const deviceId = safeString(req.body?.deviceId, 120);
+  const ref = db.collection('users').doc(userId);
+  const snap = await ref.get();
+  const user = snap.exists ? snap.data() || {} : {};
+  const devices = user.pushDevices && typeof user.pushDevices === 'object' ? user.pushDevices : {};
+  const token = devices[deviceId]?.fcmToken;
+  const pushDevices = { ...devices };
+  delete pushDevices[deviceId];
+  await ref.set({ fcmTokens: (user.fcmTokens || []).filter(item => item !== token), pushDevices, nativePushUpdatedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  await audit(db, req, actor, 'push:unregisterNative', 'users', userId, 'success', { deviceId });
+  return { ok: true };
+}
+
 async function actionPushCleanupSubscriptions(db, req, actor) {
   const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const deviceId = safeString(req.body?.deviceId, 120);
@@ -5937,6 +5990,8 @@ async function routeAction(db, req, actor) {
   if (action === 'profile:forceAcceptConsent') return actionProfileForceAcceptConsent(db, req, actor);
   if (action === 'profile:delete') return actionProfileDelete(db, req, actor);
   if (action === 'push:register') return actionPushRegister(db, req, actor);
+  if (action === 'push:registerNative') return actionPushRegisterNative(db, req, actor);
+  if (action === 'push:unregisterNative') return actionPushUnregisterNative(db, req, actor);
   if (action === 'push:cleanupSubscriptions') return actionPushCleanupSubscriptions(db, req, actor);
   if (action === 'push:testDevice') return actionPushTestDevice(db, req, actor);
   if (action === 'favorites:toggle') return actionFavoritesToggle(db, req, actor);

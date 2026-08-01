@@ -3,6 +3,7 @@ import { getDb } from '../lib/documentStore.js';
 import { FieldValue } from '../lib/documentValues.js';
 import webpush from 'web-push';
 import { requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
+import { getFirebaseMessaging, isDeadFcmCode } from '../lib/firebaseMessaging.js';
 
 const DEFAULT_CATEGORIES = {
   news: true,
@@ -70,7 +71,28 @@ export function withPushTimeout(promise, ms = WEB_PUSH_SEND_TIMEOUT_MS) {
 }
 
 async function sendToFcmTokens(tokens, userIds, title, body, url, tag, options = {}) {
-  return { sent: 0, failed: 0, cleaned: 0, skippedLegacyFirebaseTokens: tokens.length };
+  const pairs = tokens.map((token, index) => ({ token: String(token || ''), userId: userIds[index] })).filter(item => item.token);
+  if (!pairs.length) return { sent: 0, failed: 0, cleaned: 0, errors: [] };
+  try {
+    const response = await getFirebaseMessaging().sendEachForMulticast({
+      tokens: pairs.map(item => item.token),
+      notification: { title: String(title), body: String(body || ''), imageUrl: options.imageUrl || undefined },
+      data: Object.fromEntries(Object.entries({ url: url || APP_URL, deepLink: url || '/', tag: tag || 'apg-push', notificationId: options.notificationId || '', category: options.category || 'important', type: options.type || 'info' }).map(([key, value]) => [key, String(value)])),
+      android: { priority: options.priority === 'critical' ? 'high' : 'normal', notification: { channelId: options.category === 'messages' ? 'messages' : options.priority === 'critical' ? 'important' : 'updates', tag: tag || 'apg-push', defaultSound: true, defaultVibrateTimings: true } },
+    });
+    const deadByUser = {};
+    const errors = [];
+    response.responses.forEach((item, index) => {
+      if (item.success) return;
+      const code = item.error?.code || 'messaging/unknown-error';
+      errors.push({ code, message: String(item.error?.message || '').slice(0, 240) });
+      if (isDeadFcmCode(code)) (deadByUser[pairs[index].userId] ??= []).push(pairs[index].token);
+    });
+    await Promise.all(Object.entries(deadByUser).map(([uid, dead]) => getDb().collection('users').doc(uid).update({ fcmTokens: FieldValue.arrayRemove(...dead) }).catch(() => {})));
+    return { sent: response.successCount, failed: response.failureCount, cleaned: Object.values(deadByUser).flat().length, errors: errors.slice(0, 12) };
+  } catch (error) {
+    return { sent: 0, failed: pairs.length, cleaned: 0, errors: [{ code: error?.code || 'messaging/configuration-error', message: String(error?.message || '').slice(0, 240) }] };
+  }
 }
 
 function buildPayload(title, body, url, tag, options = {}) {

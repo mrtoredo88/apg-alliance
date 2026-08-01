@@ -11,8 +11,10 @@ import { ensureServerReferralSession } from './referralDiagnostics.js';
 import { installDynamicModuleRecovery } from './pwa/DynamicModuleRecovery.js';
 import './fonts.css';
 import './index.css';
+import { installNativeRuntime } from './native/index.js';
 
 installDynamicModuleRecovery();
+installNativeRuntime().catch(error => console.info('[NATIVE] bootstrap unavailable', { code: error?.code || 'BOOT_FAILED' }));
 
 // VK OAuth popup: if hash has access_token and window has an opener,
 // relay the token back to the parent and close — skip app render entirely

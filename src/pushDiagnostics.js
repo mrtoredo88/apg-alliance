@@ -1,6 +1,7 @@
 import { WEB_PUSH_VAPID_PUBLIC_KEY } from './constants.js';
 import { userAction } from './userApi.js';
 import { getDeviceInfo } from './diagnostics.js';
+import { Capacitor } from '@capacitor/core';
 
 const DEVICE_ID_KEY = 'apg_push_device_id';
 const PUSH_LOG_KEY = 'apg_push_register_log';
@@ -129,6 +130,10 @@ export async function collectPushDiagnostics(user = {}) {
 }
 
 export async function registerCurrentPushDevice(user = {}, { requestPermission = true } = {}) {
+  if (Capacitor.isNativePlatform()) {
+    const { registerNativePush } = await import('./native/push.js');
+    return registerNativePush(user, { requestPermission });
+  }
   const deviceId = getPushDeviceId();
   logPushStage('push register start', { deviceId });
   if (!('Notification' in window)) throw new Error('Notification API unsupported');

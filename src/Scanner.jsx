@@ -3,6 +3,7 @@ import QrScanner from 'qr-scanner';
 import { motionTransition } from './motion.js';
 import { sendDiagReport } from './diagnostics.js';
 import { CAMERA_WATCHDOG_MS, buildCameraAttemptDiag, getCameraRecoveryReason, isCameraFrameReady, shouldAutoRecoverCamera } from './scannerReliability.js';
+import { canUseNativeScanner, scanNativeQr } from './native/scanner.js';
 
 const T = { gold: '#C9A84C', goldL: '#E8C97A', textSec: 'rgba(240,240,240,0.45)' };
 const CAMERA_BLACK_FRAME_ERROR = 'Не удалось запустить камеру. Попробуйте перезапустить её прямо здесь.';
@@ -107,6 +108,26 @@ export default function Scanner({ isOpen, onClose, onConfirm, diagnosticUser = n
       setTorchOn(false);
       setHasTorch(false);
       return;
+    }
+
+    if (canUseNativeScanner()) {
+      let active = true;
+      logCameraDiag('native_scan_start', { provider: 'mlkit' });
+      scanNativeQr().then(value => {
+        if (!active) return;
+        if (value && !doneRef.current) {
+          doneRef.current = true;
+          logCameraDiag('native_scan_success', { provider: 'mlkit' });
+          onConfirmRef.current?.(value);
+        } else if (!value) {
+          onClose?.();
+        }
+      }).catch(error => {
+        if (!active) return;
+        logCameraDiag('native_scan_error', { provider: 'mlkit', code: error?.code || 'SCAN_FAILED' });
+        setErr(error?.code === 'CAMERA_DENIED' ? 'Доступ к камере запрещён. Разрешите его в настройках Android.' : 'Не удалось открыть нативный QR-сканер.');
+      });
+      return () => { active = false; };
     }
 
     let active = true;

@@ -8,6 +8,8 @@ import { initErrorLogger, logError, setErrorLoggerUser } from './errorLogger.js'
 import { qrError, qrLog, sanitizeQrPartnerSnapshot } from './qrDiagnostics.js';
 import { sendDiagReport, runServiceChecks } from './diagnostics.js';
 import { registerCurrentPushDevice } from './pushDiagnostics.js';
+import { clearOfflineCache, readOfflineCache, writeOfflineCache } from './native/cache.js';
+import { unregisterNativePush } from './native/push.js';
 import { confirmQrScan } from './rewardApi.js';
 import { getReputationStatus } from './economyEngine.js';
 import { userAction } from './userApi.js';
@@ -1154,6 +1156,30 @@ export function UserApp() {
   const [scannedExperts, setScannedExperts]     = useState({});
   const [events, setEvents]                     = useState([]);
   const [news, setNews]                         = useState([]);
+
+  useEffect(() => {
+    const userId = String(user?.id || '');
+    if (!userId || userId.startsWith('guest_')) return;
+    let active = true;
+    Promise.all([readOfflineCache('profile', userId), readOfflineCache('news', userId)]).then(([profileCache, newsCache]) => {
+      if (!active) return;
+      if (profileCache?.data) setUser(current => current?.id === userId ? { ...profileCache.data, ...current } : current);
+      if (Array.isArray(newsCache?.data)) setNews(current => current.length ? current : newsCache.data);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [user?.id]);
+
+  useEffect(() => {
+    const userId = String(user?.id || '');
+    if (!userId || userId.startsWith('guest_')) return;
+    writeOfflineCache('profile', userId, user).catch(() => {});
+  }, [user]);
+
+  useEffect(() => {
+    const userId = String(user?.id || '');
+    if (!userId || userId.startsWith('guest_') || !news.length) return;
+    writeOfflineCache('news', userId, news).catch(() => {});
+  }, [news, user?.id]);
   const [savedNews, setSavedNews]               = useState([]);
   const [readLaterNews, setReadLaterNews]       = useState([]);
   const [newsReactions, setNewsReactions]       = useState({});
@@ -4035,6 +4061,7 @@ export function UserApp() {
     try {
       localStorage.setItem('manualLogout', 'true');
     } catch {}
+    await Promise.allSettled([clearOfflineCache(targetUserId), unregisterNativePush(targetUserId)]);
     traceAuthStage('identity_cleanup', {
       runId,
       hasManualLogoutStorage: true,

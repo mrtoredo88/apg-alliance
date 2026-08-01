@@ -638,16 +638,7 @@ async function withEmailLoginStage(trace, stage, fn, timeoutMs = 8000) {
 async function sendVerificationEmail(db, email, userId, appUrl) {
   const token = Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
-  try {
-    await serverFoundation.identityV2.putEmailVerifyToken({ token, email, userId, expiresAt });
-  } catch (error) {
-    if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
-    await db.collection('emailVerifyTokens').doc(token).set({
-      email, userId,
-      expiresAt: expiresAt.toISOString(),
-      createdAt: FieldValue.serverTimestamp(),
-    });
-  }
+  await serverFoundation.identityV2.putEmailVerifyToken({ token, email, userId, expiresAt });
   const verifyUrl = `${appUrl}/?verify_email=${token}`;
   await sendEmail(
     email,
@@ -683,61 +674,25 @@ async function resolveEmailUser(db, email, ref, { createIfMissing = false } = {}
 }
 
 async function consumeVerificationToken(db, token) {
-  try {
-    return { source: 'identity_v2', data: await serverFoundation.identityV2.consumeEmailVerifyToken(token) };
-  } catch (error) {
-    if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
-    const ref = db.collection('emailVerifyTokens').doc(String(token));
-    const snap = await ref.get();
-    if (!snap.exists) return { source: 'firestore_fallback', data: null };
-    await ref.delete();
-    return { source: 'firestore_fallback', data: snap.data() || null };
-  }
+  return { source: 'identity_v2', data: await serverFoundation.identityV2.consumeEmailVerifyToken(token) };
 }
 
 async function getEmailOtp(codeRef, email) {
-  try {
-    return { source: 'identity_v2', data: await serverFoundation.identityV2.getEmailOtp(email) };
-  } catch (error) {
-    if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
-    const snap = await codeRef.get();
-    return { source: 'firestore_fallback', data: snap.exists ? snap.data() : null };
-  }
+  return { source: 'identity_v2', data: await serverFoundation.identityV2.getEmailOtp(email) };
 }
 
 async function setEmailOtp(codeRef, email, code) {
   const expiresAt = new Date(Date.now() + 10 * 60_000);
-  try {
-    await serverFoundation.identityV2.putEmailOtp({ email, code, expiresAt });
-    return 'identity_v2';
-  } catch (error) {
-    if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
-    await codeRef.set({
-      code,
-      expiresAt: expiresAt.toISOString(),
-      attempts: 0,
-      createdAt: FieldValue.serverTimestamp(),
-    });
-    return 'firestore_fallback';
-  }
+  await serverFoundation.identityV2.putEmailOtp({ email, code, expiresAt });
+  return 'identity_v2';
 }
 
 async function deleteEmailOtp(codeRef, email) {
-  try {
-    await serverFoundation.identityV2.deleteEmailOtp(email);
-  } catch (error) {
-    if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
-    await codeRef.delete();
-  }
+  await serverFoundation.identityV2.deleteEmailOtp(email);
 }
 
 async function incrementEmailOtpAttempts(codeRef, email) {
-  try {
-    await serverFoundation.identityV2.incrementEmailOtpAttempts(email);
-  } catch (error) {
-    if (error?.code !== 'IDENTITY_POSTGRES_NOT_CONFIGURED') throw error;
-    await codeRef.update({ attempts: FieldValue.increment(1) });
-  }
+  await serverFoundation.identityV2.incrementEmailOtpAttempts(email);
 }
 
 function otpCreatedMs(data) {
