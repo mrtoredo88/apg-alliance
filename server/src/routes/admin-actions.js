@@ -2078,6 +2078,17 @@ async function handleEntityList(db, request, actor) {
     throw error;
   }
   const reader = await requireAdminPermission(request, `${config.scope}:read`);
+  if (resource === 'users' && serverFoundation.account?.postgresPrimary) {
+    const max = Math.min(Number(request.body?.limit || listConfig.limit || 1000), listConfig.limit || 1000, 1000);
+    const rows = await serverFoundation.account.listActiveProfiles(max);
+    return {
+      ok: true,
+      resource,
+      rows: rows.map(serializeAdminValue),
+      count: rows.length,
+      source: 'account-core-active-canonical',
+    };
+  }
   let ref = db.collection(config.collection);
   if (listConfig.orderBy) ref = ref.orderBy(listConfig.orderBy[0], listConfig.orderBy[1]);
   const max = Math.min(Number(request.body?.limit || listConfig.limit || 200), listConfig.limit || 200, 1000);

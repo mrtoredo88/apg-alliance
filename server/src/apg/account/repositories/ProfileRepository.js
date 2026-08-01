@@ -60,6 +60,50 @@ export class ProfileRepository {
     return result.rows.map(row => ({ requestedUserId: row.requested_id, profile: mapProfile(row) }));
   }
 
+  async listActiveCanonical(limit = 1000) {
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 1000, 1000));
+    const result = await this.adapter.query(`
+      WITH candidates AS (
+        SELECT p.user_id, COALESCE(NULLIF(p.canonical_user_id, ''), p.user_id) AS canonical_user_id,
+          p.firebase_uid, p.email, p.telegram_id, p.display_name, p.first_name, p.last_name,
+          p.photo, p.city, p.profile, p.bootstrap, p.legacy, p.created_at, p.updated_at, p.last_seen_at,
+          2 AS source_rank
+        FROM apg_account_profiles p
+        UNION ALL
+        SELECT d.document_id AS user_id,
+          COALESCE(NULLIF(d.data->>'canonicalUserId', ''), d.document_id) AS canonical_user_id,
+          COALESCE(d.data->>'firebaseUid', d.data->>'authUid') AS firebase_uid,
+          COALESCE(d.data->>'email', d.data->>'linkedEmail') AS email,
+          COALESCE(d.data->>'telegramId', d.data->>'tgId') AS telegram_id,
+          COALESCE(d.data->>'displayName', d.data->>'name') AS display_name,
+          COALESCE(d.data->>'firstName', d.data->>'first_name') AS first_name,
+          COALESCE(d.data->>'lastName', d.data->>'last_name') AS last_name,
+          COALESCE(d.data->>'photo', d.data->>'photo_200', d.data->>'avatar') AS photo,
+          d.data->>'city' AS city, d.data AS profile, '{}'::jsonb AS bootstrap, '{}'::jsonb AS legacy,
+          d.created_at, d.updated_at, d.updated_at AS last_seen_at, 1 AS source_rank
+        FROM apg_app_documents d
+        WHERE d.collection_name = 'users' AND d.parent_path = ''
+      ), active AS (
+        SELECT * FROM candidates
+        WHERE lower(COALESCE(profile->>'archived', 'false')) <> 'true'
+          AND lower(COALESCE(profile->>'deleted', 'false')) <> 'true'
+          AND COALESCE(profile->>'mergedInto', '') = ''
+          AND COALESCE(profile->>'dataMigratedInto', '') = ''
+          AND lower(COALESCE(profile->>'accountStatus', profile->>'status', profile->>'lifecycleStatus', 'active'))
+            NOT IN ('archived', 'deleted', 'blocked', 'banned', 'merged')
+      )
+      SELECT DISTINCT ON (canonical_user_id) * FROM active
+      ORDER BY canonical_user_id, (user_id = canonical_user_id) DESC, source_rank DESC, updated_at DESC NULLS LAST
+      LIMIT $1
+    `, [safeLimit]);
+    return result.rows.map(row => {
+      const profile = mapProfile(row);
+      if (!profile) return null;
+      const canonicalId = profile.canonicalUserId || profile.id;
+      return { ...profile, sourceUserId: profile.id, id: canonicalId, userId: canonicalId, canonicalUserId: canonicalId };
+    }).filter(Boolean);
+  }
+
   async linkMergedAliases({ targetId, sourceIds = [], profile = {}, actorId = '' } = {}) {
     const canonicalId = safeString(targetId, 260);
     const aliases = [...new Set(sourceIds.map(id => safeString(id, 260)).filter(id => id && id !== canonicalId))];

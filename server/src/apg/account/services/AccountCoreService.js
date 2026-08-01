@@ -78,6 +78,11 @@ export class AccountCoreService {
     return this.measure('postgres', () => this.profiles.getMany(userIds));
   }
 
+  async listActiveProfiles(limit = 1000) {
+    this.metrics.increment('accountReads');
+    return this.measure('postgres', () => this.profiles.listActiveCanonical(limit));
+  }
+
   async upsertProfile(profile) {
     this.metrics.increment('accountWrites');
     const saved = await this.measure('postgres', () => this.profiles.upsert(profile));
