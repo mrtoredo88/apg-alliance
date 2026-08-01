@@ -2,11 +2,15 @@
 
 Status: implementation candidate only. Do not publish or deploy without owner approval.
 
+The Android package embeds the current production web application. Always run
+`npm run android:sync` immediately before building: a web-only deployment does
+not update the files already packaged in an APK/AAB.
+
 ## Release identity blockers
 
 - `applicationId` is currently `ru.myapg.app`; confirm it exactly matches the published RuStore package.
 - `versionCode` is `20000` and `versionName` is `2.0.0`; confirm `20000` is greater than every uploaded RuStore artifact.
-- Obtain the RuStore signing-certificate SHA-256 and replace `REPLACE_WITH_RUSTORE_SIGNING_CERT_SHA256` in `public/.well-known/assetlinks.json`.
+- The release certificate SHA-256 is published in `assetlinks.json`; verify every final APK/AAB has the same fingerprint before upload.
 - Create a RuStore Push project for the exact package and signing certificate, then provide `RUSTORE_PUSH_PROJECT_ID` during Android build.
 - Configure backend `RUSTORE_PUSH_PROJECT_ID` and `RUSTORE_PUSH_SERVICE_TOKEN`. Firebase, FCM and `google-services.json` are not used.
 
@@ -55,7 +59,9 @@ cd android && ./gradlew test lint bundleRelease assembleRelease
 
 ## Signed build
 
-Keep signing secrets outside git. With `APG_UPLOAD_STORE_FILE`, `APG_UPLOAD_STORE_PASSWORD`, `APG_UPLOAD_KEY_ALIAS`, and `APG_UPLOAD_KEY_PASSWORD` wired into a local untracked Gradle properties file:
+Keep signing secrets outside git. Export `APG_ANDROID_KEYSTORE`,
+`APG_ANDROID_STORE_PASSWORD`, `APG_ANDROID_KEY_ALIAS`, and
+`APG_ANDROID_KEY_PASSWORD` (the legacy `APG_UPLOAD_*` names are also accepted):
 
 ```bash
 npm ci

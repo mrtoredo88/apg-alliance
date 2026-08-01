@@ -14,6 +14,8 @@ assert.match(manifest, /android:autoVerify="true"/);
 
 const assetLinks = JSON.parse(fs.readFileSync('public/.well-known/assetlinks.json', 'utf8'));
 assert.equal(assetLinks[0].target.package_name, 'ru.myapg.app');
+assert.doesNotMatch(assetLinks[0].target.sha256_cert_fingerprints[0], /REPLACE|TODO/i);
+assert.match(assetLinks[0].target.sha256_cert_fingerprints[0], /^(?:[0-9A-F]{2}:){31}[0-9A-F]{2}$/);
 
 const nativePush = fs.readFileSync('src/native/push.js', 'utf8');
 assert.doesNotMatch(nativePush, /console\.(log|info).*token/i);
@@ -24,6 +26,8 @@ const packageJson = fs.readFileSync('package.json', 'utf8');
 const androidBuild = `${fs.readFileSync('android/build.gradle', 'utf8')}\n${fs.readFileSync('android/app/build.gradle', 'utf8')}`;
 assert.match(serverPush, /sendRuStorePush/);
 assert.match(androidBuild, /ru\.rustore\.sdk:pushclient/);
+assert.match(androidBuild, /APG_ANDROID_KEYSTORE/);
+assert.match(androidBuild, /signingConfig signingConfigs\.release/);
 assert.doesNotMatch(`${nativePush}\n${serverPush}\n${packageJson}\n${androidBuild}`, /firebase-admin|@capacitor\/push-notifications|google-services|sendEachForMulticast/i);
 assert.match(manifest, /ru\.rustore\.sdk\.pushclient\.MESSAGING_EVENT/);
 
