@@ -12,6 +12,7 @@ function assertContains(label, token, message) {
 // Contract assertions for compare behavior
 assertContains('contract', "const explicitRequestId = safeString(request.query?.requestId, 180);", 'explicit requestId should be read from query/body contract');
 assertContains('contract', "const requestId = safeString(explicitRequestId || request.headers['x-request-id'], 180);", 'header request-id should be fallback only');
+assertContains('contract', 'compareSessionIds({ requestId: explicitRequestId, loginSessionId, telegramSessionId, state }, data)', 'infrastructure request id must never be validated as a client correlation id');
 assertContains('contract', 'const hasExplicitRequestId = typeof query.requestId === \'string\' && query.requestId.trim().length > 0;', 'explicit requestId guard required');
 assertContains('contract', 'if (hasExplicitRequestId && normalized.requestId && stored.requestId && normalized.requestId !== stored.requestId) {', 'requestId mismatch must be validated only when explicitly provided');
 

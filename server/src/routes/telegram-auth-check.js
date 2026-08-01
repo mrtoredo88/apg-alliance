@@ -169,7 +169,10 @@ export default async function telegramAuthCheckRoutes(fastify) {
         }, 'telegram-auth-check-forensic');
       }
 
-      const mismatches = compareSessionIds({ requestId, loginSessionId, telegramSessionId, state }, data);
+      // The infrastructure x-request-id identifies this HTTP call, not the
+      // Telegram login flow. Validate requestId only when the client explicitly
+      // supplied the correlation id in the query string.
+      const mismatches = compareSessionIds({ requestId: explicitRequestId, loginSessionId, telegramSessionId, state }, data);
       if (mismatches.length > 0) {
         request.log.warn?.({
           stage: 'telegram_auth_check_session_mismatch',
