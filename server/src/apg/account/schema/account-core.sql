@@ -392,6 +392,82 @@ VALUES (
 )
 ON CONFLICT (version) DO NOTHING;
 
+-- Session restoration previously granted one key per day. Reverse only the
+-- implicit login bonuses that were not superseded by a later explicit admin
+-- balance adjustment. The repair is ledger-backed and idempotent per user.
+WITH last_admin AS (
+  SELECT user_id, max(created_at) AS last_admin_at
+  FROM apg_economy_operations
+  WHERE status = 'completed' AND type = 'admin_adjustment'
+  GROUP BY user_id
+), refundable AS (
+  SELECT b.user_id, sum(b.delta)::integer AS refundable_keys
+  FROM apg_economy_operations b
+  LEFT JOIN last_admin a ON a.user_id = b.user_id
+  WHERE b.status = 'completed' AND b.type = 'daily_bonus'
+    AND (a.last_admin_at IS NULL OR b.created_at > a.last_admin_at)
+  GROUP BY b.user_id
+), eligible AS (
+  SELECT p.user_id, r.refundable_keys,
+    CASE WHEN COALESCE(p.profile->>'keys', '') ~ '^[0-9]+$'
+      THEN (p.profile->>'keys')::integer ELSE 0 END AS current_balance
+  FROM refundable r
+  JOIN apg_account_profiles p ON p.user_id = r.user_id
+  WHERE r.refundable_keys > 0
+), repaired AS (
+  INSERT INTO apg_economy_operations
+    (id, idempotency_key, user_id, type, reason, source_type, source_id,
+     source_label, delta, balance_after, status, metadata)
+  SELECT
+    'economy-repair-daily-login-v1:' || md5(user_id),
+    'economy-repair-daily-login-v1:' || user_id,
+    user_id,
+    'admin_adjustment',
+    'Возврат ошибочного автоматического бонуса за вход',
+    'system_repair',
+    'implicit-daily-login-bonus',
+    'АПГ',
+    -refundable_keys,
+    current_balance - refundable_keys,
+    'completed',
+    jsonb_build_object('incident', 'implicit_daily_login_bonus', 'refundedKeys', refundable_keys)
+  FROM eligible
+  WHERE current_balance >= refundable_keys
+  ON CONFLICT (idempotency_key) DO NOTHING
+  RETURNING user_id, balance_after
+)
+UPDATE apg_account_profiles p
+SET profile = jsonb_set(p.profile, '{keys}', to_jsonb(r.balance_after), true),
+    updated_at = now()
+FROM repaired r
+WHERE p.user_id = r.user_id;
+
+WITH repaired AS (
+  SELECT user_id, balance_after
+  FROM apg_economy_operations
+  WHERE idempotency_key LIKE 'economy-repair-daily-login-v1:%'
+), repaired_documents AS (
+  SELECT d.collection_name, d.parent_path, d.document_id, r.balance_after
+  FROM apg_app_documents d
+  JOIN repaired r ON d.document_id = r.user_id
+    OR d.data->>'canonicalUserId' = r.user_id
+  WHERE d.collection_name = 'users' AND d.parent_path = ''
+)
+UPDATE apg_app_documents d
+SET data = jsonb_set(d.data, '{keys}', to_jsonb(r.balance_after), true),
+    updated_at = now()
+FROM repaired_documents r
+WHERE d.collection_name = r.collection_name AND d.parent_path = r.parent_path
+  AND d.document_id = r.document_id;
+
+INSERT INTO apg_account_schema_versions (version, checksum, description)
+VALUES (
+  'reverse-implicit-daily-login-bonus-v1-2026-08-02',
+  'reverse-implicit-daily-login-bonus-v1',
+  'Reverse login bonuses not superseded by a later explicit admin balance adjustment'
+)
+ON CONFLICT (version) DO NOTHING;
+
 -- Cabinet ownership was migrated in application user documents before
 -- Account Core became authoritative. Materialize those links once so account
 -- bootstrap never depends on client-side loading order.
