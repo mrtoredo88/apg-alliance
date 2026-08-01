@@ -15,6 +15,13 @@
 
 ---
 
+## [2026-08-01] fix: устранение преждевременного timeout Telegram getUpdates
+**Коммит:** `локально, без коммита`
+**Файлы:** `server/src/lib/telegramUpdates.js`, `scripts/telegram-auth-production-path-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** окно production polling увеличено с 2,5 до 8 секунд и добавлена вторая попытка с короткой задержкой; update-processing retry после обрыва БД сохранён.
+**Почему:** новая Telegram auth-сессия оставалась `pending`, а все `getUpdates` стабильно принудительно прерывались клиентом ровно через 2,5 секунды до получения `/start`.
+
 ## [2026-08-01] fix: повтор Telegram `/start` после обрыва PostgreSQL
 **Коммит:** `локально, без коммита`
 **Файлы:** `server/src/lib/telegramUpdates.js`, `scripts/telegram-auth-production-path-test.mjs`, `.ai/17_CHANGELOG_AI.md`

@@ -30,8 +30,8 @@ const WELCOME_TEXT =
 
 const LINKS_TEXT = '📌 Все наши площадки:';
 const TELEGRAM_FETCH_TIMEOUT_MS = 3500;
-const TELEGRAM_POLL_TIMEOUT_MS = 2500;
-const TELEGRAM_POLL_ATTEMPTS = 1;
+const TELEGRAM_POLL_TIMEOUT_MS = 8000;
+const TELEGRAM_POLL_ATTEMPTS = 2;
 const TELEGRAM_UPDATE_PROCESS_ATTEMPTS = 3;
 
 function safeDebugString(value, max = 280) {

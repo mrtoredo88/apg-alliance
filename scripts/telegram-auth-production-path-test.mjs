@@ -15,7 +15,7 @@ assert.match(start, /requestId,[\s\S]*loginSessionId: loginSessionId \|\| null,[
 assert.match(updates, /authMatch[\s\S]*telegram_auth_update_received[\s\S]*status:\s*'done'/, 'auth update reaches done');
 assert.match(updates, /await ref\.update\(\{[\s\S]*status:\s*'done'[\s\S]*completedAt:[\s\S]*Promise\.resolve\(\)[\s\S]*tgGetPhotoUrl/, 'done is persisted before optional avatar fetch');
 assert.match(updates, /timeoutMs = TELEGRAM_FETCH_TIMEOUT_MS[\s\S]*AbortSignal\.timeout\(timeoutMs\)/, 'Telegram API calls have a bounded timeout');
-assert.match(updates, /TELEGRAM_POLL_TIMEOUT_MS = 2500[\s\S]*TELEGRAM_POLL_ATTEMPTS = 1/, 'auth polling stays below the serverless client timeout');
+assert.match(updates, /TELEGRAM_POLL_TIMEOUT_MS = 8000[\s\S]*TELEGRAM_POLL_ATTEMPTS = 2/, 'Telegram polling tolerates production egress latency and retries once');
 assert.match(updates, /telegram_poll_fetch_failed[\s\S]*errorCode[\s\S]*lastErrorCode/, 'poll failures expose actionable diagnostics');
 assert.match(updates, /const POLL_LOCK_MS = 8000;/, 'a stale poll lock recovers within seconds on the warm production instance');
 assert.match(updates, /lastCheckpointAt: FieldValue\.serverTimestamp\(\)/, 'each processed Telegram update checkpoints its offset');
