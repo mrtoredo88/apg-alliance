@@ -66,8 +66,8 @@ function tokenFor(preview) {
     targetId: preview.targetId,
     sourceUpdatedAt: preview.sourceUpdatedAt,
     targetUpdatedAt: preview.targetUpdatedAt,
-    references: preview.references.map(item => [item.collection, item.parentPath, item.id, item.paths]),
-    nested: preview.nested.map(item => [item.collection, item.parentPath, item.id]),
+    references: preview.references.map(item => [item.collection, item.parentPath, item.id, [...item.paths].sort()]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+    nested: preview.nested.map(item => [item.collection, item.parentPath, item.id]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
   })).digest('hex');
 }
 
