@@ -22,6 +22,8 @@ import { learnFromPanelVisit, learnFromRecommendationResult } from './LokiLearni
 import { buildLokiMessageTimeoutFallback, recordLokiMessageTrace, recordLokiRequestDiagnostics, recordLokiPipelineError, recordLokiPipelineReturn } from './lokiMessageTrace.js';
 import { inspectLokiResponseText, normalizeLokiResponseText } from './lokiResponseText.js';
 import { resolveLokiActionForPlatform } from './core/platformCapabilities.js';
+import { createTaskSuccess, isTaskReformulation, markExternalTaskAction, markTaskAction, markTaskFeedback, markTaskReformulated } from './core/taskSuccess/TaskSuccess.js';
+import { buildLokiDashboardPulse } from './core/dashboard/DashboardPulse.js';
 import { markLokiStage } from '../performance/index.js';
 import {
   DEFAULT_LOKI_SETTINGS,
@@ -428,14 +430,6 @@ function hasOffer(item = {}) {
   return Boolean(item.offer || item.promo || item.discount || item.specialOffer || item.actionText);
 }
 
-function isToday(value) {
-  const ms = toMillis(value);
-  if (!ms) return false;
-  const date = new Date(ms);
-  const now = new Date();
-  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
-}
-
 function freshRows(items = []) {
   return (Array.isArray(items) ? items : [])
     .map(item => ({ item, ms: toMillis(item?.publishedAt ?? item?.createdAt ?? item?.date ?? item?.updatedAt) }))
@@ -506,25 +500,19 @@ function continueActionFor(row = {}) {
   return createLokiAction(LOKI_APP_ACTIONS.OPEN_LOKI);
 }
 
-function buildLokiHomeDashboard({ appState = {}, user, recommendationFeed = [] } = {}) {
-  const hour = new Date().getHours();
+export function buildLokiHomeDashboard({ appState = {}, user, recommendationFeed = [], now = new Date() } = {}) {
+  const hour = now.getHours();
   const greeting = hour < 6 ? 'Доброй ночи' : hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
-  const events = Array.isArray(appState.events) ? appState.events : [];
-  const news = Array.isArray(appState.news) ? appState.news : [];
-  const tasks = Array.isArray(appState.customTasks) ? appState.customTasks : [];
-  const partners = Array.isArray(appState.partners) ? appState.partners : [];
+  const pulse = buildLokiDashboardPulse(appState, now);
+  const { events, news, tasks, partners, rewards, activeTasks, todayEvents, freshNews, offers: offerPartners, counts, proactivePrompt } = pulse;
   const experts = Array.isArray(appState.experts) ? appState.experts : [];
   const homeExperience = appState.homeExperience || {};
   const continueExperience = appState.continueExperience || {};
   const dailySummary = appState.dailySummary || {};
   const aiMemory = appState.aiMemory || {};
   const activityTimeline = Array.isArray(appState.activityTimeline) ? appState.activityTimeline : [];
-  const todayEvents = events.filter(item => isToday(item?.date ?? item?.startAt ?? item?.startsAt ?? item?.eventDate));
-  const freshNews = freshRows(news).filter(row => row.ms && Date.now() - row.ms < 1000 * 60 * 60 * 24 * 3).map(row => row.item);
   const freshEvents = freshRows(events).filter(row => row.ms && Date.now() - row.ms < 1000 * 60 * 60 * 24 * 7).map(row => row.item);
   const freshPartners = freshRows(partners).filter(row => row.ms && Date.now() - row.ms < 1000 * 60 * 60 * 24 * 10).map(row => row.item);
-  const offerPartners = partners.filter(hasOffer);
-  const activeTasks = tasks.filter(item => !appState.completedTasks?.includes?.(item.id));
   const keyOpportunity = Math.min(5, Math.max(1, activeTasks.length || offerPartners.length || todayEvents.length));
   const priority = { event: 5, partner: 4, news: 3, task: 2, prize: 1, expert: 1 };
   const todayRecommendations = [...recommendationFeed]
@@ -573,10 +561,11 @@ function buildLokiHomeDashboard({ appState = {}, user, recommendationFeed = [] }
     text: truncateText(row.text || row.reason || row.subtitle || row.item?.summary || row.item?.description || 'Можно вернуться к этому месту.', 120),
     action: continueActionFor(row),
   }));
+  const feedByType = type => recommendationFeed.filter(row => row.type === type);
   const recommendationSections = {
-    partners: (appState.recommendations?.partners || homeExperience.recommendations?.partners || []).slice(0, 2).map(row => normalizeDashboardCard(row, 'partner')),
-    events: (appState.recommendations?.events || homeExperience.recommendations?.events || []).slice(0, 2).map(row => normalizeDashboardCard(row, 'event')),
-    news: (appState.recommendations?.news || homeExperience.recommendations?.news || []).slice(0, 2).map(row => normalizeDashboardCard(row, 'news')),
+    partners: (appState.recommendations?.partners || homeExperience.recommendations?.partners || feedByType('partner')).slice(0, 2).map(row => normalizeDashboardCard(row, 'partner')),
+    events: (appState.recommendations?.events || homeExperience.recommendations?.events || feedByType('event')).slice(0, 2).map(row => normalizeDashboardCard(row, 'event')),
+    news: (appState.recommendations?.news || homeExperience.recommendations?.news || feedByType('news')).slice(0, 2).map(row => normalizeDashboardCard(row, 'news')),
     experts: (appState.recommendations?.experts || homeExperience.recommendations?.experts || []).slice(0, 2).map(row => normalizeDashboardCard(row, 'expert')),
   };
   const changedRecentActions = activityTimeline.filter(item => toMillis(item.timestamp || item.createdAt || item.time) > Date.now() - 1000 * 60 * 60 * 24);
@@ -592,10 +581,13 @@ function buildLokiHomeDashboard({ appState = {}, user, recommendationFeed = [] }
     offerPartners[0] ? normalizeDashboardCard({ item: offerPartners[0], type: 'partner', reason: 'У партнёра есть актуальное предложение.' }, 'partner') : null,
     freshNews[0] ? normalizeDashboardCard({ item: freshNews[0], type: 'news', reason: 'Свежая новость в АПГ.' }, 'news') : null,
   ].filter(Boolean);
+  if (!todayBlocks.length) todayBlocks.push(...todayRecommendations.slice(0, 3).map(row => normalizeDashboardCard(row, row.type)));
   return {
     greeting,
     userName: safeString(user?.first_name || user?.name || appState.user?.first_name || appState.user?.name),
-    summary: `Сегодня для тебя есть ${todayEvents.length} ${todayEvents.length === 1 ? 'мероприятие' : 'мероприятия'}, ${freshNews.length} ${freshNews.length === 1 ? 'новость' : 'новости'} и возможность заработать ещё ${keyOpportunity} ключей.`,
+    summary: pulse.summary,
+    counts,
+    proactivePrompt,
     personalSummary,
     continueItems,
     recommendationSections,
@@ -635,6 +627,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
   const queueRef = useRef([]);
   const activeHistoryIdRef = useRef(null);
   const currentPriorityRef = useRef(LOKI_MESSAGE_PRIORITY.LOW);
+  const activeTaskSuccessRef = useRef(loadLokiMemory().lastTaskSuccess || null);
 
   useEffect(() => {
     const handler = event => {
@@ -691,6 +684,67 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       return next;
     });
   }, []);
+
+  const persistTaskSuccess = useCallback((task, event = 'updated') => {
+    if (!task?.id) return;
+    activeTaskSuccessRef.current = task;
+    setMemory(prev => {
+      const history = [task, ...(Array.isArray(prev.taskSuccessHistory) ? prev.taskSuccessHistory.filter(item => item?.id !== task.id) : [])].slice(0, 40);
+      const next = { ...prev, lastTaskSuccess: task, taskSuccessHistory: history, updatedAt: new Date().toISOString() };
+      saveLokiMemory(next);
+      return next;
+    });
+    userAction('loki:task-success', {
+      payload: {
+        event,
+        taskId: task.id,
+        intent: task.intent,
+        status: task.status,
+        outcome: task.outcome,
+        score: task.score,
+        actionType: task.actionType || '',
+        resultCount: task.resultCount || 0,
+        panel: activePanel,
+      },
+    }).catch(error => logError(error, 'LokiProvider.taskSuccess'));
+  }, [activePanel]);
+
+  const recordExternalTaskAction = useCallback((kind) => {
+    const next = markExternalTaskAction(activeTaskSuccessRef.current, kind);
+    if (!next) return false;
+    persistTaskSuccess(next, 'external_action');
+    return true;
+  }, [persistTaskSuccess]);
+
+  const recordTaskFeedback = useCallback((taskId, value, reason = '') => {
+    const current = activeTaskSuccessRef.current?.id === taskId
+      ? activeTaskSuccessRef.current
+      : (Array.isArray(memory.taskSuccessHistory) ? memory.taskSuccessHistory.find(item => item?.id === taskId) : null);
+    const next = markTaskFeedback(current, value, reason);
+    if (!next) return false;
+    persistTaskSuccess(next, value === 'positive' ? 'positive_feedback' : 'negative_feedback');
+    const feedback = {
+      id: `feedback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      taskId,
+      type: value,
+      score: value === 'positive' ? 1 : -1,
+      reason: String(reason || '').slice(0, 80),
+      relatedIntent: current?.intent || '',
+      createdAt: new Date().toISOString(),
+      source: 'explicit_ui',
+    };
+    loadLokiUserMemoryModule()
+      .then(async ({ mergeLokiLearningPatch }) => {
+        const { buildExplicitPreferencePatch } = await import('./core/memory/PreferenceMemory.js');
+        setUserMemory(prev => mergeLokiLearningPatch(prev, {
+          feedbackEvents: [feedback, ...(Array.isArray(prev.feedbackEvents) ? prev.feedbackEvents : [])].slice(0, 800),
+          lastFeedback: feedback,
+          preferences: buildExplicitPreferencePatch(prev.preferences, feedback, current),
+        }));
+      })
+      .catch(error => logError(error, 'LokiProvider.recordTaskFeedback'));
+    return true;
+  }, [memory.taskSuccessHistory, persistTaskSuccess]);
 
   const recordActionEvent = useCallback(async (event) => {
     const { buildActionHistoryPatch } = await loadLokiHistoryModule('action');
@@ -1241,6 +1295,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       onEvent: event => actionEvents.push(event),
     });
     if (execution.ok) {
+      persistTaskSuccess(markTaskAction(activeTaskSuccessRef.current, normalized.type, { ok: true }), 'action_completed');
       if (actionEvents.length) {
         recordActionEvent(actionEvents[actionEvents.length - 1]);
       }
@@ -1263,6 +1318,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
       return true;
     }
     if (execution.error) logError(execution.error, 'LokiProvider.executeAction');
+    persistTaskSuccess(markTaskAction(activeTaskSuccessRef.current, normalized.type, { ok: false }), 'action_failed');
     recordActionEvent(actionEvents[actionEvents.length - 1] || {
         type: LOKI_ACTION_CENTER_EVENTS.FAILED,
         action: normalized,
@@ -1272,7 +1328,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     });
     showMessage(LOKI_EVENTS.APP_ERROR, { source: 'loki_action_failed', actionType: normalized.type, message: execution.reason, priority: LOKI_MESSAGE_PRIORITY.HIGH });
     return false;
-  }, [activePanel, appActions, appState, memory, recordActionEvent, settings.personalityMode, showMessage, updateHistory, updateMemory, user]);
+  }, [activePanel, appActions, appState, memory, persistTaskSuccess, recordActionEvent, settings.personalityMode, showMessage, updateHistory, updateMemory, user]);
 
   const dispatchControlledExecution = useCallback(async (controlledExecutionContext) => {
     const actionToRun = controlledExecutionContext?.result?.dispatch || controlledExecutionContext?.dispatcher?.action || null;
@@ -1392,6 +1448,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
 
   const askExperience = useCallback(async (text, options = {}) => {
     recordLokiMessageTrace('STEP 4 LokiProvider askExperience received', { enabled: settings.enabled, textLength: String(text || '').length });
+    if (isTaskReformulation(activeTaskSuccessRef.current, text)) {
+      persistTaskSuccess(markTaskReformulated(activeTaskSuccessRef.current), 'query_reformulated');
+    }
     markLokiStage('conversation', { textLength: String(text || '').length, activePanel });
     const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
     setBrainThinking(true);
@@ -1521,6 +1580,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
           pipelineTimeline: traceTimeline(),
         },
       }, appState);
+      const taskSuccess = createTaskSuccess({ question: text, result: normalizedResult });
+      normalizedResult.taskSuccess = taskSuccess;
+      persistTaskSuccess(taskSuccess, 'results_presented');
       if (normalizedResult.capabilityContext) markLokiStage('capability', { capability: normalizedResult.capabilityContext.capability || normalizedResult.capabilitySnapshot?.Capability || '' });
       if (normalizedResult.skillContext) markLokiStage('skills', { skill: normalizedResult.skillContext.skill || normalizedResult.skillSnapshot?.['Selected Skill'] || '' });
       if (normalizedResult.executionContext || normalizedResult.controlledExecutionContext) markLokiStage('execution', { ready: Boolean(normalizedResult.executionContext?.ready || normalizedResult.controlledExecutionContext?.executionReady) });
@@ -1589,6 +1651,9 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
           knowledgeHit: normalizedResult.evolutionContext?.analytics?.metrics?.knowledgeHitRate || 0,
           feedbackScore: normalizedResult.evolutionContext?.analytics?.metrics?.feedbackScore || 0,
           fallback: Boolean(normalizedResult.evolutionContext?.learning?.quality?.fallback),
+          taskId: taskSuccess.id,
+          taskStatus: taskSuccess.status,
+          taskScore: taskSuccess.score,
         },
       }).catch(e => logError(e, 'LokiProvider.analytics'));
       updateHistory(prev => addLokiHistoryItem(prev, {
@@ -1647,7 +1712,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
         debug: { trace: typeof window !== 'undefined' ? window.__APG_LOKI_MESSAGE_TRACE__ || [] : [] },
       };
     }
-  }, [activeContext, activePanel, appState, dispatchControlledExecution, executeAction, history, memory, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordKnowledgeIndexSnapshot, recordPlanContext, recordSkillContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateHistory, updateMemory, user, userMemory]);
+  }, [activeContext, activePanel, appState, dispatchControlledExecution, executeAction, history, memory, persistTaskSuccess, recordAgentContext, recordCapabilityContext, recordControlledExecutionContext, recordConversationContext, recordDecisionContext, recordEvaluationSnapshot, recordExecutionContext, recordKnowledgeIndexSnapshot, recordPlanContext, recordSkillContext, recordToolEvents, recordWorkflowContext, settings.enabled, settings.personalityMode, showMessage, updateHistory, updateMemory, user, userMemory]);
 
   const openContextExperience = useCallback((context) => {
     const normalized = normalizeLokiContext(context);
@@ -1712,6 +1777,8 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     emotion,
     emotionalState,
     executeAction,
+    recordExternalTaskAction,
+    recordTaskFeedback,
     experienceOpen,
     pendingFirstJourneyQuestion,
     clearPendingFirstJourneyQuestion: () => setPendingFirstJourneyQuestion(null),
@@ -1799,7 +1866,7 @@ export function LokiProvider({ children, user, activePanel, appActions, appState
     setMode: (mode) => persistSettings({ ...settings, mode }),
     setPersonalityMode: (personalityMode) => persistSettings({ ...settings, personalityMode }),
   };
-  }, [action, activeContext, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, clearUserMemoryItem, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, lokiDerived, memory, message, openContextExperience, pendingFirstJourneyQuestion, persistSettings, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
+  }, [action, activeContext, activePanel, anchor, appState, askBrain, askExperience, brainThinking, canTalk, card, clearUserMemoryItem, dismissed, emotion, emotionalState, executeAction, experienceOpen, handleCharacterTap, history, isHiddenOnPanel, lastEvent, lokiDerived, memory, message, openContextExperience, pendingFirstJourneyQuestion, persistSettings, recordExternalTaskAction, recordTaskFeedback, resetUserMemory, settings, showMessage, updateHistory, updateMemory, user, userMemory, visible]);
 
   return <LokiContext.Provider value={value}>{children}</LokiContext.Provider>;
 }

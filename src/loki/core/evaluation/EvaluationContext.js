@@ -47,6 +47,7 @@ export function buildEvaluationContext({ question = '', result = {}, context = {
     journeyContext: sourceResult.journeyContext || context?.memory?.lastJourneyContext || null,
     toolContext: sourceResult.toolContext || context?.memory?.lastToolContext || null,
     personalizationContext: sourceResult.personalizationContext || null,
+    taskSuccess: sourceResult.taskSuccess || context?.memory?.lastTaskSuccess || null,
     actionCenter: sourceResult.actionCenter || null,
     appContext: {
       userName: context?.user?.name || '',

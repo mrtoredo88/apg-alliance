@@ -151,6 +151,17 @@ function scoreConversationQuality(ctx = {}) {
   };
 }
 
+function scoreTaskSuccess(ctx = {}) {
+  const task = ctx.taskSuccess;
+  if (!task?.id) return { available: false, status: 'unknown', outcome: 'unknown', score: 50 };
+  return {
+    available: true,
+    status: task.status || 'unknown',
+    outcome: task.outcome || 'unknown',
+    score: clamp(task.score),
+  };
+}
+
 function scoreHallucinationRisk(ctx = {}) {
   const answer = lower(ctx.answer);
   const uncertain = ['может быть', 'скорее всего', 'вероятно', 'возможно', 'предположительно', 'думаю, что', 'кажется'];
@@ -185,6 +196,7 @@ export function computeEvaluationMetrics(ctx = {}) {
     actionQuality: scoreActionQuality(ctx),
     personalization: scorePersonalization(ctx),
     conversationQuality: scoreConversationQuality(ctx),
+    taskSuccess: scoreTaskSuccess(ctx),
     hallucinationRisk: scoreHallucinationRisk(ctx),
   };
   metrics.confidence = scoreConfidence(ctx, metrics);

@@ -13,6 +13,8 @@ export function buildEvaluationSnapshot({ context = {}, metrics = {}, score = {}
     Hallucination: metrics.hallucinationRisk?.risk || 'LOW',
     Action: metrics.actionQuality?.score ?? 0,
     Answer: metrics.answerQuality?.score ?? 0,
+    TaskSuccess: metrics.taskSuccess?.score ?? 50,
+    taskSuccess: metrics.taskSuccess || null,
     missingContext: metrics.contextCoverage?.missing || [],
     toolQuality: metrics.toolQuality || null,
     decisionQuality: metrics.decisionQuality || null,

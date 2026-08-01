@@ -19,26 +19,29 @@ export function scoreEvaluation(metrics = {}) {
   const conversation = metrics.conversationQuality?.score ?? 0;
   const personalization = metrics.personalization?.personalizationScore ?? 0;
   const confidence = metrics.confidence ?? 0;
+  const taskSuccess = metrics.taskSuccess?.score ?? 50;
   const overallScore = clamp(
-    answer * 0.25
-    + decision * 0.20
+    answer * 0.20
+    + decision * 0.15
     + context * 0.15
     + tool * 0.10
     + conversation * 0.10
     + personalization * 0.10
     + confidence * 0.10
+    + taskSuccess * 0.10
   );
   return {
     overallScore,
     grade: gradeEvaluation(overallScore),
     weights: {
-      answer: 25,
-      decision: 20,
+      answer: 20,
+      decision: 15,
       context: 15,
       tool: 10,
       conversation: 10,
       personalization: 10,
       confidence: 10,
+      taskSuccess: 10,
     },
   };
 }

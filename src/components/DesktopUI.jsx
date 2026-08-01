@@ -11,6 +11,7 @@ import {
 } from '../workspace/WorkspaceComponents.jsx';
 import { motionTransition } from '../motion.js';
 import { parseVideoUrl } from '../utils/parseVideoUrl.js';
+import { GIFT_SHIMMER_STYLE, isGiftAction } from '../giftShimmer.js';
 
 const asArray = value => Array.isArray(value) ? value.filter(Boolean) : [];
 const MEDIA_PREVIEW_LIVE_EVENT = 'apg:media-preview-live';
@@ -183,7 +184,7 @@ export function DesktopHeroActions({ actions = [], style }) {
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', ...style }}>
       {safeActions.map(action => (
-        <GlassButton key={action.id || action.label} disabled={action.disabled} onClick={action.onClick} tone={action.tone || 'glass'} style={{ minHeight: 38, borderRadius: 15, padding: '8px 12px', fontSize: 12.2, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, ...action.style }}>
+        <GlassButton key={action.id || action.label} disabled={action.disabled} onClick={action.onClick} tone={action.tone || 'glass'} style={{ minHeight: 38, borderRadius: 15, padding: '8px 12px', fontSize: 12.2, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, ...(isGiftAction(action) ? GIFT_SHIMMER_STYLE : {}), ...action.style }}>
           {action.icon && <span>{action.icon}</span>}<span>{action.label}</span>
         </GlassButton>
       ))}
@@ -277,7 +278,7 @@ export function DesktopStickyActions({ actions = [], style }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 7, ...style }}>
       {safeActions.map(action => (
-        <GlassButton key={action.id || action.label} aria-label={action.ariaLabel || action.label} disabled={action.disabled} onClick={action.onClick} tone={action.tone || 'glass'} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 11.5, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, ...action.style }}>
+        <GlassButton key={action.id || action.label} aria-label={action.ariaLabel || action.label} disabled={action.disabled} onClick={action.onClick} tone={action.tone || 'glass'} style={{ minHeight: 34, borderRadius: 14, padding: '7px 10px', fontSize: 11.5, color: action.tone === 'gold' ? '#17120a' : APG2_PROFILE.text, ...(isGiftAction(action) ? GIFT_SHIMMER_STYLE : {}), ...action.style }}>
           {action.icon && <span>{action.icon}</span>}<span>{action.label}</span>
         </GlassButton>
       ))}
@@ -379,6 +380,7 @@ export function DesktopTopOverview({
     fontFamily: 'inherit',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
+    ...(isGiftAction(item) ? GIFT_SHIMMER_STYLE : {}),
   });
   return (
     <section style={{ display: 'grid', gap: 12, ...style }}>
@@ -431,7 +433,7 @@ export function DesktopTopOverview({
               <button type="button" aria-label="Запустить поиск" onClick={runSearch} style={{ width: 20, height: 20, borderRadius: 10, border: '1px solid rgba(201,168,76,0.22)', background: 'rgba(201,168,76,0.10)', color: APG2_PROFILE.gold, cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 11, padding: 0 }}>↵</button>
             )}
           </div>
-          <button type="button" onClick={onOpenRewards} aria-label="Подарки" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(201,168,76,0.45)', background: 'linear-gradient(145deg, rgba(201,168,76,0.22), rgba(255,255,255,0.18))', boxShadow: '0 10px 24px rgba(201,168,76,0.12), inset 0 1px 0 rgba(255,255,255,0.24)', color: APG2_PROFILE.gold, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative', overflow: 'hidden' }}>
+          <button type="button" onClick={onOpenRewards} aria-label="Подарки" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(201,168,76,0.45)', background: 'linear-gradient(145deg, rgba(201,168,76,0.22), rgba(255,255,255,0.18))', boxShadow: '0 10px 24px rgba(201,168,76,0.12), inset 0 1px 0 rgba(255,255,255,0.24)', color: APG2_PROFILE.gold, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative', overflow: 'hidden', ...GIFT_SHIMMER_STYLE }}>
             <span style={{ position: 'relative', zIndex: 1 }}>🎁</span>
           </button>
           <button type="button" onClick={onOpenMessages} aria-label="Люди" style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 16, cursor: 'pointer', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.text, fontSize: 18, display: 'grid', placeItems: 'center', position: 'relative' }}>
@@ -507,7 +509,7 @@ export function DesktopTopOverview({
           {safeQuickActions.length > 0 && (
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
               {safeQuickActions.slice(0, 1).map(action => <GlassButton key={action.id || action.label} onClick={action.onClick} tone="gold" style={{ minHeight: 34, borderRadius: 17, padding: '0 16px', fontSize: 10.5, color: '#17120a', fontWeight: 850 }}>{action.label === 'Профиль' ? 'Открыть профиль' : action.label}</GlassButton>)}
-              {safeQuickActions.slice(1, 3).map(action => <button key={action.id || action.label} type="button" onClick={action.onClick} style={{ minHeight: 32, border: 0, background: 'transparent', color: APG2_PROFILE.textSoft, padding: '0 8px', fontSize: 10.2, lineHeight: '14px', fontWeight: 760, fontFamily: 'inherit', cursor: 'pointer' }}>{action.label}</button>)}
+              {safeQuickActions.slice(1, 3).map(action => <button key={action.id || action.label} type="button" onClick={action.onClick} style={{ minHeight: 32, border: 0, background: 'transparent', color: APG2_PROFILE.textSoft, padding: '0 8px', fontSize: 10.2, lineHeight: '14px', fontWeight: 760, fontFamily: 'inherit', cursor: 'pointer', borderRadius: 14, ...(isGiftAction(action) ? GIFT_SHIMMER_STYLE : {}) }}>{action.label}</button>)}
               {profileLatestActivity && <span style={{ marginLeft: 'auto', color: APG2_PROFILE.textMuted, fontSize: 9.3, lineHeight: '12px', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profileLatestActivity}</span>}
             </div>
           )}

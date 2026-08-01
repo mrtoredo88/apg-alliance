@@ -53,10 +53,9 @@ export function makeResultCard(item, type, action) {
     label: type === 'news' ? 'Читать' : 'Открыть',
     actions: [
       { label: type === 'news' ? 'Читать' : 'Открыть', action },
-      telHref ? { label: 'Позвонить', href: telHref } : null,
       item?.address ? { label: 'Маршрут', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_MAP) } : null,
-      url ? { label: 'Записаться', href: url } : null,
-    ].filter(Boolean).slice(0, 4),
+      telHref ? { label: 'Позвонить', href: telHref } : null,
+    ].filter(Boolean),
   };
 }
 

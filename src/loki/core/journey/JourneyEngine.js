@@ -48,14 +48,10 @@ export function runJourneyEngine({ question = '', intent = {}, knowledge = {}, r
   const progress = resolveProgress({ query, plan, reasoningResult, previous, goal: goal.id });
   const suggestions = resolveJourneyActions({ goal: goal.id, selected, reasoningResult, progress });
   const journey = createJourneyState({ goal: goal.id, plan, progress, selected, previous: previous?.goal === goal.id ? previous : null, suggestions });
-  const current = journey.currentStep?.title || 'выбрать следующее действие';
   const intro = reasoningResult?.text || 'Я собрал подходящий следующий шаг по данным АПГ.';
   const repeat = shouldSuppressRepeat(previous, selected);
-  const summary = summarizeJourney(journey);
   const text = [
-    repeat ? 'Продолжаем тот же путь, карточку заново не пересказываю.' : intro,
-    summary ? `\n${summary}` : '',
-    `\nСледующее действие: ${current}.`,
+    repeat ? 'Продолжаем с выбранным вариантом.' : intro,
   ].filter(Boolean).join('\n');
   return {
     ...reasoningResult,

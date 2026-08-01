@@ -114,8 +114,9 @@ assert.equal(reasoned.ranked[0].id, 'salon-best');
 assert.ok(reasoned.confidence.value >= 80);
 assert.ok(reasoned.suggestions.length >= 2);
 assert.ok(reasoned.cards.length <= 5);
-assert.match(reasoned.text, /Почему:/);
-assert.match(reasoned.text, /Нашёл ещё/);
+assert.match(reasoned.text, /Лучше всего подойдёт/);
+assert.ok(reasoned.text.split('\n').filter(Boolean).length <= 3);
+assert.doesNotMatch(reasoned.text, /Ещё варианты:/);
 
 const followUp = runLokiKnowledgeEngine({
   text: 'Какая работает до 22?',
@@ -131,7 +132,7 @@ const why = runLokiKnowledgeEngine({
   context: { memory: { lastReasoningContext: reasoned.reasoningContext } },
 });
 assert.equal(why.intent, 'reasoning.explain_choice');
-assert.match(why.text, /потому что/);
+assert.match(why.text, /Главное:/);
 
 const lowData = runReasoningEngine({
   question: 'где подстричься',
@@ -140,7 +141,7 @@ const lowData = runReasoningEngine({
   context: {},
 });
 assert.ok(lowData.confidence.value < 80);
-assert.match(lowData.text, /Не уверен полностью|Информации мало/);
+assert.match(lowData.text, /Показываю самые близкие варианты/);
 
 const noData = runLokiKnowledgeEngine({ text: 'где сделать татуировку', appState: { partners: [], experts: [], events: [], news: [] }, context: {} });
 assert.ok(!noData || !/не знаю/i.test(noData.text || ''));

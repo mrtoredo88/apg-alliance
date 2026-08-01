@@ -7,6 +7,9 @@ const AMBIGUOUS_WORDS = ['салон', 'студия', 'мастер', 'запи
 const FOLLOWUP_WORDS = ['парковк', 'адрес', 'далеко', 'рядом', 'маршрут', 'как добраться', 'цена', 'дешев', 'подешевле', 'сегодня', 'открыто', 'вечер', 'поздно', 'работают', 'ближе', 'еще', 'ещё'];
 const SEMANTIC_STOP_WORDS = new Set(['куда', 'сходить', 'можно', 'хочу', 'есть', 'хорошие', 'посоветуй', 'что', 'нибудь', 'рядом', 'сегодня', 'лучше', 'где']);
 const SPECIFIC_SERVICE_WORDS = ['красот', 'маникюр', 'педикюр', 'ногти', 'ногот', 'стриж', 'парикмах', 'барбер', 'косметолог', 'бров', 'ресниц', 'массаж', 'spa', 'спа', 'кофе', 'капучино', 'завтрак', 'пицца', 'подар', 'цвет', 'фитнес', 'йога'];
+const STRICT_CATEGORY_TERMS = {
+  coffee_food: ['кофе', 'кофейн', 'кафе', 'пекар', 'выпеч', 'десерт', 'ресторан', 'еда', 'завтрак', 'капучино', 'латте'],
+};
 
 function editDistance(a, b) {
   if (!a || !b) return Math.max(a.length, b.length);
@@ -101,10 +104,12 @@ function findPartners(query, partners = [], intent) {
   ].filter(Boolean).map(normalizeText);
   const hintWords = categoryHints.join(' ').split(/\s+/).filter(word => word.length > 3 && !SEMANTIC_STOP_WORDS.has(word));
   const sourceQuery = intent.contextualQuery || query;
+  const strictTerms = STRICT_CATEGORY_TERMS[intent.category?.id] || null;
 
   return partners
     .map(partner => {
       const haystack = partnerHaystack(partner);
+      const strictCategoryMatch = !strictTerms || strictTerms.some(term => haystack.includes(term));
       const queryWords = sourceQuery.split(/\s+/).filter(w => w.length > 3 && !SEMANTIC_STOP_WORDS.has(w));
       const categoryScore = categoryHints.reduce((sum, hint) => sum + (hint && haystack.includes(hint) ? 4 : 0), 0);
       const semanticScore = hintWords.reduce((sum, word) => sum + (haystack.includes(word) || fuzzyWordHit(word, haystack.split(/\s+/)) ? 1.35 : 0), 0);
@@ -117,7 +122,7 @@ function findPartners(query, partners = [], intent) {
         partner.offer || partner.promo ? 1 : 0,
         partner.featured ? 1 : 0,
       ].reduce((sum, value) => sum + value, 0);
-      return { ...partner, lokiScore: score };
+      return { ...partner, lokiScore: strictCategoryMatch ? score : 0 };
     })
     .filter(partner => partner.lokiScore > 0)
     .sort((a, b) => b.lokiScore - a.lokiScore)
@@ -167,8 +172,8 @@ function answerPartners(partners, intent) {
   return {
     intent: 'partner.search',
     text: cards.length > 1
-      ? `Понял запрос${intent.category ? ` про «${intent.category.title}»` : ''}. Нашёл ${cards.length} варианта. Я бы начал с «${titleOf(first, 'партнёра')}»: ${reason}.`
-      : `Понял запрос${intent.category ? ` про «${intent.category.title}»` : ''}. Я бы начал с «${titleOf(first, 'партнёра')}»: ${reason}.`,
+      ? `Нашёл ${cards.length} подходящих места. Лучшее сейчас — «${titleOf(first, 'партнёра')}»: ${reason}.`
+      : `Нашёл подходящее место — «${titleOf(first, 'партнёра')}»: ${reason}.`,
     card: cards[0],
     cards,
   };

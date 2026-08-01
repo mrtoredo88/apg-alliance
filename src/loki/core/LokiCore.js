@@ -29,6 +29,7 @@ import { runProactiveAnswer } from './proactive/ProactiveEngine.js';
 import { runLokiActionCenter } from './actions/ActionCenter.js';
 import { runLokiDecisionEngine } from './decision/index.js';
 import { runLokiEvaluationEngine } from './evaluation/index.js';
+import { applyLokiResponsePolicy } from './response/ResponsePolicy.js';
 import { recordLokiMessageTrace, recordLokiPipelineError, recordLokiPipelineReturn } from '../lokiMessageTrace.js';
 
 const LOKI_MODULES = [
@@ -163,7 +164,15 @@ function applyEvaluation({ question, result, context, trace }) {
 }
 
 function finishResult({ shaped, question, context, trace, debugPayload = null, debug }) {
-  const evaluated = applyEvaluation({ question, result: shaped, context, trace });
+  const policyReady = applyLokiResponsePolicy({ question, result: shaped, userMemory: context?.userMemory });
+  trace.push({
+    module: 'responsePolicy',
+    ms: 0,
+    decision: policyReady.responsePolicy?.changed ? 'filtered' : 'accepted',
+    rule: policyReady.responsePolicy?.rule || 'general',
+    rejected: policyReady.responsePolicy?.rejected || 0,
+  });
+  const evaluated = applyEvaluation({ question, result: policyReady, context, trace });
   if (!debug) return evaluated;
   return {
     ...evaluated,

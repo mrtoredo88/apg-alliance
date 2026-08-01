@@ -19,6 +19,7 @@ import { selectActualEvents } from './eventSchedule.js';
 import { haversine, formatDistance } from './utils/geo.js';
 import { countRender, markPerformanceStage } from './performance/index.js';
 import { createInitialHomeHydrationState, HOME_HYDRATION_STAGES, startHomeHydration } from './home/index.js';
+import { GIFT_SHIMMER_STYLE } from './giftShimmer.js';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -641,6 +642,7 @@ function V2FirstScreenMobile({
                 position: 'relative', overflow: 'hidden',
                 background: 'linear-gradient(145deg, rgba(201,168,76,0.26), rgba(255,255,255,0.12))',
                 boxShadow: '0 12px 28px rgba(201,168,76,0.14), inset 0 1px 0 rgba(255,255,255,0.24)',
+                ...GIFT_SHIMMER_STYLE,
               }}
             >
               <span style={{ position: 'relative', zIndex: 1 }}>🎁</span>

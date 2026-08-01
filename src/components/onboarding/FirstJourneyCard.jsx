@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { APG2_PROFILE, GlassButton, GlassCard } from '../Apg2ProfileGlass.jsx';
 import { FIRST_JOURNEY_LOKI_QUESTIONS } from '../../firstJourney.js';
+import { GIFT_SHIMMER_STYLE } from '../../giftShimmer.js';
 
 function StepRow({ step }) {
   return (
@@ -14,7 +15,7 @@ function StepRow({ step }) {
 
 function ExploreCard({ icon, title, onClick }) {
   return (
-    <button type="button" onClick={onClick} style={{ minHeight: 82, borderRadius: 22, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.07)', color: APG2_PROFILE.text, cursor: 'pointer', fontFamily: 'inherit', display: 'grid', placeItems: 'center', gap: 6, padding: 12 }}>
+    <button type="button" onClick={onClick} style={{ minHeight: 82, borderRadius: 22, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.07)', color: APG2_PROFILE.text, cursor: 'pointer', fontFamily: 'inherit', display: 'grid', placeItems: 'center', gap: 6, padding: 12, ...(title === 'Подарки' ? GIFT_SHIMMER_STYLE : {}) }}>
       <span style={{ fontSize: 24, lineHeight: 1 }}>{icon}</span>
       <span style={{ fontSize: 13, lineHeight: '16px', fontWeight: 850 }}>{title}</span>
     </button>
@@ -53,7 +54,7 @@ function StepContent({ stepId, onEmailLogin, onAskLoki, onOpenRewards, onOpenPan
     return (
       <div style={{ display: 'grid', gap: 12 }}>
         <div style={{ color: APG2_PROFILE.textSoft, fontSize: 14, lineHeight: '20px' }}>Многие партнёры дарят подарки участникам АПГ.</div>
-        <GlassButton tone="gold" onClick={onOpenRewards} style={{ width: '100%', minHeight: 50, color: '#17120a' }}>Открыть подарки</GlassButton>
+        <GlassButton tone="gold" onClick={onOpenRewards} style={{ width: '100%', minHeight: 50, color: '#17120a', ...GIFT_SHIMMER_STYLE }}>Открыть подарки</GlassButton>
       </div>
     );
   }

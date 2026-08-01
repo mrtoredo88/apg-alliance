@@ -66,7 +66,13 @@ export function clearLokiUserMemoryItem(type, key) {
   }
   if (value && typeof value === 'object') {
     const nextValue = { ...value };
-    delete nextValue[key];
+    if (type === 'preferences') {
+      if (key === 'preferNearby') nextValue.preferNearby = 0;
+      else if (key === 'avoidClosed') nextValue.avoidClosed = 0;
+      else if (key === 'preferAffordable') nextValue.preferAffordable = 0;
+      else if (key === 'avoidEntities') nextValue.avoidEntities = [];
+      else delete nextValue[key];
+    } else delete nextValue[key];
     saveLokiUserMemory({ ...memory, [type]: nextValue });
     return loadLokiUserMemory();
   }

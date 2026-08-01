@@ -6,6 +6,8 @@ import { LokiIdentity } from './LokiIdentity.jsx';
 import { recordLokiMessageTrace, resetLokiMessageTrace } from './lokiMessageTrace.js';
 import { inspectLokiResponseText, isLokiUserDebugVisible } from './lokiResponseText.js';
 import { createLokiUtterance } from './lokiVoice.js';
+import { describeLokiPreferences } from './core/memory/PreferenceMemory.js';
+import { chooseLokiCard, compareLokiCards } from './core/decision/ChoiceAssistant.js';
 
 const QUICK_ACTIONS = [
   { label: '✨ Что интересного?', text: 'Что интересного сегодня?', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_OFFERS) },
@@ -28,6 +30,14 @@ const NEWS_QUICK_ACTIONS = [
   { label: '📰 Похожие', text: 'Похожие новости' },
 ];
 
+const FEEDBACK_REASONS = [
+  ['irrelevant', 'Не то'],
+  ['too_far', 'Далеко'],
+  ['closed', 'Закрыто'],
+  ['expensive', 'Дорого'],
+  ['other', 'Другое'],
+];
+
 function getShortTitle(value) {
   return String(value || 'АПГ').trim().slice(0, 48);
 }
@@ -35,6 +45,28 @@ function getShortTitle(value) {
 function getContextKey(context) {
   if (!context) return '';
   return `${context.type || 'context'}:${context.newsId || context.id || context.title || ''}`;
+}
+
+function humanizeMemory(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  const known = {
+    coffee: 'Хороший кофе',
+    cafe: 'Кафе и пекарни',
+    events: 'Мероприятия',
+    gifts: 'Подарки',
+    news: 'Новости АПГ',
+  };
+  return known[normalized] || String(value || '').replace(/[_-]+/g, ' ').trim();
+}
+
+function filterCardsForQuestion(cards, question) {
+  const query = String(question || '').toLowerCase().replace(/ё/g, 'е');
+  if (!/(кофе|кофейн|капучино|латте)/.test(query)) return cards;
+  const coffeeTerms = ['кофе', 'кофейн', 'кафе', 'пекар', 'выпеч', 'десерт', 'ресторан', 'завтрак', 'капучино', 'латте'];
+  return cards.filter(card => {
+    const haystack = `${card.title || ''} ${card.text || ''} ${(card.meta || []).join(' ')}`.toLowerCase().replace(/ё/g, 'е');
+    return coffeeTerms.some(term => haystack.includes(term));
+  });
 }
 
 function buildInitialConversation(loki) {
@@ -61,8 +93,68 @@ function LokiAvatar({ thinking, listening, speaking }) {
   );
 }
 
-function ResultCard({ card, onOpen, onAction }) {
-  const actions = Array.isArray(card.actions) ? card.actions.filter(Boolean).slice(0, 3) : [];
+function OfficeDashboard({ loki, onAsk }) {
+  const dashboard = loki.dashboard || {};
+  const today = Array.isArray(dashboard.todayBlocks) ? dashboard.todayBlocks.slice(0, 3) : [];
+  const counters = [
+    { icon: '📰', label: 'Новости', value: dashboard.counts?.news || 0, text: 'Что нового?', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_NEWS) },
+    { icon: '✦', label: 'Акции', value: dashboard.counts?.offers || 0, text: 'Какие акции доступны?', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_OFFERS) },
+    { icon: '◷', label: 'События', value: dashboard.counts?.events || 0, text: 'Какие мероприятия сегодня?', action: createLokiAction(LOKI_APP_ACTIONS.OPEN_EVENT) },
+  ];
+  return (
+    <section className="loki-office-dashboard" aria-label="Сводка кабинета Локи">
+      <div className="loki-office-welcome">
+        <div>
+          <div className="loki-office-kicker">СЕГОДНЯ В КАБИНЕТЕ</div>
+          <h1>{dashboard.greeting || 'Добрый день'}{dashboard.userName ? `, ${dashboard.userName}` : ''}</h1>
+          <p>{dashboard.summary || 'Я собрал важное и готов сразу перейти к делу.'}</p>
+        </div>
+        <LokiAvatar thinking={loki.brainThinking} />
+      </div>
+      <div className="loki-office-counters">
+        {counters.map(item => (
+          <button key={item.label} type="button" onClick={() => onAsk(item.text, item.action)}>
+            <span>{item.icon}</span>
+            <strong>{item.value}</strong>
+            <small>{item.label}</small>
+          </button>
+        ))}
+      </div>
+      {dashboard.proactivePrompt && (
+        <button
+          type="button"
+          className="loki-office-proactive"
+          onClick={() => onAsk(dashboard.proactivePrompt.prompt, dashboard.proactivePrompt.action)}
+        >
+          <span>{dashboard.proactivePrompt.icon}</span>
+          <span><strong>{dashboard.proactivePrompt.title}</strong><small>{dashboard.proactivePrompt.text}</small></span>
+          <b>→</b>
+        </button>
+      )}
+      {!!today.length && (
+        <div className="loki-office-desk">
+          <div className="loki-office-kicker">НА СТОЛЕ У ЛОКИ</div>
+          <div className="loki-office-desk-grid">
+            {today.map((item, index) => (
+              <button key={item.id || index} type="button" onClick={() => item.action && loki.executeAction(item.action)}>
+                <span>{item.type === 'event' ? '◷' : item.type === 'news' ? '📰' : '✦'}</span>
+                <strong>{getShortTitle(item.title)}</strong>
+                <small>{item.text}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ResultCard({ card, onOpen, onAction, onExternalAction }) {
+  const sourceActions = Array.isArray(card.actions) ? card.actions.filter(Boolean) : [];
+  const openAction = sourceActions.find(item => /^(открыть|читать|записаться)$/i.test(item.label || '')) || (card.action ? { label: card.type === 'news' ? 'Читать' : 'Открыть', action: card.action } : null);
+  const routeAction = sourceActions.find(item => /маршрут|карт/i.test(item.label || ''));
+  const callAction = sourceActions.find(item => /позвонить|телефон/i.test(item.label || ''));
+  const actions = [openAction, routeAction && { ...routeAction, label: 'Маршрут' }, callAction && { ...callAction, label: 'Позвонить' }].filter(Boolean);
   return (
     <GlassCard onClick={onOpen} style={{ padding: 10, borderRadius: 22, display: 'grid', gap: 10 }}>
       <span style={{ display: 'grid', gridTemplateColumns: card.image ? '64px 1fr' : '1fr', gap: 10, alignItems: 'center', minWidth: 0 }}>
@@ -74,7 +166,7 @@ function ResultCard({ card, onOpen, onAction }) {
         <span style={{ minWidth: 0, display: 'grid', gap: 4 }}>
           <span style={{ color: APG2_PROFILE.text, fontSize: 13, lineHeight: '17px', fontWeight: 860, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getShortTitle(card.title)}</span>
           <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11.5, lineHeight: '15px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.text}</span>
-          <span style={{ color: APG2_PROFILE.gold, fontSize: 11.5, lineHeight: '15px', fontWeight: 820 }}>{card.label || 'Открыть'}</span>
+          {!!card.meta?.length && <span style={{ color: APG2_PROFILE.gold, fontSize: 11.5, lineHeight: '15px', fontWeight: 820 }}>{card.meta.slice(0, 2).join(' · ')}</span>}
         </span>
       </span>
       {!!actions.length && (
@@ -86,7 +178,10 @@ function ResultCard({ card, onOpen, onAction }) {
               onClick={(event) => {
                 event.stopPropagation();
                 if (item.action) onAction?.(item.action);
-                else if (item.href && typeof window !== 'undefined') window.open(item.href, '_blank', 'noopener,noreferrer');
+                else if (item.href && typeof window !== 'undefined') {
+                  onExternalAction?.(String(item.href).startsWith('tel:') ? 'call' : 'website');
+                  window.open(item.href, '_blank', 'noopener,noreferrer');
+                }
               }}
               style={{ minHeight: 32, borderRadius: 999, padding: '0 10px', fontSize: 11, lineHeight: '14px', fontWeight: 820 }}
             >
@@ -103,6 +198,7 @@ export function LokiExperience({ loki }) {
   const [input, setInput] = useState('');
   const [voiceState, setVoiceState] = useState('idle');
   const [conversation, setConversation] = useState(() => buildInitialConversation(loki));
+  const [feedbackPromptId, setFeedbackPromptId] = useState('');
   const scrollerRef = useRef(null);
   const recognitionRef = useRef(null);
 
@@ -116,10 +212,11 @@ export function LokiExperience({ loki }) {
   const memoryChips = useMemo(() => {
     const memory = loki.userMemory || {};
     return [
-      ...(memory.interests || []).map(value => ({ type: 'interests', value, label: `Интерес: ${value}` })),
-      ...(memory.frequentQuestions || []).slice(0, 4).map(value => ({ type: 'frequentQuestions', value, label: `Вопрос: ${value}` })),
-      ...(memory.visitedPartners || []).slice(0, 4).map(value => ({ type: 'visitedPartners', value, label: `Партнёр: ${value}` })),
-      ...(memory.favoriteExperts || []).slice(0, 4).map(value => ({ type: 'favoriteExperts', value, label: `Эксперт: ${value}` })),
+      ...describeLokiPreferences(memory.preferences).map(item => ({ type: 'preferences', value: item.key, label: `✓ ${item.label}` })),
+      ...(memory.interests || []).map(value => ({ type: 'interests', value, label: `♥ ${humanizeMemory(value)}` })),
+      ...(memory.frequentQuestions || []).slice(0, 2).map(value => ({ type: 'frequentQuestions', value, label: `Часто ищете: ${humanizeMemory(value)}` })),
+      ...(memory.visitedPartners || []).slice(0, 2).map(value => ({ type: 'visitedPartners', value, label: `Были у: ${humanizeMemory(value)}` })),
+      ...(memory.favoriteExperts || []).slice(0, 2).map(value => ({ type: 'favoriteExperts', value, label: `Ваш эксперт: ${humanizeMemory(value)}` })),
     ].filter(item => item.value).slice(0, 10);
   }, [loki.userMemory]);
 
@@ -129,7 +226,13 @@ export function LokiExperience({ loki }) {
   }, [contextKey]);
 
   useEffect(() => {
-    scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: 'smooth' });
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    if (conversation.length <= 1 && !loki.brainThinking) {
+      scroller.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
   }, [conversation, loki.brainThinking]);
 
   useEffect(() => () => {
@@ -185,20 +288,57 @@ export function LokiExperience({ loki }) {
         debug: { trace: typeof window !== 'undefined' ? window.__APG_LOKI_MESSAGE_TRACE__ || [] : [] },
       };
     }
-    const answerInspection = inspectLokiResponseText(result.text || 'Готово.');
+    const rawCards = result.cards?.length ? result.cards : result.card ? [result.card] : [];
+    const cards = filterCardsForQuestion(rawCards, question);
+    const resultText = cards.length !== rawCards.length && cards.length
+      ? `Нашёл ${cards.length === 1 ? 'одно подходящее место' : `${cards.length} подходящих места`}.\nЛучшее сейчас — «${getShortTitle(cards[0].title)}».`
+      : result.text || 'Готово.';
+    const answerInspection = inspectLokiResponseText(resultText);
     const answerText = answerInspection.text;
-    const cards = result.cards?.length ? result.cards : result.card ? [result.card] : [];
     setConversation(prev => [...prev, {
       id: `loki-${Date.now()}`,
       from: 'loki',
       text: answerText,
       cards,
       debug: result.debug ?? null,
+      taskSuccess: result.taskSuccess || null,
     }]);
     recordLokiMessageTrace('STEP 19 UI answer message added', { textLength: answerText.length, cardCount: cards.length });
     const action = result.executeAction || quickAction || (question.toLowerCase().includes('покажи') ? result.autoAction : null);
     if (options.speak) speak(answerText);
     if (action) setTimeout(() => loki.executeAction(action), 520);
+  };
+
+  const submitFeedback = (messageId, taskId, value, reason = '') => {
+    if (!taskId || !loki.recordTaskFeedback?.(taskId, value, reason)) return;
+    setConversation(prev => prev.map(item => item.id === messageId
+      ? { ...item, feedback: { value, reason } }
+      : item));
+    setFeedbackPromptId('');
+  };
+
+  const compareResults = (cards) => {
+    const comparison = compareLokiCards(cards);
+    if (comparison.length < 2) return;
+    setConversation(prev => [...prev, {
+      id: `compare-${Date.now()}`,
+      from: 'loki',
+      text: 'Сравнил главное. Выбирай по тому, что важнее сейчас.',
+      cards: [],
+      comparison,
+    }]);
+  };
+
+  const decideForUser = (cards) => {
+    const choice = chooseLokiCard(cards, loki.userMemory?.preferences);
+    if (!choice) return;
+    setConversation(prev => [...prev, {
+      id: `choice-${Date.now()}`,
+      from: 'loki',
+      text: `Я бы выбрал «${getShortTitle(choice.card.title)}».\n${choice.reason}.`,
+      cards: [choice.card],
+      decisionMade: true,
+    }]);
   };
 
   useEffect(() => {
@@ -255,11 +395,31 @@ export function LokiExperience({ loki }) {
         animation: 'lokiAppear var(--motion-modal, 320ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both',
       }}
     >
-      <div style={{ width: '100%', maxWidth: 480, height: '100%', margin: '0 auto', display: 'grid', gridTemplateRows: 'auto minmax(0,1fr) auto', padding: 'calc(var(--safe-top, 0px) + 12px) 14px calc(env(safe-area-inset-bottom, 0px) + 14px)', boxSizing: 'border-box', gap: 12 }}>
+      <style>{`
+        .loki-office-shell{width:100%;max-width:1080px;height:100%;margin:0 auto;display:grid;grid-template-rows:auto minmax(0,1fr) auto;padding:calc(var(--safe-top,0px) + 12px) 14px calc(env(safe-area-inset-bottom,0px) + 14px);box-sizing:border-box;gap:12px}
+        .loki-office-dashboard{display:grid;gap:12px}
+        .loki-office-welcome{display:grid;grid-template-columns:minmax(0,1fr) 150px;align-items:center;padding:18px 22px;border:1px solid rgba(215,184,106,.22);border-radius:30px;background:linear-gradient(135deg,rgba(87,62,26,.62),rgba(25,24,22,.86)),radial-gradient(circle at 84% 20%,rgba(215,184,106,.22),transparent 36%);box-shadow:0 24px 70px rgba(0,0,0,.22)}
+        .loki-office-welcome h1{font-size:clamp(24px,4vw,38px);line-height:1.05;margin:6px 0 8px;color:${APG2_PROFILE.text}}
+        .loki-office-welcome p{max-width:600px;margin:0;color:${APG2_PROFILE.textSoft};font-size:13px;line-height:19px}
+        .loki-office-welcome>div:last-child{width:140px;height:140px}
+        .loki-office-kicker{color:${APG2_PROFILE.gold};font-size:10px;line-height:14px;font-weight:900;letter-spacing:1.4px}
+        .loki-office-counters{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+        .loki-office-counters button,.loki-office-desk-grid button{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.055);color:${APG2_PROFILE.text};font:inherit;text-align:left;cursor:pointer}
+        .loki-office-counters button{min-height:76px;border-radius:22px;padding:12px;display:grid;grid-template-columns:auto 1fr;gap:2px 8px;align-items:center}
+        .loki-office-counters strong{font-size:22px}.loki-office-counters small{grid-column:2;color:${APG2_PROFILE.textMuted};font-weight:700}
+        .loki-office-proactive{width:100%;min-height:62px;border:1px solid rgba(215,184,106,.24);border-radius:20px;padding:10px 13px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;background:linear-gradient(135deg,rgba(215,184,106,.14),rgba(255,255,255,.045));color:${APG2_PROFILE.text};text-align:left;font:inherit;cursor:pointer}
+        .loki-office-proactive>span:first-child{font-size:22px}.loki-office-proactive>span:nth-child(2){display:grid;gap:2px}.loki-office-proactive strong{font-size:12.5px;line-height:16px}.loki-office-proactive small{color:${APG2_PROFILE.textMuted};font-size:10.5px;line-height:14px}.loki-office-proactive b{color:${APG2_PROFILE.gold};font-size:18px}
+        .loki-office-desk{padding:14px;border-radius:24px;border:1px solid rgba(128,82,38,.28);background:linear-gradient(145deg,rgba(73,42,18,.46),rgba(30,21,16,.45))}
+        .loki-office-desk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:9px}
+        .loki-office-desk-grid button{min-height:92px;border-radius:17px;padding:11px;display:grid;grid-template-columns:auto 1fr;align-content:start;gap:5px 8px}
+        .loki-office-desk-grid strong{font-size:12px;line-height:16px}.loki-office-desk-grid small{grid-column:1/-1;color:${APG2_PROFILE.textMuted};font-size:10.5px;line-height:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        @media(max-width:600px){.loki-office-shell{max-width:480px}.loki-office-welcome{grid-template-columns:1fr 96px;padding:15px}.loki-office-welcome>div:last-child{width:96px;height:96px}.loki-office-welcome>div:last-child>div{transform:scale(.68);transform-origin:center}.loki-office-desk-grid{grid-template-columns:1fr}.loki-office-desk-grid button{min-height:70px}.loki-office-counters button{min-height:68px;padding:9px}.loki-office-counters strong{font-size:18px}}
+      `}</style>
+      <div className="loki-office-shell">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div style={{ color: APG2_PROFILE.gold, fontSize: 13, lineHeight: '17px', fontWeight: 900 }}>Пространство Локи</div>
-            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '16px', fontWeight: 680 }}>Главный проводник по АПГ</div>
+            <div style={{ color: APG2_PROFILE.gold, fontSize: 13, lineHeight: '17px', fontWeight: 900 }}>Кабинет Локи</div>
+            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '16px', fontWeight: 680, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6FDB9A', boxShadow: '0 0 0 4px rgba(111,219,154,.12)' }} /> На связи · готов помочь</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {loki.settings.dockedToHeader && (
@@ -289,9 +449,10 @@ export function LokiExperience({ loki }) {
         </div>
 
         <div ref={scrollerRef} style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'grid', alignContent: 'start', gap: 12, paddingBottom: 4 }}>
-          <LokiAvatar thinking={loki.brainThinking || voiceState === 'thinking' || loki.action === LOKI_ACTIONS.LOOK_AROUND} listening={voiceState === 'listening'} speaking={voiceState === 'speaking'} />
+          {!activeNewsContext && <OfficeDashboard loki={loki} onAsk={ask} />}
+          {activeNewsContext && <LokiAvatar thinking={loki.brainThinking || voiceState === 'thinking' || loki.action === LOKI_ACTIONS.LOOK_AROUND} listening={voiceState === 'listening'} speaking={voiceState === 'speaking'} />}
           <div style={{ textAlign: 'center', display: 'grid', gap: 5 }}>
-            <div style={{ color: APG2_PROFILE.text, fontSize: 23, lineHeight: '28px', fontWeight: 900 }}>{activeNewsContext ? 'Обсуждаем новость' : 'Что сделаем?'}</div>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 23, lineHeight: '28px', fontWeight: 900 }}>{activeNewsContext ? 'Обсуждаем новость' : 'Спросите Локи'}</div>
             <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '18px', fontWeight: 650 }}>{voiceState === 'listening' ? 'Слушаю внимательно...' : voiceState === 'speaking' ? 'Отвечаю голосом и показываю результат.' : activeNewsContext ? `Контекст: «${getShortTitle(contextTitle)}». Можно задавать вопросы прямо по статье.` : 'Можно написать или сказать обычными словами. Я покажу результат, а не длинную инструкцию.'}</div>
           </div>
 
@@ -332,7 +493,7 @@ export function LokiExperience({ loki }) {
 
           {!!memoryChips.length && (
             <div style={{ ...APG2_PROFILE.glass, borderRadius: 20, padding: 10, display: 'grid', gap: 8, border: '1px solid rgba(215,184,106,0.13)' }}>
-              <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '15px', fontWeight: 860 }}>Личная память</div>
+              <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '15px', fontWeight: 860 }}>Локи помнит</div>
               <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
                 {memoryChips.map(item => (
                   <button
@@ -357,8 +518,59 @@ export function LokiExperience({ loki }) {
               {!!item.cards?.length && (
                 <div style={{ width: '100%', display: 'grid', gap: 8 }}>
                   {item.cards.slice(0, 3).map(card => (
-                    <ResultCard key={`${item.id}-${card.id}`} card={card} onOpen={() => card.action && loki.executeAction(card.action)} onAction={action => loki.executeAction(action)} />
+                    <ResultCard key={`${item.id}-${card.id}`} card={card} onOpen={() => card.action && loki.executeAction(card.action)} onAction={action => loki.executeAction(action)} onExternalAction={kind => loki.recordExternalTaskAction?.(kind)} />
                   ))}
+                </div>
+              )}
+              {!!item.comparison?.length && (
+                <div style={{ width: '100%', overflowX: 'auto', border: '1px solid rgba(215,184,106,.16)', borderRadius: 18, background: 'rgba(255,255,255,.035)' }}>
+                  <div style={{ minWidth: 520, display: 'grid', gridTemplateColumns: '1.5fr repeat(4,1fr)', fontSize: 10.5, lineHeight: '14px' }}>
+                    {['Вариант', 'Рейтинг', 'Расстояние', 'Цена', 'Выгода'].map(label => <strong key={label} style={{ padding: 9, color: APG2_PROFILE.gold, borderBottom: '1px solid rgba(255,255,255,.08)' }}>{label}</strong>)}
+                    {item.comparison.flatMap(row => [
+                      <span key={`${row.id}-title`} style={{ padding: 9, color: APG2_PROFILE.text, fontWeight: 800 }}>{getShortTitle(row.title)}</span>,
+                      <span key={`${row.id}-rating`} style={{ padding: 9, color: APG2_PROFILE.textMuted }}>{row.rating}</span>,
+                      <span key={`${row.id}-distance`} style={{ padding: 9, color: APG2_PROFILE.textMuted }}>{row.distance}</span>,
+                      <span key={`${row.id}-price`} style={{ padding: 9, color: APG2_PROFILE.textMuted }}>{row.price}</span>,
+                      <span key={`${row.id}-benefit`} style={{ padding: 9, color: APG2_PROFILE.textMuted }}>{row.benefit}</span>,
+                    ])}
+                  </div>
+                </div>
+              )}
+              {item.cards?.length > 1 && !item.decisionMade && (
+                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                  <button type="button" onClick={() => compareResults(item.cards)} style={{ minHeight: 34, borderRadius: 999, padding: '0 12px', border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.055)', color: APG2_PROFILE.textSoft, fontSize: 11, fontWeight: 800, fontFamily: 'inherit' }}>Сравнить</button>
+                  <button type="button" onClick={() => decideForUser(item.cards)} style={{ minHeight: 34, borderRadius: 999, padding: '0 12px', border: '1px solid rgba(215,184,106,.28)', background: 'rgba(215,184,106,.13)', color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, fontFamily: 'inherit' }}>Реши за меня</button>
+                </div>
+              )}
+              {item.from === 'loki' && item.taskSuccess?.id && (
+                <div style={{ width: '100%', display: 'grid', gap: 7, justifyItems: 'start', paddingLeft: 4 }}>
+                  {item.feedback ? (
+                    <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '15px', fontWeight: 700 }}>
+                      {item.feedback.value === 'positive' ? 'Спасибо — это поможет Локи стать точнее.' : 'Понял. Учту это в следующих рекомендациях.'}
+                    </span>
+                  ) : feedbackPromptId === item.id ? (
+                    <>
+                      <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '15px', fontWeight: 700 }}>Что оказалось не так?</span>
+                      <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {FEEDBACK_REASONS.map(([reason, label]) => (
+                          <button
+                            key={reason}
+                            type="button"
+                            onClick={() => submitFeedback(item.id, item.taskSuccess.id, 'negative', reason)}
+                            style={{ minHeight: 30, borderRadius: 999, padding: '0 10px', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2_PROFILE.textSoft, fontSize: 10.5, fontWeight: 760, fontFamily: 'inherit' }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </span>
+                    </>
+                  ) : (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '15px', fontWeight: 700 }}>Помогло?</span>
+                      <button type="button" aria-label="Ответ Локи помог" onClick={() => submitFeedback(item.id, item.taskSuccess.id, 'positive')} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid rgba(111,219,154,.22)', background: 'rgba(111,219,154,.08)', color: APG2_PROFILE.textSoft, fontSize: 14, fontFamily: 'inherit' }}>👍</button>
+                      <button type="button" aria-label="Ответ Локи не помог" onClick={() => setFeedbackPromptId(item.id)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', color: APG2_PROFILE.textSoft, fontSize: 14, fontFamily: 'inherit' }}>👎</button>
+                    </span>
+                  )}
                 </div>
               )}
               {showDebug && item.debug && (

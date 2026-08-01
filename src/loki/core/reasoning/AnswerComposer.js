@@ -13,7 +13,7 @@ function reasonText(reasons = []) {
 
 function confidenceIntro(confidence = {}) {
   if (confidence.value >= 80) return '';
-  return `Не уверен полностью (${confidence.label}). ${confidence.note}\n\n`;
+  return 'Показываю самые близкие варианты. ';
 }
 
 export function composeReasonedAnswer({ intent = {}, ranked = [], confidence = {}, suggestions = [], explanation = [], totalFound = 0 } = {}) {
@@ -26,13 +26,9 @@ export function composeReasonedAnswer({ intent = {}, ranked = [], confidence = {
   }
   const top = ranked[0];
   const topReasons = reasonText(top.reasons);
-  const next = suggestions.length ? `\n\nДальше: ${suggestions.map(item => item.label).join(', ')}.` : '';
-  const more = totalFound > ranked.length ? `\n\nНашёл ещё ${totalFound - ranked.length}. Могу показать, если нужно.` : '';
-  const alternativeText = ranked.slice(1, 3).map((item, index) => `${index + 2}. ${title(item)} — ${reasonText(item.reasons)}.`).join('\n');
-  const alternatives = alternativeText ? `\n\nЕщё варианты:\n${alternativeText}` : '';
   const why = explanation[0]?.reasons?.length ? explanation[0].reasons.join(', ') : topReasons;
   return {
-    text: `${confidenceIntro(confidence)}Лучше всего подойдёт «${title(top)}».\n\nПочему: ${why}.\n\n${alternativeText ? 'Я бы рекомендовал три варианта:' : 'Краткий вывод:'}\n1. ${title(top)} — ${topReasons}.${alternatives}${more}${next}`,
+    text: `${confidenceIntro(confidence)}Нашёл ${ranked.length} ${ranked.length === 1 ? 'вариант' : 'варианта'}.\nЛучше всего подойдёт «${title(top)}»: ${why}.`,
     card: top.card || null,
     cards: ranked.slice(0, 5).map(item => item.card).filter(Boolean),
   };
@@ -46,7 +42,7 @@ export function composeExplanation({ memoryContext = null } = {}) {
   return {
     intent: 'reasoning.explain_choice',
     preserveText: true,
-    text: `Я выбрал «${title(top)}», потому что:\n${reasons.length ? reasons.map(item => `• ${item.label || item}`).join('\n') : '• он лучше всего совпал с предыдущим запросом'}\n\nУверенность: ${top.confidence || memoryContext.confidence || 0}%.`,
+    text: `Я выбрал «${title(top)}».\n${reasons.length ? `Главное: ${reasons.slice(0, 2).map(item => item.label || item).join(', ')}.` : 'Он лучше всего совпал с запросом.'}`,
     card: null,
     cards: [],
   };

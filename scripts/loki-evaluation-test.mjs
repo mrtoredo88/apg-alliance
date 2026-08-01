@@ -67,7 +67,8 @@ await scenario('core attaches evaluation after decision', async () => {
   const source = readFileSync(new URL('../src/loki/core/LokiCore.js', import.meta.url), 'utf8');
   assert.ok(source.includes('runLokiEvaluationEngine'));
   assert.match(source, /pushDecisionTrace\(trace, [^)]+\);[\s\S]*?PersonalityEngine\.shape/);
-  assert.match(source, /applyEvaluation\(\{ question, result: shaped, context, trace \}\)/);
+  assert.match(source, /applyLokiResponsePolicy\(\{ question, result: shaped \}\)/);
+  assert.match(source, /applyEvaluation\(\{ question, result: policyReady, context, trace \}\)/);
   assert.ok(source.includes("module: 'evaluationEngine'"));
 });
 
@@ -89,6 +90,8 @@ await scenario('direct engine scores all required metrics', async () => {
   assert.ok(evaluation.evaluationMetrics.actionQuality.score >= 0);
   assert.ok(evaluation.evaluationMetrics.personalization.personalizationScore >= 0);
   assert.ok(evaluation.evaluationMetrics.conversationQuality.score >= 0);
+  assert.ok(evaluation.evaluationMetrics.taskSuccess.score >= 0);
+  assert.ok(evaluation.evaluationSnapshot.TaskSuccess >= 0);
   assert.ok(['LOW', 'MEDIUM', 'HIGH'].includes(evaluation.evaluationMetrics.hallucinationRisk.risk));
   assert.ok(evaluation.evaluationMetrics.confidence >= 0);
 });

@@ -103,7 +103,12 @@ assert.ok(journey.journeyContext.steps.length >= 5);
 assert.ok(journey.journeyContext.currentStep);
 assert.ok(journey.suggestions.length > 0 && journey.suggestions.length <= 3);
 assert.ok(journey.suggestions.every(item => item.action?.type || item.href));
-assert.match(journey.text, /Следующее действие:/);
+assert.doesNotMatch(journey.text, /Следующее действие:/);
+assert.ok(journey.text.split('\n').filter(Boolean).length <= 3);
+
+const coffeeResult = runLokiKnowledgeEngine({ text: 'Хочу вкусный кофе', appState, context: {} });
+assert.ok((coffeeResult.cards || []).some(card => /кофе/i.test(card.title)), 'Coffee intent must return a coffee place.');
+assert.ok((coffeeResult.cards || []).every(card => !/flowers|цвет/i.test(`${card.title} ${card.text}`)), 'Coffee intent must exclude flower shops.');
 
 const summary = runLokiKnowledgeEngine({
   text: 'Что мы уже сделали?',
@@ -136,7 +141,7 @@ const followUp = runLokiKnowledgeEngine({
 });
 assert.ok(followUp.intent.startsWith('journey.'));
 assert.ok(followUp.journeyContext);
-assert.ok(followUp.text.includes('Следующее действие'));
+assert.doesNotMatch(followUp.text, /Следующее действие/);
 
 const scenarioGroups = [
   { goal: JOURNEY_GOALS.BOOK_SERVICE, queries: ['хочу подстричься', 'запиши меня на стрижку', 'есть запись завтра', 'хочу на массаж', 'нужно забронировать услугу'] },
@@ -163,7 +168,7 @@ for (let i = 0; i < 25; i++) {
     if (result.intent?.startsWith('journey.')) {
       assert.ok(result.journeyContext || result.intent === 'journey.summary' || result.intent === 'journey.recovery', query);
       assert.ok((result.suggestions || []).length <= 3, query);
-      assert.ok(result.intent === 'journey.completed' || result.text.includes('Следующий шаг') || result.text.includes('Следующее действие') || result.text.includes('остановились'), query);
+      assert.doesNotMatch(result.text, /Следующее действие:/, query);
     }
     checked++;
   }

@@ -24,6 +24,7 @@ import { groupBookingsForProfile, normalizeBooking } from '../server-shared/book
 import { SOCIAL_PRIVACY, normalizeSocialPrivacy } from './messaging/ConversationEligibility.js';
 import { buildSocialMessagingDevPanel } from './messaging/SocialMessagingSnapshot.js';
 import { PEOPLE_RELATION_STATUS, PEOPLE_TABS, buildPeoplePulse, buildPeopleRows, peopleKind, peoplePresenceLabel, peopleStatusLabel, peopleSuggestionReason, personInterestTags, searchPeopleGroups } from './social/PeopleCore.js';
+import { GIFT_SHIMMER_STYLE, isGiftAction } from './giftShimmer.js';
 
 const AUTH_TRACE_KEY = 'apg_auth_trace';
 
@@ -2251,13 +2252,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                         gap: 5,
                         padding: 8,
                         fontSize: 12,
-                        ...(action.id === 'rewards' ? {
-                          borderColor: 'rgba(201,168,76,0.42)',
-                          background: 'linear-gradient(120deg, rgba(201,168,76,0.20) 0%, rgba(255,255,255,0.46) 42%, rgba(201,168,76,0.18) 62%, rgba(255,255,255,0.18) 100%)',
-                          backgroundSize: '250% 100%',
-                          animation: 'shimmer 1.7s ease-in-out infinite',
-                          boxShadow: '0 14px 30px rgba(201,168,76,0.14)',
-                        } : {}),
+                        ...(isGiftAction(action) ? GIFT_SHIMMER_STYLE : {}),
                       })}>
                         <span style={{ color: DP.gold, fontSize: 18 }}>{action.icon}</span>
                         <span>{action.label}</span>
@@ -2400,7 +2395,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                   key={action.label}
                   onClick={action.onClick}
                   tone={action.label === 'Кабинет партнера' ? 'gold' : 'glass'}
-                  style={{ minHeight: 40, color: action.label === 'Кабинет партнера' ? '#17120a' : undefined, gridColumn: action.label === 'Кабинет партнера' ? '1 / -1' : undefined }}
+                  style={{ minHeight: 40, color: action.label === 'Кабинет партнера' ? '#17120a' : undefined, gridColumn: action.label === 'Кабинет партнера' ? '1 / -1' : undefined, ...(isGiftAction(action) ? GIFT_SHIMMER_STYLE : {}) }}
                 >
                   <span>{action.icon}</span>{action.label}
                 </GlassButton>
@@ -3734,7 +3729,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             showWorkspaceDiagnosticButton && { icon: '🖥', label: 'Диагностика Workspace', action: () => setShowWorkspaceDiagnostics(true), right: workspaceDiagnostics?.currentMode },
             { icon: '⚙️', label: 'Настройки профиля',  action: () => setShowProfileEditor(true), right: null },
           ].filter(item => typeof item.action === 'function').map((item, i, arr) => (
-            <button key={item.label} onClick={item.action} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
+            <button key={item.label} onClick={item.action} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', ...(isGiftAction(item) ? GIFT_SHIMMER_STYLE : {}) }}>
               <span style={{ fontSize: 20 }}>{item.icon}</span>
               <span style={{ fontSize: 15, color: APG2.text, fontWeight: 500 }}>{item.label}</span>
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>

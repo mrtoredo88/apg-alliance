@@ -6,6 +6,14 @@ const BLOCKING_TECHNICAL_PATTERNS = [
   /TypeError|ReferenceError|Unhandled Promise|Promise rejected/i,
 ];
 
+const USER_HIDDEN_LINES = [
+  /^(?:уч[её]л|учитываю) текущие данные/i,
+  /^по актуальным данным/i,
+  /^первый запуск прош[её]л/i,
+  /^система готова/i,
+  /^следующее действие\s*:/i,
+];
+
 const INLINE_TECHNICAL_PATTERNS = [
   /\bundefined\b|\bnull\b|\[object Object\]/gi,
 ];
@@ -45,7 +53,9 @@ export function normalizeLokiResponseText(value, { maxLength = 900 } = {}) {
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  const lines = removeDuplicateLines(normalized.split('\n'));
+  const lines = removeDuplicateLines(normalized.split('\n'))
+    .filter(line => !USER_HIDDEN_LINES.some(pattern => pattern.test(line)))
+    .slice(0, 3);
   const text = lines.join('\n').trim() || LOKI_USER_FALLBACK_TEXT;
   return text.length > maxLength ? `${text.slice(0, maxLength).trim()}...` : text;
 }
