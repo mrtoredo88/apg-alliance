@@ -31,8 +31,10 @@ const WELCOME_TEXT =
 
 const LINKS_TEXT = '📌 Все наши площадки:';
 const TELEGRAM_FETCH_TIMEOUT_MS = 3500;
-const TELEGRAM_POLL_TIMEOUT_MS = 8000;
+const TELEGRAM_SEND_TIMEOUT_MS = 12000;
+const TELEGRAM_POLL_TIMEOUT_MS = 12000;
 const TELEGRAM_POLL_ATTEMPTS = 2;
+const TELEGRAM_SEND_ATTEMPTS = 2;
 const TELEGRAM_UPDATE_PROCESS_ATTEMPTS = 3;
 
 function safeDebugString(value, max = 280) {
@@ -135,11 +137,29 @@ async function telegramPollFetch(url, options = {}, log = console) {
 async function tgSend(chatId, text, extra = {}, log = console) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   try {
-    const response = await telegramFetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ chat_id: chatId, text, ...extra }),
-    }, 'send_message');
+    let response = null;
+    let lastFetchError = null;
+    for (let attempt = 1; attempt <= TELEGRAM_SEND_ATTEMPTS; attempt += 1) {
+      try {
+        response = await telegramFetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ chat_id: chatId, text, ...extra }),
+        }, 'send_message', TELEGRAM_SEND_TIMEOUT_MS);
+        break;
+      } catch (error) {
+        lastFetchError = error;
+        log.warn?.({
+          stage: 'telegram_send_retry',
+          chatIdHash: telegramIdHash(chatId),
+          attempt,
+          attempts: TELEGRAM_SEND_ATTEMPTS,
+          errorCode: safeDebugString(error?.code || error?.cause?.code, 120) || null,
+        }, 'telegram-send-forensic');
+        if (attempt < TELEGRAM_SEND_ATTEMPTS) await new Promise(resolve => setTimeout(resolve, attempt * 200));
+      }
+    }
+    if (!response) throw lastFetchError || Object.assign(new Error('send_message:no_response'), { code: 'TELEGRAM_SEND_FAILED' });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload?.ok === false) {
       log.warn?.({
@@ -640,10 +660,10 @@ export async function processTelegramUpdate(db, update, log = console) {
 
 // Poll-модель вместо webhook: входящий путь Telegram → Yandex Cloud ненадёжен
 // (getWebhookInfo: connection timed out; доставка с опозданием в десятки минут).
-// The warm production instance polls every 5 seconds. Keep the distributed
-// lock only slightly longer than one cycle so a terminated request cannot
-// silence the bot for another half minute.
-const POLL_LOCK_MS = 8000;
+// Background polling handles commands quickly; the external minute timer is a
+// lifecycle watchdog. The lock covers the full network retry window so an auth
+// check and watchdog cannot issue conflicting getUpdates calls.
+const POLL_LOCK_MS = 28000;
 const POLL_STATE_REF = db => db.collection('config').doc('telegramPolling');
 
 export async function pollTelegramUpdates(db, log = console) {

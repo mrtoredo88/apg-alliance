@@ -95,7 +95,7 @@ echo "Published image digest: $IMAGE_DIGEST"
 yc serverless container revision deploy \
   --container-name apg-api \
   --image "$IMAGE_URI" \
-  --cores 1 --core-fraction 20 --memory 512MB --execution-timeout 30s \
+  --cores 1 --core-fraction 20 --memory 512MB --execution-timeout 60s \
   --concurrency 16 --min-instances 1 --zone-instances-limit 1 \
   --network-id enpa19j9jpki1f67p6kq \
   --service-account-id ajegfv96md2tqri8gjdp \
@@ -107,7 +107,7 @@ yc serverless container revision deploy \
   --environment ACTIVITY_SECRET="$(get_env ACTIVITY_SECRET)" \
   --environment TELEGRAM_BOT_TOKEN="$(get_env TELEGRAM_BOT_TOKEN)" \
   --environment TELEGRAM_WEBHOOK_SECRET="$(get_env PUSH_SECRET)" \
-  --environment TELEGRAM_DELIVERY_MODE=timer \
+  --environment TELEGRAM_DELIVERY_MODE=background \
   --environment VK_SERVICE_TOKEN="$(get_env VK_SERVICE_TOKEN)" \
   --environment VK_USER_TOKEN="$(get_env VK_USER_TOKEN)" \
   --environment VK_GROUP_TOKEN="$(get_env VK_GROUP_TOKEN)" \
