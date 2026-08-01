@@ -5327,49 +5327,15 @@ async function actionConnectionsSearch(db, req, actor) {
   const query = safeString(req.body?.query, 120).toLowerCase().replace(/ё/g, 'е');
   if (query.length === 1) return { ok: true, people: [] };
   const adapter = postgresSocialAdapter();
-  if (adapter) {
-    const [accountRows, requests] = await Promise.all([
-      searchAccountProfilesForConnections(query, actor.userId),
-      postgresConnectionsForUser(adapter, actor.userId),
-    ]);
-    const people = (accountRows || []).filter(row => !isArchivedUser(row)).slice(0, query ? 40 : 700).map(row => {
-      const aliases = Array.from(new Set([row.id, row.canonicalUserId, ...(row.identityAliases || [])].map(cleanSocialId).filter(Boolean)));
-      const request = requests.find(item => {
-        const otherId = item.senderId === actor.userId ? item.recipientId : item.senderId;
-        return aliases.includes(otherId);
-      }) || null;
-      const status = request?.status === SOCIAL_REQUEST_STATUS.ACCEPTED
-        ? CONNECTION_STATUS.CONNECTED
-        : request?.status === SOCIAL_REQUEST_STATUS.PENDING
-          ? CONNECTION_STATUS.PENDING
-          : 'stranger';
-      return {
-        ...socialPublicUser(row, row.id),
-        identityAliases: aliases,
-        username: safeString(row.username, 80),
-        company: safeString(row.company || row.companyName || row.organization || row.partnerName || row.expertName, 160),
-        city: safeString(row.city || row.town, 120),
-        about: safeString(row.about || row.bio || row.description, 240),
-        status,
-        direction: request ? socialRequestMirror(request, actor.userId).direction : '',
-        dialogId: request?.dialogId || '',
-        shared: buildConnectionSharedContext(actor.user || {}, row),
-      };
-    });
-    return { ok: true, people };
-  }
-  const [accountRows, usersSnap, requests, contactsSnap, blockedSnap] = await Promise.all([
-    searchAccountProfilesForConnections(query, actor.userId).catch(error => {
-      serverFoundation.account.metrics.recordError(error);
-      return null;
-    }),
-    db.collection('users').limit(700).get(),
-    querySocialRequestsForUser(db, actor.userId).catch(() => []),
+  const [usersSnap, requests, contactsSnap] = await Promise.all([
+    db.collection('users').limit(1000).get(),
+    (adapter
+      ? postgresConnectionsForUser(adapter, actor.userId)
+      : querySocialRequestsForUser(db, actor.userId)
+    ).catch(() => []),
     db.collection('users').doc(actor.userId).collection('connections').limit(300).get().catch(() => null),
-    db.collection('users').doc(actor.userId).collection('blockedUsers').limit(100).get().catch(() => null),
   ]);
   const contacts = (contactsSnap?.docs || []).map(doc => ({ id: doc.id, ...doc.data() }));
-  const blocked = new Set((blockedSnap?.docs || []).map(doc => String(doc.id || doc.data()?.blockedUserId || '')).filter(Boolean));
   const connected = new Set(contacts
     .filter(item => normalizeConnectionStatus(item.status) === CONNECTION_STATUS.CONNECTED)
     .map(item => String(item.contactUserId || item.id || ''))
@@ -5380,26 +5346,17 @@ async function actionConnectionsSearch(db, req, actor) {
     .forEach(item => {
       [item.senderId, item.recipientId].map(String).filter(id => id && id !== String(actor.userId)).forEach(id => pendingByUser.set(id, item));
     });
-  const accountMatches = (Array.isArray(accountRows) ? accountRows : [])
-    .filter(row => !blocked.has(String(row.id)) && !(row.identityAliases || []).some(id => blocked.has(String(id))))
-    .filter(row => row.id !== actor.userId);
-  const usersMatches = Array.isArray(accountRows) ? [] : (usersSnap?.docs || [])
-      .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
-      .filter(row => row.id !== actor.userId && !blocked.has(String(row.id)) && !isArchivedUser(row))
-      .filter(row => !isLegacyOwnerPlaceholder(row))
-      .filter(row => publicUserSearchText(row, row.id).includes(query))
-      .filter(row => !(row.identityAliases || []).some(id => blocked.has(String(id))))
-      .slice(0, query ? 80 : 700);
-  const matchedRows = [
-    ...accountMatches,
-    ...usersMatches,
-  ];
-  const dedupedRows = await dedupeSocialSearchRows(db, matchedRows);
-  const people = dedupedRows
-    .filter(({ row }) => !isArchivedUser(row))
-    .filter(({ canonicalId, aliases }) => canonicalId !== actor.userId && !(aliases || []).includes(actor.userId))
+  // Keep this predicate identical to AdminUsersPanel's "Активные" view.
+  // The main users collection is the source of truth; account-core aliases must
+  // never add historical or merged profiles back to the People directory.
+  const activeUsers = (usersSnap?.docs || [])
+    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+    .filter(row => !row.archived && !row.mergedInto && row.accountStatus !== 'archived')
+    .filter(row => publicUserSearchText(row, row.id).includes(query));
+  const people = activeUsers
     .slice(0, query ? 40 : 700)
-    .map(({ row, canonicalId, aliases }) => {
+    .map(row => {
+    const aliases = Array.from(new Set([row.id, ...(row.identityAliases || [])].map(cleanSocialId).filter(Boolean)));
     const aliasSet = new Set(aliases.map(String));
     const pending = aliases.map(id => pendingByUser.get(String(id))).find(Boolean);
     const contact = contacts.find(item => aliasSet.has(String(item.contactUserId || item.id || '')));
@@ -5409,7 +5366,7 @@ async function actionConnectionsSearch(db, req, actor) {
         ? SOCIAL_REQUEST_STATUS.PENDING
         : 'stranger';
     return {
-      ...socialPublicUser(row, canonicalId || row.id),
+      ...socialPublicUser(row, row.id),
       identityAliases: aliases,
       username: safeString(row.username, 80),
       company: safeString(row.company || row.companyName || row.organization || row.partnerName || row.expertName, 160),

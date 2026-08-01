@@ -209,24 +209,25 @@ export function relationStatusForPerson(person = {}, { connections = [], request
     : PEOPLE_RELATION_STATUS.OUTGOING;
 }
 
-export function buildPeopleRows({ users = [], connections = [], requests = [], dialogs = [], blocked = [], actor = {} } = {}) {
+export function buildPeopleRows({ users = [], connections = [], requests = [], dialogs = [], blocked = [], actor = {}, restrictToUsers = false } = {}) {
   const actorId = idOf(actor);
+  const directoryIds = new Set(list(users).map(idOf).filter(Boolean));
   const byId = new Map();
-  const upsert = (person, patch = {}) => {
+  const upsert = (person, patch = {}, allowNew = true) => {
     const id = idOf(person);
-    if (!id || id === actorId) return;
+    if (!id || id === actorId || (!allowNew && !directoryIds.has(id))) return;
     byId.set(id, { ...(byId.get(id) || publicPerson(person, id)), ...publicPerson(person, id), ...patch });
   };
   list(users).forEach(user => upsert(user, { status: user.status, direction: user.direction, dialogId: user.dialogId || '', shared: user.shared || null }));
-  list(connections).forEach(row => upsert(row.contact || row, { connection: row, dialogId: row.dialogId || '', shared: row.shared || null, lastActivityAt: row.lastMessageAt || row.connectedAt || row.updatedAt || '' }));
+  list(connections).forEach(row => upsert(row.contact || row, { connection: row, dialogId: row.dialogId || '', shared: row.shared || null, lastActivityAt: row.lastMessageAt || row.connectedAt || row.updatedAt || '' }, !restrictToUsers));
   list(requests).forEach(row => {
     const person = String(row.senderId) === String(actorId) ? row.recipient : row.sender;
-    upsert(person || row, { request: row, dialogId: row.dialogId || '', lastActivityAt: row.updatedAt || row.createdAt || '' });
+    upsert(person || row, { request: row, dialogId: row.dialogId || '', lastActivityAt: row.updatedAt || row.createdAt || '' }, !restrictToUsers);
   });
   list(dialogs).forEach(dialog => {
     const participants = list(dialog.participants || dialog.context?.participants);
     const directUser = participants.find(item => idOf(item) && idOf(item) !== actorId);
-    if (dialog.type === 'direct' || dialog.context?.type === 'direct') upsert(directUser || { id: dialog.context?.targetUserId || dialog.objectId, displayName: dialog.context?.title }, { dialog, dialogId: dialog.id || dialog.dialogId, lastActivityAt: dialog.lastMessageAt || dialog.updatedAt || '' });
+    if (dialog.type === 'direct' || dialog.context?.type === 'direct') upsert(directUser || { id: dialog.context?.targetUserId || dialog.objectId, displayName: dialog.context?.title }, { dialog, dialogId: dialog.id || dialog.dialogId, lastActivityAt: dialog.lastMessageAt || dialog.updatedAt || '' }, !restrictToUsers);
   });
   return [...byId.values()].map(row => ({
     ...row,

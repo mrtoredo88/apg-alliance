@@ -1713,6 +1713,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     dialogs: peopleDialogs,
     blocked: socialBlockedIds,
     actor: user,
+    restrictToUsers: true,
   }), [connectionRequests, connections, peopleDialogs, peopleSearchResults, socialBlockedIds, user]);
   const peopleGroups = useMemo(() => searchPeopleGroups({
     query: peopleSearch,
