@@ -1,5 +1,4 @@
 import { getDb } from '../lib/documentStore.js';
-import { pollTelegramUpdates } from '../lib/telegramUpdates.js';
 import { serverFoundation } from '../apg/index.js';
 
 function safeString(value, max = 220) {
@@ -134,10 +133,6 @@ export default async function telegramAuthCheckRoutes(fastify) {
     const deadline = Date.now() + 6_000;
 
     while (Date.now() < deadline) {
-      // Push-доставка Telegram → Yandex ненадёжна: пока клиент ждёт авторизацию,
-      // сами забираем апдейты бота — /start auth_* обрабатывается за ~1-2 секунды
-      await pollTelegramUpdates(db, fastify.log).catch(() => {});
-
       const snap = await ref.get();
 
       if (!snap.exists) return {
