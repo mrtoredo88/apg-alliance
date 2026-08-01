@@ -53,7 +53,8 @@ export default async function mergedAccountMaintenanceRoutes(fastify) {
     previews.sort((left, right) => (right.chain?.length || 0) - (left.chain?.length || 0));
     const results = [];
     for (const preview of previews) {
-      results.push(await purgeMergedAccount({ sourceId: preview.sourceId, stateToken: preview.stateToken, actorId: 'maintenance-approved-owner', reason }));
+      const freshPreview = (await previewMergedAccountCleanup([preview.sourceId]))[0];
+      results.push(await purgeMergedAccount({ sourceId: freshPreview.sourceId, stateToken: freshPreview.stateToken, actorId: 'maintenance-approved-owner', reason }));
     }
     return reply.send({ ok: true, purged: results.length, results: results.map(item => ({ sourceHash: hash(item.sourceId), targetHash: hash(item.targetId), snapshotId: item.snapshotId, movedReferences: item.movedReferences, movedNested: item.movedNested })) });
   });
