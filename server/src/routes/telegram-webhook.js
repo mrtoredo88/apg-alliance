@@ -16,7 +16,7 @@ export default async function telegramWebhookRoutes(fastify) {
       text: messageText,
     }, 'telegram-webhook-forensic');
     const db = getDb();
-    await processTelegramUpdate(db, payload, request.log).catch(error => {
+    void processTelegramUpdate(db, payload, request.log).catch(error => {
       request.log.warn({ message: error?.message || String(error) }, 'telegram webhook processing failed');
     });
     return { ok: true };
