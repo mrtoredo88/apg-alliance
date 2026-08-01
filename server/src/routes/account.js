@@ -170,7 +170,11 @@ export default async function accountRoutes(fastify) {
       const sessionUserId = safeString(sessionIdentity?.id || decoded.uid, 260);
       const legacyAccount = sessionUserId ? await getDb().collection('users').doc(sessionUserId).get().catch(() => null) : null;
       const legacyData = legacyAccount?.exists ? legacyAccount.data() || {} : {};
-      const mergedInto = safeString(legacyData.mergedInto || legacyData.dataMigratedInto || '', 260);
+      const aliasAccount = !legacyAccount?.exists && sessionUserId
+        ? await getDb().collection('accountAliases').doc(sessionUserId).get().catch(() => null)
+        : null;
+      const aliasData = aliasAccount?.exists ? aliasAccount.data() || {} : {};
+      const mergedInto = safeString(legacyData.mergedInto || legacyData.dataMigratedInto || aliasData.canonicalUserId || '', 260);
       if (mergedInto && mergedInto !== sessionUserId) {
         await serverFoundation.account.linkMergedAccounts({
           targetId: mergedInto,

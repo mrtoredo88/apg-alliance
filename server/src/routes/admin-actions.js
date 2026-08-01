@@ -27,6 +27,7 @@ import { buildReferralMonitoring, referralAlertsToCsv } from '../../../server-sh
 import { buildReferralRecoveryScanPlan, summarizeReferralRecoveryPlan } from '../../../server-shared/referral-state-recovery.js';
 import { buildDuplicateGroups, mergeUserProfiles } from '../../../server-shared/admin-user-duplicates.js';
 import { findUserReferences } from '../../../server-shared/admin-user-references.js';
+import { previewMergedAccountCleanup, purgeMergedAccount } from '../lib/mergedAccountCleanup.js';
 
 const NEWS_FIELDS = new Set(['title', 'subtitle', 'summary', 'text', 'fullText', 'author', 'sourceName', 'source', 'expiresAt', 'tags', 'emoji', 'imageUrl', 'coverPhoto', 'photos', 'photoItems', 'gallery', 'videos', 'links', 'socialLinks', 'contentBlocks', 'faq', 'ctaButtons', 'docs', 'linkUrl', 'linkLabel', 'priority', 'category', 'publicationType', 'timelineType', 'distributionMode', 'visibility', 'publishScope', 'apgPublication', 'profileOnly', 'active', 'status', 'publishedAt', 'pinned', 'isPinned', 'commentsEnabled', 'linksCheckedAt', 'adminComment']);
 
@@ -399,6 +400,34 @@ async function handleUserAccountsAction(db, request, actor) {
       await writeAuditLog(db, request, actor, action, 'users', targetId, { label: `Объединены аккаунты в ${targetId}`, reason, snapshotId: snapshotRef.id, ...preview });
       return { ok: true, preview, snapshotId: snapshotRef.id };
     });
+  }
+
+  if (action === 'user-accounts:purge-preview') {
+    await requireAdminPermission(request, 'users:delete');
+    if (String(actor?.role || '').toLowerCase() !== 'owner') throw Object.assign(new Error('Очистка объединённых аккаунтов доступна только owner.'), { statusCode: 403 });
+    if (!userIds.length || userIds.length > 20) throw Object.assign(new Error('Выберите от 1 до 20 объединённых архивных аккаунтов.'), { statusCode: 400 });
+    const previews = await previewMergedAccountCleanup(userIds);
+    return { ok: true, previews, safeToPurge: previews.every(item => item.safeToPurge) };
+  }
+
+  if (action === 'user-accounts:purge') {
+    await requireAdminPermission(request, 'users:delete');
+    if (String(actor?.role || '').toLowerCase() !== 'owner') throw Object.assign(new Error('Очистка объединённых аккаунтов доступна только owner.'), { statusCode: 403 });
+    const reason = String(request.body?.reason || '').trim();
+    const confirmations = Array.isArray(request.body?.confirmations) ? request.body.confirmations : [];
+    if (!confirmations.length || confirmations.length > 20) throw Object.assign(new Error('Перед удалением выполните preview.'), { statusCode: 400 });
+    if (reason.length < 3) throw Object.assign(new Error('Укажите причину окончательной очистки.'), { statusCode: 400 });
+    const results = [];
+    for (const confirmation of confirmations) {
+      results.push(await purgeMergedAccount({
+        sourceId: String(confirmation?.sourceId || ''),
+        stateToken: String(confirmation?.stateToken || ''),
+        actorId: actor.userId || actor.uid,
+        reason,
+      }));
+    }
+    await writeAuditLog(db, request, actor, action, 'users', results.map(item => item.sourceId).join(','), { label: `Безопасно очищено объединённых аккаунтов: ${results.length}`, reason, results });
+    return { ok: true, results };
   }
 
   if (action === 'user-accounts:delete') {

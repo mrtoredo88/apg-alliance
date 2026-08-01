@@ -2212,6 +2212,45 @@ export function AdminUsersPanel({ users, activity = [], onAction, onRefresh, can
   };
 
   const deleteSelected = async () => {
+    const selectedUsers = users.filter(user => selectedIds.includes(user.id));
+    const mergedUsers = selectedUsers.filter(user => user.mergedInto || user.dataMigratedInto || user.accountStatus === 'merged');
+    if (mergedUsers.length > 0) {
+      if (mergedUsers.length !== selectedUsers.length) {
+        setNotice('Объединённые aliases и обычные архивные аккаунты нужно удалять отдельно.');
+        return;
+      }
+      setBusy(true);
+      setNotice('Проверяем связи и вложенные данные...');
+      try {
+        const previewResult = await onAction('user-accounts:purge-preview', { userIds: selectedIds });
+        const previews = Array.isArray(previewResult.previews) ? previewResult.previews : [];
+        const conflicts = previews.reduce((sum, item) => sum + Number(item.nestedConflicts?.length || 0), 0);
+        if (!previewResult.safeToPurge || conflicts > 0) {
+          setNotice(`Очистка остановлена: конфликтов вложенных данных — ${conflicts}. Данные не изменены.`);
+          return;
+        }
+        const moved = previews.reduce((sum, item) => sum + Number(item.movableReferences?.length || 0) + Number(item.nested?.length || 0), 0);
+        const check = prompt(`Проверка пройдена. Будет перенесено связей: ${moved}. Перед удалением создастся восстановимый снимок. Введите ОЧИСТИТЬ ${selectedIds.length}.`);
+        if (check !== `ОЧИСТИТЬ ${selectedIds.length}`) {
+          setNotice('Очистка отменена.');
+          return;
+        }
+        const reason = prompt('Укажите причину безопасной очистки объединённых аккаунтов.');
+        if (!reason?.trim()) return;
+        const result = await onAction('user-accounts:purge', {
+          confirmations: previews.map(item => ({ sourceId: item.sourceId, stateToken: item.stateToken })),
+          reason: reason.trim(),
+        });
+        setNotice(`Очищено объединённых аккаунтов: ${result.results?.length || 0}. Alias входа и снимки сохранены.`);
+        setSelectedIds([]);
+        await onRefresh?.();
+      } catch (error) {
+        setNotice(error.message || 'Безопасная очистка не выполнена.');
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     const check = prompt(`Окончательное удаление необратимо. Введите УДАЛИТЬ ${selectedIds.length}, чтобы продолжить.`);
     if (check !== `УДАЛИТЬ ${selectedIds.length}`) return;
     const reason = prompt('Укажите причину окончательного удаления.');
