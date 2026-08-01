@@ -6,6 +6,14 @@ function safeString(value, max = 220) {
   return String(value ?? '').trim().slice(0, max);
 }
 
+export function isTransientIdentityDatabaseError(error) {
+  const code = safeString(error?.code || error?.statusCode || '', 40);
+  const message = safeString(error?.message || error || '', 500).toLowerCase();
+  return code === '53300'
+    || message.includes('too many active clients')
+    || message.includes('remaining connection slots are reserved');
+}
+
 function buildTelegramAuthDiagnostics(source = {}) {
   return {
     stage: source.stage || 'unknown',
@@ -290,6 +298,17 @@ export default async function telegramAuthCheckRoutes(fastify) {
             }),
           };
         } catch (error) {
+          if (isTransientIdentityDatabaseError(error) && Date.now() + 350 < deadline) {
+            request.log.warn?.({
+              stage: 'telegram_auth_check_identity_retry',
+              state,
+              requestId: resolvedRequestId,
+              code: error?.code || null,
+              retryAfterMs: 300,
+            }, 'telegram-auth-check-forensic');
+            await new Promise(resolve => setTimeout(resolve, 300));
+            continue;
+          }
           request.log.warn?.({
             stage: 'telegram_auth_check_done_custom_token_failed',
             state,

@@ -40,12 +40,13 @@ export class PostgresIdentityAdapter {
     if (!this.pool) {
       this.pool = new Pool({
         connectionString: this.config.connectionString,
-        // Odyssey limits this database user to 8 clients. All server
-        // repositories share this adapter, so two connections are enough for
-        // one serverless instance without exhausting the database proxy.
-        max: Math.max(1, Number(process.env.APG_IDENTITY_POOL_SIZE || 2)),
-        idleTimeoutMillis: 20_000,
-        connectionTimeoutMillis: 4_000,
+        // Odyssey limits this database user to 8 clients. A serverless rollout
+        // can briefly keep several warm revisions alive, and the document and
+        // identity repositories each own an adapter. One connection per
+        // adapter leaves enough headroom for overlapping revisions.
+        max: Math.max(1, Number(process.env.APG_IDENTITY_POOL_SIZE || 1)),
+        idleTimeoutMillis: 8_000,
+        connectionTimeoutMillis: 10_000,
         ssl: process.env.APG_IDENTITY_PG_SSL === '0' ? false : { rejectUnauthorized: false },
       });
       this.pool.on('error', error => {

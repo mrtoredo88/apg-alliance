@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { resolve } from 'node:path';
-import { compareSessionIds } from '../server/src/routes/telegram-auth-check.js';
+import { compareSessionIds, isTransientIdentityDatabaseError } from '../server/src/routes/telegram-auth-check.js';
 
 const read = file => fs.readFileSync(resolve(file), 'utf8');
 const start = read('server/src/routes/telegram-auth-start.js');
@@ -23,6 +23,7 @@ assert.match(updates, /failed \+= 1;[\s\S]*break;/, 'a failed update is retained
 assert.match(updates, /conflict:\s*res\.error_code === 409/, 'webhook and polling conflict is detected');
 assert.match(postgresAdapter, /client\.on\('error', onClientError\)/, 'checked-out PostgreSQL clients cannot crash the Telegram poller process');
 assert.match(postgresAdapter, /client\.removeListener\('error', onClientError\)/, 'transaction client listener is cleaned up before release');
+assert.match(postgresAdapter, /APG_IDENTITY_POOL_SIZE \|\| 1/, 'serverless adapters default to one PostgreSQL connection');
 assert.match(webhook, /await processTelegramUpdate\(db, payload, request\.log\)/, 'webhook must finish Telegram processing before the serverless request returns');
 assert.match(webhook, /x-telegram-bot-api-secret-token/, 'webhook validates the Telegram secret token');
 assert.match(check, /status:\s*'expired'[\s\S]*stage:\s*'done_expired'/, 'expired sessions return a clear status and diagnostic stage');
@@ -34,5 +35,8 @@ const session = { requestId: 'req-1', loginSessionId: 'login-1', telegramSession
 assert.deepEqual(compareSessionIds(session, session), [], 'matching auth-check correlation succeeds');
 assert.deepEqual(compareSessionIds({ state: 'state-1' }, session), [], 'reload may restore by state without inventing mismatches');
 assert.equal(compareSessionIds({ ...session, requestId: 'req-other' }, session)[0]?.key, 'requestId', 'explicit requestId mismatch is intentional');
+assert.equal(isTransientIdentityDatabaseError({ code: '53300', message: 'too many active clients' }), true, 'Odyssey pool exhaustion is retryable');
+assert.equal(isTransientIdentityDatabaseError({ code: '23505', message: 'duplicate key' }), false, 'identity conflicts are not retried as pool failures');
+assert.match(check, /telegram_auth_check_identity_retry[\s\S]*continue;/, 'completed Telegram auth retries transient PostgreSQL exhaustion');
 
 console.log('telegram-auth-production-path PASS');
