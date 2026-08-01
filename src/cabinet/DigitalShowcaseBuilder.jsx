@@ -81,7 +81,7 @@ function SaveState({ state }) {
   return <GlassBadge tone={state === 'saved' ? 'gold' : 'glass'}>{state === 'saved' ? '✓ ' : state === 'dirty' ? '• ' : ''}{label}</GlassBadge>;
 }
 
-function ShowcaseTab({ draft, update, roleId, publicUrl }) {
+function ShowcaseTab({ draft, update, roleId, publicUrl, onOpenPublicCard }) {
   return (
     <GlassSection title="Витрина">
       <EntityPreviewCard type={roleId === 'expert' ? 'expert' : 'partner'} item={{ ...draft, offer: draft.slogan, specialization: draft.shortDescription }} compact />
@@ -97,7 +97,7 @@ function ShowcaseTab({ draft, update, roleId, publicUrl }) {
         </div>
         <Field label="Адрес"><GlassInput value={draft.address} onChange={e => update({ address: e.target.value })} style={inputStyle} /></Field>
         <Field label="Часы работы"><GlassInput value={draft.hours} onChange={e => update({ hours: e.target.value })} style={inputStyle} placeholder="Пн-Пт 10:00-20:00" /></Field>
-        {publicUrl && <GlassButton onClick={() => window.open(publicUrl, '_blank')} style={{ width: '100%' }}>Открыть публичную карточку</GlassButton>}
+        {publicUrl && <GlassButton onClick={onOpenPublicCard} style={{ width: '100%' }}>Открыть публичную карточку</GlassButton>}
       </div>
     </GlassSection>
   );
@@ -426,7 +426,7 @@ function AnalyticsTab({ analytics }) {
   );
 }
 
-function ClientViewTab({ draft, roleId, publicUrl }) {
+function ClientViewTab({ draft, roleId, publicUrl, onOpenPublicCard }) {
   return (
     <GlassSection title="Как видят клиенты">
       <EntityPreviewCard type={roleId === 'expert' ? 'expert' : 'partner'} item={{ ...draft, offer: draft.slogan, specialization: draft.shortDescription }} />
@@ -436,7 +436,7 @@ function ClientViewTab({ draft, roleId, publicUrl }) {
         <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 12 }}>
           {[draft.phone && 'Телефон', draft.address && 'Адрес', draft.telegramUrl && 'Telegram', draft.websiteUrl && 'Сайт', draft.bookingUrl && 'Запись'].filter(Boolean).map(item => <GlassBadge key={item}>{item}</GlassBadge>)}
         </div>
-        {publicUrl && <GlassButton onClick={() => window.open(publicUrl, '_blank')} tone="gold" style={{ width: '100%', marginTop: 12, color: '#17120a' }}>Открыть как клиент</GlassButton>}
+        {publicUrl && <GlassButton onClick={onOpenPublicCard} tone="gold" style={{ width: '100%', marginTop: 12, color: '#17120a' }}>Открыть как клиент</GlassButton>}
       </GlassCard>
     </GlassSection>
   );
@@ -468,7 +468,7 @@ function LokiTab({ tips, onOpenTab }) {
   );
 }
 
-export function DigitalShowcaseBuilder({ role, profile, relatedEvents = [], onSaved, onOpenModule, onEventCreated, onToast, publicUrl, focusTab, onCompletionChange }) {
+export function DigitalShowcaseBuilder({ role, profile, relatedEvents = [], onSaved, onOpenModule, onEventCreated, onToast, publicUrl, onOpenPublicCard, focusTab, onCompletionChange }) {
   const roleId = role?.id || 'partner';
   const draftKey = profile?.id ? `apg_showcase_draft_${roleId}_${profile.id}` : '';
   const [activeTab, setActiveTab] = useState('showcase');
@@ -576,14 +576,14 @@ export function DigitalShowcaseBuilder({ role, profile, relatedEvents = [], onSa
   }, [focusTab?.tab, focusTab?.nonce, visibleTabs]);
 
   const renderTab = () => {
-    if (activeTab === 'showcase') return <ShowcaseTab draft={draft} update={update} roleId={roleId} publicUrl={publicUrl} />;
+    if (activeTab === 'showcase') return <ShowcaseTab draft={draft} update={update} roleId={roleId} publicUrl={publicUrl} onOpenPublicCard={onOpenPublicCard} />;
     if (activeTab === 'locations' && roleId === 'partner') return <LocationsTab draft={draft} update={update} />;
     if (activeTab === 'media') return <MediaTab draft={draft} update={update} roleId={roleId} profileId={profile?.id} />;
     if (activeTab === 'contacts') return <ContactsTab draft={draft} update={update} />;
     if (activeTab === 'about') return <AboutTab draft={draft} update={update} roleId={roleId} />;
     if (activeTab === 'content') return <ContentTab roleId={roleId} events={relatedEvents} onOpenModule={onOpenModule} onEventCreated={onEventCreated} profile={profile} onToast={onToast} />;
     if (activeTab === 'analytics') return <AnalyticsTab analytics={analytics} />;
-    if (activeTab === 'client-view') return <ClientViewTab draft={draft} roleId={roleId} publicUrl={publicUrl} />;
+    if (activeTab === 'client-view') return <ClientViewTab draft={draft} roleId={roleId} publicUrl={publicUrl} onOpenPublicCard={onOpenPublicCard} />;
     if (activeTab === 'loki') return <LokiTab tips={tips} onOpenTab={setActiveTab} />;
     return null;
   };

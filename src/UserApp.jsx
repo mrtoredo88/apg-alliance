@@ -5778,6 +5778,10 @@ export function UserApp() {
                     onBack={goBackPanel}
                     onOpenDialogs={() => navigatePanel('dialogs')}
                     onOpenPanel={goPanel}
+                    onOpenPublicCard={(role, profile) => {
+                      if (role === 'partner') openPartner(profile);
+                      else window.location.assign(`/?expert=${encodeURIComponent(profile.id)}`);
+                    }}
                     onToast={showToast}
                     onEventCreated={(event) => setEvents(prev => {
                       const normalized = { ...event, createdAt: event.createdAt || new Date().toISOString(), submittedAt: event.submittedAt || new Date().toISOString() };
@@ -5812,6 +5816,10 @@ export function UserApp() {
                     onBack={goBackPanel}
                     onOpenDialogs={() => navigatePanel('dialogs')}
                     onOpenPanel={goPanel}
+                    onOpenPublicCard={(role, profile) => {
+                      if (role === 'partner') openPartner(profile);
+                      else window.location.assign(`/?expert=${encodeURIComponent(profile.id)}`);
+                    }}
                     onToast={showToast}
                     onEventCreated={(event) => setEvents(prev => {
                       const normalized = { ...event, createdAt: event.createdAt || new Date().toISOString(), submittedAt: event.submittedAt || new Date().toISOString() };

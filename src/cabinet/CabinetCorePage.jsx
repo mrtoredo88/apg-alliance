@@ -678,7 +678,7 @@ function BookingModule({ role, profile, onSaved, onToast }) {
   );
 }
 
-export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, preferredRole = 'partner', initialModule = 'showcase-builder', events = [], news = [], onBack, onProfileUpdate, onEventCreated, onToast, onOpenDialogs, onOpenPanel }) {
+export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, preferredRole = 'partner', initialModule = 'showcase-builder', events = [], news = [], onBack, onProfileUpdate, onEventCreated, onToast, onOpenDialogs, onOpenPanel, onOpenPublicCard }) {
   const roleState = useMemo(() => getCabinetRoles({ user, partner, expert, preferredRole }), [user, partner, expert, preferredRole]);
   const [activeRoleId, setActiveRoleId] = useState(roleState.activeRole?.id || preferredRole);
   const activeRole = roleState.roles.find(role => role.id === activeRoleId) || roleState.activeRole;
@@ -765,6 +765,13 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
 
   const snapshot = buildCabinetSnapshot({ role: activeRole, profile: currentProfile, events, reviews });
   const publicUrl = getCabinetPublicUrl(snapshot);
+  const openPublicCard = () => {
+    if (onOpenPublicCard) {
+      onOpenPublicCard(activeRole.id, currentProfile);
+      return;
+    }
+    if (publicUrl) window.location.assign(publicUrl);
+  };
   const handleSaved = (updated) => {
     setProfile(updated);
     onProfileUpdate?.(activeRole.id, updated);
@@ -785,7 +792,7 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
   };
   const renderModule = () => {
     if (activeModule === 'dashboard') return <DashboardModule snapshot={snapshot} onOpenModule={openCabinetModule} />;
-    if (activeModule === 'showcase-builder') return <DigitalShowcaseBuilder role={activeRole} profile={currentProfile} relatedEvents={snapshot.relatedEvents} onSaved={handleSaved} onOpenModule={openCabinetModule} onEventCreated={onEventCreated} onToast={onToast} publicUrl={publicUrl} focusTab={showcaseFocusTab} />;
+    if (activeModule === 'showcase-builder') return <DigitalShowcaseBuilder role={activeRole} profile={currentProfile} relatedEvents={snapshot.relatedEvents} onSaved={handleSaved} onOpenModule={openCabinetModule} onEventCreated={onEventCreated} onToast={onToast} publicUrl={publicUrl} onOpenPublicCard={openPublicCard} focusTab={showcaseFocusTab} />;
     if (activeModule === 'tasks') return <TasksModule snapshot={snapshot} onOpenModule={openCabinetModule} />;
     if (activeModule === 'analytics') return <AnalyticsModule snapshot={snapshot} />;
     if (activeModule === 'media') return <MediaModule snapshot={snapshot} />;
@@ -840,7 +847,7 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
           </GlassCard>
         )}
         <GlassCard style={{ borderRadius: 26, marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <GlassButton onClick={() => publicUrl && window.open(publicUrl, '_blank')}>Открыть карточку</GlassButton>
+          <GlassButton onClick={openPublicCard}>Открыть карточку</GlassButton>
           <GlassButton
             tone="gold"
             onClick={async () => {
