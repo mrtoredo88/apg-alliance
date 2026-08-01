@@ -9,6 +9,8 @@ const start = read('server/src/routes/telegram-auth-start.js');
 const check = read('server/src/routes/telegram-auth-check.js');
 const updates = read('server/src/lib/telegramUpdates.js');
 const webhook = read('server/src/routes/telegram-webhook.js');
+const server = read('server/src/server.js');
+const deploy = read('server/deploy.sh');
 const postgresAdapter = read('server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js');
 
 assert.match(start, /requestId,[\s\S]*loginSessionId: loginSessionId \|\| null,[\s\S]*telegramSessionId: state,[\s\S]*state,/, 'auth-start persists and returns correlation ids');
@@ -29,6 +31,13 @@ assert.match(postgresAdapter, /client\.removeListener\('error', onClientError\)/
 assert.match(postgresAdapter, /APG_IDENTITY_POOL_SIZE \|\| 1/, 'serverless adapters default to one PostgreSQL connection');
 assert.match(webhook, /await processTelegramUpdate\(db, payload, request\.log\)/, 'webhook must finish Telegram processing before the serverless request returns');
 assert.match(webhook, /x-telegram-bot-api-secret-token/, 'webhook validates the Telegram secret token');
+assert.match(webhook, /timingSafeEqual/, 'webhook secret comparison is timing safe');
+assert.match(webhook, /stage: 'update_received'[\s\S]*chatIdHash:[\s\S]*stage: 'webhook_handled'/, 'webhook emits a privacy-safe correlation trace');
+assert.match(updates, /stage: 'start_detected'/, '/start detection is logged');
+assert.match(updates, /stage: 'reply_sent'/, 'successful Telegram replies are logged');
+assert.doesNotMatch(updates, /from: safeDebugPayload\(from\)/, 'Telegram user payload is not written to production logs');
+assert.match(server, /TELEGRAM_DELIVERY_MODE !== 'webhook'/, 'background polling is disabled when webhook delivery is active');
+assert.match(deploy, /TELEGRAM_WEBHOOK_SECRET[\s\S]*TELEGRAM_DELIVERY_MODE=webhook/, 'production deploy enables authenticated webhook-only delivery');
 assert.match(check, /status:\s*'expired'[\s\S]*stage:\s*'done_expired'/, 'expired sessions return a clear status and diagnostic stage');
 assert.doesNotMatch(check, /ref\.delete\(\)/, 'completed Telegram sessions remain retryable until their original expiry');
 assert.match(check, /tokenIssuedAt:[\s\S]*resolvedUserId:/, 'successful token delivery is checkpointed idempotently');

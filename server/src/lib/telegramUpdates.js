@@ -7,6 +7,7 @@ import { serverFoundation } from '../apg/index.js';
 import { completeReferralSessionAsync, resolveReferralSessionReferrer } from './referralSessions.js';
 import { recordReferralEventAsync } from './referralEvents.js';
 import { fetchAndStoreTelegramAvatar } from './telegramAvatar.js';
+import { createHash } from 'node:crypto';
 
 const TELEGRAM_HELPER_URL = `${APP_URL}/#/telegram-helper`;
 
@@ -42,6 +43,10 @@ function safeDebugPayload(value) {
   if (value == null) return null;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
   return safeDebugString(JSON.stringify(value), 280);
+}
+
+function telegramIdHash(value) {
+  return value ? createHash('sha256').update(String(value)).digest('hex').slice(0, 16) : null;
 }
 
 export function isTransientTelegramProcessingError(error) {
@@ -139,7 +144,7 @@ async function tgSend(chatId, text, extra = {}, log = console) {
     if (!response.ok || payload?.ok === false) {
       log.warn?.({
         stage: 'telegram_send_failed',
-        chatId,
+        chatIdHash: telegramIdHash(chatId),
         status: response.status,
         errorCode: payload?.error_code || null,
         description: safeDebugString(payload?.description, 240),
@@ -150,11 +155,16 @@ async function tgSend(chatId, text, extra = {}, log = console) {
       });
       throw error;
     }
+    log.info?.({
+      stage: 'reply_sent', chatIdHash: telegramIdHash(chatId),
+      telegramMessageId: payload?.result?.message_id || null,
+      revision: process.env.GIT_SHA || process.env.APP_VERSION || null,
+    }, 'telegram-send-forensic');
     return payload;
   } catch (error) {
     log.warn?.({
       stage: 'telegram_send_failed',
-      chatId,
+      chatIdHash: telegramIdHash(chatId),
       errorCode: safeDebugString(error?.code || error?.cause?.code, 120) || null,
       description: safeDebugString(error?.message, 240),
     }, 'telegram-send-forensic');
@@ -326,10 +336,11 @@ export async function processTelegramUpdate(db, update, log = console) {
   const messageId = safeDebugString(update?.update_id, 120);
   const chatId = safeDebugString(from?.id, 120);
   log.info?.({
-    messageId,
-    chatId,
-    from: safeDebugPayload(from),
-    text: safeDebugString(text, 120),
+    stage: 'handler_started',
+    updateId: messageId,
+    chatIdHash: telegramIdHash(chatId),
+    command: safeDebugString(text.split(/\s+/, 1)[0], 40),
+    revision: process.env.GIT_SHA || process.env.APP_VERSION || null,
   }, 'telegram-update-received');
 
   const authMatch = text.match(/^\/start auth_([a-f0-9]{32})$/);
@@ -596,6 +607,7 @@ export async function processTelegramUpdate(db, update, log = console) {
   }
 
   if (text === '/start') {
+    log.info?.({ stage: 'start_detected', updateId: messageId, chatIdHash: telegramIdHash(chatId) }, 'telegram-start-forensic');
     await tgSend(from.id, WELCOME_TEXT, { reply_markup: SOCIAL_KEYBOARD }, log);
     return { handled: true, kind: 'start' };
   }

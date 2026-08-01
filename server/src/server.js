@@ -119,7 +119,7 @@ fastify.get('/health', async (request, reply) => {
 const port = Number(process.env.PORT ?? 3000);
 await fastify.listen({ port, host: '0.0.0.0' });
 
-if (process.env.TELEGRAM_BOT_TOKEN) {
+if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_DELIVERY_MODE !== 'webhook') {
   let telegramPollRunning = false;
   const runTelegramPoll = async () => {
     if (telegramPollRunning) return;
