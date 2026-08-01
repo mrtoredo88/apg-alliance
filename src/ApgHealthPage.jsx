@@ -612,7 +612,7 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
                 <DiagnosticLine label="Web Push subscription" value={pushDiagnostics?.subscriptionExists ? 'ACTIVE' : 'MISSING'} tone={pushDiagnostics?.subscriptionExists ? 'ok' : 'bad'} />
                 <DiagnosticLine label="Active subscription in profile" value={pushDiagnostics?.subscriptionActiveInProfile ? 'YES' : 'NO'} tone={pushDiagnostics?.subscriptionActiveInProfile ? 'ok' : 'bad'} />
                 <DiagnosticLine label="Endpoint host" value={pushDiagnostics?.subscriptionEndpointHost || '—'} />
-                <DiagnosticLine label="FCM" value={`${pushDiagnostics?.fcmTokenCount ?? 0} tokens`} />
+                <DiagnosticLine label="RuStore Push" value={`${pushDiagnostics?.rustoreTokenCount ?? 0} tokens`} />
                 <DiagnosticLine label="Last registration" value={pushDiagnostics?.lastRegistration || '—'} />
                 <DiagnosticLine label="Last successful push" value={pushDiagnostics?.lastSuccessfulPush || '—'} />
                 <DiagnosticLine label="Last push status" value={pushDiagnostics?.lastPushStatus || '—'} />

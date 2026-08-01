@@ -3,7 +3,7 @@ import { getDb } from '../lib/documentStore.js';
 import { serverFoundation } from '../apg/index.js';
 import { APP_URL } from '../lib/config.js';
 import webpush from 'web-push';
-import { getFirebaseMessaging, isDeadFcmCode } from '../lib/firebaseMessaging.js';
+import { isDeadRuStoreToken, sendRuStorePush } from '../lib/rustorePush.js';
 import { ECONOMY_CONFIG, ECONOMY_VERSION, calculateTicketExchange, economyMigrationPatch, getEconomyReward, getReputationStatus } from '../../../server-shared/economy-engine.js';
 import { upsertErrorLog } from '../../../server-shared/error-log.js';
 import { hasRole, ROLES } from '../../../server-shared/role-engine.js';
@@ -4198,7 +4198,7 @@ async function getDialogRecipientState(db, userId, dialogId, senderId) {
   const blocked = hasBlockedDialog(user, senderId);
   const archived = isArchivedUser(user);
   const pushConsent = user.notificationsEnabled === true || user.notificationConsent === true;
-  const providerOk = !user.notificationProvider || user.notificationProvider === 'webpush' || user.notificationProvider === 'vk';
+  const providerOk = !user.notificationProvider || ['webpush', 'vk', 'rustore'].includes(user.notificationProvider);
   const prefOk = boolNotificationPref(user.notificationPreferences || {}, 'messages');
   return {
     userId,
@@ -4337,36 +4337,25 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
     }, { merge: true }).catch(() => {});
     return stats;
   }
-  const fcmTokens = Array.isArray(user.fcmTokens) ? user.fcmTokens.map(token => safeString(token, 600)).filter(Boolean) : [];
+  const rustorePushTokens = Array.isArray(user.rustorePushTokens) ? user.rustorePushTokens.map(token => safeString(token, 600)).filter(Boolean) : [];
   const webSubscriptions = Array.isArray(user.webPushSubscriptions) ? user.webPushSubscriptions.map(normalizeDialogSubscription).filter(Boolean) : [];
   const url = `${APP_URL}${buildDialogDeepLink(dialogId)}`;
   let sent = 0;
   let failed = 0;
   const errors = [];
-  const deadFcmTokens = [];
+  const deadRuStoreTokens = [];
   const deadWebSubscriptions = [];
 
-  if (fcmTokens.length) {
+  await Promise.all(rustorePushTokens.map(async token => {
     try {
-      const response = await getFirebaseMessaging().sendEachForMulticast({
-        tokens: fcmTokens,
-        notification: { title: 'Новое сообщение', body: 'Откройте АПГ, чтобы прочитать.' },
-        data: { url: '/messages', deepLink: '/messages', category: 'messages', type: 'contextDialogMessage' },
-        android: { priority: 'high', notification: { channelId: 'messages', tag: 'apg-messages', defaultSound: true, defaultVibrateTimings: true } },
-      });
-      sent += response.successCount;
-      failed += response.failureCount;
-      response.responses.forEach((item, index) => {
-        if (item.success) return;
-        const code = item.error?.code || 'messaging/unknown-error';
-        errors.push({ code, message: safeString(item.error?.message, 240) });
-        if (isDeadFcmCode(code)) deadFcmTokens.push(fcmTokens[index]);
-      });
+      await sendRuStorePush(token, { title: 'Новое сообщение', body: 'Откройте АПГ, чтобы прочитать.', deepLink: '/messages', channelId: 'messages', data: { category: 'messages', type: 'contextDialogMessage' } });
+      sent += 1;
     } catch (error) {
-      failed += fcmTokens.length;
-      errors.push({ code: error?.code || 'messaging/configuration-error', message: safeString(error?.message, 240) });
+      failed += 1;
+      errors.push({ code: error?.code || 'rustore/push-error', message: safeString(error?.message, 240) });
+      if (isDeadRuStoreToken(error)) deadRuStoreTokens.push(token);
     }
-  }
+  }));
 
   if (webSubscriptions.length && initDialogWebPush()) {
     await Promise.all(webSubscriptions.map(async subscription => {
@@ -4385,9 +4374,9 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
     }));
   }
 
-  if (deadFcmTokens.length || deadWebSubscriptions.length) {
+  if (deadRuStoreTokens.length || deadWebSubscriptions.length) {
     await db.collection('users').doc(userId).update({
-      ...(deadFcmTokens.length ? { fcmTokens: FieldValue.arrayRemove(...deadFcmTokens) } : {}),
+      ...(deadRuStoreTokens.length ? { rustorePushTokens: FieldValue.arrayRemove(...deadRuStoreTokens) } : {}),
       ...(deadWebSubscriptions.length ? { webPushSubscriptions: FieldValue.arrayRemove(...deadWebSubscriptions) } : {}),
       webPushUpdatedAt: FieldValue.serverTimestamp(),
     }).catch(() => {});
@@ -4395,8 +4384,8 @@ async function sendDialogPush(db, userId, notificationId, title, body, dialogId)
   const stats = {
     sent,
     failed,
-    subscribers: fcmTokens.length + webSubscriptions.length,
-    cleaned: deadFcmTokens.length + deadWebSubscriptions.length,
+    subscribers: rustorePushTokens.length + webSubscriptions.length,
+    cleaned: deadRuStoreTokens.length + deadWebSubscriptions.length,
     errors: errors.slice(0, 10),
   };
   await db.collection('notifications').doc(notificationId).set({
@@ -5828,12 +5817,12 @@ async function actionPushRegisterNative(db, req, actor) {
   const snap = await ref.get();
   const user = snap.exists ? snap.data() || {} : {};
   const devices = user.pushDevices && typeof user.pushDevices === 'object' ? user.pushDevices : {};
-  const previousToken = devices[deviceId]?.fcmToken;
-  const fcmTokens = [...new Set([...(user.fcmTokens || []).filter(item => item && item !== previousToken), token])].slice(-10);
-  const pushDevices = { ...devices, [deviceId]: { ...(devices[deviceId] || {}), deviceId, platform: 'android', fcmToken: token, subscriptionActive: true, lastRegistrationAt: new Date().toISOString(), updatedAt: new Date().toISOString() } };
-  await ref.set({ fcmTokens, pushDevices, notificationProvider: 'webpush', notificationsEnabled: true, notificationConsent: true, nativePushUpdatedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  const previousToken = devices[deviceId]?.rustorePushToken;
+  const rustorePushTokens = [...new Set([...(user.rustorePushTokens || []).filter(item => item && item !== previousToken), token])].slice(-10);
+  const pushDevices = { ...devices, [deviceId]: { ...(devices[deviceId] || {}), deviceId, platform: 'android', pushProvider: 'rustore', rustorePushToken: token, subscriptionActive: true, lastRegistrationAt: new Date().toISOString(), updatedAt: new Date().toISOString() } };
+  await ref.set({ rustorePushTokens, pushDevices, notificationProvider: 'rustore', notificationsEnabled: true, notificationConsent: true, nativePushUpdatedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   await audit(db, req, actor, 'push:registerNative', 'users', userId, 'success', { deviceId, tokenLength: token.length });
-  return { ok: true, userId, deviceId, device: { ...pushDevices[deviceId], fcmToken: undefined }, tokenCount: fcmTokens.length };
+  return { ok: true, userId, deviceId, device: { ...pushDevices[deviceId], rustorePushToken: undefined }, tokenCount: rustorePushTokens.length };
 }
 
 async function actionPushUnregisterNative(db, req, actor) {
@@ -5843,10 +5832,10 @@ async function actionPushUnregisterNative(db, req, actor) {
   const snap = await ref.get();
   const user = snap.exists ? snap.data() || {} : {};
   const devices = user.pushDevices && typeof user.pushDevices === 'object' ? user.pushDevices : {};
-  const token = devices[deviceId]?.fcmToken;
+  const token = devices[deviceId]?.rustorePushToken;
   const pushDevices = { ...devices };
   delete pushDevices[deviceId];
-  await ref.set({ fcmTokens: (user.fcmTokens || []).filter(item => item !== token), pushDevices, nativePushUpdatedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  await ref.set({ rustorePushTokens: (user.rustorePushTokens || []).filter(item => item !== token), pushDevices, nativePushUpdatedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   await audit(db, req, actor, 'push:unregisterNative', 'users', userId, 'success', { deviceId });
   return { ok: true };
 }

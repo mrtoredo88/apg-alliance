@@ -3,7 +3,7 @@ import { getDb } from '../lib/documentStore.js';
 import { FieldValue } from '../lib/documentValues.js';
 import webpush from 'web-push';
 import { requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
-import { getFirebaseMessaging, isDeadFcmCode } from '../lib/firebaseMessaging.js';
+import { isDeadRuStoreToken, sendRuStorePush } from '../lib/rustorePush.js';
 
 const DEFAULT_CATEGORIES = {
   news: true,
@@ -70,29 +70,25 @@ export function withPushTimeout(promise, ms = WEB_PUSH_SEND_TIMEOUT_MS) {
   ]);
 }
 
-async function sendToFcmTokens(tokens, userIds, title, body, url, tag, options = {}) {
+async function sendToRuStoreTokens(tokens, userIds, title, body, url, tag, options = {}) {
   const pairs = tokens.map((token, index) => ({ token: String(token || ''), userId: userIds[index] })).filter(item => item.token);
   if (!pairs.length) return { sent: 0, failed: 0, cleaned: 0, errors: [] };
-  try {
-    const response = await getFirebaseMessaging().sendEachForMulticast({
-      tokens: pairs.map(item => item.token),
-      notification: { title: String(title), body: String(body || ''), imageUrl: options.imageUrl || undefined },
-      data: Object.fromEntries(Object.entries({ url: url || APP_URL, deepLink: url || '/', tag: tag || 'apg-push', notificationId: options.notificationId || '', category: options.category || 'important', type: options.type || 'info' }).map(([key, value]) => [key, String(value)])),
-      android: { priority: options.priority === 'critical' ? 'high' : 'normal', notification: { channelId: options.category === 'messages' ? 'messages' : options.priority === 'critical' ? 'important' : 'updates', tag: tag || 'apg-push', defaultSound: true, defaultVibrateTimings: true } },
-    });
-    const deadByUser = {};
-    const errors = [];
-    response.responses.forEach((item, index) => {
-      if (item.success) return;
-      const code = item.error?.code || 'messaging/unknown-error';
-      errors.push({ code, message: String(item.error?.message || '').slice(0, 240) });
-      if (isDeadFcmCode(code)) (deadByUser[pairs[index].userId] ??= []).push(pairs[index].token);
-    });
-    await Promise.all(Object.entries(deadByUser).map(([uid, dead]) => getDb().collection('users').doc(uid).update({ fcmTokens: FieldValue.arrayRemove(...dead) }).catch(() => {})));
-    return { sent: response.successCount, failed: response.failureCount, cleaned: Object.values(deadByUser).flat().length, errors: errors.slice(0, 12) };
-  } catch (error) {
-    return { sent: 0, failed: pairs.length, cleaned: 0, errors: [{ code: error?.code || 'messaging/configuration-error', message: String(error?.message || '').slice(0, 240) }] };
-  }
+  let sent = 0;
+  let failed = 0;
+  const deadByUser = {};
+  const errors = [];
+  await Promise.all(pairs.map(async pair => {
+    try {
+      await sendRuStorePush(pair.token, { title, body, deepLink: url || '/', channelId: options.category === 'messages' ? 'messages' : options.priority === 'critical' ? 'important' : 'updates', ttlSeconds: options.priority === 'critical' ? 86400 : 21600, data: { tag: tag || 'apg-push', notificationId: options.notificationId || '', category: options.category || 'important', type: options.type || 'info' } });
+      sent += 1;
+    } catch (error) {
+      failed += 1;
+      errors.push({ code: error?.code || 'rustore/push-error', message: String(error?.message || '').slice(0, 240) });
+      if (isDeadRuStoreToken(error)) (deadByUser[pair.userId] ??= []).push(pair.token);
+    }
+  }));
+  await Promise.all(Object.entries(deadByUser).map(([uid, dead]) => getDb().collection('users').doc(uid).update({ rustorePushTokens: FieldValue.arrayRemove(...dead) }).catch(() => {})));
+  return { sent, failed, cleaned: Object.values(deadByUser).flat().length, errors: errors.slice(0, 12) };
 }
 
 function buildPayload(title, body, url, tag, options = {}) {
@@ -174,15 +170,15 @@ async function sendToWebPushSubscriptions(subscriptions, userIds, title, body, u
   return { sent, failed, cleaned: Object.values(deadByUser).flat().length, errors: errors.slice(0, 12) };
 }
 
-function mergeStats(nativeStats, fcmStats, subscribers) {
+function mergeStats(webStats, rustoreStats, subscribers) {
   return {
     subscribers,
-    sent: Number(nativeStats.sent || 0) + Number(fcmStats.sent || 0),
-    failed: Number(nativeStats.failed || 0) + Number(fcmStats.failed || 0),
-    cleaned: Number(nativeStats.cleaned || 0) + Number(fcmStats.cleaned || 0),
-    native: nativeStats,
-    fcm: fcmStats,
-    errors: [...(nativeStats.errors || []), ...(fcmStats.errors || [])].slice(0, 20),
+    sent: Number(webStats.sent || 0) + Number(rustoreStats.sent || 0),
+    failed: Number(webStats.failed || 0) + Number(rustoreStats.failed || 0),
+    cleaned: Number(webStats.cleaned || 0) + Number(rustoreStats.cleaned || 0),
+    web: webStats,
+    rustore: rustoreStats,
+    errors: [...(webStats.errors || []), ...(rustoreStats.errors || [])].slice(0, 20),
   };
 }
 
@@ -301,11 +297,11 @@ export async function sendBroadcastPush({
       return;
     }
     if (data.notificationProvider && data.notificationProvider !== 'webpush') { skippedReasons.noSubscription += 1; return; }
-    const fcmTokens = Array.isArray(data.fcmTokens) ? data.fcmTokens : [];
+    const rustorePushTokens = Array.isArray(data.rustorePushTokens) ? data.rustorePushTokens : [];
     const webPushSubs = Array.isArray(data.webPushSubscriptions) ? data.webPushSubscriptions : [];
-    if (!fcmTokens.length && !webPushSubs.length) { skippedReasons.noSubscription += 1; return; }
+    if (!rustorePushTokens.length && !webPushSubs.length) { skippedReasons.noSubscription += 1; return; }
     reachedUsers += 1;
-    fcmTokens.forEach(token => {
+    rustorePushTokens.forEach(token => {
       tokens.push(token);
       tokenUserIds.push(d.id);
     });
@@ -328,9 +324,9 @@ export async function sendBroadcastPush({
       ...audienceSummary,
     };
   } else {
-    const fcmTotal = { sent: 0, failed: 0, cleaned: 0, errors: [] };
+    const rustoreTotal = { sent: 0, failed: 0, cleaned: 0, errors: [] };
     for (let i = 0; i < tokens.length; i += 500) {
-      const stats = await sendToFcmTokens(
+      const stats = await sendToRuStoreTokens(
         tokens.slice(i, i + 500),
         tokenUserIds.slice(i, i + 500),
         title,
@@ -339,10 +335,10 @@ export async function sendBroadcastPush({
         tag,
         { notificationId, category, type, priority, imageUrl, actionLabel },
       );
-      fcmTotal.sent += stats.sent;
-      fcmTotal.failed += stats.failed;
-      fcmTotal.cleaned += stats.cleaned;
-      fcmTotal.errors = [...fcmTotal.errors, ...(stats.errors || [])].slice(0, 20);
+      rustoreTotal.sent += stats.sent;
+      rustoreTotal.failed += stats.failed;
+      rustoreTotal.cleaned += stats.cleaned;
+      rustoreTotal.errors = [...rustoreTotal.errors, ...(stats.errors || [])].slice(0, 20);
     }
     const nativeTotal = await sendToWebPushSubscriptions(
       subscriptions,
@@ -354,7 +350,7 @@ export async function sendBroadcastPush({
       { notificationId, category, type, priority, imageUrl, actionLabel },
     );
     const vkTotal = await sendToVkUsers(vkUserIds, title, body, url);
-    const webTotal = mergeStats(nativeTotal, fcmTotal, subscriptions.length + tokens.length);
+    const webTotal = mergeStats(nativeTotal, rustoreTotal, subscriptions.length + tokens.length);
     total = {
       ...webTotal,
       subscribers: webTotal.subscribers + vkUserIds.length,
@@ -420,7 +416,7 @@ export default async function sendPushRoutes(fastify) {
         const snap = await db.collection('users').doc(String(userId)).get();
         if (!snap.exists) return reply.code(404).send({ error: 'user not found' });
         const userData = snap.data() || {};
-        const { fcmTokens = [], webPushSubscriptions = [] } = userData;
+        const { rustorePushTokens = [], webPushSubscriptions = [] } = userData;
         const hasConsent = userData.notificationsEnabled === true || userData.notificationConsent === true;
         if (!hasConsent) return { skipped: true, reason: 'notifications_disabled', subscribers: 0, sent: 0, failed: 0 };
         if (!boolPref(userData.notificationPreferences || DEFAULT_CATEGORIES, category)) {
@@ -436,19 +432,19 @@ export default async function sendPushRoutes(fastify) {
           }, { merge: true }).catch(() => {});
           return { ...stats, subscribers: vkUserId ? 1 : 0 };
         }
-        if (!fcmTokens.length && !webPushSubscriptions.length) return { skipped: true, reason: 'no push subscriptions', subscribers: 0, sent: 0, failed: 0 };
+        if (!rustorePushTokens.length && !webPushSubscriptions.length) return { skipped: true, reason: 'no push subscriptions', subscribers: 0, sent: 0, failed: 0 };
 
         const nativeStats = await sendToWebPushSubscriptions(
           webPushSubscriptions, webPushSubscriptions.map(() => String(userId)),
           title, body, url, tag,
           { notificationId, category, type, priority, imageUrl, actionLabel },
         );
-        const fcmStats = await sendToFcmTokens(
-          fcmTokens, fcmTokens.map(() => String(userId)),
+        const rustoreStats = await sendToRuStoreTokens(
+          rustorePushTokens, rustorePushTokens.map(() => String(userId)),
           title, body, url, tag,
           { notificationId, category, type, priority, imageUrl, actionLabel },
         );
-        const stats = mergeStats(nativeStats, fcmStats, webPushSubscriptions.length + fcmTokens.length);
+        const stats = mergeStats(nativeStats, rustoreStats, webPushSubscriptions.length + rustorePushTokens.length);
         if (notificationId) await db.collection('notifications').doc(String(notificationId)).set({
           pushStatus: stats.failed ? 'partial' : 'sent',
           pushStats: stats,

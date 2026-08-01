@@ -119,7 +119,7 @@ export async function collectPushDiagnostics(user = {}) {
     subscriptionActiveInProfile: registered,
     subscriptionEndpointHost: endpoint.host,
     subscriptionEndpointLength: endpoint.length,
-    fcmTokenCount: Array.isArray(user?.fcmTokens) ? user.fcmTokens.length : 0,
+    rustoreTokenCount: Array.isArray(user?.rustorePushTokens) ? user.rustorePushTokens.length : 0,
     registeredDeviceCount: Object.keys(devices).length || (Array.isArray(user?.webPushSubscriptions) ? user.webPushSubscriptions.length : 0),
     profileSubscriptionCount: Array.isArray(user?.webPushSubscriptions) ? user.webPushSubscriptions.length : 0,
     lastRegistration: currentDevice?.lastRegistrationAt || user?.lastPushRegistration?.at || null,

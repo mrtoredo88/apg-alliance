@@ -43,7 +43,8 @@ assert.match(pushRoute, /\/api\/send-push\/retry-pending/, 'pending content noti
 assert.match(pushRoute, /stale_pending_notification/, 'stale pending notifications are not sent late');
 assert.match(pushRoute, /reason: 'category_disabled'/, 'direct delivery respects category preferences');
 assert.match(userActions, /sendDialogVkPush/, 'message notifications support VK delivery');
-assert.match(userActions, /deadFcmTokens[\s\S]*deadWebSubscriptions/, 'message delivery cleans broken subscriptions');
+assert.match(userActions, /deadRuStoreTokens[\s\S]*deadWebSubscriptions/, 'message delivery cleans broken RuStore and web subscriptions');
+assert.match(userActions, /sendRuStorePush/, 'message notifications support RuStore delivery');
 assert.match(userApp, /browser's current PushManager[\s\S]*subscription is authoritative/, 'installed PWA uses its actual device subscription as the notification source');
 assert.doesNotMatch(userApp, /hasStoredPushChannel[\s\S]{0,800}setNotifEnabled\(false\)/, 'a lagging server profile cannot disable a working PWA subscription');
 assert.match(constants, /WEB_PUSH_VAPID_PUBLIC_KEY = 'BIY6fBBaGoouByjJosD9BKLXBRVoChXSpwgkXTwDJZs_gykj9gr8Fe5LVnTKCs8hseG5iJGLR-rqprfbS3Y3YLs'/, 'frontend uses the active backend VAPID public key');

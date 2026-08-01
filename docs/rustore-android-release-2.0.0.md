@@ -7,8 +7,8 @@ Status: implementation candidate only. Do not publish or deploy without owner ap
 - `applicationId` is currently `ru.myapg.app`; confirm it exactly matches the published RuStore package.
 - `versionCode` is `20000` and `versionName` is `2.0.0`; confirm `20000` is greater than every uploaded RuStore artifact.
 - Obtain the RuStore signing-certificate SHA-256 and replace `REPLACE_WITH_RUSTORE_SIGNING_CERT_SHA256` in `public/.well-known/assetlinks.json`.
-- Place the matching Firebase Android app's `google-services.json` at `android/app/google-services.json`. Never commit the file.
-- Configure backend Application Default Credentials or `FIREBASE_SERVICE_ACCOUNT_JSON` with Firebase Messaging permission. This SDK is delivery-only; identity stays in PostgreSQL Identity V2.
+- Create a RuStore Push project for the exact package and signing certificate, then provide `RUSTORE_PUSH_PROJECT_ID` during Android build.
+- Configure backend `RUSTORE_PUSH_PROJECT_ID` and `RUSTORE_PUSH_SERVICE_TOKEN`. Firebase, FCM and `google-services.json` are not used.
 
 ## Changelog
 
@@ -26,7 +26,7 @@ Run each row on Android 10, 11, 12, 13, 14 and 15 (physical device for push/came
 
 | Scenario | Expected |
 |---|---|
-| Clean install, notification allowed | One device row; one FCM token; channels created |
+| Clean install, notification allowed | One device row; one RuStore token; channels created |
 | Clean install, notification denied | App works; settings can retry; no loop |
 | Upgrade over RuStore version | Session survives; schema v2 cache migrates by ignoring old records |
 | Email OTP online | One code, PostgreSQL Identity V2 session restored after force-stop/reboot |
@@ -71,10 +71,10 @@ Artifacts: `android/app/build/outputs/bundle/release/app-release.aab` and `andro
 ## Publication plan
 
 1. Confirm package id, current RuStore version and signing ownership.
-2. Add Firebase Android app for that exact package; install `google-services.json`; configure backend Messaging credentials.
+2. Create the matching RuStore Push project; configure Android project ID and backend RuStore service token.
 3. Replace and deploy `assetlinks.json`; verify HTTPS 200, `application/json`, no redirect, correct certificate fingerprint.
 4. Build signed AAB/APK locally and verify certificate equals the published app certificate.
 5. Run the full matrix on a clean device and an upgrade installed from the current RuStore APK.
-6. Send an internal test FCM to foreground/background/killed app and verify token cleanup/rotation.
+6. Send an internal RuStore test push to foreground/background/killed app and verify token cleanup/rotation.
 7. Upload AAB to RuStore only after explicit owner approval; use staged rollout if available.
-8. Monitor authentication failures, FCM delivery, crashes and App Link verification; retain the prior artifact for rollback.
+8. Monitor authentication failures, RuStore delivery, crashes and App Link verification; retain the prior artifact for rollback.

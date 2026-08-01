@@ -20,7 +20,11 @@ assert.doesNotMatch(nativePush, /console\.(log|info).*token/i);
 assert.match(nativePush, /push:registerNative/);
 
 const serverPush = fs.readFileSync('server/src/routes/send-push.js', 'utf8');
-assert.match(serverPush, /sendEachForMulticast/);
-assert.doesNotMatch(serverPush, /skippedLegacyFirebaseTokens/);
+const packageJson = fs.readFileSync('package.json', 'utf8');
+const androidBuild = `${fs.readFileSync('android/build.gradle', 'utf8')}\n${fs.readFileSync('android/app/build.gradle', 'utf8')}`;
+assert.match(serverPush, /sendRuStorePush/);
+assert.match(androidBuild, /ru\.rustore\.sdk:pushclient/);
+assert.doesNotMatch(`${nativePush}\n${serverPush}\n${packageJson}\n${androidBuild}`, /firebase-admin|@capacitor\/push-notifications|google-services|sendEachForMulticast/i);
+assert.match(manifest, /ru\.rustore\.sdk\.pushclient\.MESSAGING_EVENT/);
 
 console.log('Android release contract: OK');
