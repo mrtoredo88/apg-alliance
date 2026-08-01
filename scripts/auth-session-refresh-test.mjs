@@ -17,7 +17,12 @@ globalThis.fetch = async () => {
 };
 
 const provider = new NativeApgProvider();
-await provider.authenticate({ uid: 'user-1', token: 'old-token', issuedAt: Date.now() - 22 * 86_400_000 });
+await provider.authenticate({
+  uid: 'user-1',
+  token: 'old-token',
+  issuedAt: Date.now() - 35 * 60_000,
+  expiresAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+});
 const tokens = await Promise.all(Array.from({ length: 100 }, () => provider.getSessionToken()));
 
 assert.equal(calls, 1, '100 parallel requests share one refresh operation');
@@ -27,5 +32,18 @@ assert.equal(JSON.parse(values.get('apg_native_identity')).token, 'rotated-token
 
 await provider.getSessionToken();
 assert.equal(calls, 1, 'fresh token is reused without another refresh');
+
+const diagnostics = JSON.parse(values.get('apg_auth_session_diagnostics'));
+assert.equal(diagnostics.refreshCount, 1, 'refresh is observable in APG Health diagnostics');
+assert.equal(diagnostics.lokiAuthStatus, 'ready');
+
+await provider.authenticate({
+  uid: 'user-1',
+  token: 'second-expired-token',
+  issuedAt: Date.now() - 70 * 60_000,
+  expiresAt: new Date(Date.now() - 40 * 60_000).toISOString(),
+});
+await provider.getSessionToken();
+assert.equal(calls, 2, 'a second 35+ minute cycle refreshes without login');
 
 console.log('AUTH_SESSION_REFRESH_OK');

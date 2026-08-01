@@ -6,6 +6,7 @@ import {
   emitAppActionEvent,
 } from './intelligence/EventBus.js';
 import { routeEventThroughPipeline, wireDefaultNotificationPipeline } from './intelligence/NotificationPipeline.js';
+import { updateAuthSessionDiagnostics } from './apg/identity/authDiagnostics.js';
 
 wireDefaultNotificationPipeline();
 
@@ -134,24 +135,43 @@ export async function userAction(action, payload = {}) {
     error.code = 'AUTH_REQUIRED';
     throw error;
   }
-  const [token, version] = await Promise.all([apgIdentity.getSessionToken(), getPwaVersion()]);
-  const response = await fetch(`${API_BASE_URL}/api/user-actions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-APG-Auth': token,
-      'X-APG-Version': version,
-    },
-    body: JSON.stringify({ action, ...payload }),
-  });
-  const data = await response.json().catch(() => ({}));
+  const version = await getPwaVersion();
+  const send = async forceRefresh => {
+    const token = forceRefresh
+      ? await apgIdentity.getSessionToken({ forceRefresh: true })
+      : await apgIdentity.getSessionToken();
+    const response = await fetch(`${API_BASE_URL}/api/user-actions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-APG-Auth': token,
+        'X-APG-Version': version,
+      },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    return { response, data: await response.json().catch(() => ({})) };
+  };
+  let { response, data } = await send(false);
+  if (response.status === 401) {
+    updateAuthSessionDiagnostics({
+      last401At: new Date().toISOString(),
+      lastAuthError: data.code || `HTTP_${response.status}`,
+      lokiAuthStatus: action.startsWith('loki:') ? 'refreshing' : readAuthStatus(action),
+    });
+    ({ response, data } = await send(true));
+  }
   if (!response.ok || data.ok === false) {
     const error = new Error(data.error || 'Не удалось выполнить действие.');
     error.code = data.code;
     error.status = response.status;
     if (response.status === 401 || response.status === 403) error.isAuthError = true;
+    if (error.isAuthError) updateAuthSessionDiagnostics({
+      lastAuthError: error.code || `HTTP_${response.status}`,
+      lokiAuthStatus: action.startsWith('loki:') ? 'auth_failed' : 'protected_api_auth_failed',
+    });
     throw error;
   }
+  if (action.startsWith('loki:')) updateAuthSessionDiagnostics({ lokiAuthStatus: 'ready', lastAuthError: null });
 
   try {
     const eventPayload = normalizeEventFromAction(action, payload, data);
@@ -162,4 +182,8 @@ export async function userAction(action, payload = {}) {
   }
 
   return data;
+}
+
+function readAuthStatus(action) {
+  return action.startsWith('loki:') ? 'refreshing' : 'protected_api_refreshing';
 }

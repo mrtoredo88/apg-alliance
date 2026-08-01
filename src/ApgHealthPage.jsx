@@ -7,6 +7,8 @@ import { runServiceChecks, getDeviceInfo } from './diagnostics.js';
 import { cleanupCurrentPushSubscriptions, collectPushDiagnostics, getPushRegistrationLog, registerCurrentPushDevice, sendCurrentDeviceTestPush } from './pushDiagnostics.js';
 import { APG2_PROFILE, EmptyStateV2, GlassButton, GlassCard, GlassPanel, GlassSection, ScreenHeader } from './components/Apg2ProfileGlass.jsx';
 import { clearEmailLoginDiagnostics, readEmailLoginDiagnostics } from './auth/emailLoginDiagnostics.js';
+import { apgIdentity } from './apg/index.js';
+import { getAuthSessionHealth } from './apg/identity/authDiagnostics.js';
 import {
   buildPerformanceExport,
   forcePerformanceSnapshot,
@@ -95,6 +97,16 @@ function formatDateTime(value) {
   return date.toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
+function formatTimeLeft(value) {
+  if (value == null) return '—';
+  if (value <= 0) return 'истёк';
+  const minutes = Math.ceil(value / 60_000);
+  if (minutes < 60) return `${minutes} мин`;
+  const hours = Math.ceil(minutes / 60);
+  if (hours < 48) return `${hours} ч`;
+  return `${Math.ceil(hours / 24)} дн`;
+}
+
 export function ApgHealthPage({ nav = 'health', user = null, partners = [], experts = [], events = [], news = [], customTasks = [], userCount = 0, totalScans = 0, onBack, onGoAdmin }) {
   const [checks, setChecks]           = useState(null);
   const [checking, setChecking]       = useState(true);
@@ -111,6 +123,7 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
   const [architectureStatus, setArchitectureStatus] = useState(null);
   const [releaseStatus, setReleaseStatus] = useState(null);
   const [qualityReport, setQualityReport] = useState(null);
+  const [authSessionHealth, setAuthSessionHealth] = useState(() => getAuthSessionHealth(apgIdentity.getCurrentIdentity()));
 
   const runChecks = useCallback(async () => {
     setChecking(true);
@@ -189,6 +202,7 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
     setPerformanceReport(report);
     setPerformanceRuns(readPerformanceRuns());
     setEmailLoginDiagnostics(readEmailLoginDiagnostics());
+    setAuthSessionHealth(getAuthSessionHealth(apgIdentity.getCurrentIdentity()));
     return report;
   }, []);
 
@@ -379,6 +393,18 @@ export function ApgHealthPage({ nav = 'health', user = null, partners = [], expe
               <GlassButton onClick={runChecks} disabled={checking} style={{ width: '100%', marginTop: 10 }}>
                 {checking ? 'Проверяем...' : '↻ Перепроверить'}
               </GlassButton>
+            </GlassSection>
+
+            <GlassSection title="Авторизация защищённых API">
+              <GlassCard style={{ borderRadius: 28, padding: 14 }}>
+                <DiagnosticLine label="Access token истекает через" value={formatTimeLeft(authSessionHealth.accessExpiresInMs)} tone={authSessionHealth.accessExpiresInMs > 0 ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Refresh token истекает через" value={formatTimeLeft(authSessionHealth.refreshExpiresInMs)} tone={authSessionHealth.refreshExpiresInMs > 0 ? 'ok' : 'bad'} />
+                <DiagnosticLine label="Last refresh" value={formatDateTime(authSessionHealth.lastRefreshAt)} />
+                <DiagnosticLine label="Last 401" value={formatDateTime(authSessionHealth.last401At)} tone={authSessionHealth.last401At ? 'bad' : 'ok'} />
+                <DiagnosticLine label="Refresh count" value={authSessionHealth.refreshCount} />
+                <DiagnosticLine label="Loki auth status" value={authSessionHealth.lokiAuthStatus || 'unknown'} tone={authSessionHealth.lokiAuthStatus === 'ready' ? 'ok' : authSessionHealth.lokiAuthStatus === 'refresh_failed' ? 'bad' : 'default'} />
+                <DiagnosticLine label="Last auth error" value={authSessionHealth.lastAuthError || '—'} tone={authSessionHealth.lastAuthError ? 'bad' : 'ok'} />
+              </GlassCard>
             </GlassSection>
 
             <GlassSection title="Последние ошибки">

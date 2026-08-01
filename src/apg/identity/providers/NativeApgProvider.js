@@ -1,8 +1,10 @@
 import { IdentityProvider } from '../IdentityProvider.js';
 import { setNativeAuthUser } from '../../../nativeAuth.js';
 import { API_BASE_URL } from '../../../constants.js';
+import { updateAuthSessionDiagnostics } from '../authDiagnostics.js';
 
 const SESSION_REFRESH_AGE_MS = 21 * 86_400_000;
+const SESSION_REFRESH_LEEWAY_MS = 60_000;
 
 export class NativeApgProvider extends IdentityProvider {
   constructor() {
@@ -36,6 +38,7 @@ export class NativeApgProvider extends IdentityProvider {
       claims: value.claims || {},
       issuedAt: Number(value.issuedAt || Date.now()),
       expiresAt: value.expiresAt || null,
+      refreshExpiresAt: value.refreshExpiresAt || value.expiresAt || null,
     };
   }
 
@@ -49,6 +52,7 @@ export class NativeApgProvider extends IdentityProvider {
       claims: this.identity.claims,
       issuedAt: this.identity.issuedAt,
       expiresAt: this.identity.expiresAt,
+      refreshExpiresAt: this.identity.refreshExpiresAt,
     }));
     this.listeners.forEach(listener => listener(this.identity));
     setNativeAuthUser(this.identity);
@@ -72,6 +76,7 @@ export class NativeApgProvider extends IdentityProvider {
       claims: input.claims || {},
       issuedAt: input.issuedAt || Date.now(),
       expiresAt: input.expiresAt || null,
+      refreshExpiresAt: input.refreshExpiresAt || input.expiresAt || null,
     });
     if (!this.identity.uid) throw new Error('native_apg_user_id_required');
     this.persist();
@@ -82,7 +87,9 @@ export class NativeApgProvider extends IdentityProvider {
   async refreshSession({ force = false } = {}) {
     if (!this.identity?.token || this.identity.isAnonymous) return this.identity?.token || '';
     const age = Date.now() - Number(this.identity.issuedAt || 0);
-    if (!force && age < SESSION_REFRESH_AGE_MS) return this.identity.token;
+    const expiresAtMs = this.identity.expiresAt ? new Date(this.identity.expiresAt).getTime() : 0;
+    const expiresSoon = Number.isFinite(expiresAtMs) && expiresAtMs > 0 && expiresAtMs - Date.now() <= SESSION_REFRESH_LEEWAY_MS;
+    if (!force && !expiresSoon && age < SESSION_REFRESH_AGE_MS) return this.identity.token;
     if (this.refreshPromise) return this.refreshPromise;
     const currentToken = this.identity.token;
     this.refreshPromise = fetch(`${API_BASE_URL}/api/auth-session/refresh`, {
@@ -95,6 +102,7 @@ export class NativeApgProvider extends IdentityProvider {
         const error = new Error(data.error || 'auth_session_refresh_failed');
         error.code = data.code || 'AUTH_SESSION_REFRESH_FAILED';
         error.status = response.status;
+        updateAuthSessionDiagnostics({ lastAuthError: error.code, lokiAuthStatus: 'refresh_failed' });
         throw error;
       }
       if (this.identity?.token !== currentToken) return this.identity?.token || data.token;
@@ -103,8 +111,15 @@ export class NativeApgProvider extends IdentityProvider {
         token: data.token,
         issuedAt: Date.now(),
         expiresAt: data.expiresAt || null,
+        refreshExpiresAt: data.refreshExpiresAt || data.expiresAt || null,
       });
       this.persist();
+      const diagnostics = updateAuthSessionDiagnostics({
+        lastRefreshAt: new Date().toISOString(),
+        lastAuthError: null,
+        lokiAuthStatus: 'ready',
+      });
+      updateAuthSessionDiagnostics({ refreshCount: Number(diagnostics.refreshCount || 0) + 1 });
       return data.token;
     }).finally(() => {
       this.refreshPromise = null;

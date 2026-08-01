@@ -15,6 +15,13 @@
 
 ---
 
+## [2026-08-01] fix: восстановление Локи после истечения auth-сессии
+**Коммит:** `локально, без коммита`
+**Файлы:** `src/apg/identity/providers/NativeApgProvider.js`, `src/apg/identity/authDiagnostics.js`, `src/userApi.js`, `src/ApgHealthPage.jsx`, `scripts/auth-session-refresh-test.mjs`, `package.json`, `.ai/04_API.md`, `.ai/12_SECURITY.md`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** native APG session обновляется по `expiresAt`, параллельные refresh объединяются, а защищённый запрос после первого `401` один раз повторяется с новым токеном. APG Health получил безопасные метрики срока сессии, last refresh/401, refresh count и Loki auth status; тест воспроизводит два цикла свыше 35 минут без повторного входа.
+**Почему:** запросы Локи и другие `userAction` продолжали использовать истёкший bearer-токен и не восстанавливались после `401`, поэтому новый вход временно возвращал работоспособность.
+
 ## [2026-07-29] fix: надёжная обработка очереди Telegram `/start`
 **Коммит:** `локально, без коммита`
 **Файлы:** `server/src/lib/telegramUpdates.js`, `scripts/telegram-auth-production-path-test.mjs`, `.ai/17_CHANGELOG_AI.md`
