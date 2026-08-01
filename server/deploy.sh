@@ -112,6 +112,8 @@ yc serverless container revision deploy \
   --environment WEB_PUSH_VAPID_PUBLIC_KEY="$(get_env WEB_PUSH_VAPID_PUBLIC_KEY)" \
   --environment WEB_PUSH_VAPID_PRIVATE_KEY="$(get_env WEB_PUSH_VAPID_PRIVATE_KEY)" \
   --environment WEB_PUSH_VAPID_SUBJECT="$(get_env WEB_PUSH_VAPID_SUBJECT)" \
+  --environment RUSTORE_PUSH_PROJECT_ID="$(get_env RUSTORE_PUSH_PROJECT_ID)" \
+  --environment RUSTORE_PUSH_SERVICE_TOKEN="$(get_env RUSTORE_PUSH_SERVICE_TOKEN)" \
   --environment YANDEX_EMAIL="$(get_env YANDEX_EMAIL)" \
   --environment YANDEX_EMAIL_PASS="$(get_env YANDEX_EMAIL_PASS)" \
   --environment POSTBOX_KEY_ID="$(get_env POSTBOX_KEY_ID)" \
