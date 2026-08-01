@@ -107,7 +107,7 @@ yc serverless container revision deploy \
   --environment ACTIVITY_SECRET="$(get_env ACTIVITY_SECRET)" \
   --environment TELEGRAM_BOT_TOKEN="$(get_env TELEGRAM_BOT_TOKEN)" \
   --environment TELEGRAM_WEBHOOK_SECRET="$(get_env PUSH_SECRET)" \
-  --environment TELEGRAM_DELIVERY_MODE=background \
+  --environment TELEGRAM_DELIVERY_MODE=webhook \
   --environment VK_SERVICE_TOKEN="$(get_env VK_SERVICE_TOKEN)" \
   --environment VK_USER_TOKEN="$(get_env VK_USER_TOKEN)" \
   --environment VK_GROUP_TOKEN="$(get_env VK_GROUP_TOKEN)" \

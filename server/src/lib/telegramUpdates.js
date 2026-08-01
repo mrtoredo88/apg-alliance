@@ -658,17 +658,19 @@ export async function processTelegramUpdate(db, update, log = console) {
   return { handled: true, kind: 'fallback' };
 }
 
-// Poll-модель вместо webhook: входящий путь Telegram → Yandex Cloud ненадёжен
-// (getWebhookInfo: connection timed out; доставка с опозданием в десятки минут).
-// Background polling handles commands quickly; the external minute timer is a
-// lifecycle watchdog. The lock covers the full network retry window so an auth
-// check and watchdog cannot issue conflicting getUpdates calls.
+// Polling remains available as an explicit fallback, but production webhook
+// delivery must never race it: Telegram permits only one delivery mechanism.
+// Serverless containers may freeze background intervals between HTTP requests,
+// so production commands are delivered through the Yandex API Gateway webhook.
 const POLL_LOCK_MS = 28000;
 const POLL_STATE_REF = db => db.collection('config').doc('telegramPolling');
 
 export async function pollTelegramUpdates(db, log = console) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return { ok: false, reason: 'no_token' };
+  if (process.env.TELEGRAM_DELIVERY_MODE === 'webhook') {
+    return { ok: true, skipped: 'webhook_delivery' };
+  }
 
   const stateRef = POLL_STATE_REF(db);
   const startedAt = Date.now();
