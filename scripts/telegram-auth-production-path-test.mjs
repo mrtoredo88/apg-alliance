@@ -36,8 +36,8 @@ assert.match(webhook, /stage: 'update_received'[\s\S]*chatIdHash:[\s\S]*stage: '
 assert.match(updates, /stage: 'start_detected'/, '/start detection is logged');
 assert.match(updates, /stage: 'reply_sent'/, 'successful Telegram replies are logged');
 assert.doesNotMatch(updates, /from: safeDebugPayload\(from\)/, 'Telegram user payload is not written to production logs');
-assert.match(server, /TELEGRAM_DELIVERY_MODE !== 'webhook'/, 'background polling is disabled when webhook delivery is active');
-assert.match(deploy, /TELEGRAM_WEBHOOK_SECRET[\s\S]*TELEGRAM_DELIVERY_MODE=webhook/, 'production deploy enables authenticated webhook-only delivery');
+assert.match(server, /TELEGRAM_DELIVERY_MODE === 'background'/, 'in-process polling is opt-in and disabled for serverless timer delivery');
+assert.match(deploy, /TELEGRAM_WEBHOOK_SECRET[\s\S]*TELEGRAM_DELIVERY_MODE=timer/, 'production deploy uses the external timer as its only polling lifecycle');
 assert.match(check, /status:\s*'expired'[\s\S]*stage:\s*'done_expired'/, 'expired sessions return a clear status and diagnostic stage');
 assert.doesNotMatch(check, /ref\.delete\(\)/, 'completed Telegram sessions remain retryable until their original expiry');
 assert.match(check, /tokenIssuedAt:[\s\S]*resolvedUserId:/, 'successful token delivery is checkpointed idempotently');
