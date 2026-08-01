@@ -18,6 +18,7 @@ assert.match(updates, /authMatch[\s\S]*telegram_auth_update_received[\s\S]*statu
 assert.match(updates, /await ref\.update\(\{[\s\S]*status:\s*'done'[\s\S]*completedAt:[\s\S]*Promise\.resolve\(\)[\s\S]*tgGetPhotoUrl/, 'done is persisted before optional avatar fetch');
 assert.match(updates, /timeoutMs = TELEGRAM_FETCH_TIMEOUT_MS[\s\S]*AbortSignal\.timeout\(timeoutMs\)/, 'Telegram API calls have a bounded timeout');
 assert.match(updates, /TELEGRAM_SEND_TIMEOUT_MS = 12000[\s\S]*TELEGRAM_POLL_TIMEOUT_MS = 12000[\s\S]*TELEGRAM_POLL_ATTEMPTS = 2[\s\S]*TELEGRAM_SEND_ATTEMPTS = 2/, 'Telegram transport tolerates observed production egress latency and retries once');
+assert.match(updates, /new Agent\(\{ connect: \{ family: 4 \} \}\)[\s\S]*dispatcher: TELEGRAM_IPV4_AGENT/, 'Telegram transport is pinned to IPv4 on Yandex Serverless');
 assert.match(updates, /telegram_poll_fetch_failed[\s\S]*errorCode[\s\S]*lastErrorCode/, 'poll failures expose actionable diagnostics');
 assert.match(updates, /const POLL_LOCK_MS = 28000;/, 'the distributed lock covers the full Telegram network retry window');
 assert.match(updates, /stage: 'telegram_send_retry'/, 'outgoing replies retry production Telegram timeouts');

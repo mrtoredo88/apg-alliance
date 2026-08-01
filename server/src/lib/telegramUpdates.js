@@ -8,6 +8,7 @@ import { completeReferralSessionAsync, resolveReferralSessionReferrer } from './
 import { recordReferralEventAsync } from './referralEvents.js';
 import { fetchAndStoreTelegramAvatar } from './telegramAvatar.js';
 import { createHash } from 'node:crypto';
+import { Agent } from 'undici';
 
 const TELEGRAM_HELPER_URL = `${APP_URL}/#/telegram-helper`;
 
@@ -33,6 +34,10 @@ const LINKS_TEXT = '📌 Все наши площадки:';
 const TELEGRAM_FETCH_TIMEOUT_MS = 3500;
 const TELEGRAM_SEND_TIMEOUT_MS = 12000;
 const TELEGRAM_POLL_TIMEOUT_MS = 12000;
+// Yandex Serverless has no reliable IPv6 egress to Telegram. Node's default
+// address selection intermittently waits on Telegram's AAAA address until the
+// request times out, so Telegram transport is pinned to IPv4.
+const TELEGRAM_IPV4_AGENT = new Agent({ connect: { family: 4 } });
 const TELEGRAM_POLL_ATTEMPTS = 2;
 const TELEGRAM_SEND_ATTEMPTS = 2;
 const TELEGRAM_UPDATE_PROCESS_ATTEMPTS = 3;
@@ -104,6 +109,7 @@ async function telegramFetch(url, options = {}, stage = 'telegram_api', timeoutM
   try {
     return await fetch(url, {
       ...options,
+      dispatcher: TELEGRAM_IPV4_AGENT,
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
