@@ -19,6 +19,9 @@ assert.match(updates, /await ref\.update\(\{[\s\S]*status:\s*'done'[\s\S]*comple
 assert.match(updates, /timeoutMs = TELEGRAM_FETCH_TIMEOUT_MS[\s\S]*AbortSignal\.timeout\(timeoutMs\)/, 'Telegram API calls have a bounded timeout');
 assert.match(updates, /TELEGRAM_SEND_TIMEOUT_MS = 12000[\s\S]*TELEGRAM_POLL_TIMEOUT_MS = 32000[\s\S]*TELEGRAM_POLL_ATTEMPTS = 2[\s\S]*TELEGRAM_SEND_ATTEMPTS = 2/, 'Telegram transport covers the full authorization long-poll window and retries once');
 assert.match(updates, /new Agent\(\{ connect: \{ family: 4 \} \}\)[\s\S]*dispatcher: TELEGRAM_IPV4_AGENT/, 'Telegram transport is pinned to IPv4 on Yandex Serverless');
+assert.match(updates, /function telegramApiEndpoint[\s\S]*TELEGRAM_RELAY_URL[\s\S]*\/telegram\/\$\{method\}/, 'Telegram API calls can use the external relay');
+assert.match(updates, /function telegramApiHeaders[\s\S]*x-apg-relay-secret[\s\S]*telegramApiEndpoint\(token, 'sendMessage'\)/, 'outgoing Telegram replies authenticate to the relay');
+assert.match(updates, /session\.status === 'done'[\s\S]*auth_done_replay/, 'Telegram webhook retries are idempotent after authorization completes');
 assert.match(updates, /telegram_poll_fetch_failed[\s\S]*errorCode[\s\S]*lastErrorCode/, 'poll failures expose actionable diagnostics');
 assert.match(updates, /const POLL_LOCK_MS = 35000;/, 'the distributed lock covers the full authorization long-poll window');
 assert.match(updates, /waitSeconds \? 1 : TELEGRAM_POLL_ATTEMPTS/, 'a long poll stays within the serverless execution timeout instead of retrying for another full window');
@@ -46,7 +49,7 @@ assert.match(server, /TELEGRAM_DELIVERY_MODE === 'background'/, 'in-process poll
 assert.match(updates, /TELEGRAM_DELIVERY_MODE === 'webhook'[\s\S]*skipped: 'webhook_delivery'/, 'polling cannot conflict with production webhook delivery');
 assert.match(updates, /waitSeconds[\s\S]*timeout: waitSeconds/, 'authorization polling supports Telegram long polling');
 assert.match(check, /pollTelegramUpdates\(db, fastify\.log, \{ waitSeconds: 25 \}\)/, 'authorization keeps polling for the full client-documented window after opening Telegram');
-assert.match(deploy, /execution-timeout 60s[\s\S]*TELEGRAM_WEBHOOK_SECRET[\s\S]*TELEGRAM_DELIVERY_MODE=polling/, 'production uses outbound Telegram delivery without an unreachable webhook');
+assert.match(deploy, /execution-timeout 60s[\s\S]*TELEGRAM_WEBHOOK_SECRET[\s\S]*TELEGRAM_RELAY_URL=https:\/\/apg-telegram-relay\.apg-app\.workers\.dev[\s\S]*TELEGRAM_RELAY_SECRET[\s\S]*TELEGRAM_DELIVERY_MODE=webhook/, 'production routes Telegram webhook and replies through Cloudflare relay');
 assert.match(check, /status:\s*'expired'[\s\S]*stage:\s*'done_expired'/, 'expired sessions return a clear status and diagnostic stage');
 assert.doesNotMatch(check, /ref\.delete\(\)/, 'completed Telegram sessions remain retryable until their original expiry');
 assert.match(check, /tokenIssuedAt:[\s\S]*resolvedUserId:/, 'successful token delivery is checkpointed idempotently');

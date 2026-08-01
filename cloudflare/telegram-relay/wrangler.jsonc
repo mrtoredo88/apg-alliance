@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "apg-telegram-relay",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "secrets": {
+    "required": ["TELEGRAM_BOT_TOKEN", "WEBHOOK_SECRET", "BACKEND_SECRET", "RELAY_SECRET"]
+  },
+  "vars": {
+    "BACKEND_WEBHOOK_URL": "https://bbangqkf2d4pa9855lu0.containers.yandexcloud.net/api/telegram-webhook"
+  }
+}

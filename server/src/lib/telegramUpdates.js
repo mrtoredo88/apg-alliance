@@ -42,6 +42,22 @@ const TELEGRAM_POLL_ATTEMPTS = 2;
 const TELEGRAM_SEND_ATTEMPTS = 2;
 const TELEGRAM_UPDATE_PROCESS_ATTEMPTS = 3;
 
+function telegramApiEndpoint(token, method) {
+  const relayUrl = String(process.env.TELEGRAM_RELAY_URL || '').trim().replace(/\/+$/, '');
+  return relayUrl
+    ? `${relayUrl}/telegram/${method}`
+    : `https://api.telegram.org/bot${token}/${method}`;
+}
+
+function telegramApiHeaders(headers = {}) {
+  const relayUrl = String(process.env.TELEGRAM_RELAY_URL || '').trim();
+  const relaySecret = String(process.env.TELEGRAM_RELAY_SECRET || process.env.PUSH_SECRET || '').trim();
+  return {
+    ...headers,
+    ...(relayUrl && relaySecret ? { 'x-apg-relay-secret': relaySecret } : {}),
+  };
+}
+
 function safeDebugString(value, max = 280) {
   return String(value ?? '').trim().slice(0, max);
 }
@@ -147,9 +163,9 @@ async function tgSend(chatId, text, extra = {}, log = console) {
     let lastFetchError = null;
     for (let attempt = 1; attempt <= TELEGRAM_SEND_ATTEMPTS; attempt += 1) {
       try {
-        response = await telegramFetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        response = await telegramFetch(telegramApiEndpoint(token, 'sendMessage'), {
           method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: telegramApiHeaders({ 'Content-Type': 'application/json' }),
           body:    JSON.stringify({ chat_id: chatId, text, ...extra }),
         }, 'send_message', TELEGRAM_SEND_TIMEOUT_MS);
         break;
@@ -401,6 +417,16 @@ export async function processTelegramUpdate(db, update, log = console) {
         },
         'telegram-auth-update-received'
       );
+    }
+
+    if (snap.exists && session.status === 'done' && String(session.tgUserId || '') === String(from.id)) {
+      await tgSend(from.id,
+        session.linking === true
+          ? '✅ Telegram уже подтверждён. Вернитесь в приложение АПГ.'
+          : '✅ Авторизация уже подтверждена. Вернитесь в приложение АПГ — вход завершится автоматически.',
+        { reply_markup: SOCIAL_KEYBOARD }, log,
+      );
+      return { handled: true, kind: 'auth_done_replay' };
     }
 
     if (!snap.exists || session.status !== 'pending') {
@@ -699,9 +725,9 @@ export async function pollTelegramUpdates(db, log = console, options = {}) {
   if (!acquired) return { ok: true, skipped: 'locked' };
 
   try {
-    const res = await telegramPollFetch(`https://api.telegram.org/bot${token}/getUpdates`, {
+    const res = await telegramPollFetch(telegramApiEndpoint(token, 'getUpdates'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: telegramApiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         ...(offset ? { offset } : {}),
         timeout: waitSeconds,
