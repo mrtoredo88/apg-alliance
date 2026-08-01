@@ -1,10 +1,32 @@
 import { createHash } from 'node:crypto';
 import { getDb } from '../lib/documentStore.js';
 import { previewMergedAccountCleanup, purgeMergedAccount } from '../lib/mergedAccountCleanup.js';
+import { serverFoundation } from '../apg/index.js';
 
 const hash = value => createHash('sha256').update(String(value || '')).digest('hex').slice(0, 12);
 
 export default async function mergedAccountMaintenanceRoutes(fastify) {
+  fastify.get('/api/maintenance/economy-daily-bonus-impact', async (request, reply) => {
+    const secret = String(request.headers['x-cron-secret'] || '');
+    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+      return reply.code(403).send({ ok: false, error: 'Forbidden' });
+    }
+    const adapter = serverFoundation.data.adapter?.adapter;
+    if (!adapter?.query) return reply.code(503).send({ ok: false, error: 'Postgres unavailable' });
+    const result = await adapter.query(`
+      SELECT
+        count(*)::integer AS operations,
+        count(DISTINCT user_id)::integer AS affected_users,
+        count(*) FILTER (WHERE created_at >= now() - interval '7 days')::integer AS operations_7d,
+        count(DISTINCT user_id) FILTER (WHERE created_at >= now() - interval '7 days')::integer AS affected_users_7d,
+        min(created_at) AS first_operation_at,
+        max(created_at) AS last_operation_at
+      FROM apg_economy_operations
+      WHERE status = 'completed' AND type = 'daily_bonus'
+    `);
+    return reply.send({ ok: true, ...result.rows[0] });
+  });
+
   fastify.post('/api/maintenance/merged-account-preview', async (request, reply) => {
     const secret = String(request.headers['x-cron-secret'] || request.body?.secret || '');
     if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {

@@ -66,6 +66,7 @@ assert.equal(state.operations.length, 1, 'retry must not create a second balance
 
 const adminActions = fs.readFileSync(new URL('../server/src/routes/admin-actions.js', import.meta.url), 'utf8');
 const adminPanel = fs.readFileSync(new URL('../src/AdminPanel.jsx', import.meta.url), 'utf8');
+const userActions = fs.readFileSync(new URL('../server/src/routes/user-actions.js', import.meta.url), 'utf8');
 assert.match(adminActions, /setEconomyBalance\(\{/);
 assert.match(adminActions, /patch\.keys = economyResult\.balanceAfter/);
 assert.match(adminActions, /delete increments\.keys/);
@@ -76,5 +77,6 @@ assert.match(adminActions, /bulk_economy:\$\{actor\.uid\}:\$\{id\}/);
 assert.match(adminActions, /balance: patch\.keys/);
 assert.match(adminActions, /keys: economy\.balance/);
 assert.match(adminPanel, /Показан фактический баланс Account Core/);
+assert.match(userActions, /APG_DAILY_LOGIN_BONUS_ENABLED === 'true'/, 'login bonus must be opt-in so session restore cannot change balances');
 
 console.log('Admin key balance regression: Account Core, ledger, mirror and idempotency passed');
