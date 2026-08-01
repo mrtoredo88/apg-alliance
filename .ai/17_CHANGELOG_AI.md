@@ -15,6 +15,13 @@
 
 ---
 
+## [2026-08-01] fix: повтор Telegram `/start` после обрыва PostgreSQL
+**Коммит:** `локально, без коммита`
+**Файлы:** `server/src/lib/telegramUpdates.js`, `scripts/telegram-auth-production-path-test.mjs`, `.ai/17_CHANGELOG_AI.md`
+**Тип:** fix
+**Что изменено:** обработчик Telegram update повторяет до трёх раз только временные обрывы PostgreSQL/сети внутри одного poll-цикла и сохраняет offset лишь после успешной обработки. Каждая попытка отражается отдельным forensic-событием.
+**Почему:** production получил `/start auth_…`, но первое чтение auth-сессии завершилось `Connection terminated unexpectedly`; update остался в очереди, однако пользователь не получил ответа.
+
 ## [2026-08-01] fix: восстановление Локи после истечения auth-сессии
 **Коммит:** `локально, без коммита`
 **Файлы:** `src/apg/identity/providers/NativeApgProvider.js`, `src/apg/identity/authDiagnostics.js`, `src/userApi.js`, `src/ApgHealthPage.jsx`, `scripts/auth-session-refresh-test.mjs`, `package.json`, `.ai/04_API.md`, `.ai/12_SECURITY.md`, `.ai/17_CHANGELOG_AI.md`

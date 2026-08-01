@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { resolve } from 'node:path';
 import { compareSessionIds, isTransientIdentityDatabaseError } from '../server/src/routes/telegram-auth-check.js';
+import { isTransientTelegramProcessingError } from '../server/src/lib/telegramUpdates.js';
 
 const read = file => fs.readFileSync(resolve(file), 'utf8');
 const start = read('server/src/routes/telegram-auth-start.js');
@@ -20,6 +21,8 @@ assert.match(updates, /const POLL_LOCK_MS = 8000;/, 'a stale poll lock recovers 
 assert.match(updates, /lastCheckpointAt: FieldValue\.serverTimestamp\(\)/, 'each processed Telegram update checkpoints its offset');
 assert.match(updates, /throw error;[\s\S]*let failed = 0;/, 'failed sendMessage calls remain visible to the poller');
 assert.match(updates, /failed \+= 1;[\s\S]*break;/, 'a failed update is retained instead of advancing the Telegram offset');
+assert.match(updates, /TELEGRAM_UPDATE_PROCESS_ATTEMPTS = 3/, 'each Telegram update retries transient database disconnects in the same poll cycle');
+assert.match(updates, /processTelegramUpdateWithRetry\(db, update, log\)/, 'poller uses resilient update processing');
 assert.match(updates, /conflict:\s*res\.error_code === 409/, 'webhook and polling conflict is detected');
 assert.match(postgresAdapter, /client\.on\('error', onClientError\)/, 'checked-out PostgreSQL clients cannot crash the Telegram poller process');
 assert.match(postgresAdapter, /client\.removeListener\('error', onClientError\)/, 'transaction client listener is cleaned up before release');
@@ -37,6 +40,9 @@ assert.deepEqual(compareSessionIds({ state: 'state-1' }, session), [], 'reload m
 assert.equal(compareSessionIds({ ...session, requestId: 'req-other' }, session)[0]?.key, 'requestId', 'explicit requestId mismatch is intentional');
 assert.equal(isTransientIdentityDatabaseError({ code: '53300', message: 'too many active clients' }), true, 'Odyssey pool exhaustion is retryable');
 assert.equal(isTransientIdentityDatabaseError({ code: '23505', message: 'duplicate key' }), false, 'identity conflicts are not retried as pool failures');
+assert.equal(isTransientTelegramProcessingError(new Error('Connection terminated unexpectedly')), true, 'database disconnect is retryable before Telegram offset advances');
+assert.equal(isTransientTelegramProcessingError({ code: 'ECONNRESET', message: 'socket reset' }), true, 'socket reset is retryable');
+assert.equal(isTransientTelegramProcessingError({ code: '23505', message: 'duplicate key' }), false, 'business conflicts are not blindly retried');
 assert.match(check, /telegram_auth_check_identity_retry[\s\S]*continue;/, 'completed Telegram auth retries transient PostgreSQL exhaustion');
 
 console.log('telegram-auth-production-path PASS');

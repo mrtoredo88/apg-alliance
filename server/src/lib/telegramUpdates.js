@@ -32,6 +32,7 @@ const LINKS_TEXT = '📌 Все наши площадки:';
 const TELEGRAM_FETCH_TIMEOUT_MS = 3500;
 const TELEGRAM_POLL_TIMEOUT_MS = 2500;
 const TELEGRAM_POLL_ATTEMPTS = 1;
+const TELEGRAM_UPDATE_PROCESS_ATTEMPTS = 3;
 
 function safeDebugString(value, max = 280) {
   return String(value ?? '').trim().slice(0, max);
@@ -41,6 +42,40 @@ function safeDebugPayload(value) {
   if (value == null) return null;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
   return safeDebugString(JSON.stringify(value), 280);
+}
+
+export function isTransientTelegramProcessingError(error) {
+  const code = safeDebugString(error?.code || error?.cause?.code, 80).toUpperCase();
+  const message = safeDebugString(error?.message || error, 500).toLowerCase();
+  return ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', '57P01', '57P02', '57P03', '53300'].includes(code)
+    || message.includes('connection terminated unexpectedly')
+    || message.includes('connection ended unexpectedly')
+    || message.includes('too many active clients')
+    || message.includes('remaining connection slots are reserved');
+}
+
+async function processTelegramUpdateWithRetry(db, update, log) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= TELEGRAM_UPDATE_PROCESS_ATTEMPTS; attempt += 1) {
+    try {
+      return await processTelegramUpdate(db, update, log);
+    } catch (error) {
+      lastError = error;
+      const transient = isTransientTelegramProcessingError(error);
+      log.warn?.({
+        stage: 'telegram_update_processing_retry',
+        updateId: update?.update_id,
+        attempt,
+        attempts: TELEGRAM_UPDATE_PROCESS_ATTEMPTS,
+        transient,
+        error: safeDebugString(error?.message, 220),
+        errorCode: safeDebugString(error?.code || error?.cause?.code, 80) || null,
+      }, 'telegram-update-forensic');
+      if (!transient || attempt >= TELEGRAM_UPDATE_PROCESS_ATTEMPTS) break;
+      await new Promise(resolve => setTimeout(resolve, attempt * 200));
+    }
+  }
+  throw lastError;
 }
 
 async function appendTelegramTimeline(ref, entry = {}, log = console) {
@@ -653,7 +688,7 @@ export async function pollTelegramUpdates(db, log = console) {
     let failed = 0;
     for (const update of updates) {
       try {
-        await processTelegramUpdate(db, update, log);
+        await processTelegramUpdateWithRetry(db, update, log);
         processed += 1;
         nextOffset = Number(update?.update_id || 0) + 1 || nextOffset;
         await stateRef.set({
