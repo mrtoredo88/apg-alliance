@@ -11,7 +11,7 @@ not update the files already packaged in an APK/AAB.
 - `applicationId` is currently `ru.myapg.app`; confirm it exactly matches the published RuStore package.
 - `versionCode` is `20000` and `versionName` is `2.0.0`; confirm `20000` is greater than every uploaded RuStore artifact.
 - The release certificate SHA-256 is published in `assetlinks.json`; verify every final APK/AAB has the same fingerprint before upload.
-- Create a RuStore Push project for the exact package and signing certificate, then provide `RUSTORE_PUSH_PROJECT_ID` during Android build.
+- RuStore Push production project `I8pESpf4UeWxkCYrWrDdSO-wfps2-Fne` is embedded for package `ru.myapg.app`; `RUSTORE_PUSH_PROJECT_ID` can override it for non-production builds.
 - Configure backend `RUSTORE_PUSH_PROJECT_ID` and `RUSTORE_PUSH_SERVICE_TOKEN`. Firebase, FCM and `google-services.json` are not used.
 
 ## Changelog

@@ -26,6 +26,7 @@ const packageJson = fs.readFileSync('package.json', 'utf8');
 const androidBuild = `${fs.readFileSync('android/build.gradle', 'utf8')}\n${fs.readFileSync('android/app/build.gradle', 'utf8')}`;
 assert.match(serverPush, /sendRuStorePush/);
 assert.match(androidBuild, /ru\.rustore\.sdk:pushclient/);
+assert.match(androidBuild, /I8pESpf4UeWxkCYrWrDdSO-wfps2-Fne/);
 assert.match(androidBuild, /APG_ANDROID_KEYSTORE/);
 assert.match(androidBuild, /signingConfig signingConfigs\.release/);
 assert.doesNotMatch(`${nativePush}\n${serverPush}\n${packageJson}\n${androidBuild}`, /firebase-admin|@capacitor\/push-notifications|google-services|sendEachForMulticast/i);
