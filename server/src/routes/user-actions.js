@@ -3588,7 +3588,12 @@ function boolNotificationPref(prefs, key) {
 }
 
 function isArchivedUser(user = {}) {
-  return user.archived === true || user.deleted === true || ['archived', 'deleted', 'blocked', 'banned'].includes(String(user.status || user.accountStatus || '').toLowerCase());
+  const statuses = [user.status, user.accountStatus, user.lifecycleStatus, user.contentStatus]
+    .map(value => String(value || '').trim().toLowerCase());
+  return user.archived === true
+    || user.deleted === true
+    || Boolean(user.archivedAt || user.deletedAt || user.mergedInto || user.dataMigratedInto)
+    || statuses.some(status => ['archived', 'deleted', 'blocked', 'banned', 'merged'].includes(status));
 }
 
 function hasBlockedDialog(user = {}, senderId = '') {
@@ -5151,7 +5156,7 @@ function accountSearchRowFromPg(row = {}) {
 
 function mergeAccountSearchRows(rows = []) {
   const groups = new Map();
-  for (const row of rows.map(accountSearchRowFromPg)) {
+  for (const row of rows.map(accountSearchRowFromPg).filter(item => !isArchivedUser(item))) {
     const canonicalId = cleanSocialId(row.canonicalUserId || row.id);
     if (!canonicalId) continue;
     const current = groups.get(canonicalId);
@@ -5317,7 +5322,7 @@ async function actionConnectionsSearch(db, req, actor) {
       searchAccountProfilesForConnections(query, actor.userId),
       postgresConnectionsForUser(adapter, actor.userId),
     ]);
-    const people = (accountRows || []).slice(0, query ? 40 : 700).map(row => {
+    const people = (accountRows || []).filter(row => !isArchivedUser(row)).slice(0, query ? 40 : 700).map(row => {
       const aliases = Array.from(new Set([row.id, row.canonicalUserId, ...(row.identityAliases || [])].map(cleanSocialId).filter(Boolean)));
       const request = requests.find(item => {
         const otherId = item.senderId === actor.userId ? item.recipientId : item.senderId;
@@ -5381,6 +5386,7 @@ async function actionConnectionsSearch(db, req, actor) {
   ];
   const dedupedRows = await dedupeSocialSearchRows(db, matchedRows);
   const people = dedupedRows
+    .filter(({ row }) => !isArchivedUser(row))
     .filter(({ canonicalId, aliases }) => canonicalId !== actor.userId && !(aliases || []).includes(actor.userId))
     .slice(0, query ? 40 : 700)
     .map(({ row, canonicalId, aliases }) => {
