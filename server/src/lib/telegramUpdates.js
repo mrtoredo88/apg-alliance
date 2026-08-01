@@ -593,7 +593,10 @@ export async function processTelegramUpdate(db, update, log = console) {
 
 // Poll-модель вместо webhook: входящий путь Telegram → Yandex Cloud ненадёжен
 // (getWebhookInfo: connection timed out; доставка с опозданием в десятки минут).
-const POLL_LOCK_MS = 30000;
+// The warm production instance polls every 5 seconds. Keep the distributed
+// lock only slightly longer than one cycle so a terminated request cannot
+// silence the bot for another half minute.
+const POLL_LOCK_MS = 8000;
 const POLL_STATE_REF = db => db.collection('config').doc('telegramPolling');
 
 export async function pollTelegramUpdates(db, log = console) {

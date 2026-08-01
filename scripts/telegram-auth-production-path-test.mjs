@@ -16,7 +16,7 @@ assert.match(updates, /await ref\.update\(\{[\s\S]*status:\s*'done'[\s\S]*comple
 assert.match(updates, /timeoutMs = TELEGRAM_FETCH_TIMEOUT_MS[\s\S]*AbortSignal\.timeout\(timeoutMs\)/, 'Telegram API calls have a bounded timeout');
 assert.match(updates, /TELEGRAM_POLL_ATTEMPTS = 3[\s\S]*telegramPollFetch[\s\S]*get_updates', TELEGRAM_POLL_TIMEOUT_MS/, 'getUpdates retries within a separate container-safe timeout');
 assert.match(updates, /telegram_poll_fetch_failed[\s\S]*errorCode[\s\S]*lastErrorCode/, 'poll failures expose actionable diagnostics');
-assert.match(updates, /const POLL_LOCK_MS = 30000;/, 'poll lock covers the full server request window');
+assert.match(updates, /const POLL_LOCK_MS = 8000;/, 'a stale poll lock recovers within seconds on the warm production instance');
 assert.match(updates, /lastCheckpointAt: FieldValue\.serverTimestamp\(\)/, 'each processed Telegram update checkpoints its offset');
 assert.match(updates, /throw error;[\s\S]*let failed = 0;/, 'failed sendMessage calls remain visible to the poller');
 assert.match(updates, /failed \+= 1;[\s\S]*break;/, 'a failed update is retained instead of advancing the Telegram offset');
