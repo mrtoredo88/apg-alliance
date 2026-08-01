@@ -15,17 +15,25 @@ export default async function mergedAccountMaintenanceRoutes(fastify) {
       .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
       .filter(user => user.archived === true && (user.mergedInto || user.dataMigratedInto) && ['merged', 'legacy_linked'].includes(String(user.accountStatus || user.identityStatus || '').toLowerCase()));
     const previews = [];
-    for (const user of candidates) previews.push((await previewMergedAccountCleanup([user.id]))[0]);
+    const errors = [];
+    for (const user of candidates) {
+      try {
+        previews.push((await previewMergedAccountCleanup([user.id]))[0]);
+      } catch (error) {
+        errors.push({ sourceHash: hash(user.id), targetHash: hash(user.mergedInto || user.dataMigratedInto), code: String(error?.code || 'PREVIEW_FAILED') });
+      }
+    }
     return reply.send({
       ok: true,
       productionWrites: 0,
       candidates: previews.length,
       safe: previews.filter(item => item.safeToPurge).length,
-      blocked: previews.filter(item => !item.safeToPurge).length,
+      blocked: previews.filter(item => !item.safeToPurge).length + errors.length,
       movableReferences: previews.reduce((sum, item) => sum + item.movableReferences.length, 0),
       historicalReferences: previews.reduce((sum, item) => sum + item.historicalReferences.length, 0),
       nestedDocuments: previews.reduce((sum, item) => sum + item.nested.length, 0),
       nestedConflicts: previews.reduce((sum, item) => sum + item.nestedConflicts.length, 0),
+      errors,
       rows: previews.map(item => ({ sourceHash: hash(item.sourceId), targetHash: hash(item.targetId), safe: item.safeToPurge, movableReferences: item.movableReferences.length, historicalReferences: item.historicalReferences.length, nestedDocuments: item.nested.length, nestedConflicts: item.nestedConflicts.length })),
     });
   });
