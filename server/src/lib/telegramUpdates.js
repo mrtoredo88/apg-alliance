@@ -665,12 +665,13 @@ export async function processTelegramUpdate(db, update, log = console) {
 const POLL_LOCK_MS = 28000;
 const POLL_STATE_REF = db => db.collection('config').doc('telegramPolling');
 
-export async function pollTelegramUpdates(db, log = console) {
+export async function pollTelegramUpdates(db, log = console, options = {}) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return { ok: false, reason: 'no_token' };
   if (process.env.TELEGRAM_DELIVERY_MODE === 'webhook') {
     return { ok: true, skipped: 'webhook_delivery' };
   }
+  const waitSeconds = Math.max(0, Math.min(8, Number(options.waitSeconds) || 0));
 
   const stateRef = POLL_STATE_REF(db);
   const startedAt = Date.now();
@@ -697,7 +698,7 @@ export async function pollTelegramUpdates(db, log = console) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...(offset ? { offset } : {}),
-        timeout: 0,
+        timeout: waitSeconds,
         limit: 50,
         allowed_updates: ['message'],
       }),

@@ -42,7 +42,9 @@ assert.match(updates, /stage: 'reply_sent'/, 'successful Telegram replies are lo
 assert.doesNotMatch(updates, /from: safeDebugPayload\(from\)/, 'Telegram user payload is not written to production logs');
 assert.match(server, /TELEGRAM_DELIVERY_MODE === 'background'/, 'in-process polling is opt-in and disabled for serverless timer delivery');
 assert.match(updates, /TELEGRAM_DELIVERY_MODE === 'webhook'[\s\S]*skipped: 'webhook_delivery'/, 'polling cannot conflict with production webhook delivery');
-assert.match(deploy, /execution-timeout 60s[\s\S]*TELEGRAM_WEBHOOK_SECRET[\s\S]*TELEGRAM_DELIVERY_MODE=webhook/, 'production delivers Telegram updates through the Yandex webhook');
+assert.match(updates, /waitSeconds[\s\S]*timeout: waitSeconds/, 'authorization polling supports Telegram long polling');
+assert.match(check, /pollTelegramUpdates\(db, fastify\.log, \{ waitSeconds: 5 \}\)/, 'authorization keeps polling after the browser opens Telegram');
+assert.match(deploy, /execution-timeout 60s[\s\S]*TELEGRAM_WEBHOOK_SECRET[\s\S]*TELEGRAM_DELIVERY_MODE=polling/, 'production uses outbound Telegram delivery without an unreachable webhook');
 assert.match(check, /status:\s*'expired'[\s\S]*stage:\s*'done_expired'/, 'expired sessions return a clear status and diagnostic stage');
 assert.doesNotMatch(check, /ref\.delete\(\)/, 'completed Telegram sessions remain retryable until their original expiry');
 assert.match(check, /tokenIssuedAt:[\s\S]*resolvedUserId:/, 'successful token delivery is checkpointed idempotently');

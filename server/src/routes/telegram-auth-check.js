@@ -136,7 +136,11 @@ export default async function telegramAuthCheckRoutes(fastify) {
     while (Date.now() < deadline) {
       // Serverless containers may pause background timers. Poll while the
       // authorization client is actively waiting so /start is handled now.
-      await pollTelegramUpdates(db, fastify.log).catch(() => {});
+      // Keep the outbound Telegram request alive after the browser opens the
+      // Telegram app. Yandex continues this server-side request even when the
+      // browser is backgrounded, so the arriving /start cannot fall between
+      // short client checks.
+      await pollTelegramUpdates(db, fastify.log, { waitSeconds: 5 }).catch(() => {});
 
       const snap = await ref.get();
 
