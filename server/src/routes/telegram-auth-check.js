@@ -123,7 +123,7 @@ export default async function telegramAuthCheckRoutes(fastify) {
       loginSessionId,
     }, 'telegram-auth-check-forensic');
 
-    const deadline = Date.now() + 25_000;
+    const deadline = Date.now() + 6_000;
 
     while (Date.now() < deadline) {
       // Push-доставка Telegram → Yandex ненадёжна: пока клиент ждёт авторизацию,
@@ -239,7 +239,6 @@ export default async function telegramAuthCheckRoutes(fastify) {
             }),
           };
         }
-        ref.delete().catch(() => {});
         const normalizedTelegramId = String(data.tgUserId || '').trim();
         try {
           if (!normalizedTelegramId) {
@@ -253,6 +252,11 @@ export default async function telegramAuthCheckRoutes(fastify) {
           const resolvedPhoto = safeString(data.photoUrl || data.photo_200 || data.photo || identity.user?.photo || identity.user?.linkedTelegram?.photo || '', 500);
           const tokenStartedAt = Date.now();
           const token = await serverFoundation.identityV2.createCustomToken(identity.userId, identity.user || {});
+          await ref.set({
+            checkedAt: new Date(),
+            tokenIssuedAt: new Date(),
+            resolvedUserId: identity.userId,
+          }, { merge: true }).catch(() => {});
           return {
             status: 'done',
             tgId,
@@ -345,7 +349,19 @@ export default async function telegramAuthCheckRoutes(fastify) {
         };
       }
 
-      await new Promise(r => setTimeout(r, 1000));
+      return {
+        status: 'pending',
+        diagnostics: buildTelegramAuthDiagnostics({
+          stage: 'polling_pending',
+          state,
+          requestId: resolvedRequestId,
+          loginSessionId: resolvedLoginSessionId,
+          telegramSessionId: resolvedTelegramSessionId,
+          elapsedMs: Date.now() - startAt,
+          identityV2Attempted: false,
+          note: 'short_poll_complete_client_should_retry',
+        }),
+      };
     }
 
     return {

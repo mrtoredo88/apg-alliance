@@ -14,7 +14,7 @@ assert.match(start, /requestId,[\s\S]*loginSessionId: loginSessionId \|\| null,[
 assert.match(updates, /authMatch[\s\S]*telegram_auth_update_received[\s\S]*status:\s*'done'/, 'auth update reaches done');
 assert.match(updates, /await ref\.update\(\{[\s\S]*status:\s*'done'[\s\S]*completedAt:[\s\S]*Promise\.resolve\(\)[\s\S]*tgGetPhotoUrl/, 'done is persisted before optional avatar fetch');
 assert.match(updates, /timeoutMs = TELEGRAM_FETCH_TIMEOUT_MS[\s\S]*AbortSignal\.timeout\(timeoutMs\)/, 'Telegram API calls have a bounded timeout');
-assert.match(updates, /TELEGRAM_POLL_ATTEMPTS = 3[\s\S]*telegramPollFetch[\s\S]*get_updates', TELEGRAM_POLL_TIMEOUT_MS/, 'getUpdates retries within a separate container-safe timeout');
+assert.match(updates, /TELEGRAM_POLL_TIMEOUT_MS = 2500[\s\S]*TELEGRAM_POLL_ATTEMPTS = 1/, 'auth polling stays below the serverless client timeout');
 assert.match(updates, /telegram_poll_fetch_failed[\s\S]*errorCode[\s\S]*lastErrorCode/, 'poll failures expose actionable diagnostics');
 assert.match(updates, /const POLL_LOCK_MS = 8000;/, 'a stale poll lock recovers within seconds on the warm production instance');
 assert.match(updates, /lastCheckpointAt: FieldValue\.serverTimestamp\(\)/, 'each processed Telegram update checkpoints its offset');
@@ -26,6 +26,9 @@ assert.match(postgresAdapter, /client\.removeListener\('error', onClientError\)/
 assert.match(webhook, /await processTelegramUpdate\(db, payload, request\.log\)/, 'webhook must finish Telegram processing before the serverless request returns');
 assert.match(webhook, /x-telegram-bot-api-secret-token/, 'webhook validates the Telegram secret token');
 assert.match(check, /status:\s*'expired'[\s\S]*stage:\s*'done_expired'/, 'expired sessions return a clear status and diagnostic stage');
+assert.doesNotMatch(check, /ref\.delete\(\)/, 'completed Telegram sessions remain retryable until their original expiry');
+assert.match(check, /tokenIssuedAt:[\s\S]*resolvedUserId:/, 'successful token delivery is checkpointed idempotently');
+assert.match(check, /short_poll_complete_client_should_retry/, 'auth check returns quickly and lets the client retry');
 
 const session = { requestId: 'req-1', loginSessionId: 'login-1', telegramSessionId: 'state-1', state: 'state-1' };
 assert.deepEqual(compareSessionIds(session, session), [], 'matching auth-check correlation succeeds');
