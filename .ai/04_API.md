@@ -552,6 +552,10 @@ Production delivery — `POLLING_PRIMARY`: auth-check вызывает `getUpdat
 
 ---
 
+## POST /api/auth-session/verify, /refresh, /logout
+
+Управление native APG-сессией через `X-APG-Auth`. `verify` проверяет текущую сессию, `refresh` атомарно ротирует bearer-токен и продлевает срок на 30 дней, `logout` отзывает токен. Клиент выполняет refresh заранее и объединяет параллельные попытки в один запрос.
+
 ## POST /api/email-auth
 
 **Назначение:** Многоцелевой эндпоинт email-авторизации.

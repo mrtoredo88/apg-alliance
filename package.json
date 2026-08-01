@@ -194,6 +194,7 @@
     "test:migration-env-loader": "node scripts/migration-env-loader-test.mjs",
     "account:resolve-p0": "node scripts/account-p0-resolution.mjs",
     "test:auth-bugfix-regression": "node scripts/auth-bugfix-regression.mjs",
+    "test:auth-session-refresh": "node scripts/auth-session-refresh-test.mjs",
     "test:profile-sync-preservation": "node scripts/profile-sync-preservation-test.mjs",
     "identity:merge-execute": "node scripts/identity-merge-execute.mjs"
   },

@@ -57,6 +57,22 @@ export class SessionRepository {
     };
   }
 
+  async rotateBearerSession({ token, userId, device = {}, platform = '', ttlDays = 30 }) {
+    const currentHash = hash(token);
+    const nextToken = `apg_${crypto.randomBytes(32).toString('base64url')}`;
+    const nextHash = hash(nextToken);
+    const expiresAt = new Date(Date.now() + Math.max(1, Number(ttlDays) || 30) * 86_400_000);
+    const result = await this.adapter.query(`
+      UPDATE apg_identity_sessions
+      SET refresh_token_hash = $1, device = $2::jsonb, platform = $3, expires_at = $4, last_seen_at = now()
+      WHERE refresh_token_hash = $5 AND user_id = $6 AND status = 'active'
+        AND (expires_at IS NULL OR expires_at > now())
+      RETURNING id
+    `, [nextHash, JSON.stringify(device || {}), safeString(platform, 120) || null, expiresAt, currentHash, safeString(userId, 260)]);
+    if (!result.rowCount) throw Object.assign(new Error('Недействительная сессия.'), { code: 'AUTH_SESSION_INVALID', statusCode: 401 });
+    return { id: result.rows[0].id, userId: safeString(userId, 260), status: 'active', token: nextToken, expiresAt };
+  }
+
   async revokeBearerToken(token) {
     const result = await this.adapter.query(
       "UPDATE apg_identity_sessions SET status = 'revoked', revoked_at = now() WHERE refresh_token_hash = $1 RETURNING id",

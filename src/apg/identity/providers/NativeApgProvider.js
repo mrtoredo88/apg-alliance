@@ -1,10 +1,14 @@
 import { IdentityProvider } from '../IdentityProvider.js';
 import { setNativeAuthUser } from '../../../nativeAuth.js';
+import { API_BASE_URL } from '../../../constants.js';
+
+const SESSION_REFRESH_AGE_MS = 21 * 86_400_000;
 
 export class NativeApgProvider extends IdentityProvider {
   constructor() {
     super('native-apg');
     this.listeners = new Set();
+    this.refreshPromise = null;
     this.identity = this.restore();
     setNativeAuthUser(this.identity);
   }
@@ -30,6 +34,8 @@ export class NativeApgProvider extends IdentityProvider {
       getIdTokenResult: async () => ({ token: provider.identity?.token || '', claims: value.claims || {} }),
       token: String(value.token || ''),
       claims: value.claims || {},
+      issuedAt: Number(value.issuedAt || Date.now()),
+      expiresAt: value.expiresAt || null,
     };
   }
 
@@ -41,6 +47,8 @@ export class NativeApgProvider extends IdentityProvider {
       isAnonymous: this.identity.isAnonymous,
       token: this.identity.token,
       claims: this.identity.claims,
+      issuedAt: this.identity.issuedAt,
+      expiresAt: this.identity.expiresAt,
     }));
     this.listeners.forEach(listener => listener(this.identity));
     setNativeAuthUser(this.identity);
@@ -62,6 +70,8 @@ export class NativeApgProvider extends IdentityProvider {
       email: input.email,
       token: input.token,
       claims: input.claims || {},
+      issuedAt: input.issuedAt || Date.now(),
+      expiresAt: input.expiresAt || null,
     });
     if (!this.identity.uid) throw new Error('native_apg_user_id_required');
     this.persist();
@@ -69,10 +79,52 @@ export class NativeApgProvider extends IdentityProvider {
   }
 
   async createIdentity(input = {}) { return this.authenticate(input); }
-  async refreshSession() { return this.getSessionToken(); }
+  async refreshSession({ force = false } = {}) {
+    if (!this.identity?.token || this.identity.isAnonymous) return this.identity?.token || '';
+    const age = Date.now() - Number(this.identity.issuedAt || 0);
+    if (!force && age < SESSION_REFRESH_AGE_MS) return this.identity.token;
+    if (this.refreshPromise) return this.refreshPromise;
+    const currentToken = this.identity.token;
+    this.refreshPromise = fetch(`${API_BASE_URL}/api/auth-session/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-APG-Auth': currentToken },
+      body: JSON.stringify({ platform: 'web-app' }),
+    }).then(async response => {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.token) {
+        const error = new Error(data.error || 'auth_session_refresh_failed');
+        error.code = data.code || 'AUTH_SESSION_REFRESH_FAILED';
+        error.status = response.status;
+        throw error;
+      }
+      if (this.identity?.token !== currentToken) return this.identity?.token || data.token;
+      this.identity = this.createUser({
+        ...this.identity,
+        token: data.token,
+        issuedAt: Date.now(),
+        expiresAt: data.expiresAt || null,
+      });
+      this.persist();
+      return data.token;
+    }).finally(() => {
+      this.refreshPromise = null;
+    });
+    return this.refreshPromise;
+  }
   async verifySession() { return this.identity; }
-  async invalidateSession() { this.identity = null; this.persist(); return true; }
-  getSessionToken() { return Promise.resolve(this.identity?.token || ''); }
+  async invalidateSession() {
+    const token = this.identity?.token || '';
+    this.identity = null;
+    this.persist();
+    if (token) {
+      await fetch(`${API_BASE_URL}/api/auth-session/logout`, {
+        method: 'POST',
+        headers: { 'X-APG-Auth': token },
+      }).catch(() => {});
+    }
+    return true;
+  }
+  getSessionToken({ forceRefresh = false } = {}) { return this.refreshSession({ force: forceRefresh }); }
   getSessionClaims() { return Promise.resolve({ claims: this.identity?.claims || {} }); }
 
   onIdentityChanged(handler) {

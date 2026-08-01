@@ -35,6 +35,7 @@ import partnershipApplicationRoutes from './routes/partnership-application.js';
 import accountRoutes from './routes/account.js';
 import appDataRoutes from './routes/app-data.js';
 import mergedAccountMaintenanceRoutes from './routes/merged-account-maintenance.js';
+import authSessionRoutes from './routes/auth-session.js';
 
 const fastify = Fastify({ logger: true, bodyLimit: 8_388_608 });
 
@@ -95,6 +96,7 @@ fastify.register(partnershipApplicationRoutes);
 fastify.register(accountRoutes);
 fastify.register(appDataRoutes);
 fastify.register(mergedAccountMaintenanceRoutes);
+fastify.register(authSessionRoutes);
 
 fastify.get('/version', async () => ({
   git: process.env.GIT_SHA || process.env.APP_VERSION || '',

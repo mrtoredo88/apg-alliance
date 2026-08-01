@@ -25,8 +25,12 @@ export class NativeApgServerIdentityProvider extends ServerIdentityProvider {
 
   async refreshSession(input = {}) {
     const identity = await this.verifySession(input);
-    await this.sessions.revokeBearerToken(input.token);
-    return this.authenticate({ uid: identity.uid, device: input.device, platform: input.platform });
+    return this.sessions.rotateBearerSession({
+      token: input.token,
+      userId: identity.uid,
+      device: input.device,
+      platform: input.platform,
+    });
   }
 
   async invalidateSession(input = {}) {
