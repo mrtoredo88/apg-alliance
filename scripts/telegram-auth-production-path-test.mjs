@@ -17,10 +17,11 @@ assert.match(start, /requestId,[\s\S]*loginSessionId: loginSessionId \|\| null,[
 assert.match(updates, /authMatch[\s\S]*telegram_auth_update_received[\s\S]*status:\s*'done'/, 'auth update reaches done');
 assert.match(updates, /await ref\.update\(\{[\s\S]*status:\s*'done'[\s\S]*completedAt:[\s\S]*Promise\.resolve\(\)[\s\S]*tgGetPhotoUrl/, 'done is persisted before optional avatar fetch');
 assert.match(updates, /timeoutMs = TELEGRAM_FETCH_TIMEOUT_MS[\s\S]*AbortSignal\.timeout\(timeoutMs\)/, 'Telegram API calls have a bounded timeout');
-assert.match(updates, /TELEGRAM_SEND_TIMEOUT_MS = 12000[\s\S]*TELEGRAM_POLL_TIMEOUT_MS = 12000[\s\S]*TELEGRAM_POLL_ATTEMPTS = 2[\s\S]*TELEGRAM_SEND_ATTEMPTS = 2/, 'Telegram transport tolerates observed production egress latency and retries once');
+assert.match(updates, /TELEGRAM_SEND_TIMEOUT_MS = 12000[\s\S]*TELEGRAM_POLL_TIMEOUT_MS = 32000[\s\S]*TELEGRAM_POLL_ATTEMPTS = 2[\s\S]*TELEGRAM_SEND_ATTEMPTS = 2/, 'Telegram transport covers the full authorization long-poll window and retries once');
 assert.match(updates, /new Agent\(\{ connect: \{ family: 4 \} \}\)[\s\S]*dispatcher: TELEGRAM_IPV4_AGENT/, 'Telegram transport is pinned to IPv4 on Yandex Serverless');
 assert.match(updates, /telegram_poll_fetch_failed[\s\S]*errorCode[\s\S]*lastErrorCode/, 'poll failures expose actionable diagnostics');
-assert.match(updates, /const POLL_LOCK_MS = 28000;/, 'the distributed lock covers the full Telegram network retry window');
+assert.match(updates, /const POLL_LOCK_MS = 35000;/, 'the distributed lock covers the full authorization long-poll window');
+assert.match(updates, /waitSeconds \? 1 : TELEGRAM_POLL_ATTEMPTS/, 'a long poll stays within the serverless execution timeout instead of retrying for another full window');
 assert.match(updates, /stage: 'telegram_send_retry'/, 'outgoing replies retry production Telegram timeouts');
 assert.match(updates, /lastCheckpointAt: FieldValue\.serverTimestamp\(\)/, 'each processed Telegram update checkpoints its offset');
 assert.match(updates, /throw error;[\s\S]*let failed = 0;/, 'failed sendMessage calls remain visible to the poller');
@@ -44,7 +45,7 @@ assert.doesNotMatch(updates, /from: safeDebugPayload\(from\)/, 'Telegram user pa
 assert.match(server, /TELEGRAM_DELIVERY_MODE === 'background'/, 'in-process polling is opt-in and disabled for serverless timer delivery');
 assert.match(updates, /TELEGRAM_DELIVERY_MODE === 'webhook'[\s\S]*skipped: 'webhook_delivery'/, 'polling cannot conflict with production webhook delivery');
 assert.match(updates, /waitSeconds[\s\S]*timeout: waitSeconds/, 'authorization polling supports Telegram long polling');
-assert.match(check, /pollTelegramUpdates\(db, fastify\.log, \{ waitSeconds: 5 \}\)/, 'authorization keeps polling after the browser opens Telegram');
+assert.match(check, /pollTelegramUpdates\(db, fastify\.log, \{ waitSeconds: 25 \}\)/, 'authorization keeps polling for the full client-documented window after opening Telegram');
 assert.match(deploy, /execution-timeout 60s[\s\S]*TELEGRAM_WEBHOOK_SECRET[\s\S]*TELEGRAM_DELIVERY_MODE=polling/, 'production uses outbound Telegram delivery without an unreachable webhook');
 assert.match(check, /status:\s*'expired'[\s\S]*stage:\s*'done_expired'/, 'expired sessions return a clear status and diagnostic stage');
 assert.doesNotMatch(check, /ref\.delete\(\)/, 'completed Telegram sessions remain retryable until their original expiry');

@@ -33,7 +33,7 @@ const WELCOME_TEXT =
 const LINKS_TEXT = '📌 Все наши площадки:';
 const TELEGRAM_FETCH_TIMEOUT_MS = 3500;
 const TELEGRAM_SEND_TIMEOUT_MS = 12000;
-const TELEGRAM_POLL_TIMEOUT_MS = 12000;
+const TELEGRAM_POLL_TIMEOUT_MS = 32000;
 // Yandex Serverless has no reliable IPv6 egress to Telegram. Node's default
 // address selection intermittently waits on Telegram's AAAA address until the
 // request times out, so Telegram transport is pinned to IPv4.
@@ -120,9 +120,9 @@ async function telegramFetch(url, options = {}, stage = 'telegram_api', timeoutM
   }
 }
 
-async function telegramPollFetch(url, options = {}, log = console) {
+async function telegramPollFetch(url, options = {}, log = console, maxAttempts = TELEGRAM_POLL_ATTEMPTS) {
   let lastError = null;
-  for (let attempt = 1; attempt <= TELEGRAM_POLL_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       return await telegramFetch(url, options, 'get_updates', TELEGRAM_POLL_TIMEOUT_MS);
     } catch (error) {
@@ -130,11 +130,11 @@ async function telegramPollFetch(url, options = {}, log = console) {
       log.warn?.({
         stage: 'telegram_poll_fetch_retry',
         attempt,
-        attempts: TELEGRAM_POLL_ATTEMPTS,
+        attempts: maxAttempts,
         error: safeDebugString(error?.message, 160),
         errorCode: safeDebugString(error?.code || error?.cause?.code, 120) || null,
       }, 'telegram-poll-forensic');
-      if (attempt < TELEGRAM_POLL_ATTEMPTS) await new Promise(resolve => setTimeout(resolve, attempt * 200));
+      if (attempt < maxAttempts) await new Promise(resolve => setTimeout(resolve, attempt * 200));
     }
   }
   throw lastError;
@@ -668,7 +668,7 @@ export async function processTelegramUpdate(db, update, log = console) {
 // delivery must never race it: Telegram permits only one delivery mechanism.
 // Serverless containers may freeze background intervals between HTTP requests,
 // so production commands are delivered through the Yandex API Gateway webhook.
-const POLL_LOCK_MS = 28000;
+const POLL_LOCK_MS = 35000;
 const POLL_STATE_REF = db => db.collection('config').doc('telegramPolling');
 
 export async function pollTelegramUpdates(db, log = console, options = {}) {
@@ -677,7 +677,7 @@ export async function pollTelegramUpdates(db, log = console, options = {}) {
   if (process.env.TELEGRAM_DELIVERY_MODE === 'webhook') {
     return { ok: true, skipped: 'webhook_delivery' };
   }
-  const waitSeconds = Math.max(0, Math.min(8, Number(options.waitSeconds) || 0));
+  const waitSeconds = Math.max(0, Math.min(25, Number(options.waitSeconds) || 0));
 
   const stateRef = POLL_STATE_REF(db);
   const startedAt = Date.now();
@@ -708,7 +708,7 @@ export async function pollTelegramUpdates(db, log = console, options = {}) {
         limit: 50,
         allowed_updates: ['message'],
       }),
-    }, log).then(r => r.json());
+    }, log, waitSeconds ? 1 : TELEGRAM_POLL_ATTEMPTS).then(r => r.json());
 
     if (!res.ok) {
       const errorText = `${res.error_code || ''} ${res.description || 'getUpdates failed'}`.trim().slice(0, 200);

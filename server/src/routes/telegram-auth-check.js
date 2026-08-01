@@ -140,7 +140,7 @@ export default async function telegramAuthCheckRoutes(fastify) {
       // Telegram app. Yandex continues this server-side request even when the
       // browser is backgrounded, so the arriving /start cannot fall between
       // short client checks.
-      await pollTelegramUpdates(db, fastify.log, { waitSeconds: 5 }).catch(() => {});
+      await pollTelegramUpdates(db, fastify.log, { waitSeconds: 25 }).catch(() => {});
 
       const snap = await ref.get();
 
