@@ -1,4 +1,5 @@
 import { getDb } from '../lib/documentStore.js';
+import { pollTelegramUpdates } from '../lib/telegramUpdates.js';
 import { serverFoundation } from '../apg/index.js';
 
 function safeString(value, max = 220) {
@@ -133,6 +134,10 @@ export default async function telegramAuthCheckRoutes(fastify) {
     const deadline = Date.now() + 6_000;
 
     while (Date.now() < deadline) {
+      // Serverless containers may pause background timers. Poll while the
+      // authorization client is actively waiting so /start is handled now.
+      await pollTelegramUpdates(db, fastify.log).catch(() => {});
+
       const snap = await ref.get();
 
       if (!snap.exists) return {

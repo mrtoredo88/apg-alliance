@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { serverFoundation } from './apg/index.js';
+import { getDb } from './lib/documentStore.js';
+import { pollTelegramUpdates } from './lib/telegramUpdates.js';
 
 import vkNewsRoutes           from './routes/vk-news.js';
 import uploadPhotoRoutes      from './routes/upload-photo.js';
@@ -114,3 +116,20 @@ fastify.get('/health', async (request, reply) => {
 
 const port = Number(process.env.PORT ?? 3000);
 await fastify.listen({ port, host: '0.0.0.0' });
+
+if (process.env.TELEGRAM_BOT_TOKEN) {
+  let telegramPollRunning = false;
+  const runTelegramPoll = async () => {
+    if (telegramPollRunning) return;
+    telegramPollRunning = true;
+    try {
+      await pollTelegramUpdates(getDb(), fastify.log);
+    } catch (error) {
+      fastify.log.warn({ message: error?.message || String(error) }, 'telegram background poll failed');
+    } finally {
+      telegramPollRunning = false;
+    }
+  };
+  setInterval(runTelegramPoll, 5000);
+  setTimeout(runTelegramPoll, 1000);
+}

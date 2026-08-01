@@ -1,5 +1,5 @@
 import { getDb } from '../lib/documentStore.js';
-import { processTelegramUpdate } from '../lib/telegramUpdates.js';
+import { processTelegramUpdate, pollTelegramUpdates } from '../lib/telegramUpdates.js';
 
 export default async function telegramWebhookRoutes(fastify) {
   fastify.post('/api/telegram-webhook', async (request, reply) => {
@@ -27,5 +27,15 @@ export default async function telegramWebhookRoutes(fastify) {
       request.log.warn({ message: error?.message || String(error) }, 'telegram webhook processing failed');
       return reply.code(500).send({ ok: false });
     }
+  });
+
+  // Yandex timer invokes this once a minute for ordinary bot commands. Login
+  // checks also poll immediately, so authorization does not wait for the timer.
+  fastify.post('/api/telegram-poll', async (request, reply) => {
+    const secret = request.body?.secret || request.headers['x-cron-secret'];
+    const valid = secret && [process.env.CRON_SECRET, process.env.PUSH_SECRET].filter(Boolean).includes(secret);
+    if (!valid) return reply.code(401).send({ ok: false, error: 'unauthorized' });
+    const result = await pollTelegramUpdates(getDb(), request.log);
+    return { ok: true, ...result };
   });
 }
