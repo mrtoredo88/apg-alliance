@@ -109,7 +109,11 @@ async function tgSend(chatId, text, extra = {}, log = console) {
         errorCode: payload?.error_code || null,
         description: safeDebugString(payload?.description, 240),
       }, 'telegram-send-forensic');
-      return { ok: false, status: response.status, payload };
+      const error = Object.assign(new Error(`telegram_send_failed:${payload?.description || response.status}`), {
+        code: 'TELEGRAM_SEND_FAILED',
+        status: response.status,
+      });
+      throw error;
     }
     return payload;
   } catch (error) {
@@ -119,7 +123,7 @@ async function tgSend(chatId, text, extra = {}, log = console) {
       errorCode: safeDebugString(error?.code || error?.cause?.code, 120) || null,
       description: safeDebugString(error?.message, 240),
     }, 'telegram-send-forensic');
-    return { ok: false, error };
+    throw error;
   }
 }
 
@@ -643,19 +647,21 @@ export async function pollTelegramUpdates(db, log = console) {
 
     let processed = 0;
     let nextOffset = offset;
+    let failed = 0;
     for (const update of updates) {
       try {
         await processTelegramUpdate(db, update, log);
         processed += 1;
-      } catch (error) {
-        log.warn?.({ message: error?.message || String(error), updateId: update?.update_id }, 'telegram update processing failed');
-      } finally {
         nextOffset = Number(update?.update_id || 0) + 1 || nextOffset;
         await stateRef.set({
           offset: nextOffset,
           lockUntil: Date.now() + POLL_LOCK_MS,
           lastCheckpointAt: FieldValue.serverTimestamp(),
-        }, { merge: true }).catch(() => {});
+        }, { merge: true });
+      } catch (error) {
+        failed += 1;
+        log.warn?.({ message: error?.message || String(error), updateId: update?.update_id }, 'telegram update processing failed');
+        break;
       }
     }
 
@@ -666,7 +672,7 @@ export async function pollTelegramUpdates(db, log = console) {
       lastError: null,
       ...(updates.length ? { lastUpdateAt: FieldValue.serverTimestamp(), processedTotal: FieldValue.increment(processed) } : {}),
     }, { merge: true });
-    return { ok: true, received: updates.length, processed, tookMs: Date.now() - startedAt };
+    return { ok: failed === 0, received: updates.length, processed, failed, tookMs: Date.now() - startedAt };
   } catch (error) {
     const errorText = String(error?.message || error).slice(0, 200);
     const errorCode = safeDebugString(error?.code || error?.cause?.code || error?.cause?.cause?.code, 120) || null;

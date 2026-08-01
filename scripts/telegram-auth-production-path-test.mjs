@@ -18,6 +18,8 @@ assert.match(updates, /TELEGRAM_POLL_ATTEMPTS = 3[\s\S]*telegramPollFetch[\s\S]*
 assert.match(updates, /telegram_poll_fetch_failed[\s\S]*errorCode[\s\S]*lastErrorCode/, 'poll failures expose actionable diagnostics');
 assert.match(updates, /const POLL_LOCK_MS = 30000;/, 'poll lock covers the full server request window');
 assert.match(updates, /lastCheckpointAt: FieldValue\.serverTimestamp\(\)/, 'each processed Telegram update checkpoints its offset');
+assert.match(updates, /throw error;[\s\S]*let failed = 0;/, 'failed sendMessage calls remain visible to the poller');
+assert.match(updates, /failed \+= 1;[\s\S]*break;/, 'a failed update is retained instead of advancing the Telegram offset');
 assert.match(updates, /conflict:\s*res\.error_code === 409/, 'webhook and polling conflict is detected');
 assert.match(postgresAdapter, /client\.on\('error', onClientError\)/, 'checked-out PostgreSQL clients cannot crash the Telegram poller process');
 assert.match(postgresAdapter, /client\.removeListener\('error', onClientError\)/, 'transaction client listener is cleaned up before release');
