@@ -7,8 +7,8 @@ const read = file => fs.readFileSync(resolve(file), 'utf8');
 const start = read('server/src/routes/telegram-auth-start.js');
 const check = read('server/src/routes/telegram-auth-check.js');
 const updates = read('server/src/lib/telegramUpdates.js');
+const webhook = read('server/src/routes/telegram-webhook.js');
 const postgresAdapter = read('server/src/apg/infrastructure/adapters/PostgresIdentityAdapter.js');
-const deployment = read('.ai/13_DEPLOYMENT.md');
 
 assert.match(start, /requestId,[\s\S]*loginSessionId: loginSessionId \|\| null,[\s\S]*telegramSessionId: state,[\s\S]*state,/, 'auth-start persists and returns correlation ids');
 assert.match(updates, /authMatch[\s\S]*telegram_auth_update_received[\s\S]*status:\s*'done'/, 'auth update reaches done');
@@ -21,8 +21,9 @@ assert.match(updates, /lastCheckpointAt: FieldValue\.serverTimestamp\(\)/, 'each
 assert.match(updates, /conflict:\s*res\.error_code === 409/, 'webhook and polling conflict is detected');
 assert.match(postgresAdapter, /client\.on\('error', onClientError\)/, 'checked-out PostgreSQL clients cannot crash the Telegram poller process');
 assert.match(postgresAdapter, /client\.removeListener\('error', onClientError\)/, 'transaction client listener is cleaned up before release');
+assert.match(webhook, /await processTelegramUpdate\(db, payload, request\.log\)/, 'webhook must finish Telegram processing before the serverless request returns');
+assert.match(webhook, /x-telegram-bot-api-secret-token/, 'webhook validates the Telegram secret token');
 assert.match(check, /status:\s*'expired'[\s\S]*stage:\s*'done_expired'/, 'expired sessions return a clear status and diagnostic stage');
-assert.match(deployment, /Webhook НЕ устанавливать:[\s\S]*getUpdates возвращает 409/, 'production delivery contract remains polling-only');
 
 const session = { requestId: 'req-1', loginSessionId: 'login-1', telegramSessionId: 'state-1', state: 'state-1' };
 assert.deepEqual(compareSessionIds(session, session), [], 'matching auth-check correlation succeeds');

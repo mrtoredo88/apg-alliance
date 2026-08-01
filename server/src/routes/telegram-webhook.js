@@ -2,8 +2,12 @@ import { getDb } from '../lib/documentStore.js';
 import { processTelegramUpdate, pollTelegramUpdates } from '../lib/telegramUpdates.js';
 
 export default async function telegramWebhookRoutes(fastify) {
-  // Webhook оставлен на случай возврата push-доставки; основной канал — getUpdates-поллинг
-  fastify.post('/api/telegram-webhook', async (request) => {
+  fastify.post('/api/telegram-webhook', async (request, reply) => {
+    const configuredSecret = String(process.env.TELEGRAM_WEBHOOK_SECRET || process.env.PUSH_SECRET || '').trim();
+    const suppliedSecret = String(request.headers['x-telegram-bot-api-secret-token'] || '').trim();
+    if (configuredSecret && suppliedSecret !== configuredSecret) {
+      return reply.code(401).send({ ok: false });
+    }
     const requestId = String(request.headers['x-request-id'] || request.headers['x-telegram-bot-api-secret-token'] || '').trim();
     const payload = request.body ?? {};
     const messageText = String(payload?.message?.text || '').slice(0, 120);
@@ -16,10 +20,13 @@ export default async function telegramWebhookRoutes(fastify) {
       text: messageText,
     }, 'telegram-webhook-forensic');
     const db = getDb();
-    void processTelegramUpdate(db, payload, request.log).catch(error => {
+    try {
+      const result = await processTelegramUpdate(db, payload, request.log);
+      return { ok: true, handled: Boolean(result?.handled), kind: result?.kind || 'unknown' };
+    } catch (error) {
       request.log.warn({ message: error?.message || String(error) }, 'telegram webhook processing failed');
-    });
-    return { ok: true };
+      return reply.code(500).send({ ok: false });
+    }
   });
 
   // Вызывается cron-триггером Yandex раз в минуту: подхватывает органические команды боту
