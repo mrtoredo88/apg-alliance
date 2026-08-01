@@ -92,13 +92,35 @@ async function telegramPollFetch(url, options = {}, log = console) {
   throw lastError;
 }
 
-async function tgSend(chatId, text, extra = {}) {
+async function tgSend(chatId, text, extra = {}, log = console) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  return telegramFetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ chat_id: chatId, text, ...extra }),
-  }, 'send_message').catch(() => {});
+  try {
+    const response = await telegramFetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ chat_id: chatId, text, ...extra }),
+    }, 'send_message');
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.ok === false) {
+      log.warn?.({
+        stage: 'telegram_send_failed',
+        chatId,
+        status: response.status,
+        errorCode: payload?.error_code || null,
+        description: safeDebugString(payload?.description, 240),
+      }, 'telegram-send-forensic');
+      return { ok: false, status: response.status, payload };
+    }
+    return payload;
+  } catch (error) {
+    log.warn?.({
+      stage: 'telegram_send_failed',
+      chatId,
+      errorCode: safeDebugString(error?.code || error?.cause?.code, 120) || null,
+      description: safeDebugString(error?.message, 240),
+    }, 'telegram-send-forensic');
+    return { ok: false, error };
+  }
 }
 
 async function tgGetPhotoUrl(userId) {
@@ -314,7 +336,7 @@ export async function processTelegramUpdate(db, update, log = console) {
         telegramSessionId: state,
         reason: snap.exists ? 'not_pending' : 'missing',
       }, log);
-      tgSend(from.id, '⚠️ Ссылка устарела или уже использована. Вернитесь в приложение и нажмите кнопку снова.');
+      await tgSend(from.id, '⚠️ Ссылка устарела или уже использована. Вернитесь в приложение и нажмите кнопку снова.', {}, log);
       return { handled: true, kind: 'auth_stale' };
     }
 
@@ -330,7 +352,7 @@ export async function processTelegramUpdate(db, update, log = console) {
         expiresAt: safeDebugString(String(session.expiresAt || ''), 120),
       }, log);
       await ref.update({ status: 'expired' });
-      tgSend(from.id, '⚠️ Ссылка устарела. Вернитесь в приложение и нажмите кнопку снова.');
+      await tgSend(from.id, '⚠️ Ссылка устарела. Вернитесь в приложение и нажмите кнопку снова.', {}, log);
       return { handled: true, kind: 'auth_expired' };
     }
 
@@ -435,11 +457,11 @@ export async function processTelegramUpdate(db, update, log = console) {
             message: safeDebugString(error?.message, 220),
           }, 'telegram-update-linking-forensic'));
       }
-      tgSend(from.id,
+      await tgSend(from.id,
         linkError
           ? '⚠️ Не удалось подключить Telegram. Вернитесь в приложение — там показана причина.'
           : '✅ Telegram подтверждён. Вернитесь в приложение АПГ — привязка завершится автоматически.',
-        { reply_markup: SOCIAL_KEYBOARD },
+        { reply_markup: SOCIAL_KEYBOARD }, log,
       );
       await appendTelegramTimeline(ref, {
         stage: 'telegram_auth_link_done',
@@ -527,40 +549,40 @@ export async function processTelegramUpdate(db, update, log = console) {
       telegramSessionId: state,
       resolvedReferrerId: safeDebugString(resolvedReferrerId, 200),
     }, log);
-    tgSend(from.id,
+    await tgSend(from.id,
       `✅ Вы вошли в приложение АПГ!\n\nВернитесь в браузер — страница обновится автоматически.\n\n📌 Наши площадки:`,
-      { reply_markup: SOCIAL_KEYBOARD },
+      { reply_markup: SOCIAL_KEYBOARD }, log,
     );
     return { handled: true, kind: 'auth_done' };
   }
 
   if (text === '/start') {
-    tgSend(from.id, WELCOME_TEXT, { reply_markup: SOCIAL_KEYBOARD });
+    await tgSend(from.id, WELCOME_TEXT, { reply_markup: SOCIAL_KEYBOARD }, log);
     return { handled: true, kind: 'start' };
   }
 
   if (text === '/links' || text === '/social') {
-    tgSend(from.id, LINKS_TEXT, { reply_markup: SOCIAL_KEYBOARD });
+    await tgSend(from.id, LINKS_TEXT, { reply_markup: SOCIAL_KEYBOARD }, log);
     return { handled: true, kind: 'links' };
   }
 
   if (text === '/help') {
-    tgSend(from.id,
+    await tgSend(from.id,
       'ℹ️ Команды бота АПГ:\n\n' +
       '/start — приветствие и ссылки\n' +
       '/links — наши соцсети\n' +
       '/help — эта справка\n\n' +
       '◌ Кнопка «Локи АПГ» открывает карманную версию Локи прямо внутри Telegram.\n\n' +
       `Для входа в приложение открой ${APP_URL} и нажми «Войти через Telegram».`,
-      { reply_markup: SOCIAL_KEYBOARD },
+      { reply_markup: SOCIAL_KEYBOARD }, log,
     );
     return { handled: true, kind: 'help' };
   }
 
-  tgSend(from.id,
+  await tgSend(from.id,
     `Для входа в приложение открой ${APP_URL} и нажми «Войти через Telegram».\n\n` +
     'Чтобы быстро попасть в АПГ — нажми «Локи АПГ».',
-    { reply_markup: SOCIAL_KEYBOARD },
+    { reply_markup: SOCIAL_KEYBOARD }, log,
   );
   return { handled: true, kind: 'fallback' };
 }
