@@ -12,6 +12,17 @@ function shortHash(value) {
   return value ? createHash('sha256').update(String(value)).digest('hex').slice(0, 16) : null;
 }
 
+function timerSecret(request) {
+  if (request.headers['x-cron-secret']) return request.headers['x-cron-secret'];
+  if (request.body && typeof request.body === 'object' && !Buffer.isBuffer(request.body)) return request.body.secret;
+  try {
+    const raw = Buffer.isBuffer(request.body) ? request.body.toString('utf8') : String(request.body || '');
+    return raw ? JSON.parse(raw).secret : '';
+  } catch {
+    return '';
+  }
+}
+
 export default async function telegramWebhookRoutes(fastify) {
   fastify.post('/api/telegram-webhook', async (request, reply) => {
     const configuredSecret = String(process.env.TELEGRAM_WEBHOOK_SECRET || process.env.PUSH_SECRET || '').trim();
@@ -57,9 +68,17 @@ export default async function telegramWebhookRoutes(fastify) {
   // Yandex timer invokes this once a minute for ordinary bot commands. Login
   // checks also poll immediately, so authorization does not wait for the timer.
   fastify.post('/api/telegram-poll', async (request, reply) => {
-    const secret = request.body?.secret || request.headers['x-cron-secret'];
+    const secret = timerSecret(request);
     const valid = secret && [process.env.CRON_SECRET, process.env.PUSH_SECRET].filter(Boolean).includes(secret);
-    if (!valid) return reply.code(401).send({ ok: false, error: 'unauthorized' });
+    if (!valid) {
+      request.log.warn({
+        stage: 'telegram_timer_unauthorized',
+        bodyType: Buffer.isBuffer(request.body) ? 'buffer' : typeof request.body,
+        contentType: request.headers['content-type'] || null,
+        revision: process.env.GIT_SHA || process.env.APP_VERSION || null,
+      }, 'telegram-timer-forensic');
+      return reply.code(401).send({ ok: false, error: 'unauthorized' });
+    }
     const result = await pollTelegramUpdates(getDb(), request.log);
     return { ok: true, ...result };
   });

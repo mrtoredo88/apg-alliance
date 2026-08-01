@@ -31,6 +31,8 @@ assert.match(postgresAdapter, /client\.removeListener\('error', onClientError\)/
 assert.match(postgresAdapter, /APG_IDENTITY_POOL_SIZE \|\| 1/, 'serverless adapters default to one PostgreSQL connection');
 assert.match(webhook, /await processTelegramUpdate\(db, payload, request\.log\)/, 'webhook must finish Telegram processing before the serverless request returns');
 assert.match(webhook, /x-telegram-bot-api-secret-token/, 'webhook validates the Telegram secret token');
+assert.match(webhook, /function timerSecret[\s\S]*Buffer\.isBuffer[\s\S]*JSON\.parse/, 'timer accepts Yandex payloads even without parsed JSON content type');
+assert.match(webhook, /telegram_timer_unauthorized[\s\S]*bodyType[\s\S]*contentType/, 'timer authorization failures are diagnosable');
 assert.match(webhook, /timingSafeEqual/, 'webhook secret comparison is timing safe');
 assert.match(webhook, /stage: 'update_received'[\s\S]*chatIdHash:[\s\S]*stage: 'webhook_handled'/, 'webhook emits a privacy-safe correlation trace');
 assert.match(updates, /stage: 'start_detected'/, '/start detection is logged');
