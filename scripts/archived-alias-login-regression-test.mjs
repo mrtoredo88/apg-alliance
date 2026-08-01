@@ -6,6 +6,7 @@ const profileSource = fs.readFileSync(new URL('../server/src/apg/account/reposit
 const economySource = fs.readFileSync(new URL('../server/src/apg/account/repositories/EconomyRepository.js', import.meta.url), 'utf8');
 const accountRouteSource = fs.readFileSync(new URL('../server/src/routes/account.js', import.meta.url), 'utf8');
 const adminSource = fs.readFileSync(new URL('../server/src/routes/admin-actions.js', import.meta.url), 'utf8');
+const adminSecuritySource = fs.readFileSync(new URL('../server/src/lib/adminSecurity.js', import.meta.url), 'utf8');
 
 assert.match(profileSource, /SELECT canonical_user_id FROM apg_identity_users WHERE id = \$1/);
 assert.match(profileSource, /linkMergedAliases/);
@@ -16,6 +17,8 @@ assert.match(economySource, /SELECT canonical_user_id FROM apg_identity_users WH
 assert.match(accountRouteSource, /account-bootstrap-self-heal/);
 assert.match(accountRouteSource, /legacyData\.mergedInto \|\| legacyData\.dataMigratedInto/);
 assert.match(adminSource, /linkMergedAccounts\(\{/);
+assert.match(adminSecuritySource, /collection\('accountAliases'\)/, 'admin guard must follow a retained merged-account alias');
+assert.match(adminSecuritySource, /resolvedViaAlias/, 'canonical profile must remain authoritative after an alias is resolved');
 
 const calls = [];
 const service = new AccountCoreService({

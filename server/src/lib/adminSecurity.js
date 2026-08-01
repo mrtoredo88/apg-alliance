@@ -39,8 +39,49 @@ function getBearerToken(request) {
 
 async function findUserByIdentityUid(db, uid) {
   const identity = await serverFoundation.identityV2.getUser(uid).catch(() => null);
-  if (identity?.id) return { id: identity.id, data: identity, source: 'identity_v2' };
-  return null;
+  const identityId = String(identity?.canonicalUserId || identity?.canonical_user_id || identity?.id || uid || '').trim();
+  const candidateIds = Array.from(new Set([identityId, String(uid || '').trim()].filter(Boolean)));
+
+  let canonicalId = identityId;
+  let persistedUser = null;
+  let resolvedViaAlias = false;
+  for (const candidateId of candidateIds) {
+    const userSnap = await db.collection('users').doc(candidateId).get().catch(() => null);
+    if (userSnap?.exists) {
+      canonicalId = candidateId;
+      persistedUser = userSnap.data() || {};
+      break;
+    }
+
+    const aliasSnap = await db.collection('accountAliases').doc(candidateId).get().catch(() => null);
+    const aliasTargetId = String(aliasSnap?.exists ? aliasSnap.data()?.canonicalUserId || '' : '').trim();
+    if (!aliasTargetId) continue;
+    const canonicalSnap = await db.collection('users').doc(aliasTargetId).get().catch(() => null);
+    if (canonicalSnap?.exists) {
+      canonicalId = aliasTargetId;
+      persistedUser = canonicalSnap.data() || {};
+      resolvedViaAlias = true;
+      break;
+    }
+    const canonicalIdentity = await serverFoundation.identityV2.getUser(aliasTargetId).catch(() => null);
+    if (canonicalIdentity?.id) {
+      canonicalId = aliasTargetId;
+      persistedUser = canonicalIdentity;
+      resolvedViaAlias = true;
+      break;
+    }
+  }
+
+  if (!identity && !persistedUser) return null;
+  return {
+    id: canonicalId || identity?.id || uid,
+    data: {
+      ...(resolvedViaAlias ? (identity || {}) : (persistedUser || {})),
+      ...(resolvedViaAlias ? (persistedUser || {}) : (identity || {})),
+      id: canonicalId || identity?.id || uid,
+    },
+    source: persistedUser ? 'identity_v2_canonical_profile' : 'identity_v2',
+  };
 }
 
 export async function requireAdminPermission(request, permission) {
