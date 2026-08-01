@@ -1,6 +1,5 @@
 import { isLifecyclePublic, normalizeContentStatus } from '../../../server-shared/content-lifecycle.js';
 import { PostgresDataAdapter } from '../apg/data/PostgresDataAdapter.js';
-import { serverFoundation } from '../apg/index.js';
 
 const data = new PostgresDataAdapter();
 
@@ -81,20 +80,9 @@ export default async function publicDataRoutes(fastify) {
         .filter(Boolean);
       const names = requested.length ? requested.filter(name => PUBLIC_COLLECTIONS[name]) : Object.keys(PUBLIC_COLLECTIONS);
       const { data: publicRows, errors } = await readPublicCollections(data, names, request.log);
-      const wantsStats = !requested.length || requested.includes('stats');
-      const [stats, activeProfiles] = wantsStats
-        ? await Promise.all([
-          data.getDocument('stats', 'global').catch(() => null),
-          serverFoundation.account.listActiveProfiles(1000).catch(() => null),
-        ])
-        : [null, null];
-      const currentStats = wantsStats ? {
-        ...(stats || {}),
-        ...(Array.isArray(activeProfiles) ? {
-          userCount: activeProfiles.length,
-          userCountSource: 'account-core-active-canonical',
-        } : {}),
-      } : null;
+      const stats = !requested.length || requested.includes('stats')
+        ? await data.getDocument('stats', 'global').catch(() => null)
+        : null;
       const categories = !requested.length || requested.includes('expertCategories')
         ? await data.getDocument('config', 'expertCategories').catch(() => null)
         : null;
@@ -105,7 +93,7 @@ export default async function publicDataRoutes(fastify) {
         errors,
         data: {
           ...publicRows,
-          ...(currentStats ? { stats: serializePublicValue(currentStats) } : {}),
+          ...(stats ? { stats: serializePublicValue(stats) } : {}),
           expertCategories: Array.isArray(categories?.custom) ? serializePublicValue(categories.custom) : [],
         },
       };
