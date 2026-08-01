@@ -7,7 +7,8 @@ const account = fs.readFileSync('server/src/routes/account.js', 'utf8');
 const panel = fs.readFileSync('src/AdminPanel.jsx', 'utf8');
 
 assert.match(cleanup, /isMergedSource/, 'purge accepts only previously merged archived accounts');
-assert.match(cleanup, /nestedConflicts/, 'nested document collisions block purge');
+assert.match(cleanup, /mergeNested/, 'nested document collisions are merged deterministically');
+assert.match(cleanup, /nestedBackups/, 'both sides of nested collisions are backed up');
 assert.match(cleanup, /userPurgeSnapshots/, 'recoverable purge snapshot is created');
 assert.match(cleanup, /referenceBackups/, 'changed business documents are backed up');
 assert.match(cleanup, /accountAliases/, 'minimal login redirect survives profile deletion');

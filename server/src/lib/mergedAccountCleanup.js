@@ -42,6 +42,18 @@ function replaceExact(value, sourceId, targetId, paths = [], path = '') {
   return { value, changed: false, paths };
 }
 
+function mergeNested(source, target) {
+  if (Array.isArray(source) && Array.isArray(target)) {
+    return [...target, ...source.filter(item => !target.some(current => JSON.stringify(current) === JSON.stringify(item)))];
+  }
+  if (source && target && typeof source === 'object' && typeof target === 'object' && !Array.isArray(source) && !Array.isArray(target)) {
+    const merged = { ...source };
+    for (const [key, value] of Object.entries(target)) merged[key] = key in source ? mergeNested(source[key], value) : value;
+    return merged;
+  }
+  return target ?? source;
+}
+
 function isMergedSource(data = {}) {
   const targetId = clean(data.mergedInto || data.dataMigratedInto || data.canonicalUserId, 260);
   const status = clean(data.accountStatus || data.identityStatus || '', 80).toLowerCase();
@@ -65,11 +77,21 @@ async function buildPreviewWithClient(client, sourceId) {
   if (!sourceRow) throw Object.assign(new Error('Архивный аккаунт не найден.'), { statusCode: 404 });
   const source = parseJson(sourceRow.data);
   if (!isMergedSource(source)) throw Object.assign(new Error('Удалять этим способом можно только архивный аккаунт, уже объединённый с основным.'), { statusCode: 409, code: 'NOT_MERGED_ALIAS' });
-  const targetId = clean(source.mergedInto || source.dataMigratedInto || source.canonicalUserId, 260);
+  let targetId = clean(source.mergedInto || source.dataMigratedInto || source.canonicalUserId, 260);
   if (!targetId || targetId === sourceId) throw Object.assign(new Error('Основной аккаунт для alias не определён.'), { statusCode: 409 });
-  const targetResult = await client.query(`SELECT data, updated_at FROM apg_app_documents WHERE collection_name = 'users' AND parent_path = '' AND document_id = $1 LIMIT 1`, [targetId]);
-  const targetRow = targetResult.rows[0];
-  const target = parseJson(targetRow?.data);
+  let targetRow = null;
+  let target = {};
+  const chain = [sourceId];
+  for (let depth = 0; depth < 12; depth += 1) {
+    const targetResult = await client.query(`SELECT data, updated_at FROM apg_app_documents WHERE collection_name = 'users' AND parent_path = '' AND document_id = $1 LIMIT 1`, [targetId]);
+    targetRow = targetResult.rows[0];
+    target = parseJson(targetRow?.data);
+    const nextTarget = clean(target.mergedInto || target.dataMigratedInto || '', 260);
+    if (!targetRow || !target.archived || !nextTarget) break;
+    if (chain.includes(targetId) || nextTarget === targetId) throw Object.assign(new Error('Обнаружен цикл объединённых аккаунтов.'), { statusCode: 409, code: 'MERGED_ALIAS_CYCLE' });
+    chain.push(targetId);
+    targetId = nextTarget;
+  }
   if (!targetRow || target.archived === true || ['merged', 'deleted'].includes(clean(target.accountStatus, 80).toLowerCase())) {
     throw Object.assign(new Error('Основной аккаунт отсутствует или неактивен.'), { statusCode: 409, code: 'CANONICAL_ACCOUNT_UNAVAILABLE' });
   }
@@ -113,7 +135,8 @@ async function buildPreviewWithClient(client, sourceId) {
     historicalReferences: references.filter(item => item.immutable),
     nested,
     nestedConflicts,
-    safeToPurge: nestedConflicts.length === 0,
+    chain,
+    safeToPurge: true,
   };
   return { ...preview, stateToken: tokenFor(preview) };
 }
@@ -133,13 +156,19 @@ export async function purgeMergedAccount({ sourceId, stateToken, actorId = '', r
   return adapter.transaction(async client => {
     const preview = await buildPreviewWithClient(client, clean(sourceId, 260));
     if (!stateToken || stateToken !== preview.stateToken) throw Object.assign(new Error('Данные изменились после проверки. Выполните preview повторно.'), { statusCode: 409, code: 'PURGE_STATE_CHANGED' });
-    if (!preview.safeToPurge) throw Object.assign(new Error(`Удаление остановлено: конфликтов вложенных данных — ${preview.nestedConflicts.length}.`), { statusCode: 409, code: 'PURGE_NESTED_CONFLICT' });
     const source = await client.query(`SELECT data FROM apg_app_documents WHERE collection_name = 'users' AND parent_path = '' AND document_id = $1 FOR UPDATE`, [preview.sourceId]);
     const snapshotId = `purge_${Date.now().toString(36)}_${randomBytes(5).toString('hex')}`;
     const referenceBackups = [];
     for (const reference of preview.movableReferences) {
       const row = await client.query('SELECT data FROM apg_app_documents WHERE collection_name = $1 AND parent_path = $2 AND document_id = $3 FOR UPDATE', [reference.collection, reference.parentPath, reference.id]);
       if (row.rows[0]) referenceBackups.push({ ...reference, data: parseJson(row.rows[0].data) });
+    }
+    const nestedBackups = [];
+    for (const item of preview.nested) {
+      const targetParent = item.parentPath.replace(`users/${preview.sourceId}`, `users/${preview.targetId}`);
+      const sourceNested = await client.query('SELECT data FROM apg_app_documents WHERE collection_name = $1 AND parent_path = $2 AND document_id = $3 FOR UPDATE', [item.collection, item.parentPath, item.id]);
+      const targetNested = await client.query('SELECT data FROM apg_app_documents WHERE collection_name = $1 AND parent_path = $2 AND document_id = $3 FOR UPDATE', [item.collection, targetParent, item.id]);
+      nestedBackups.push({ ...item, targetParent, sourceData: parseJson(sourceNested.rows[0]?.data), targetData: targetNested.rows[0] ? parseJson(targetNested.rows[0].data) : null });
     }
     await client.query(`INSERT INTO apg_app_documents (collection_name, document_id, parent_path, data) VALUES ('userPurgeSnapshots', $1, '', $2::jsonb)`, [snapshotId, JSON.stringify({
       id: snapshotId,
@@ -148,6 +177,7 @@ export async function purgeMergedAccount({ sourceId, stateToken, actorId = '', r
       source: parseJson(source.rows[0]?.data),
       preview,
       referenceBackups,
+      nestedBackups,
       actorId,
       reason,
       createdAt: new Date().toISOString(),
@@ -163,9 +193,14 @@ export async function purgeMergedAccount({ sourceId, stateToken, actorId = '', r
       }
       await client.query('UPDATE apg_app_documents SET data = $4::jsonb, updated_at = now() WHERE collection_name = $1 AND parent_path = $2 AND document_id = $3', [reference.collection, reference.parentPath, reference.id, JSON.stringify(replaced.value)]);
     }
-    for (const item of preview.nested) {
-      const targetParent = item.parentPath.replace(`users/${preview.sourceId}`, `users/${preview.targetId}`);
-      await client.query('UPDATE apg_app_documents SET parent_path = $4, updated_at = now() WHERE collection_name = $1 AND parent_path = $2 AND document_id = $3', [item.collection, item.parentPath, item.id, targetParent]);
+    for (const item of nestedBackups) {
+      if (item.targetData) {
+        const merged = mergeNested(item.sourceData, item.targetData);
+        await client.query('UPDATE apg_app_documents SET data = $4::jsonb, updated_at = now() WHERE collection_name = $1 AND parent_path = $2 AND document_id = $3', [item.collection, item.targetParent, item.id, JSON.stringify(merged)]);
+        await client.query('DELETE FROM apg_app_documents WHERE collection_name = $1 AND parent_path = $2 AND document_id = $3', [item.collection, item.parentPath, item.id]);
+      } else {
+        await client.query('UPDATE apg_app_documents SET parent_path = $4, updated_at = now() WHERE collection_name = $1 AND parent_path = $2 AND document_id = $3', [item.collection, item.parentPath, item.id, item.targetParent]);
+      }
     }
     await client.query(`INSERT INTO apg_app_documents (collection_name, document_id, parent_path, data) VALUES ('accountAliases', $1, '', $2::jsonb) ON CONFLICT (collection_name, parent_path, document_id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`, [preview.sourceId, JSON.stringify({
       id: preview.sourceId,
