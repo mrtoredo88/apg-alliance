@@ -14,15 +14,33 @@ export default async function mergedAccountMaintenanceRoutes(fastify) {
     const adapter = serverFoundation.data.adapter?.adapter;
     if (!adapter?.query) return reply.code(503).send({ ok: false, error: 'Postgres unavailable' });
     const result = await adapter.query(`
+      WITH last_admin AS (
+        SELECT user_id, max(created_at) AS last_admin_at
+        FROM apg_economy_operations
+        WHERE status = 'completed' AND type = 'admin_adjustment'
+        GROUP BY user_id
+      ), bonuses AS (
+        SELECT b.*, a.last_admin_at,
+          (a.last_admin_at IS NULL OR b.created_at > a.last_admin_at) AS reversible
+        FROM apg_economy_operations b
+        LEFT JOIN last_admin a ON a.user_id = b.user_id
+        WHERE b.status = 'completed' AND b.type = 'daily_bonus'
+      ), refundable AS (
+        SELECT user_id, sum(delta)::integer AS refundable_keys
+        FROM bonuses WHERE reversible GROUP BY user_id
+      )
       SELECT
         count(*)::integer AS operations,
         count(DISTINCT user_id)::integer AS affected_users,
         count(*) FILTER (WHERE created_at >= now() - interval '7 days')::integer AS operations_7d,
         count(DISTINCT user_id) FILTER (WHERE created_at >= now() - interval '7 days')::integer AS affected_users_7d,
+        count(*) FILTER (WHERE reversible)::integer AS reversible_operations,
+        count(DISTINCT user_id) FILTER (WHERE reversible)::integer AS reversible_users,
+        count(DISTINCT user_id) FILTER (WHERE last_admin_at IS NOT NULL)::integer AS users_with_admin_adjustment,
+        COALESCE((SELECT sum(refundable_keys)::integer FROM refundable), 0) AS refundable_keys,
         min(created_at) AS first_operation_at,
         max(created_at) AS last_operation_at
-      FROM apg_economy_operations
-      WHERE status = 'completed' AND type = 'daily_bonus'
+      FROM bonuses
     `);
     return reply.send({ ok: true, ...result.rows[0] });
   });
