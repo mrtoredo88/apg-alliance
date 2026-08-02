@@ -452,7 +452,7 @@ const DesktopNewsRow = memo(function DesktopNewsRow({ item, onOpen }) {
 });
 
 function DesktopProfileEditor({ user, onClose, onSaved }) {
-  const [form, setForm] = useState(() => ({
+  const initialFormRef = useRef({
     firstName: dpText(user?.firstName || user?.first_name || String(user?.displayName || '').split(/\s+/)[0]),
     lastName: dpText(user?.lastName || user?.last_name || String(user?.displayName || '').split(/\s+/).slice(1).join(' ')),
     birthDate: dpText(user?.birthDate || user?.birthday || user?.dateOfBirth),
@@ -460,10 +460,17 @@ function DesktopProfileEditor({ user, onClose, onSaved }) {
     phone: dpText(user?.phone),
     telegram: dpText(user?.telegram || user?.telegramUsername),
     vk: dpText(user?.vk || user?.vkUrl),
-  }));
+  });
+  const [form, setForm] = useState(initialFormRef.current);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const dirty = JSON.stringify(form) !== JSON.stringify(initialFormRef.current);
   const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
+  const requestClose = () => {
+    if (saving) return;
+    if (dirty && !window.confirm('Закрыть редактор без сохранения изменений?')) return;
+    onClose?.();
+  };
   const save = async () => {
     if (saving) return;
     setSaving(true);
@@ -490,7 +497,7 @@ function DesktopProfileEditor({ user, onClose, onSaved }) {
   };
   const inputStyle = { width: '100%', minHeight: 42, borderRadius: 8, border: `1px solid ${DP.border}`, background: DP.control, color: DP.text, outline: 'none', padding: '0 11px', fontFamily: 'inherit', fontSize: 13.5, boxSizing: 'border-box' };
   return (
-    <ApgModal title="Редактировать профиль" subtitle="Личные данные обычного профиля АПГ." onClose={onClose} maxWidth={520}>
+    <ApgModal title="Редактировать профиль" subtitle="Личные данные обычного профиля АПГ." onClose={requestClose} maxWidth={520} swipeToClose={false}>
       <div style={{ display: 'grid', gap: 11 }}>
         <input value={form.firstName} onChange={event => update('firstName', event.target.value)} placeholder="Имя" autoComplete="given-name" style={inputStyle} />
         <input value={form.lastName} onChange={event => update('lastName', event.target.value)} placeholder="Фамилия" autoComplete="family-name" style={inputStyle} />
@@ -504,7 +511,7 @@ function DesktopProfileEditor({ user, onClose, onSaved }) {
         <input value={form.vk} onChange={event => update('vk', event.target.value)} placeholder="VK" style={inputStyle} />
         {error && <div role="alert" aria-live="polite" style={{ color: DP.red, fontSize: 12.5, lineHeight: '18px' }}>{error}</div>}
         <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.2fr', gap: 9 }}>
-          <button type="button" onClick={onClose} style={dpButton('light', { width: '100%' })}>Отмена</button>
+          <button type="button" onClick={requestClose} style={dpButton('light', { width: '100%' })}>Отмена</button>
           <button type="button" onClick={save} disabled={saving || !form.firstName.trim()} style={dpButton('primary', { width: '100%', opacity: saving || !form.firstName.trim() ? 0.58 : 1 })}>{saving ? 'Сохраняем...' : 'Сохранить'}</button>
         </div>
       </div>

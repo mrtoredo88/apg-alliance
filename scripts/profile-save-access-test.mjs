@@ -63,12 +63,12 @@ assert.match(
 );
 assert.match(
   userActions,
-  /if \(resolved === actor\.userId \|\| resolved === actor\.uid\) return target;/,
-  'editing through an archived login alias must persist to the requested canonical profile',
+  /if \(resolved === actor\.userId \|\| resolved === actor\.uid\) return actor\.userId;/,
+  'editing through an archived login alias must persist to the actor canonical profile',
 );
 assert.match(
   userActions,
-  /await writeIdentityProfileBestEffort\(userId, patch\);/,
+  /await writeIdentityProfileBestEffort\(identityUserId, patch\);/,
   'profile edits must keep the identity mirror in sync',
 );
 

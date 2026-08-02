@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const profileSource = readFileSync(new URL('../src/ProfilePanel.jsx', import.meta.url), 'utf8');
 const userAppSource = readFileSync(new URL('../src/UserApp.jsx', import.meta.url), 'utf8');
+const profileGlassSource = readFileSync(new URL('../src/components/Apg2ProfileGlass.jsx', import.meta.url), 'utf8');
 
 assert.ok(profileSource.includes('data-desktop-user-profile'), 'desktop profile branch must be explicit');
 assert.ok(profileSource.includes('if (desktopMode)'), 'desktop profile must be gated by desktopMode');
@@ -15,6 +16,9 @@ const desktopBranch = profileSource.slice(
 );
 
 assert.ok(profileSource.includes('DesktopProfileEditor'), 'desktop profile should open the profile editor');
+assert.ok(profileSource.includes('swipeToClose={false}'), 'profile editor must not close when the user scrolls the form downward');
+assert.ok(profileSource.includes("window.confirm('Закрыть редактор без сохранения изменений?')"), 'profile editor must guard unsaved changes before closing');
+assert.ok(profileGlassSource.includes('if (!swipeToClose)'), 'modal gesture handling must respect the swipeToClose safety switch');
 assert.ok(profileSource.includes('DesktopBookingRow'), 'desktop profile should show compact booking rows');
 assert.ok(profileSource.includes('DesktopFavoriteRow'), 'desktop profile should show compact favorite rows');
 assert.ok(profileSource.includes('DesktopNewsRow'), 'desktop profile should show compact saved news rows');

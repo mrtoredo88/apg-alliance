@@ -259,13 +259,17 @@ export function GlassSection({ title, action, children, style }) {
   );
 }
 
-export function ApgModal({ title, subtitle, children, onClose, maxWidth = 430 }) {
+export function ApgModal({ title, subtitle, children, onClose, maxWidth = 430, swipeToClose = true }) {
   const startYRef = useRef(0);
   const dragReadyRef = useRef(false);
   const [dragY, setDragY] = useState(0);
 
   const handleTouchStart = (e) => {
     e.stopPropagation();
+    if (!swipeToClose) {
+      dragReadyRef.current = false;
+      return;
+    }
     startYRef.current = e.touches[0].clientY;
     dragReadyRef.current = e.currentTarget.scrollTop <= 2;
   };
@@ -333,7 +337,7 @@ export function ApgModal({ title, subtitle, children, onClose, maxWidth = 430 })
         }}
         onClick={e => e.stopPropagation()}
       >
-        <div style={{ width: 42, height: 4, borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.24)', margin: '0 auto 14px' }} />
+        {swipeToClose && <div style={{ width: 42, height: 4, borderRadius: 999, background: 'rgba(var(--apg2-glass-a,255,255,255),0.24)', margin: '0 auto 14px' }} />}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, marginBottom: 16 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             {title && <div style={{ color: APG2_PROFILE.text, fontSize: 21, lineHeight: '25px', fontWeight: 850 }}>{title}</div>}
