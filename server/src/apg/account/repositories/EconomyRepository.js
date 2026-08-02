@@ -152,41 +152,61 @@ export class EconomyRepository {
     const cleanUserId = safeString(userId, 260);
     const cleanDateKey = safeString(dateKey, 20);
     const delta = Math.max(0, integer(keys, 1));
-    const idempotencyKey = `daily_bonus:${cleanUserId}:${cleanDateKey}`;
     if (!cleanUserId || !cleanDateKey) {
       throw Object.assign(new Error('Daily bonus identifiers are required.'), { code: 'ECONOMY_BAD_REQUEST' });
     }
     return this.adapter.transaction(async client => {
+      const profileResult = await client.query(
+        `WITH requested AS (
+           SELECT COALESCE(
+             (SELECT canonical_user_id FROM apg_identity_users WHERE id = $1 LIMIT 1),
+             $1
+           ) AS canonical_id
+         )
+         SELECT *
+         FROM apg_account_profiles, requested
+         WHERE user_id = requested.canonical_id OR canonical_user_id = requested.canonical_id
+         ORDER BY (user_id = canonical_user_id) DESC, (user_id = requested.canonical_id) DESC, updated_at DESC
+         LIMIT 1 FOR UPDATE`,
+        [cleanUserId],
+      );
+      const row = profileResult.rows[0];
+      if (!row) throw Object.assign(new Error('Пользователь не найден'), { code: 'USER_NOT_FOUND' });
+      const resolvedUserId = row.user_id;
+      const idempotencyKey = `daily_bonus:${resolvedUserId}:${cleanDateKey}`;
       const previous = await client.query(
-        'SELECT * FROM apg_economy_operations WHERE idempotency_key = $1 LIMIT 1',
-        [idempotencyKey],
+        `SELECT * FROM apg_economy_operations
+         WHERE idempotency_key = $1 OR (
+           type = 'daily_bonus' AND source_id = $2 AND user_id IN (
+             SELECT $3
+             UNION SELECT id FROM apg_identity_users WHERE canonical_user_id = $3
+           )
+         )
+         ORDER BY created_at ASC LIMIT 1`,
+        [idempotencyKey, cleanDateKey, resolvedUserId],
       );
       if (previous.rows[0]) {
-        const currentProfile = await client.query(
-          'SELECT profile FROM apg_account_profiles WHERE user_id = $1 FOR UPDATE',
-          [cleanUserId],
-        );
         const operation = mapOperation(previous.rows[0]);
-        let currentBalance = integer(currentProfile.rows[0]?.profile?.keys, operation.balanceAfter);
+        let currentBalance = integer(row.profile?.keys, operation.balanceAfter);
         const latestOperation = await client.query(
           `SELECT balance_after FROM apg_economy_operations
            WHERE user_id = $1 AND status = 'completed'
            ORDER BY created_at DESC
            LIMIT 1`,
-          [cleanUserId],
+          [resolvedUserId],
         );
         const ledgerBalance = integer(latestOperation.rows[0]?.balance_after, currentBalance);
         const balanceReconciled = currentBalance !== ledgerBalance;
         if (balanceReconciled) {
           currentBalance = ledgerBalance;
           const repairedProfile = {
-            ...(currentProfile.rows[0]?.profile || {}),
+            ...(row.profile || {}),
             keys: currentBalance,
             lastBonusDate: cleanDateKey,
           };
           await client.query(
             'UPDATE apg_account_profiles SET profile = $2::jsonb, updated_at = now() WHERE user_id = $1',
-            [cleanUserId, JSON.stringify(repairedProfile)],
+            [resolvedUserId, JSON.stringify(repairedProfile)],
           );
         }
         return {
@@ -196,18 +216,12 @@ export class EconomyRepository {
         };
       }
 
-      const profileResult = await client.query(
-        'SELECT * FROM apg_account_profiles WHERE user_id = $1 FOR UPDATE',
-        [cleanUserId],
-      );
-      const row = profileResult.rows[0];
-      if (!row) throw Object.assign(new Error('Пользователь не найден'), { code: 'USER_NOT_FOUND' });
       const profile = mapProfile(row);
       const balanceAfter = Math.max(0, integer(profile.keys)) + delta;
       const nextProfile = { ...profile, keys: balanceAfter, lastBonusDate: cleanDateKey };
       await client.query(
         'UPDATE apg_account_profiles SET profile = $2::jsonb, updated_at = now() WHERE user_id = $1',
-        [cleanUserId, JSON.stringify(nextProfile)],
+        [resolvedUserId, JSON.stringify(nextProfile)],
       );
       const operationId = randomUUID();
       const inserted = await client.query(
@@ -215,7 +229,7 @@ export class EconomyRepository {
           (id, idempotency_key, user_id, type, reason, source_type, source_id, source_label, delta, balance_after, status, metadata)
          VALUES ($1, $2, $3, 'daily_bonus', 'Ежедневный бонус', 'system', $4, 'АПГ', $5, $6, 'completed', $7::jsonb)
          RETURNING *`,
-        [operationId, idempotencyKey, cleanUserId, cleanDateKey, delta, balanceAfter, JSON.stringify({ dateKey: cleanDateKey })],
+        [operationId, idempotencyKey, resolvedUserId, cleanDateKey, delta, balanceAfter, JSON.stringify({ dateKey: cleanDateKey })],
       );
       return { operation: mapOperation(inserted.rows[0]), replayed: false };
     });

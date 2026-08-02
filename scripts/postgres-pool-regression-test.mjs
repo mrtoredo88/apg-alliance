@@ -43,7 +43,7 @@ assert.match(userApp, /activeBalanceUserIdRef\.current === userId/);
 assert.match(userApp, /if \(result\?\.dailyBonusAwarded\)/);
 assert.match(userApp, /userAction\('profile:sync', syncExistingPayload\)\.then\(handleDailySyncResult\)/);
 assert.match(userActions, /timeZone:\s*'Europe\/Moscow'/);
-assert.match(userActions, /if \(accountCoreWriteEnabled\(\) && process\.env\.APG_DAILY_LOGIN_BONUS_ENABLED === 'true'\) \{\s*const dailyResult = await serverFoundation\.account\.awardDailyBonus/);
+assert.match(userActions, /if \(accountCoreWriteEnabled\(\)\) \{\s*const dailyResult = await serverFoundation\.account\.awardDailyBonus/);
 assert.match(userActions, /migratedDocuments\.flatMap\(row => \[row\.partnerId/);
 assert.match(userApp, /\[data-horizontal-gesture-boundary="true"\], \[data-apg-horizontal-scroll="true"\]/);
 assert.match(economyRepository, /daily_bonus:\$\{cleanUserId\}:\$\{cleanDateKey\}/);

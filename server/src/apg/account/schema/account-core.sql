@@ -468,6 +468,122 @@ VALUES (
 )
 ON CONFLICT (version) DO NOTHING;
 
+-- Daily login rewards are valid product economy. Restore every reward removed
+-- by the incident repair, unless a human explicitly set that balance after
+-- the removal. This compensating operation keeps the ledger auditable.
+WITH removed AS (
+  SELECT user_id, (-delta)::integer AS restore_keys, created_at AS removed_at
+  FROM apg_economy_operations
+  WHERE idempotency_key LIKE 'economy-repair-daily-login-v1:%'
+    AND status = 'completed' AND delta < 0
+), eligible AS (
+  SELECT p.user_id, r.restore_keys,
+    CASE WHEN COALESCE(p.profile->>'keys', '') ~ '^[0-9]+$'
+      THEN (p.profile->>'keys')::integer ELSE 0 END AS current_balance
+  FROM removed r
+  JOIN apg_account_profiles p ON p.user_id = r.user_id
+  WHERE NOT EXISTS (
+    SELECT 1 FROM apg_economy_operations later
+    WHERE later.user_id = r.user_id AND later.status = 'completed'
+      AND later.type = 'admin_adjustment' AND later.created_at > r.removed_at
+      AND later.idempotency_key NOT LIKE 'economy-repair-daily-login-v1:%'
+  )
+), restored AS (
+  INSERT INTO apg_economy_operations
+    (id, idempotency_key, user_id, type, reason, source_type, source_id,
+     source_label, delta, balance_after, status, metadata)
+  SELECT
+    'restore-valid-daily-login-v1:' || md5(user_id),
+    'restore-valid-daily-login-v1:' || user_id,
+    user_id, 'admin_adjustment',
+    'Возврат ошибочно отозванных ключей за ежедневный вход',
+    'system_repair', 'restore-valid-daily-login', 'АПГ',
+    restore_keys, current_balance + restore_keys, 'completed',
+    jsonb_build_object('incident', 'incorrect_daily_bonus_reversal', 'restoredKeys', restore_keys)
+  FROM eligible
+  ON CONFLICT (idempotency_key) DO NOTHING
+  RETURNING user_id, balance_after
+)
+UPDATE apg_account_profiles p
+SET profile = jsonb_set(p.profile, '{keys}', to_jsonb(r.balance_after), true),
+    updated_at = now()
+FROM restored r
+WHERE p.user_id = r.user_id;
+
+WITH restored AS (
+  SELECT user_id, balance_after FROM apg_economy_operations
+  WHERE idempotency_key LIKE 'restore-valid-daily-login-v1:%'
+)
+UPDATE apg_app_documents d
+SET data = jsonb_set(d.data, '{keys}', to_jsonb(r.balance_after), true), updated_at = now()
+FROM restored r
+WHERE d.collection_name = 'users' AND d.parent_path = ''
+  AND (d.document_id = r.user_id OR d.data->>'canonicalUserId' = r.user_id);
+
+-- The owner explicitly confirmed the current balance as exactly 54 keys.
+-- Apply that absolute value after restoring valid daily rewards and record the
+-- adjustment for every matching Account Core profile.
+WITH owner_profiles AS (
+  SELECT DISTINCT p.user_id,
+    CASE WHEN COALESCE(p.profile->>'keys', '') ~ '^[0-9]+$'
+      THEN (p.profile->>'keys')::integer ELSE 0 END AS current_balance
+  FROM apg_account_profiles p
+  WHERE lower(COALESCE(p.email, p.profile->>'email', p.profile->>'linkedEmail', '')) = 'mrtoredo88@mail.ru'
+    OR p.user_id IN (
+      SELECT user_id FROM apg_identity_email_index WHERE lower(email) = 'mrtoredo88@mail.ru'
+      UNION SELECT canonical_user_id FROM apg_identity_email_index WHERE lower(email) = 'mrtoredo88@mail.ru'
+      UNION SELECT id FROM apg_identity_users WHERE lower(COALESCE(email, '')) = 'mrtoredo88@mail.ru'
+      UNION SELECT canonical_user_id FROM apg_identity_users WHERE lower(COALESCE(email, '')) = 'mrtoredo88@mail.ru'
+    )
+    OR p.canonical_user_id IN (
+      SELECT user_id FROM apg_identity_email_index WHERE lower(email) = 'mrtoredo88@mail.ru'
+      UNION SELECT canonical_user_id FROM apg_identity_email_index WHERE lower(email) = 'mrtoredo88@mail.ru'
+      UNION SELECT id FROM apg_identity_users WHERE lower(COALESCE(email, '')) = 'mrtoredo88@mail.ru'
+      UNION SELECT canonical_user_id FROM apg_identity_users WHERE lower(COALESCE(email, '')) = 'mrtoredo88@mail.ru'
+    )
+), owner_adjustment AS (
+  INSERT INTO apg_economy_operations
+    (id, idempotency_key, user_id, type, reason, source_type, source_id,
+     source_label, delta, balance_after, status, metadata)
+  SELECT
+    'owner-confirmed-balance-54-v1:' || md5(user_id),
+    'owner-confirmed-balance-54-v1:' || user_id,
+    user_id, 'admin_adjustment', 'Подтверждённый владельцем баланс: 54 ключа',
+    'owner_confirmation', 'owner-confirmed-balance-54', 'АПГ',
+    54 - current_balance, 54, 'completed',
+    jsonb_build_object('confirmedBalance', 54, 'confirmedAt', '2026-08-02')
+  FROM owner_profiles
+  ON CONFLICT (idempotency_key) DO NOTHING
+  RETURNING user_id, balance_after
+)
+UPDATE apg_account_profiles p
+SET profile = jsonb_set(p.profile, '{keys}', to_jsonb(a.balance_after), true), updated_at = now()
+FROM owner_adjustment a
+WHERE p.user_id = a.user_id;
+
+WITH owner_ids AS (
+  SELECT user_id FROM apg_account_profiles
+  WHERE lower(COALESCE(email, profile->>'email', profile->>'linkedEmail', '')) = 'mrtoredo88@mail.ru'
+  UNION SELECT user_id FROM apg_identity_email_index WHERE lower(email) = 'mrtoredo88@mail.ru'
+  UNION SELECT canonical_user_id FROM apg_identity_email_index WHERE lower(email) = 'mrtoredo88@mail.ru'
+  UNION SELECT id FROM apg_identity_users WHERE lower(COALESCE(email, '')) = 'mrtoredo88@mail.ru'
+  UNION SELECT canonical_user_id FROM apg_identity_users WHERE lower(COALESCE(email, '')) = 'mrtoredo88@mail.ru'
+)
+UPDATE apg_app_documents d
+SET data = jsonb_set(d.data, '{keys}', '54'::jsonb, true), updated_at = now()
+WHERE d.collection_name = 'users' AND d.parent_path = ''
+  AND (d.document_id IN (SELECT user_id FROM owner_ids WHERE user_id IS NOT NULL AND user_id <> '')
+    OR d.data->>'canonicalUserId' IN (SELECT user_id FROM owner_ids WHERE user_id IS NOT NULL AND user_id <> '')
+    OR lower(COALESCE(d.data->>'email', d.data->>'linkedEmail', '')) = 'mrtoredo88@mail.ru');
+
+INSERT INTO apg_account_schema_versions (version, checksum, description)
+VALUES (
+  'restore-daily-login-and-owner-54-v1-2026-08-02',
+  'restore-daily-login-and-owner-54-v1',
+  'Restore valid daily-login rewards and apply the owner-confirmed 54-key balance'
+)
+ON CONFLICT (version) DO NOTHING;
+
 -- Cabinet ownership was migrated in application user documents before
 -- Account Core became authoritative. Materialize those links once so account
 -- bootstrap never depends on client-side loading order.

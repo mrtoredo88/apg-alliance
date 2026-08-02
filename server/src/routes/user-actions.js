@@ -974,10 +974,7 @@ async function actionProfileSync(db, req, actor) {
     })));
   }
   let accountBalance = null;
-  // Restoring a login session must not mutate the economy balance. Keep the
-  // legacy daily-login award disabled unless the product explicitly enables
-  // it again after a separate economy decision.
-  if (accountCoreWriteEnabled() && process.env.APG_DAILY_LOGIN_BONUS_ENABLED === 'true') {
+  if (accountCoreWriteEnabled()) {
     const dailyResult = await serverFoundation.account.awardDailyBonus({
       userId,
       dateKey: todayKey,

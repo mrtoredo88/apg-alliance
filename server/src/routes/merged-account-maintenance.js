@@ -38,6 +38,13 @@ export default async function mergedAccountMaintenanceRoutes(fastify) {
         count(DISTINCT user_id) FILTER (WHERE reversible)::integer AS reversible_users,
         count(DISTINCT user_id) FILTER (WHERE last_admin_at IS NOT NULL)::integer AS users_with_admin_adjustment,
         COALESCE((SELECT sum(refundable_keys)::integer FROM refundable), 0) AS refundable_keys,
+        (SELECT count(*)::integer FROM apg_economy_operations
+          WHERE idempotency_key LIKE 'restore-valid-daily-login-v1:%') AS restored_users,
+        (SELECT max(CASE WHEN COALESCE(p.profile->>'keys', '') ~ '^[0-9]+$'
+          THEN (p.profile->>'keys')::integer ELSE NULL END)
+          FROM apg_account_profiles p
+          WHERE lower(COALESCE(p.email, p.profile->>'email', p.profile->>'linkedEmail', '')) = 'mrtoredo88@mail.ru'
+            OR p.user_id IN (SELECT canonical_user_id FROM apg_identity_email_index WHERE lower(email) = 'mrtoredo88@mail.ru')) AS verified_owner_balance,
         min(created_at) AS first_operation_at,
         max(created_at) AS last_operation_at
       FROM bonuses

@@ -78,9 +78,11 @@ assert.match(adminActions, /bulk_economy:\$\{actor\.uid\}:\$\{id\}/);
 assert.match(adminActions, /balance: patch\.keys/);
 assert.match(adminActions, /keys: economy\.balance/);
 assert.match(adminPanel, /Показан фактический баланс Account Core/);
-assert.match(userActions, /APG_DAILY_LOGIN_BONUS_ENABLED === 'true'/, 'login bonus must be opt-in so session restore cannot change balances');
+assert.match(userActions, /if \(accountCoreWriteEnabled\(\)\) \{\s*const dailyResult = await serverFoundation\.account\.awardDailyBonus/, 'daily login bonus must remain enabled');
 assert.match(accountSchema, /economy-repair-daily-login-v1:/, 'daily-login repair must be idempotent');
 assert.match(accountSchema, /b\.created_at > a\.last_admin_at/, 'repair must preserve balances superseded by later admin adjustments');
 assert.match(accountSchema, /'system_repair'/, 'repair must be recorded in the canonical ledger');
+assert.match(accountSchema, /restore-valid-daily-login-v1:/, 'incorrectly removed daily bonuses must be restored idempotently');
+assert.match(accountSchema, /owner-confirmed-balance-54-v1:/, 'owner-confirmed 54-key balance must be ledger-backed');
 
 console.log('Admin key balance regression: Account Core, ledger, mirror and idempotency passed');
