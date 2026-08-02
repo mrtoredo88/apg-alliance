@@ -740,6 +740,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   const [linkEmailError, setLinkEmailError] = useState('');
   const [linkEmailDone, setLinkEmailDone] = useState(false);
   const tgPollRef = useRef(null);
+  const tgPollControllerRef = useRef(null);
+  const tgPollGenerationRef = useRef(0);
   const tgStateRef = useRef(null);
   const tgLinkingRef = useRef(false);
   const tgActionRef = useRef(0);
@@ -983,6 +985,9 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
 
   const stopPolling = useCallback(() => {
     if (tgPollRef.current) clearTimeout(tgPollRef.current);
+    tgPollGenerationRef.current += 1;
+    tgPollControllerRef.current?.abort?.();
+    tgPollControllerRef.current = null;
     tgStateRef.current = null;
     tgPollRef.current = null;
   }, []);
@@ -1034,6 +1039,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   // Long-poll: одним fetch ждём до 25 с на сервере, при timeout — сразу повторяем
   const startWaiting = useCallback((state, diagnostics = {}) => {
     stopPolling();
+    const pollGeneration = tgPollGenerationRef.current;
     tgStateRef.current = state;
     tgAuthTraceRef.current = {
       requestId: safeTraceString(diagnostics.requestId || createTraceId('tg_req'), 180),
@@ -1043,12 +1049,17 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     };
 
     const finishAttempt = () => {
+      tgPollGenerationRef.current += 1;
+      tgPollControllerRef.current?.abort?.();
+      tgPollControllerRef.current = null;
       if (tgStateRef.current === state) tgStateRef.current = null;
       localStorage.removeItem('apg_tg_pending');
     };
 
     const poll = async () => {
-      if (tgStateRef.current !== state) return;
+      if (tgStateRef.current !== state || tgPollGenerationRef.current !== pollGeneration) return;
+      const pollController = new AbortController();
+      tgPollControllerRef.current = pollController;
       try {
         traceAuthStage('telegram_poll_start', { state, ...tgAuthTraceRef.current });
         const checkUrl = new URL(`${API_BASE_URL}/api/telegram-auth-check`);
@@ -1058,9 +1069,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         if (tgAuthTraceRef.current.telegramSessionId) checkUrl.searchParams.set('telegramSessionId', tgAuthTraceRef.current.telegramSessionId);
         const r    = await fetch(checkUrl.toString(), {
           headers: { 'X-APG-Version': 'telegram-auth-diagnose' },
+          signal: pollController.signal,
         });
         const data = await r.json();
-        if (tgStateRef.current !== state) return;
+        if (tgStateRef.current !== state || tgPollGenerationRef.current !== pollGeneration) return;
         if (data.status === 'done') {
           const responseIsLinking = data.linking === true || tgLinkingRef.current;
           const hasLinkState = responseIsLinking || data.linked === true;
@@ -1235,6 +1247,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
           tgPollRef.current = setTimeout(poll, 900);
         }
       } catch (e) {
+        if (e?.name === 'AbortError' || tgPollGenerationRef.current !== pollGeneration) return;
         logError(e, 'ProfilePanel.telegram.poll');
         traceAuthStage('telegram_poll_error', { state, error: e?.message ?? String(e), ...tgAuthTraceRef.current });
         if (tgStateRef.current !== state) return;
@@ -1248,6 +1261,8 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
         traceAuthStage('telegram_poll_retry', { state, ...tgAuthTraceRef.current });
         await new Promise(r => setTimeout(r, 2000));
         poll();
+      } finally {
+        if (tgPollControllerRef.current === pollController) tgPollControllerRef.current = null;
       }
     };
 
@@ -1349,25 +1364,47 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
     }
   };
 
-  // Восстанавливаем сессию после перезагрузки страницы (мобильный редирект)
+  // Restore immediately both after a reload and when the browser returns from
+  // Telegram. Mobile browsers can suspend the original fetch and its timers
+  // while the external app is in the foreground.
   useEffect(() => {
-    const saved = localStorage.getItem('apg_tg_pending');
-    if (!saved) return;
-    try {
-      const { state, url, linking, at, requestId, loginSessionId, telegramSessionId } = JSON.parse(saved);
-      if (Date.now() - at > 5 * 60 * 1000) { localStorage.removeItem('apg_tg_pending'); return; }
-      tgLinkingRef.current = linking === true;
-      setTgBotUrl(url);
-      setTgStep('waiting');
-      tgAuthTraceRef.current = {
-        requestId: safeTraceString(requestId, 180),
-        loginSessionId: safeTraceString(loginSessionId, 220),
-        telegramSessionId: safeTraceString(telegramSessionId || state, 220),
-        state,
-      };
-      startWaiting(state, tgAuthTraceRef.current);
-    } catch { localStorage.removeItem('apg_tg_pending'); }
-  }, []);
+    const restorePendingTelegramAuth = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      const saved = localStorage.getItem('apg_tg_pending');
+      if (!saved) return;
+      try {
+        const { state, url, linking, at, requestId, loginSessionId, telegramSessionId } = JSON.parse(saved);
+        if (!state || Date.now() - at > 5 * 60 * 1000) {
+          localStorage.removeItem('apg_tg_pending');
+          return;
+        }
+        tgLinkingRef.current = linking === true;
+        setTgBotUrl(url);
+        setTgStep('waiting');
+        tgAuthTraceRef.current = {
+          requestId: safeTraceString(requestId, 180),
+          loginSessionId: safeTraceString(loginSessionId, 220),
+          telegramSessionId: safeTraceString(telegramSessionId || state, 220),
+          state,
+        };
+        startWaiting(state, tgAuthTraceRef.current);
+      } catch {
+        localStorage.removeItem('apg_tg_pending');
+      }
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') restorePendingTelegramAuth();
+    };
+    restorePendingTelegramAuth();
+    window.addEventListener('focus', restorePendingTelegramAuth);
+    window.addEventListener('pageshow', restorePendingTelegramAuth);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('focus', restorePendingTelegramAuth);
+      window.removeEventListener('pageshow', restorePendingTelegramAuth);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [startWaiting]);
 
   const handleLinkEmail = useCallback(async () => {
     if (linkEmailLoading || !linkEmailValue || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(linkEmailValue)) return;

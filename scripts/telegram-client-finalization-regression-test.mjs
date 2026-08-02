@@ -14,5 +14,9 @@ assert.doesNotMatch(donePrefix, /tgStateRef\.current = null/, 'active session mu
 assert.ok(readyAt > authenticateAt, 'ready event must be emitted after authentication');
 assert.ok(finishAt > readyAt, 'pending session must be finalized only after ready event');
 assert.match(source, /if \(!data\.token\) throw new Error\('telegram_custom_token_missing'\)/, 'missing token must retry the same completed session');
+assert.match(source, /window\.addEventListener\('focus', restorePendingTelegramAuth\)/, 'returning from Telegram must resume the pending session immediately');
+assert.match(source, /document\.addEventListener\('visibilitychange', handleVisibility\)/, 'mobile visibility resume must restart the pending check');
+assert.match(source, /tgPollControllerRef\.current\?\.abort/, 'a suspended long poll must be aborted before resume');
+assert.match(source, /tgPollGenerationRef\.current !== pollGeneration/, 'stale poll responses must not race the resumed request');
 
 console.log('Telegram client finalization regression: completed server session remains retryable until client login succeeds');
