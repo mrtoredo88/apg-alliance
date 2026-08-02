@@ -6,6 +6,38 @@ import { serverFoundation } from '../apg/index.js';
 const hash = value => createHash('sha256').update(String(value || '')).digest('hex').slice(0, 12);
 
 export default async function mergedAccountMaintenanceRoutes(fastify) {
+  fastify.get('/api/maintenance/telegram-auth-recent', async (request, reply) => {
+    const secret = String(request.headers['x-cron-secret'] || '');
+    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+      return reply.code(403).send({ ok: false, error: 'Forbidden' });
+    }
+    const snap = await getDb().collection('telegramAuthSessions').orderBy('createdAt', 'desc').limit(8).get();
+    const toIso = value => {
+      if (!value) return null;
+      const date = value?.toDate ? value.toDate() : new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    };
+    const sessions = snap.docs.map(doc => {
+      const data = doc.data() || {};
+      const timeline = Array.isArray(data.timeline) ? data.timeline : [];
+      return {
+        sessionHash: hash(doc.id),
+        requestHash: hash(data.requestId),
+        loginSessionHash: hash(data.loginSessionId),
+        status: String(data.status || 'unknown'),
+        linking: data.linking === true,
+        createdAt: toIso(data.createdAt),
+        completedAt: toIso(data.completedAt),
+        checkedAt: toIso(data.checkedAt),
+        tokenIssuedAt: toIso(data.tokenIssuedAt),
+        resolved: Boolean(data.resolvedUserId),
+        stages: timeline.slice(-12).map(item => String(item?.stage || '')).filter(Boolean),
+        lastError: String(data.linkError || data.error || data.lastError || '').slice(0, 120) || null,
+      };
+    });
+    return reply.send({ ok: true, sessions });
+  });
+
   fastify.get('/api/maintenance/economy-daily-bonus-impact', async (request, reply) => {
     const secret = String(request.headers['x-cron-secret'] || '');
     if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {

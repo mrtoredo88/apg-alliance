@@ -1042,6 +1042,11 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       state,
     };
 
+    const finishAttempt = () => {
+      if (tgStateRef.current === state) tgStateRef.current = null;
+      localStorage.removeItem('apg_tg_pending');
+    };
+
     const poll = async () => {
       if (tgStateRef.current !== state) return;
       try {
@@ -1077,8 +1082,6 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             ...tgAuthTraceRef.current,
             ...checkDiagnostics,
           });
-          tgStateRef.current = null;
-          localStorage.removeItem('apg_tg_pending');
           if (hasLinkState && (user?.id || responseHasLinkOwner)) {
             if (data.linkError) {
               const errorText = {
@@ -1090,6 +1093,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               tgLinkingRef.current = false;
               setTgError(errorText);
               setTgStep('idle');
+              finishAttempt();
               return;
             }
             tgLinkingRef.current = false;
@@ -1120,68 +1124,68 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               }
             } catch {}
             setTgStep('linked');
+            finishAttempt();
           } else {
-            if (data.token) {
-              const identityResolved = checkDiagnostics.identityResolved === true || Boolean(checkDiagnostics.identitySource);
-              const customTokenIssued = checkDiagnostics.customTokenIssued === true;
-              const identityPath = safeTraceString(checkDiagnostics.identityPath || null, 220);
-              const identitySource = safeTraceString(checkDiagnostics.identitySource || null, 220);
-              traceAuthStage('telegram_start', {
-                state,
-                userId: data.user?.id ?? null,
-                ...tgAuthTraceRef.current,
-                identitySource,
-              });
-              traceAuthStage('identity_resolved', {
-                state,
-                userId: data.user?.id ?? null,
-                identityResolved,
-                identitySource,
-                identityPath,
-                ...tgAuthTraceRef.current,
-              });
-              traceAuthStage('custom_token_created', {
-                state,
-                userId: data.user?.id ?? null,
-                customTokenIssued,
-                identitySource,
-                identityPath,
-                ...tgAuthTraceRef.current,
-              });
-              traceAuthStage('firebase_signin_start', { state, ...tgAuthTraceRef.current, identityResolved });
-              await apgIdentity.authenticate({
-                provider: 'native-apg',
-                token: data.token,
-                uid: data.user?.id || data.userId || data.tgId || '',
-                email: data.user?.email || '',
-              });
-              const expectedUid = safeTraceString(data.user?.id || data.tgId || '', 220);
-              const authUser = await waitForAuthStateChanged(expectedUid, 8000);
-              if (expectedUid && authUser?.uid !== expectedUid) {
-                throw new Error(`telegram_auth_signin_mismatch: expected ${expectedUid} got ${authUser?.uid || 'null'}`);
-              }
-              traceAuthStage('auth_state_changed', {
-                state,
-                userId: data.user?.id ?? null,
-                uid: authUser?.uid ?? auth.currentUser?.uid ?? null,
-                isAnonymous: authUser?.isAnonymous ?? null,
-                ...tgAuthTraceRef.current,
-              });
-              traceAuthStage('user_loaded', {
-                userId: data.user?.id ?? null,
-                hasToken: !!data.token,
-                source: 'after_auth_state_changed',
-                uid: authUser?.uid ?? auth.currentUser?.uid ?? null,
-                ...tgAuthTraceRef.current,
-              });
-              traceAuthStage('firebase_signin_done', {
-                state,
-                userId: data.user?.id ?? null,
-                uid: authUser?.uid ?? auth.currentUser?.uid ?? null,
-                isAnonymous: authUser?.isAnonymous ?? null,
-                ...tgAuthTraceRef.current,
-              });
+            if (!data.token) throw new Error('telegram_custom_token_missing');
+            const identityResolved = checkDiagnostics.identityResolved === true || Boolean(checkDiagnostics.identitySource);
+            const customTokenIssued = checkDiagnostics.customTokenIssued === true;
+            const identityPath = safeTraceString(checkDiagnostics.identityPath || null, 220);
+            const identitySource = safeTraceString(checkDiagnostics.identitySource || null, 220);
+            traceAuthStage('telegram_start', {
+              state,
+              userId: data.user?.id ?? null,
+              ...tgAuthTraceRef.current,
+              identitySource,
+            });
+            traceAuthStage('identity_resolved', {
+              state,
+              userId: data.user?.id ?? null,
+              identityResolved,
+              identitySource,
+              identityPath,
+              ...tgAuthTraceRef.current,
+            });
+            traceAuthStage('custom_token_created', {
+              state,
+              userId: data.user?.id ?? null,
+              customTokenIssued,
+              identitySource,
+              identityPath,
+              ...tgAuthTraceRef.current,
+            });
+            traceAuthStage('firebase_signin_start', { state, ...tgAuthTraceRef.current, identityResolved });
+            await apgIdentity.authenticate({
+              provider: 'native-apg',
+              token: data.token,
+              uid: data.user?.id || data.userId || data.tgId || '',
+              email: data.user?.email || '',
+            });
+            const expectedUid = safeTraceString(data.user?.id || data.tgId || '', 220);
+            const authUser = await waitForAuthStateChanged(expectedUid, 8000);
+            if (expectedUid && authUser?.uid !== expectedUid) {
+              throw new Error(`telegram_auth_signin_mismatch: expected ${expectedUid} got ${authUser?.uid || 'null'}`);
             }
+            traceAuthStage('auth_state_changed', {
+              state,
+              userId: data.user?.id ?? null,
+              uid: authUser?.uid ?? auth.currentUser?.uid ?? null,
+              isAnonymous: authUser?.isAnonymous ?? null,
+              ...tgAuthTraceRef.current,
+            });
+            traceAuthStage('user_loaded', {
+              userId: data.user?.id ?? null,
+              hasToken: true,
+              source: 'after_auth_state_changed',
+              uid: authUser?.uid ?? auth.currentUser?.uid ?? null,
+              ...tgAuthTraceRef.current,
+            });
+            traceAuthStage('firebase_signin_done', {
+              state,
+              userId: data.user?.id ?? null,
+              uid: authUser?.uid ?? auth.currentUser?.uid ?? null,
+              isAnonymous: authUser?.isAnonymous ?? null,
+              ...tgAuthTraceRef.current,
+            });
             localStorage.setItem('apg_tg_user', JSON.stringify(data.user));
             traceAuthStage('user_loaded', {
               userId: data.user?.id ?? null,
@@ -1206,6 +1210,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 requestId: tgAuthTraceRef.current.requestId,
               },
             }));
+            finishAttempt();
             setTgStep('idle');
           }
         } else if (data.status === 'failed') {
