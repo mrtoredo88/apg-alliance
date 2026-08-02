@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { isIgnorableErrorPayload } from '../server-shared/error-log.js';
+import { isErrorActionable, isExpectedAdminAccessNoise } from '../server-shared/error-policy.js';
 
 const client = readFileSync(new URL('../src/errorLogger.js', import.meta.url), 'utf8');
 const userApp = readFileSync(new URL('../src/UserApp.jsx', import.meta.url), 'utf8');
@@ -10,7 +11,29 @@ assert.equal(isIgnorableErrorPayload({
   message: 'Telegram не привязан к профилю.',
   source: 'ProfilePanel.telegramAvatar.refresh',
 }), true);
+assert.equal(isExpectedAdminAccessNoise({
+  message: 'APP_DATA_QUERY_FAILED: Нет доступа к данным.',
+  source: 'AdminPanel.fetchData.notifications.attempt1',
+}), true);
+assert.equal(isIgnorableErrorPayload({
+  message: 'Нет доступа к данным.',
+  source: 'AdminPanel.fetchData.customTasks.attempt1',
+}), true);
+assert.equal(isExpectedAdminAccessNoise({
+  message: 'Нет доступа к данным.',
+  source: 'PartnerPage.fetchReviews',
+}), false, 'Real user-facing access failures must remain visible.');
+assert.equal(isErrorActionable({
+  message: 'Current failure', version: 'newbuild1', resolved: false, archived: false,
+}, { currentVersion: 'newbuild1' }), true);
+assert.equal(isErrorActionable({
+  message: 'Old failure', version: 'oldbuild1', resolved: false, archived: false,
+}, { currentVersion: 'newbuild1' }), false);
+assert.equal(isErrorActionable({
+  message: 'Нет доступа к данным.', source: 'AdminPanel.fetchData.notifications.attempt1', version: 'newbuild1',
+}, { currentVersion: 'newbuild1' }), false);
 assert.match(client, /transientNetworkError/);
+assert.match(client, /isExpectedAdminAccessNoise/);
 assert.ok(client.includes('`network|${String(message).slice(0, 120)}`'));
 assert.ok(client.includes("transientNetworkError ? 'warning'"));
 assert.match(userApp, /PUBLIC_BOOTSTRAP_RETRIES = 1/);

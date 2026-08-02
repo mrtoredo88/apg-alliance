@@ -2,6 +2,7 @@ import { auth } from './platformDataAuth.js';
 import { signInAnonymously } from './nativeAuth.js';
 import { userAction } from './userApi.js';
 import { getPwaVersion } from './pwa/PwaUpdateManager.js';
+import { isExpectedAdminAccessNoise } from '../server-shared/error-policy.js';
 
 let _userId = null;
 let _version = '?';
@@ -27,6 +28,7 @@ function deviceInfo() {
 function shouldIgnore(message, source, errorName = '') {
   const text = `${message} ${source} ${errorName}`.toLowerCase();
   return !message
+    || isExpectedAdminAccessNoise({ message, source })
     || /script error|resizeobserver|chrome-extension|moz-extension/.test(text)
     || /aborterror|the operation was aborted|signal is aborted|fetch is aborted|fetch.*cancelled|fetch.*canceled/.test(text)
     || /auth_timeout|_timeout\b|timeout \d+ms|public_data_missing_/.test(text)

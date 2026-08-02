@@ -2,10 +2,56 @@ import { createHash } from 'node:crypto';
 import { getDb } from '../lib/documentStore.js';
 import { previewMergedAccountCleanup, purgeMergedAccount } from '../lib/mergedAccountCleanup.js';
 import { serverFoundation } from '../apg/index.js';
+import { isErrorOpen, isExpectedAdminAccessNoise } from '../../../server-shared/error-policy.js';
 
 const hash = value => createHash('sha256').update(String(value || '')).digest('hex').slice(0, 12);
 
 export default async function mergedAccountMaintenanceRoutes(fastify) {
+  fastify.post('/api/maintenance/error-log-archive', async (request, reply) => {
+    const secret = String(request.headers['x-cron-secret'] || request.body?.secret || '');
+    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+      return reply.code(403).send({ ok: false, error: 'Forbidden' });
+    }
+    const currentVersion = String(request.body?.currentVersion || '').trim();
+    if (!/^[a-f0-9]{8}$/i.test(currentVersion)) {
+      return reply.code(400).send({ ok: false, error: 'Valid currentVersion is required' });
+    }
+    const snapshot = await getDb().collection('errorLogs').limit(10000).get();
+    const rows = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+    const candidates = rows.filter(item => {
+      if (!isErrorOpen(item)) return false;
+      if (isExpectedAdminAccessNoise(item)) return true;
+      const version = String(item.version || item.build || '').trim();
+      return Boolean(version && version !== '?' && version !== currentVersion);
+    });
+    const byReason = candidates.reduce((result, item) => {
+      const reason = isExpectedAdminAccessNoise(item) ? 'expected_admin_access' : 'superseded_build';
+      result[reason] = (result[reason] || 0) + 1;
+      return result;
+    }, {});
+    const preview = {
+      ok: true,
+      currentVersion,
+      total: rows.length,
+      candidates: candidates.length,
+      retained: rows.filter(item => isErrorOpen(item)).length - candidates.length,
+      byReason,
+      productionWrites: 0,
+    };
+    if (request.body?.confirm !== 'ARCHIVE_SUPERSEDED_ERROR_LOGS') return reply.send(preview);
+    const archivedAt = new Date().toISOString();
+    const batch = getDb().batch();
+    candidates.forEach(item => batch.set(getDb().collection('errorLogs').doc(item.id), {
+      archived: true,
+      archivedAt,
+      archivedBy: 'error-policy-v2',
+      archiveReason: isExpectedAdminAccessNoise(item) ? 'expected_admin_access' : 'superseded_build',
+      supersededByVersion: currentVersion,
+    }, { merge: true }));
+    await batch.commit();
+    return reply.send({ ...preview, productionWrites: candidates.length, archivedAt });
+  });
+
   fastify.get('/api/maintenance/telegram-auth-recent', async (request, reply) => {
     const secret = String(request.headers['x-cron-secret'] || '');
     if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {

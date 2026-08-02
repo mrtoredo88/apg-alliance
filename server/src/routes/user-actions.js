@@ -489,7 +489,7 @@ async function assertOwn(actor, userId) {
     || identity?.user?.canonicalUserId
     || identity?.user?.id,
   );
-  if (resolved === actor.userId || resolved === actor.uid) return target;
+  if (resolved === actor.userId || resolved === actor.uid) return actor.userId;
 
   throw Object.assign(new Error('Нельзя менять данные другого пользователя.'), { statusCode: 403 });
 }

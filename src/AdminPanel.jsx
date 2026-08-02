@@ -30,6 +30,9 @@ import { telegramShareUrl } from '../server-shared/telegram.js';
 import { getProfileLocations, normalizeLocationsForSave, normalizeLocationIds } from '../server-shared/locations.js';
 import { buildLokiEvolutionCenter, buildLokiQualityCenter, exportLokiQualityCsv } from './loki/analytics/index.js';
 import { buildSocialAnalytics } from './social/PeopleCore.js';
+import { isErrorActionable, isErrorArchived, isErrorOpen, isErrorResolved } from '../server-shared/error-policy.js';
+
+const CURRENT_APP_VERSION = import.meta.env.VITE_APP_VERSION || 'local';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },
@@ -81,9 +84,7 @@ const NOTIFICATION_PRIORITIES = [
 ];
 
 const isArchived = item => item?.archived === true || ['archived', 'deleted', 'trash'].includes(normalizeContentStatus(item));
-const isErrorArchived = item => item?.archived === true;
-const isErrorResolved = item => item?.resolved === true;
-const isErrorActive = item => !isErrorResolved(item) && !isErrorArchived(item);
+const isErrorActive = item => isErrorActionable(item, { currentVersion: CURRENT_APP_VERSION });
 const errorTimestamp = item => item?.timestamp || item?.createdAt || item?.updatedAt || item?.resolvedAt || item?.archivedAt;
 const isTodayValue = value => dateKey(value) === new Date().toISOString().slice(0, 10);
 const CONTENT_CATEGORIES = [
@@ -198,6 +199,8 @@ function isExpectedAdminAccessError(error) {
   return status === 401 || status === 403
     || code === 'permission-denied'
     || message.includes('недостаточно прав')
+    || message.includes('нет доступа к данным')
+    || message.includes('app_data_query_failed')
     || message.includes('требуется авторизация администратора');
 }
 
@@ -5349,7 +5352,6 @@ export const AdminPanel = () => {
   const [errComponent, setErrComponent] = useState('all');
   const [errSort, setErrSort] = useState('frequent');
   const [errExpanded, setErrExpanded]       = useState({});
-  const [errDeletedCount, setErrDeletedCount] = useState(0);
   const [systemStatus, setSystemStatus] = useState(null);
   const [systemStatusLoading, setSystemStatusLoading] = useState(false);
   const [migrationStatus, setMigrationStatus] = useState(null);
@@ -5386,12 +5388,9 @@ export const AdminPanel = () => {
     const archived = errorLogs.filter(isErrorArchived);
     if (!archived.length) return;
     if (!window.confirm(`Удалить ${archived.length} архивных ошибок? Активные ошибки останутся без изменений.`)) return;
-    let deleted = 0;
     for (const item of archived) {
       await runAdminEntityAction('errorLogs', 'delete', { id: item.id, idempotencyKey: `delete_archived_error_${item.id}_${Date.now()}` });
-      deleted += 1;
     }
-    setErrDeletedCount(prev => prev + deleted);
     setErrorLogs(prev => prev.filter(item => !archived.some(error => error.id === item.id)));
     setAdminMetrics(prev => ({ ...prev, errorLogs: prev.errorLogs.filter(item => !archived.some(error => error.id === item.id)) }));
   }, [errorLogs]);
@@ -8007,7 +8006,7 @@ export const AdminPanel = () => {
     search: activeTab === 'partners' ? partnerSearch : activeTab === 'experts' ? expertSearch : globalSearch,
     selected: { partnerId: expandedPartnerId, expertId: expandedExpertId, eventId: selectedEventForSheet?.id, newsIds: selectedNewsIds },
     data: {
-      users: adminMetrics.users, partners, experts, events, news, comments: newsComments, errors: errorLogs,
+      users: adminMetrics.users, partners, experts, events, news, comments: newsComments, errors: errorLogs.filter(isErrorActive),
       prizes, notifications: notifs, activity: adminMetrics.adminActivity, analytics,
     },
     loadedAt: adminLoadInfo.lastLoadedAt,
@@ -11823,6 +11822,7 @@ export const AdminPanel = () => {
       {/* ── ОШИБКИ ── */}
       {activeTab === 'errors' && (() => {
         const activeErrors = errorLogs.filter(isErrorActive);
+        const historicalErrors = errorLogs.filter(e => isErrorOpen(e) && !isErrorActive(e));
         const resolvedErrors = errorLogs.filter(e => isErrorResolved(e) && !isErrorArchived(e));
         const archivedErrors = errorLogs.filter(isErrorArchived);
         const resolvedToday = errorLogs.filter(e => isErrorResolved(e) && isTodayValue(e.resolvedAt || e.updatedAt || e.archivedAt)).length;
@@ -11839,6 +11839,7 @@ export const AdminPanel = () => {
           if (errFilter === 'all') return true;
           if (errFilter === 'resolved') return isErrorResolved(e) && !isErrorArchived(e);
           if (errFilter === 'archive') return isErrorArchived(e);
+          if (errFilter === 'historical') return isErrorOpen(e) && !isErrorActive(e);
           return isErrorActive(e);
         }).filter(e => {
           const haystack = `${e.message || e.error || ''} ${e.stack || ''} ${errorRoute(e)} ${errorComponent(e)} ${e.userId || ''}`.toLowerCase();
@@ -11856,7 +11857,8 @@ export const AdminPanel = () => {
         });
         const filters = [
           ['all', 'Все', errorLogs.length],
-          ['active', 'Активные', activeErrors.length],
+          ['active', 'Актуальные', activeErrors.length],
+          ['historical', 'Исторические', historicalErrors.length],
           ['resolved', 'Решённые', resolvedErrors.length],
           ['archive', 'Архив', archivedErrors.length],
         ];
@@ -11882,7 +11884,7 @@ export const AdminPanel = () => {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 8, marginTop: 12 }}>
                 <div style={{ padding: '10px 12px', borderRadius: 14, background: activeErrors.length ? 'rgba(230,70,70,0.12)' : 'rgba(75,179,75,0.12)', border: `1px solid ${activeErrors.length ? 'rgba(230,70,70,0.28)' : 'rgba(75,179,75,0.28)'}` }}>
-                  <div style={{ fontSize: 11, color: A.textSec, fontWeight: 800 }}>🟢 Активных ошибок</div>
+                  <div style={{ fontSize: 11, color: A.textSec, fontWeight: 800 }}>🟢 Актуальных ошибок</div>
                   <div style={{ fontSize: 24, fontWeight: 950, color: activeErrors.length ? A.red : '#4BB34B' }}>{activeErrors.length}</div>
                 </div>
                 <div style={{ padding: '10px 12px', borderRadius: 14, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)' }}>
@@ -11890,12 +11892,12 @@ export const AdminPanel = () => {
                   <div style={{ fontSize: 24, fontWeight: 950, color: '#f59e0b' }}>{resolvedToday}</div>
                 </div>
                 <div style={{ padding: '10px 12px', borderRadius: 14, background: 'rgba(201,168,76,0.10)', border: '1px solid rgba(201,168,76,0.25)' }}>
-                  <div style={{ fontSize: 11, color: A.textSec, fontWeight: 800 }}>📦 В архиве</div>
-                  <div style={{ fontSize: 24, fontWeight: 950, color: A.gold }}>{archivedErrors.length}</div>
+                  <div style={{ fontSize: 11, color: A.textSec, fontWeight: 800 }}>🕘 Исторических</div>
+                  <div style={{ fontSize: 24, fontWeight: 950, color: A.gold }}>{historicalErrors.length}</div>
                 </div>
                 <div style={{ padding: '10px 12px', borderRadius: 14, background: A.chip, border: `1px solid ${A.border}` }}>
-                  <div style={{ fontSize: 11, color: A.textSec, fontWeight: 800 }}>🔁 Повторений · удалено {errDeletedCount}</div>
-                  <div style={{ fontSize: 24, fontWeight: 950, color: A.text }}>{errorLogs.reduce((sum, error) => sum + occurrenceCount(error), 0)}</div>
+                  <div style={{ fontSize: 11, color: A.textSec, fontWeight: 800 }}>🔁 Актуальных повторений</div>
+                  <div style={{ fontSize: 24, fontWeight: 950, color: A.text }}>{activeErrors.reduce((sum, error) => sum + occurrenceCount(error), 0)}</div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
@@ -11910,7 +11912,7 @@ export const AdminPanel = () => {
                 ))}
               </div>
               <p style={{ margin: '8px 0 0', fontSize: 12, color: activeErrors.length ? A.textSec : '#4BB34B' }}>
-                {activeErrors.length ? `${activeErrors.length} требуют внимания` : 'Система здорова: активных ошибок нет'}
+                {activeErrors.length ? `${activeErrors.length} требуют внимания на сборке ${CURRENT_APP_VERSION}` : `На сборке ${CURRENT_APP_VERSION} актуальных ошибок нет`}
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 8, marginTop: 12 }}>
                 <input value={errSearch} onChange={event => setErrSearch(event.target.value)} placeholder="Поиск по сообщению, stack, пользователю" style={{ ...s.input, minWidth: 0 }} />

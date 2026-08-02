@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isExpectedAdminAccessNoise } from './error-policy.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -29,6 +30,7 @@ function inferLevel(payload) {
 export function isIgnorableErrorPayload(payload = {}) {
   const text = `${payload.message || payload.error || ''} ${payload.source || payload.component || ''} ${payload.name || ''}`.toLowerCase();
   return !String(payload.message || payload.error || '').trim()
+    || isExpectedAdminAccessNoise(payload)
     || /script error|resizeobserver|chrome-extension|moz-extension/.test(text)
     || /aborterror|the operation was aborted|signal is aborted|fetch is aborted|fetch.*cancelled|fetch.*canceled/.test(text)
     || /auth_timeout|_timeout\b|timeout \d+ms|public_data_missing_/.test(text)
