@@ -32,7 +32,9 @@ import { buildLokiEvolutionCenter, buildLokiQualityCenter, exportLokiQualityCsv 
 import { buildSocialAnalytics } from './social/PeopleCore.js';
 import { isErrorActionable, isErrorArchived, isErrorOpen, isErrorResolved } from '../server-shared/error-policy.js';
 
-const CURRENT_APP_VERSION = import.meta.env.VITE_APP_VERSION || 'local';
+const CURRENT_APP_VERSION = typeof __APG_BUILD_VERSION__ !== 'undefined'
+  ? __APG_BUILD_VERSION__
+  : import.meta.env.VITE_APP_VERSION || 'local';
 
 const CATEGORIES = [
   { id: 'food',          label: 'Еда',          emoji: '🍕' },

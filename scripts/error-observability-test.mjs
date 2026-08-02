@@ -4,6 +4,7 @@ import { isIgnorableErrorPayload } from '../server-shared/error-log.js';
 import { isErrorActionable, isExpectedAdminAccessNoise } from '../server-shared/error-policy.js';
 
 const client = readFileSync(new URL('../src/errorLogger.js', import.meta.url), 'utf8');
+const adminPanel = readFileSync(new URL('../src/AdminPanel.jsx', import.meta.url), 'utf8');
 const userApp = readFileSync(new URL('../src/UserApp.jsx', import.meta.url), 'utf8');
 const userActions = readFileSync(new URL('../server/src/routes/user-actions.js', import.meta.url), 'utf8');
 
@@ -34,6 +35,7 @@ assert.equal(isErrorActionable({
 }, { currentVersion: 'newbuild1' }), false);
 assert.match(client, /transientNetworkError/);
 assert.match(client, /isExpectedAdminAccessNoise/);
+assert.match(adminPanel, /typeof __APG_BUILD_VERSION__ !== 'undefined'/, 'Admin error policy must use the real production build version.');
 assert.ok(client.includes('`network|${String(message).slice(0, 120)}`'));
 assert.ok(client.includes("transientNetworkError ? 'warning'"));
 assert.match(userApp, /PUBLIC_BOOTSTRAP_RETRIES = 1/);
