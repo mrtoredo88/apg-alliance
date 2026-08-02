@@ -81,6 +81,8 @@ const LIST_CONFIG = {
   partners: { orderBy: null, limit: 1000 },
   experts: { orderBy: null, limit: 1000 },
   events: { orderBy: null, limit: 1000 },
+  notifications: { orderBy: ['createdAt', 'desc'], limit: 1000 },
+  customTasks: { orderBy: ['createdAt', 'asc'], limit: 1000 },
   users: { orderBy: null, limit: 1000 },
   prizeClaims: { orderBy: ['claimedAt', 'desc'], limit: 200 },
   banners: { orderBy: ['priority', 'asc'], limit: 200 },

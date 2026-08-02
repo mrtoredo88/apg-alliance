@@ -30,6 +30,22 @@ for (const resource of ['partners', 'experts', 'events']) {
   );
 }
 
+for (const resource of ['notifications', 'customTasks']) {
+  assert.ok(
+    bootstrapSlice.includes(`fetchAdminEntityList('${resource}', 1000)`),
+    `Admin bootstrap must load ${resource} through the protected entity:list API.`,
+  );
+  assert.ok(
+    !bootstrapSlice.includes(`collection(db, '${resource}')`),
+    `Admin bootstrap must not use the public app-data API for ${resource}.`,
+  );
+  assert.match(
+    adminActions,
+    new RegExp(`${resource}: \\{ orderBy: \\['createdAt', '(?:asc|desc)'\\], limit: 1000 \\}`),
+    `Backend entity:list must expose ${resource} to authorized admins.`,
+  );
+}
+
 assert.ok(adminPanel.includes('durationMs: Math.round(performance.now() - startedAt)'), 'Admin loader must record per-source duration diagnostics.');
 assert.ok(adminPanel.includes('Array.from({ length: Math.min(3, specs.length) }'), 'Admin bootstrap must cap parallel reads to protect the database pool.');
 assert.ok(adminPanel.includes('if (isFinalAttempt && name !== \'errorLogs\''), 'Transient retry attempts must not create duplicate admin errors.');
