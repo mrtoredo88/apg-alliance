@@ -59,6 +59,11 @@ function types(result) {
       event(REFERRAL_EVENT_TYPES.SESSION_CREATED, { sessionId: 'session_fail', referralFlowId: 'flow_fail', timestamp: minutesAgo(49) }),
       ...completedEvents,
     ],
+    recoveryCandidates: [
+      { id: 'missing_1', kind: 'user_reward_missing', referredUserId: 'missing_1', reason: 'reward missing' },
+      { id: 'missing_2', kind: 'user_reward_missing', referredUserId: 'missing_2', reason: 'reward missing' },
+      { id: 'missing_3', kind: 'user_reward_missing', referredUserId: 'missing_3', reason: 'reward missing' },
+    ],
   });
   assert.equal(types(result).has(REFERRAL_ALERT_TYPES.SUCCESS_RATE_LOW), true, 'detects low success rate');
 }
@@ -70,7 +75,43 @@ function types(result) {
     events: [event(REFERRAL_EVENT_TYPES.SESSION_CREATED, { sessionId: 'session_broken', referralFlowId: 'flow_broken', timestamp: minutesAgo(45) })],
   });
   assert.equal(types(result).has(REFERRAL_ALERT_TYPES.BROKEN_SESSION), true, 'detects broken session');
-  assert.equal(types(result).has(REFERRAL_ALERT_TYPES.LONG_RUNNING_SESSION), true, 'detects long running session');
+  assert.equal(types(result).has(REFERRAL_ALERT_TYPES.LONG_RUNNING_SESSION), false, 'does not duplicate a broken session as long-running');
+}
+
+{
+  const oldSession = session('session_old', { referralFlowId: 'flow_old', createdAt: minutesAgo(2 * 24 * 60) });
+  const result = buildReferralMonitoring({
+    now,
+    sessions: [oldSession],
+    events: [event(REFERRAL_EVENT_TYPES.SESSION_CREATED, { sessionId: 'session_old', referralFlowId: 'flow_old', timestamp: minutesAgo(2 * 24 * 60) })],
+    recoveryCandidates: [{ id: 'session_old', kind: 'session_incomplete', referralSessionId: 'session_old', reason: 'legacy session candidate' }],
+  });
+  assert.equal(result.summary.openAlerts, 1, 'legacy session candidate is not multiplied by lifecycle alerts');
+  assert.equal(types(result).has(REFERRAL_ALERT_TYPES.BROKEN_SESSION), false, 'expired session is not an active incident');
+  assert.equal(types(result).has(REFERRAL_ALERT_TYPES.LONG_RUNNING_SESSION), false, 'expired session is not long-running');
+  assert.equal(result.summary.activeSessions, 0, 'expired session is not active');
+}
+
+{
+  const duplicateEvents = [
+    ...Array.from({ length: 12 }, (_, index) => event(REFERRAL_EVENT_TYPES.AUTH_STARTED, { id: `auth_${index}`, sessionId: 'session_unique', referralFlowId: 'flow_unique' })),
+    ...Array.from({ length: 20 }, (_, index) => event(REFERRAL_EVENT_TYPES.PROFILE_SYNC_STARTED, { id: `sync_${index}`, sessionId: 'session_unique', referralFlowId: 'flow_unique' })),
+    event(REFERRAL_EVENT_TYPES.REWARD_GRANTED, { sessionId: 'session_unique', referralFlowId: 'flow_unique', referredUserId: 'user_unique' }),
+  ];
+  const result = buildReferralMonitoring({ now, events: duplicateEvents });
+  assert.equal(result.funnel.total.authStarted, 1, 'retries count as one unique referral flow');
+  assert.equal(result.funnel.total.profileSync, 1, 'repeated profile sync counts once');
+  assert.equal(result.summary.successRate, 100, 'one rewarded unique flow is 100% successful');
+  assert.equal(types(result).has(REFERRAL_ALERT_TYPES.SUCCESS_RATE_LOW), false, 'duplicate events do not create a false low success alert');
+}
+
+{
+  const result = buildReferralMonitoring({
+    now,
+    events: [event(REFERRAL_EVENT_TYPES.REWARD_GRANTED, { referralFlowId: 'flow_rewarded', referredUserId: 'user_rewarded' })],
+    recoveryCandidates: [{ id: 'ref__missing', kind: 'user_reward_missing', referredUserId: 'user_missing', reason: 'reward missing' }],
+  });
+  assert.equal(result.summary.successRate, 50, 'success rate uses unique eligible referral outcomes');
 }
 
 {
@@ -88,13 +129,11 @@ function types(result) {
 {
   const result = buildReferralMonitoring({
     now,
-    sessions: [session('session_auth', { referralFlowId: 'flow_auth', createdAt: minutesAgo(20) })],
     events: [
-      event(REFERRAL_EVENT_TYPES.SESSION_CREATED, { sessionId: 'session_auth', referralFlowId: 'flow_auth', timestamp: minutesAgo(20) }),
-      event(REFERRAL_EVENT_TYPES.AUTH_STARTED, { sessionId: 'session_auth', referralFlowId: 'flow_auth', timestamp: minutesAgo(19) }),
+      { ...event(REFERRAL_EVENT_TYPES.AUTH_STARTED, { referralFlowId: 'flow_auth', timestamp: minutesAgo(19) }), sessionId: '' },
     ],
   });
-  assert.equal(types(result).has(REFERRAL_ALERT_TYPES.AUTH_TIMEOUT), true, 'detects auth timeout');
+  assert.equal(types(result).has(REFERRAL_ALERT_TYPES.AUTH_TIMEOUT), true, 'detects auth timeout without a server session');
 }
 
 {

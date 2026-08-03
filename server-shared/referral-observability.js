@@ -128,10 +128,6 @@ function emptyKpis() {
   return Object.fromEntries(RANGE_KEYS.map(key => [key, { ...KPI_TEMPLATE }]));
 }
 
-function emptyFunnel() {
-  return Object.fromEntries(RANGE_KEYS.map(key => [key, { ...FUNNEL_TEMPLATE }]));
-}
-
 function applyKpi(kpi, event) {
   if (event.type === REFERRAL_EVENT_TYPES.QUERY_DETECTED) kpi.openedLinks += 1;
   if (event.type === REFERRAL_EVENT_TYPES.AUTH_STARTED) kpi.authStarted += 1;
@@ -149,6 +145,44 @@ function applyFunnel(funnel, event) {
   if ([REFERRAL_EVENT_TYPES.PROFILE_SYNC_STARTED, REFERRAL_EVENT_TYPES.PROFILE_SYNC_COMPLETED, REFERRAL_EVENT_TYPES.SESSION_PROFILE_SYNC].includes(event.type)) funnel.profileSync += 1;
   if ([REFERRAL_EVENT_TYPES.REFERRAL_ATTACHED, REFERRAL_EVENT_TYPES.SESSION_ATTACHED].includes(event.type)) funnel.referralAttached += 1;
   if (event.type === REFERRAL_EVENT_TYPES.REWARD_GRANTED) funnel.rewardGranted += 1;
+}
+
+function referralFlowKey(event = {}) {
+  return event.referralFlowId || event.sessionId || event.referredUserId || event.referralCode || event.id;
+}
+
+function referralOutcomeKey(event = {}) {
+  return event.referredUserId || event.referralFlowId || event.sessionId || event.referralCode || event.id;
+}
+
+function buildUniqueReferralFunnel(events = [], now = new Date()) {
+  const nowMs = referralEventTime(now);
+  const day = 24 * 60 * 60 * 1000;
+  const ranges = { today: day, week: day * 7, month: day * 31, total: Infinity };
+  return Object.fromEntries(Object.entries(ranges).map(([range, maxAge]) => {
+    const flows = new Map();
+    sortReferralEvents(events).forEach(event => {
+      const age = nowMs - referralEventTime(event.timestamp);
+      if (age > maxAge) return;
+      const key = referralFlowKey(event);
+      if (!key) return;
+      if (!flows.has(key)) flows.set(key, { ...FUNNEL_TEMPLATE });
+      const stages = flows.get(key);
+      const incremented = { ...FUNNEL_TEMPLATE };
+      applyFunnel(incremented, event);
+      Object.keys(incremented).forEach(stage => {
+        if (incremented[stage]) stages[stage] = 1;
+      });
+    });
+    const values = { ...FUNNEL_TEMPLATE };
+    flows.forEach(stages => Object.keys(values).forEach(stage => { values[stage] += stages[stage]; }));
+    const steps = FUNNEL_STAGES.map((stage, index) => {
+      const value = values[stage.key] || 0;
+      const previous = index === 0 ? value : values[FUNNEL_STAGES[index - 1].key] || 0;
+      return { ...stage, value, conversionFromPreviousPct: previous ? Math.min(100, Math.round((value / previous) * 1000) / 10) : value ? 100 : 0 };
+    });
+    return [range, { ...values, steps }];
+  }));
 }
 
 export function aggregateReferralEvents(events = [], now = new Date()) {
@@ -169,28 +203,7 @@ export function aggregateReferralEvents(events = [], now = new Date()) {
 }
 
 export function buildReferralFunnel(events = [], now = new Date()) {
-  const funnel = emptyFunnel();
-  const nowMs = referralEventTime(now);
-  const day = 24 * 60 * 60 * 1000;
-  sortReferralEvents(events).forEach(event => {
-    const age = nowMs - referralEventTime(event.timestamp);
-    applyFunnel(funnel.total, event);
-    if (age <= day) applyFunnel(funnel.today, event);
-    if (age <= day * 7) applyFunnel(funnel.week, event);
-    if (age <= day * 31) applyFunnel(funnel.month, event);
-  });
-  return Object.fromEntries(Object.entries(funnel).map(([range, values]) => {
-    const steps = FUNNEL_STAGES.map((stage, index) => {
-      const value = values[stage.key] || 0;
-      const previous = index === 0 ? value : values[FUNNEL_STAGES[index - 1].key] || 0;
-      return {
-        ...stage,
-        value,
-        conversionFromPreviousPct: previous ? Math.round((value / previous) * 1000) / 10 : value ? 100 : 0,
-      };
-    });
-    return [range, { ...values, steps }];
-  }));
+  return buildUniqueReferralFunnel(events, now);
 }
 
 function normalizeReferralSession(session = {}) {
@@ -273,7 +286,13 @@ export function buildReferralSessionInspectors(sessions = [], events = []) {
 
 export function buildReferralHealth(events = [], sessions = [], recoveryCandidates = [], now = new Date()) {
   const dashboard = aggregateReferralEvents(events, now);
-  const incomplete = detectIncompleteReferralSessions(sessions, events, now);
+  const nowMs = referralEventTime(now);
+  const actionableWindowMs = 24 * 60 * 60 * 1000;
+  const incomplete = detectIncompleteReferralSessions(sessions, events, now).filter(session => {
+    const expiresMs = referralEventTime(session.expiresAt);
+    const createdMs = referralEventTime(session.createdAt);
+    return !(expiresMs && expiresMs <= nowMs) && (!createdMs || nowMs - createdMs <= actionableWindowMs);
+  });
   const inspectors = buildReferralSessionInspectors(sessions, events);
   const completedSessions = inspectors.filter(session => session.completed);
   const completionTimes = completedSessions.map(session => session.completionSeconds).filter(value => Number.isFinite(value));
@@ -281,8 +300,17 @@ export function buildReferralHealth(events = [], sessions = [], recoveryCandidat
     const completedMs = referralEventTime(session.completedAt);
     return completedMs && referralEventTime(now) - completedMs <= 24 * 60 * 60 * 1000;
   }).length;
+  const rewarded = new Set(sortReferralEvents(events)
+    .filter(event => [REFERRAL_EVENT_TYPES.REWARD_GRANTED, REFERRAL_EVENT_TYPES.ALREADY_GRANTED].includes(event.type))
+    .map(referralOutcomeKey)
+    .filter(Boolean));
+  const missingRewards = new Set(recoveryCandidates
+    .filter(candidate => candidate?.kind === 'user_reward_missing')
+    .map(candidate => candidate.referredUserId || candidate.id)
+    .filter(Boolean));
+  const eligibleOutcomes = rewarded.size + missingRewards.size;
   return {
-    successRatePct: dashboard.total.openedLinks ? Math.round((dashboard.total.rewardsGranted / dashboard.total.openedLinks) * 1000) / 10 : 100,
+    successRatePct: eligibleOutcomes ? Math.round((rewarded.size / eligibleOutcomes) * 1000) / 10 : 100,
     averageCompletionSeconds: completionTimes.length ? Math.round(completionTimes.reduce((sum, value) => sum + value, 0) / completionTimes.length) : null,
     brokenSessions: incomplete.length,
     recoveryPending: recoveryCandidates.length,

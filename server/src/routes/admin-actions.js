@@ -1301,7 +1301,7 @@ function serializeReferralSessionDoc(doc) {
   };
 }
 
-function buildReferralRecoveryCandidates(rows = [], sessions = []) {
+function buildReferralRecoveryCandidates(rows = []) {
   const userCandidates = rows
     .filter(row => row?.referrer?.id && row?.invited?.id && row.registrationComplete && row.granted !== true)
     .map(row => ({
@@ -1313,19 +1313,8 @@ function buildReferralRecoveryCandidates(rows = [], sessions = []) {
       reason: row.referredBy ? 'referredBy exists, reward not confirmed' : 'registered referral chain missing reward',
       status: row.status || 'needs_recovery',
     }));
-  const sessionCandidates = sessions
-    .filter(session => session?.id && !session.completed && session.status !== 'completed')
-    .map(session => ({
-      id: session.id,
-      kind: 'session_incomplete',
-      referrerId: session.referrerId || '',
-      referredUserId: session.userId || '',
-      referralSessionId: session.id,
-      reason: 'server referral session is not completed',
-      status: session.status || 'active',
-    }));
   const byId = new Map();
-  [...userCandidates, ...sessionCandidates].forEach(item => byId.set(item.id, item));
+  userCandidates.forEach(item => byId.set(item.id, item));
   return [...byId.values()].slice(0, 160);
 }
 

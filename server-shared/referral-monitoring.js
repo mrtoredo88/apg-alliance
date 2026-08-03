@@ -35,6 +35,7 @@ const DEFAULT_THRESHOLDS = Object.freeze({
   authTimeoutMinutes: 10,
   profileSyncTimeoutMinutes: 10,
   recoveryPendingMinutes: 10,
+  actionableWindowMinutes: 24 * 60,
 });
 
 function safeString(value, max = 240) {
@@ -113,6 +114,15 @@ export function buildReferralMonitoring({ events = [], sessions = [], recoveryCa
   const health = buildReferralHealth(sortedEvents, sessions, recoveryCandidates, now);
   const inspectors = buildReferralSessionInspectors(sessions, sortedEvents);
   const incompleteSessions = detectIncompleteReferralSessions(sessions, sortedEvents, now, 10);
+  const sessionIsActionable = session => {
+    const createdMs = referralEventTime(session.createdAt) || referralEventTime(session.events?.[0]?.timestamp);
+    const expiresMs = referralEventTime(session.expiresAt);
+    if (expiresMs && expiresMs <= nowMs) return false;
+    return !createdMs || nowMs - createdMs <= config.actionableWindowMinutes * 60_000;
+  };
+  const actionableIncompleteSessions = incompleteSessions.filter(sessionIsActionable);
+  const actionableInspectors = inspectors.filter(session => !session.completed && sessionIsActionable(session));
+  const actionableSessionKeys = new Set(actionableIncompleteSessions.flatMap(session => [session.id, session.referralFlowId].filter(Boolean)));
   const alerts = [];
 
   if (health.successRatePct < config.successRatePct && (funnel.total.sessionsCreated || funnel.total.authStarted || funnel.total.rewardGranted)) {
@@ -126,7 +136,7 @@ export function buildReferralMonitoring({ events = [], sessions = [], recoveryCa
     }));
   }
 
-  incompleteSessions.forEach(session => {
+  actionableIncompleteSessions.forEach(session => {
     alerts.push(makeAlert({
       type: REFERRAL_ALERT_TYPES.BROKEN_SESSION,
       severity: session.ageMinutes >= config.longRunningMinutes ? 'critical' : 'warning',
@@ -141,24 +151,10 @@ export function buildReferralMonitoring({ events = [], sessions = [], recoveryCa
     }));
   });
 
-  inspectors.forEach(session => {
+  actionableInspectors.forEach(session => {
     const eventsForSession = session.events || sessionEvents(sortedEvents, session);
     const createdMs = referralEventTime(session.createdAt) || referralEventTime(eventsForSession[0]?.timestamp);
     const ageMinutes = createdMs ? Math.max(0, Math.round((nowMs - createdMs) / 60000)) : 0;
-    if (!session.completed && ageMinutes >= config.longRunningMinutes) {
-      alerts.push(makeAlert({
-        type: REFERRAL_ALERT_TYPES.LONG_RUNNING_SESSION,
-        severity: 'critical',
-        flowId: session.referralFlowId,
-        sessionId: session.id,
-        userId: session.userId,
-        summary: `Referral session активна ${ageMinutes} мин.`,
-        details: { ageMinutes, status: session.status, referrerId: session.referrerId },
-        createdAt: session.createdAt,
-        updatedAt: eventsForSession.at(-1)?.timestamp || session.createdAt,
-        events: eventsForSession,
-      }));
-    }
     if (eventsForSession.some(event => [REFERRAL_EVENT_TYPES.REFERRAL_ATTACHED, REFERRAL_EVENT_TYPES.SESSION_ATTACHED].includes(event.type)) && !hasReward(eventsForSession)) {
       alerts.push(makeAlert({
         type: REFERRAL_ALERT_TYPES.REWARD_PENDING,
@@ -193,10 +189,12 @@ export function buildReferralMonitoring({ events = [], sessions = [], recoveryCa
     const first = flowEvents[0];
     const last = flowEvents.at(-1);
     const ageMinutes = Math.max(0, Math.round((nowMs - referralEventTime(first?.timestamp)) / 60000));
+    const idleMinutes = Math.max(0, Math.round((nowMs - referralEventTime(last?.timestamp)) / 60000));
     const authStarted = flowEvents.some(event => [REFERRAL_EVENT_TYPES.AUTH_STARTED, REFERRAL_EVENT_TYPES.SESSION_EMAIL_LINKED, REFERRAL_EVENT_TYPES.SESSION_TELEGRAM_LINKED].includes(event.type));
     const authCompleted = flowEvents.some(eventHasCompletedAuth);
     const hasSession = flowEvents.some(event => event.sessionId || [REFERRAL_EVENT_TYPES.SESSION_CREATED, REFERRAL_EVENT_TYPES.SESSION_RESTORED].includes(event.type));
-    if (authStarted && !authCompleted && ageMinutes >= config.authTimeoutMinutes) {
+    const isCoveredBySessionAlert = actionableSessionKeys.has(first?.sessionId) || actionableSessionKeys.has(flowId);
+    if (authStarted && !authCompleted && ageMinutes >= config.authTimeoutMinutes && idleMinutes <= config.actionableWindowMinutes && !isCoveredBySessionAlert) {
       alerts.push(makeAlert({
         type: REFERRAL_ALERT_TYPES.AUTH_TIMEOUT,
         severity: 'warning',
@@ -210,7 +208,7 @@ export function buildReferralMonitoring({ events = [], sessions = [], recoveryCa
         events: flowEvents,
       }));
     }
-    if (!hasSession && flowId && flowId !== first?.id) {
+    if (!hasSession && flowId && flowId !== first?.id && idleMinutes <= config.actionableWindowMinutes) {
       alerts.push(makeAlert({
         type: REFERRAL_ALERT_TYPES.SESSION_ORPHAN,
         severity: 'warning',
@@ -271,11 +269,11 @@ export function buildReferralMonitoring({ events = [], sessions = [], recoveryCa
     timestamp: dateIso(now),
     thresholds: config,
     status,
-    healthScore: Math.max(0, Math.min(100, Math.round((health.successRatePct || 100) - criticalAlerts.length * 15 - warnings.length * 5))),
+    healthScore: Math.max(0, Math.min(100, Math.round((Number.isFinite(health.successRatePct) ? health.successRatePct : 100) - criticalAlerts.length * 15 - warnings.length * 5))),
     health: {
       ...health,
-      activeSessions: inspectors.filter(session => !session.completed).length,
-      abandonedSessions: incompleteSessions.length,
+      activeSessions: actionableInspectors.length,
+      abandonedSessions: actionableIncompleteSessions.length,
       completedHour,
     },
     alerts: uniqueAlerts,
@@ -284,13 +282,13 @@ export function buildReferralMonitoring({ events = [], sessions = [], recoveryCa
       critical: criticalAlerts.length,
       warnings: warnings.length,
       resolvedToday: resolvedToday.length,
-      brokenSessions: health.brokenSessions || incompleteSessions.length,
+      brokenSessions: actionableIncompleteSessions.length,
       recoveryPending: health.recoveryPending || recoveryCandidates.length,
       rewardPending: openAlerts.filter(alert => alert.type === REFERRAL_ALERT_TYPES.REWARD_PENDING).length,
       successRate: health.successRatePct,
       averageCompletion: health.averageCompletionSeconds,
-      activeSessions: inspectors.filter(session => !session.completed).length,
-      abandonedSessions: incompleteSessions.length,
+      activeSessions: actionableInspectors.length,
+      abandonedSessions: actionableIncompleteSessions.length,
     },
     funnel,
   };
