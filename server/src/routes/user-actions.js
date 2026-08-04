@@ -1959,8 +1959,23 @@ async function actionReviewPartner(db, req, actor) {
     partnerReviewRef.set(reviewData, { merge: true }),
     publicReviewRef.set({ ...reviewData, partnerId, partnerName: safeString(req.body?.partnerName, 200) }, { merge: true }),
   ]);
-  if (!existingReview.exists) {
-    const reward = getEconomyReward('review');
+  const reward = getEconomyReward('review');
+  let rewardResult = null;
+  if (accountCoreWriteEnabled()) {
+    rewardResult = await serverFoundation.account.awardAction({
+      userId,
+      actionType: 'review_reward',
+      sourceType: 'partner',
+      sourceId: partnerId,
+      sourceLabel: safeString(req.body?.partnerName || 'Партнёр АПГ', 200),
+      idempotencyKey: `review:partner:${partnerId}:${userId}`,
+      keys: reward.keys,
+      reputation: reward.reputation,
+      reason: 'Награда за отзыв о партнёре',
+      metadata: { partnerId },
+    });
+  }
+  if (!existingReview.exists && !accountCoreWriteEnabled()) {
     const userRef = db.collection('users').doc(userId);
     await Promise.all([
       userRef.set({
@@ -1980,6 +1995,17 @@ async function actionReviewPartner(db, req, actor) {
         ts: FieldValue.serverTimestamp(),
       }),
     ]);
+  } else if (rewardResult && !rewardResult.replayed) {
+    await db.collection('users').doc(userId).collection('activity').add({
+      type: 'review',
+      icon: '⭐',
+      text: `Отзыв о партнёре: +${reward.keys} ключа`,
+      keys: reward.keys,
+      reputation: reward.reputation,
+      partnerId,
+      economyVersion: ECONOMY_VERSION,
+      ts: FieldValue.serverTimestamp(),
+    });
   }
   const snap = await partnerRef.collection('reviews').get();
   const list = snap.docs.map(d => d.data() || {});
@@ -1992,7 +2018,14 @@ async function actionReviewPartner(db, req, actor) {
     providerId: partnerId,
   });
   await audit(db, req, actor, 'review:partner', 'partners', partnerId, 'success', { stars });
-  return { ok: true, avgRating, reviewCount: list.length, review: { ...reviewData, id: userId, createdAt: new Date().toISOString() } };
+  return {
+    ok: true,
+    avgRating,
+    reviewCount: list.length,
+    awardedKeys: rewardResult?.replayed ? 0 : Number(rewardResult?.operation?.delta || 0),
+    balanceAfter: rewardResult?.operation?.balanceAfter ?? null,
+    review: { ...reviewData, id: userId, createdAt: new Date().toISOString() },
+  };
 }
 
 async function actionReviewExpert(db, req, actor) {
@@ -2014,8 +2047,23 @@ async function actionReviewExpert(db, req, actor) {
   const reviewRef = db.collection('expertReviews').doc(reviewId);
   const existingReview = await reviewRef.get();
   await reviewRef.set(reviewData, { merge: true });
-  if (!existingReview.exists) {
-    const reward = getEconomyReward('review');
+  const reward = getEconomyReward('review');
+  let rewardResult = null;
+  if (accountCoreWriteEnabled()) {
+    rewardResult = await serverFoundation.account.awardAction({
+      userId,
+      actionType: 'review_reward',
+      sourceType: 'expert',
+      sourceId: expertId,
+      sourceLabel: safeString(req.body?.expertName || 'Эксперт АПГ', 200),
+      idempotencyKey: `review:expert:${expertId}:${userId}`,
+      keys: reward.keys,
+      reputation: reward.reputation,
+      reason: 'Награда за отзыв об эксперте',
+      metadata: { expertId },
+    });
+  }
+  if (!existingReview.exists && !accountCoreWriteEnabled()) {
     const userRef = db.collection('users').doc(userId);
     await Promise.all([
       userRef.set({
@@ -2035,6 +2083,17 @@ async function actionReviewExpert(db, req, actor) {
         ts: FieldValue.serverTimestamp(),
       }),
     ]);
+  } else if (rewardResult && !rewardResult.replayed) {
+    await db.collection('users').doc(userId).collection('activity').add({
+      type: 'review',
+      icon: '⭐',
+      text: `Отзыв об эксперте: +${reward.keys} ключа`,
+      keys: reward.keys,
+      reputation: reward.reputation,
+      expertId,
+      economyVersion: ECONOMY_VERSION,
+      ts: FieldValue.serverTimestamp(),
+    });
   }
   const snap = await db.collection('expertReviews').where('expertId', '==', expertId).get();
   const list = snap.docs.map(d => d.data() || {});
@@ -2047,7 +2106,14 @@ async function actionReviewExpert(db, req, actor) {
     providerId: expertId,
   });
   await audit(db, req, actor, 'review:expert', 'experts', expertId, 'success', { rating });
-  return { ok: true, avgRating, reviewCount: list.length, review: { ...reviewData, id: reviewId, createdAt: new Date().toISOString() } };
+  return {
+    ok: true,
+    avgRating,
+    reviewCount: list.length,
+    awardedKeys: rewardResult?.replayed ? 0 : Number(rewardResult?.operation?.delta || 0),
+    balanceAfter: rewardResult?.operation?.balanceAfter ?? null,
+    review: { ...reviewData, id: reviewId, createdAt: new Date().toISOString() },
+  };
 }
 
 async function actionReviewReply(db, req, actor) {

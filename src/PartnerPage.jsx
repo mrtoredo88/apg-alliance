@@ -347,17 +347,12 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
         ...reviewData,
       });
 
-      // Обновляем список отзывов
-      const snap = await getDocs(query(
-        collection(db, 'partners', partner.id, 'reviews'),
-        orderBy('createdAt', 'desc'),
-      ));
       if (!mountedRef.current) return;
-      const allReviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setReviews(allReviews);
+      const savedReview = { id: userId, ...reviewData, ...(result.review || {}), createdAt: result.review?.createdAt || new Date().toISOString() };
+      setReviews(previous => [savedReview, ...previous.filter(item => item.id !== userId)]);
 
       const newAvg = result.avgRating ?? partner.avgRating ?? 0;
-      const newCount = result.reviewCount ?? allReviews.length;
+      const newCount = result.reviewCount ?? (myReview ? reviews.length : reviews.length + 1);
       if (!mountedRef.current) return;
       onPartnerUpdate?.(partner.id, { avgRating: newAvg, reviewCount: newCount });
 
@@ -370,9 +365,16 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       const stars = '⭐'.repeat(formStars);
       const msg = `Побывал у партнёра АПГ «${partner.name}» — ${stars}\n${formText.trim() ? formText.trim() + '\n' : ''}\n#АПГ_Зеленоград`;
       vkBridge.send('VKWebAppShowWallPostBox', { message: msg }).catch(() => {});
+
+      getDocs(query(
+        collection(db, 'partners', partner.id, 'reviews'),
+        orderBy('createdAt', 'desc'),
+      )).then(snap => {
+        if (mountedRef.current) setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }).catch(error => logError(error, 'PartnerPage.refreshReviewsAfterSubmit'));
     } catch (e) { logError(e, 'PartnerPage.submitReview'); setReviewError('Ошибка отправки. Проверьте соединение.'); }
     if (mountedRef.current) setSubmitting(false);
-  }, [partner, userId, formStars, formText, submitting, user, onPartnerUpdate, reviewPromptBookingId, displayLocation?.id, displayLocation?.title]);
+  }, [partner, userId, formStars, formText, submitting, user, onPartnerUpdate, reviewPromptBookingId, displayLocation?.id, displayLocation?.title, myReview, reviews.length]);
 
   if (!partner) return null;
 

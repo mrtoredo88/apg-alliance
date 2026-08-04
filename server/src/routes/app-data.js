@@ -1,7 +1,7 @@
 import { serverFoundation } from '../apg/index.js';
 import { getPrimaryRole } from '../../../server-shared/role-engine.js';
 
-const PUBLIC_COLLECTIONS = new Set(['partners', 'experts', 'news', 'events', 'promotions', 'prizes', 'tasks', 'banners', 'reviews', 'stats', 'config']);
+const PUBLIC_COLLECTIONS = new Set(['partners', 'experts', 'news', 'events', 'promotions', 'prizes', 'tasks', 'banners', 'reviews', 'expertReviews', 'stats', 'config']);
 const ADMIN_ROLES = new Set(['owner', 'super_admin', 'admin', 'editor', 'moderator']);
 const clean = (value, max = 700) => String(value ?? '').trim().slice(0, max);
 
@@ -16,6 +16,11 @@ async function actorFor(request) {
 
 function assertAccess(collectionName, parentPath, actor) {
   if (PUBLIC_COLLECTIONS.has(collectionName) && !parentPath) return;
+  const publicParts = parentPath.split('/').filter(Boolean);
+  if (collectionName === 'reviews'
+    && publicParts.length === 2
+    && ['partners', 'experts'].includes(publicParts[0])
+    && publicParts[1]) return;
   if (!actor?.uid) throw Object.assign(new Error('Требуется авторизация.'), { statusCode: 401 });
   if (ADMIN_ROLES.has(getPrimaryRole(actor))) return;
   const parts = parentPath.split('/').filter(Boolean);
