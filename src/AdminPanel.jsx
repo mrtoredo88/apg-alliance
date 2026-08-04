@@ -1573,6 +1573,7 @@ function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
   const [auditResult, setAuditResult] = useState('all');
   const [selectedRole, setSelectedRole] = useState('owner');
   const [showCreate, setShowCreate] = useState(false);
+  const [passwordReset, setPasswordReset] = useState({ adminId: '', password: '' });
   const [adminForm, setAdminForm] = useState({
     firstName: '', lastName: '', email: '', password: '', password2: '', position: '', photo: '', role: 'admin',
   });
@@ -1704,10 +1705,23 @@ function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
                 </select>
                 <button type="button" disabled={!canManage || admin.role === 'owner'} onClick={() => onAction(admin.status === 'active' ? 'admin:block' : 'admin:unblock', admin)} style={{ ...s.btn, ...(admin.status === 'active' ? s.btnDanger : s.btnGray), padding: '8px 9px', fontSize: 12 }}>{admin.status === 'active' ? 'Блок' : 'Разблок'}</button>
                 <button type="button" disabled={!canManage} onClick={() => onAction('admin:revokeSessions', admin)} style={{ ...s.btn, ...s.btnGray, padding: '8px 9px', fontSize: 12 }}>Сессии</button>
-                <button type="button" disabled={!canManage || !admin.email} onClick={() => {
-                  const nextPassword = window.prompt('Введите новый временный пароль администратора. Он не будет сохранён в Firestore.');
-                  if (nextPassword) onAction('admin:updatePassword', admin, { password: nextPassword });
-                }} style={{ ...s.btn, ...s.btnGray, padding: '8px 9px', fontSize: 12 }}>Пароль</button>
+                <button type="button" disabled={!canManage || !admin.email} onClick={() => setPasswordReset(current => ({
+                  adminId: current.adminId === admin.id ? '' : admin.id,
+                  password: '',
+                }))} style={{ ...s.btn, ...s.btnGray, padding: '8px 9px', fontSize: 12 }}>Пароль</button>
+                {passwordReset.adminId === admin.id && (
+                  <div style={{ gridColumn: '1 / -1', display: 'grid', gap: 7 }}>
+                    <input type="password" value={passwordReset.password} onChange={event => setPasswordReset({ adminId: admin.id, password: event.target.value })} placeholder="Новый пароль" autoComplete="new-password" style={{ ...s.input, marginBottom: 0, fontSize: 12, padding: '8px 9px' }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7 }}>
+                      <button type="button" disabled={loading || !passwordReset.password} onClick={async () => {
+                        const isTatyanaPermanentPassword = security?.actor?.role === 'owner' && String(admin.email || '').trim().toLowerCase() === 'gordeeva.tatyana@mail.ru';
+                        await onAction('admin:updatePassword', admin, { password: passwordReset.password, ...(isTatyanaPermanentPassword ? { mustChangePassword: false } : {}) });
+                        setPasswordReset({ adminId: '', password: '' });
+                      }} style={{ ...s.btn, ...s.btnPri, padding: '8px 9px', fontSize: 12 }}>Сохранить пароль</button>
+                      <button type="button" onClick={() => setPasswordReset({ adminId: '', password: '' })} style={{ ...s.btn, ...s.btnGray, padding: '8px 9px', fontSize: 12 }}>Отмена</button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}

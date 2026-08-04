@@ -5,6 +5,7 @@ import traverseModule from '@babel/traverse';
 
 const traverse = traverseModule.default;
 const source = await readFile(new URL('../src/AdminPanel.jsx', import.meta.url), 'utf8');
+const adminSecuritySource = await readFile(new URL('../server/src/routes/admin-security.js', import.meta.url), 'utf8');
 const ast = parse(source, { sourceType: 'module', plugins: ['jsx'] });
 const buttonsWithoutAction = [];
 let buttonCount = 0;
@@ -55,5 +56,10 @@ assert.match(source, /canDeleteUsers=\{String\(adminSession\?\.role \|\| adminSe
 assert.match(source, />Карточка<\/button>/);
 assert.match(source, />Не дубли<\/button>/);
 assert.match(source, />Отделить от группы<\/button>/);
+assert.match(source, /placeholder="Новый пароль"/);
+assert.match(source, /isTatyanaPermanentPassword/);
+assert.doesNotMatch(source, /window\.prompt\('Введите новый временный пароль администратора/);
+assert.match(adminSecuritySource, /gordeeva\.tatyana@mail\.ru/);
+assert.match(adminSecuritySource, /request\.body\?\.mustChangePassword === false/);
 
 console.log(`Admin interaction contract passed: ${buttonCount} buttons and all user-account actions checked`);
