@@ -380,9 +380,15 @@ WITH owner_ids AS (
 UPDATE apg_account_profiles
 SET profile = jsonb_set(profile, '{keys}', '32'::jsonb, true),
     updated_at = now()
-WHERE lower(COALESCE(email, '')) = 'mrtoredo88@mail.ru'
-   OR user_id IN (SELECT user_id FROM owner_ids WHERE user_id IS NOT NULL AND user_id <> '')
-   OR canonical_user_id IN (SELECT user_id FROM owner_ids WHERE user_id IS NOT NULL AND user_id <> '');
+WHERE NOT EXISTS (
+    SELECT 1 FROM apg_account_schema_versions
+    WHERE version = 'owner-canonical-keys-reconcile-v3-2026-07-28'
+  )
+  AND (
+    lower(COALESCE(email, '')) = 'mrtoredo88@mail.ru'
+    OR user_id IN (SELECT user_id FROM owner_ids WHERE user_id IS NOT NULL AND user_id <> '')
+    OR canonical_user_id IN (SELECT user_id FROM owner_ids WHERE user_id IS NOT NULL AND user_id <> '')
+  );
 
 INSERT INTO apg_account_schema_versions (version, checksum, description)
 VALUES (

@@ -84,5 +84,10 @@ assert.match(accountSchema, /b\.created_at > a\.last_admin_at/, 'repair must pre
 assert.match(accountSchema, /'system_repair'/, 'repair must be recorded in the canonical ledger');
 assert.match(accountSchema, /restore-valid-daily-login-v1:/, 'incorrectly removed daily bonuses must be restored idempotently');
 assert.match(accountSchema, /owner-confirmed-balance-54-v1:/, 'owner-confirmed 54-key balance must be ledger-backed');
+assert.match(
+  accountSchema,
+  /WHERE NOT EXISTS \(\s*SELECT 1 FROM apg_account_schema_versions\s*WHERE version = 'owner-canonical-keys-reconcile-v3-2026-07-28'/,
+  'the historic owner balance repair must never reset keys again on container startup',
+);
 
 console.log('Admin key balance regression: Account Core, ledger, mirror and idempotency passed');

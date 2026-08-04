@@ -78,8 +78,13 @@ export class EconomyRepository {
         [dailyIdempotencyKey],
       );
       if (previousResult.rows[0]) {
+        const currentBalance = Math.max(0, integer(row.profile?.keys, previousResult.rows[0].balance_after));
         return {
-          operation: mapOperation(previousResult.rows[0]),
+          operation: {
+            ...mapOperation(previousResult.rows[0]),
+            userId: resolvedUserId,
+            balanceAfter: currentBalance,
+          },
           replayed: true,
           alreadyAwarded: integer(previousResult.rows[0].delta) === 0,
         };
