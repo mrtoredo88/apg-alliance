@@ -5,6 +5,7 @@ const profile = readFileSync('src/ProfilePanel.jsx', 'utf8');
 const userApp = readFileSync('src/UserApp.jsx', 'utf8');
 const actions = readFileSync('server/src/routes/user-actions.js', 'utf8');
 const economy = readFileSync('server/src/apg/account/repositories/EconomyRepository.js', 'utf8');
+const rewardService = readFileSync('server-shared/reward-service.js', 'utf8');
 
 const profileSync = actions.slice(
   actions.indexOf('async function actionProfileSync'),
@@ -22,6 +23,8 @@ assert.match(economy, /metadata->>'dateKey' = \$4/, 'visit rewards must be uniqu
 assert.match(economy, /const resolvedUserId = row\.user_id/, 'visit rewards must be written to the canonical Account Core profile');
 assert.doesNotMatch(economy, /Boolean\(legacyScans\?\./, 'historic scanned flags must not block a new-day reward');
 assert.match(economy, /ON CONFLICT \(user_id, subject_type, subject_id\)/, 'latest visit reward marker must be updated on a later day');
+assert.match(rewardService, /legacy-visit:\$\{context\.userId\}:\$\{context\.subjectType\}:\$\{context\.subjectId\}:\$\{dateKey\}/, 'every partner and expert legacy QR must include the Moscow date');
+assert.match(rewardService, /raw\.startsWith\('expert_'\)/, 'expert service QR values must use the same visit reward pipeline');
 assert.match(profile, /label: 'Поделиться'/, 'Referrals entry must be renamed without changing its handler');
 assert.match(profile, /id: 'notifications'/, 'profile must keep the notifications action');
 assert.match(profile, /ownedPartner && \{ id: 'partner'/, 'partner cabinet must remain role-gated');

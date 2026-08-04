@@ -5,7 +5,12 @@ const state = {
   profile: {
     user_id: 'canonical-owner',
     canonical_user_id: 'canonical-owner',
-    profile: { keys: 37, scannedPartners: { happiness: true }, visitCounts: { happiness: 1 } },
+    profile: {
+      keys: 37,
+      scannedPartners: { happiness: true },
+      scannedExperts: { trustedExpert: 5 },
+      visitCounts: { happiness: 1, trustedExpert: 5 },
+    },
   },
   operations: [{
     id: 'failed-old-rule',
@@ -91,4 +96,29 @@ const nextDay = await economy.awardVisit({
 assert.equal(nextDay.operation.delta, 2);
 assert.equal(nextDay.operation.balanceAfter, 41, 'a new Moscow calendar day must award again');
 
-console.log('Visit reward regression: canonical balance, daily replay and next-day award passed');
+const expertFirst = await economy.awardVisit({
+  userId: 'linked-owner', subjectType: 'expert', subjectId: 'trustedExpert', subjectLabel: 'Проверенный эксперт',
+  idempotencyKey: 'qr:expert-visit-2026-08-05-a',
+  requestedKeys: 3, dateKey: '2026-08-05', scanDate: '2026-08-05',
+});
+assert.equal(expertFirst.operation.delta, 3, 'historic expert scans must not block a new-day reward');
+assert.equal(expertFirst.operation.balanceAfter, 44);
+
+const expertReplay = await economy.awardVisit({
+  userId: 'another-linked-owner', subjectType: 'expert', subjectId: 'trustedExpert', subjectLabel: 'Проверенный эксперт',
+  idempotencyKey: 'qr:expert-visit-2026-08-05-b',
+  requestedKeys: 3, dateKey: '2026-08-05', scanDate: '2026-08-05',
+});
+assert.equal(expertReplay.operation.delta, 0, 'a second expert scan on the same day must not award again');
+assert.equal(expertReplay.alreadyAwarded, true);
+assert.equal(state.profile.profile.keys, 44);
+
+const expertNextDay = await economy.awardVisit({
+  userId: 'linked-owner', subjectType: 'expert', subjectId: 'trustedExpert', subjectLabel: 'Проверенный эксперт',
+  idempotencyKey: 'qr:expert-visit-2026-08-06-a',
+  requestedKeys: 3, dateKey: '2026-08-06', scanDate: '2026-08-06',
+});
+assert.equal(expertNextDay.operation.delta, 3);
+assert.equal(expertNextDay.operation.balanceAfter, 47, 'an expert visit must award again on the next Moscow day');
+
+console.log('Visit reward regression: all partner and expert visits use canonical daily idempotency');
