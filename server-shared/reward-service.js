@@ -219,7 +219,7 @@ async function awardVisitTransaction(store, accountCore, context) {
   const requestedKeys = Math.max(0, configuredKeys || Math.round(baseReward.keys * partnerBoost));
   const idempotencyKey = context.nonce
     ? `qr:${context.nonce}`
-    : `legacy-visit:${context.userId}:${context.subjectType}:${context.subjectId}`;
+    : `legacy-visit:${context.userId}:${context.subjectType}:${context.subjectId}:${dateKey}`;
   const awarded = await accountCore.awardVisit({
     userId: context.userId,
     subjectType: context.subjectType,

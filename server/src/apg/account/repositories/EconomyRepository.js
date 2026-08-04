@@ -46,37 +46,61 @@ export class EconomyRepository {
     const cleanSubjectType = subjectType === 'expert' ? 'expert' : 'partner';
     const cleanSubjectId = safeString(subjectId, 260);
     const cleanIdempotencyKey = safeString(idempotencyKey, 500);
-    if (!cleanUserId || !cleanSubjectId || !cleanIdempotencyKey) {
+    const cleanDateKey = safeString(dateKey, 20);
+    if (!cleanUserId || !cleanSubjectId || !cleanIdempotencyKey || !cleanDateKey) {
       throw Object.assign(new Error('Economy visit identifiers are required.'), { code: 'ECONOMY_BAD_REQUEST' });
     }
 
     return this.adapter.transaction(async client => {
-      const previousResult = await client.query(
-        'SELECT * FROM apg_economy_operations WHERE idempotency_key = $1 LIMIT 1',
-        [cleanIdempotencyKey],
-      );
-      if (previousResult.rows[0]) {
-        return { operation: mapOperation(previousResult.rows[0]), replayed: true, alreadyAwarded: integer(previousResult.rows[0].delta) === 0 };
-      }
-
       const profileResult = await client.query(
-        'SELECT * FROM apg_account_profiles WHERE user_id = $1 FOR UPDATE',
+        `WITH requested AS (
+           SELECT COALESCE(
+             (SELECT canonical_user_id FROM apg_identity_users WHERE id = $1 LIMIT 1),
+             $1
+           ) AS canonical_id
+         )
+         SELECT *
+         FROM apg_account_profiles, requested
+         WHERE user_id = requested.canonical_id OR canonical_user_id = requested.canonical_id
+         ORDER BY (user_id = canonical_user_id) DESC, (user_id = requested.canonical_id) DESC, updated_at DESC
+         LIMIT 1 FOR UPDATE`,
         [cleanUserId],
       );
       const row = profileResult.rows[0];
       if (!row) throw Object.assign(new Error('Пользователь не найден'), { code: 'USER_NOT_FOUND' });
+      const resolvedUserId = row.user_id;
+      const dailyIdempotencyKey = cleanIdempotencyKey.startsWith('legacy-visit:') && cleanDateKey
+        ? `legacy-visit:${resolvedUserId}:${cleanSubjectType}:${cleanSubjectId}:${cleanDateKey}`
+        : cleanIdempotencyKey;
+
+      const previousResult = await client.query(
+        'SELECT * FROM apg_economy_operations WHERE idempotency_key = $1 LIMIT 1',
+        [dailyIdempotencyKey],
+      );
+      if (previousResult.rows[0]) {
+        return {
+          operation: mapOperation(previousResult.rows[0]),
+          replayed: true,
+          alreadyAwarded: integer(previousResult.rows[0].delta) === 0,
+        };
+      }
 
       const profile = mapProfile(row);
-      const previousReward = await client.query(
-        `SELECT operation_id FROM apg_economy_visit_rewards
-         WHERE user_id = $1 AND subject_type = $2 AND subject_id = $3 LIMIT 1`,
-        [cleanUserId, cleanSubjectType, cleanSubjectId],
+      const rewardToday = await client.query(
+        `SELECT id FROM apg_economy_operations
+         WHERE user_id = $1
+           AND type = 'visit_reward'
+           AND source_type = $2
+           AND source_id = $3
+           AND delta > 0
+           AND (
+             metadata->>'dateKey' = $4
+             OR (metadata->>'dateKey' IS NULL AND (created_at AT TIME ZONE 'Europe/Moscow')::date = $4::date)
+           )
+         LIMIT 1`,
+        [resolvedUserId, cleanSubjectType, cleanSubjectId, cleanDateKey],
       );
-      const legacyScans = cleanSubjectType === 'expert' ? profile.scannedExperts : profile.scannedPartners;
-      const alreadyAwarded = Boolean(previousReward.rows[0])
-        || (cleanSubjectType === 'expert'
-          ? integer(legacyScans?.[cleanSubjectId]) > 0
-          : Boolean(legacyScans?.[cleanSubjectId]));
+      const alreadyAwarded = Boolean(rewardToday.rows[0]);
       const delta = alreadyAwarded ? 0 : Math.max(0, integer(requestedKeys));
       const balanceBefore = Math.max(0, integer(profile.keys));
       const balanceAfter = balanceBefore + delta;
@@ -115,7 +139,7 @@ export class EconomyRepository {
         `UPDATE apg_account_profiles
          SET profile = $2::jsonb, updated_at = now()
          WHERE user_id = $1`,
-        [cleanUserId, JSON.stringify(nextProfile)],
+        [resolvedUserId, JSON.stringify(nextProfile)],
       );
 
       const operationId = randomUUID();
@@ -126,22 +150,24 @@ export class EconomyRepository {
          RETURNING *`,
         [
           operationId,
-          cleanIdempotencyKey,
-          cleanUserId,
+          dailyIdempotencyKey,
+          resolvedUserId,
           alreadyAwarded ? 'Повторный визит без повторного начисления' : 'Награда за визит',
           cleanSubjectType,
           cleanSubjectId,
           safeString(subjectLabel, 220),
           delta,
           balanceAfter,
-          JSON.stringify({ alreadyAwarded, visitCount: visitCounts[cleanSubjectId] }),
+          JSON.stringify({ alreadyAwarded, visitCount: visitCounts[cleanSubjectId], dateKey: cleanDateKey }),
         ],
       );
       if (!alreadyAwarded) {
         await client.query(
           `INSERT INTO apg_economy_visit_rewards (user_id, subject_type, subject_id, operation_id)
-           VALUES ($1, $2, $3, $4)`,
-          [cleanUserId, cleanSubjectType, cleanSubjectId, operationId],
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (user_id, subject_type, subject_id)
+           DO UPDATE SET operation_id = EXCLUDED.operation_id, created_at = now()`,
+          [resolvedUserId, cleanSubjectType, cleanSubjectId, operationId],
         );
       }
       return { operation: mapOperation(operationResult.rows[0]), replayed: false, alreadyAwarded, streak, scanDates: nextDates, visitCount: visitCounts[cleanSubjectId] };

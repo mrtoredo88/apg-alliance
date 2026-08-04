@@ -3205,7 +3205,12 @@ export function UserApp() {
       }
       if (awardedKeys > 0 && rewardBelongsToCurrentUser) {
         const serverBalance = Number(result.balanceAfter);
-        setUserKeys(prev => Number.isFinite(serverBalance) ? serverBalance : prev + awardedKeys);
+        setUserKeys(prev => {
+          const balance = Number.isFinite(serverBalance) ? serverBalance : prev + awardedKeys;
+          try { localStorage.setItem('apg_canonical_key_balance', String(balance)); } catch {}
+          return balance;
+        });
+        setUser(prev => prev ? { ...prev, keys: Number.isFinite(serverBalance) ? serverBalance : Number(prev.keys || 0) + awardedKeys } : prev);
         setKeyBurst({ amount: awardedKeys, id: Date.now() });
         showLokiMessage(LOKI_EVENTS.KEY_RECEIVED, { keysCount: awardedKeys, source: result.subjectType, id: result.subjectId });
         const partner = result.subjectType === 'partner'
