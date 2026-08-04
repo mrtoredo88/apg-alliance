@@ -3939,6 +3939,9 @@ export function UserApp() {
         userId: String(targetUser.id),
         profile: targetUser,
         consent: consentPayload,
+      }, {
+        timeoutMs: 10000,
+        retryOnTimeout: true,
       });
       traceAuthStage('CONSENTS_SAVE_SUCCESS', {
         profileId: targetUser.id,

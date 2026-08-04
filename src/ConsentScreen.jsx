@@ -10,17 +10,7 @@ export const CONSENT_DOCS = {
 
 function ConsentCheckbox({ checked, onChange, required = false, children }) {
   return (
-    <div
-      role="checkbox"
-      aria-checked={checked}
-      tabIndex={0}
-      onClick={() => onChange(!checked)}
-      onKeyDown={e => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onChange(!checked);
-        }
-      }}
+    <label
       style={{
         width: '100%',
         display: 'grid',
@@ -42,6 +32,13 @@ function ConsentCheckbox({ checked, onChange, required = false, children }) {
         transition: 'border-color 180ms ease, background 180ms ease, transform 180ms ease',
       }}
     >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={event => onChange(event.target.checked)}
+        required={required}
+        style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }}
+      />
       <span
         aria-hidden="true"
         style={{
@@ -64,7 +61,7 @@ function ConsentCheckbox({ checked, onChange, required = false, children }) {
         {children}
         {required && <span style={{ color: APG2_PROFILE.gold }}> *</span>}
       </span>
-    </div>
+    </label>
   );
 }
 
@@ -182,9 +179,15 @@ export function ConsentScreen({
           </div>
         )}
 
-        <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
+        <form
+          onSubmit={event => {
+            event.preventDefault();
+            if (canContinue) onAccept?.({ termsAccepted, privacyAccepted, notificationsAccepted });
+          }}
+          style={{ display: 'grid', gap: 10, marginTop: 18 }}
+        >
           <GlassButton
-            onClick={() => canContinue && onAccept?.({ termsAccepted, privacyAccepted, notificationsAccepted })}
+            type="submit"
             disabled={!canContinue}
             tone="gold"
             style={{ width: '100%', minHeight: 54, color: '#17120a', fontSize: 15, fontWeight: 880 }}
@@ -196,7 +199,7 @@ export function ConsentScreen({
               {error ? 'Выйти и войти заново' : 'Вернуться назад'}
             </GlassButton>
           )}
-        </div>
+        </form>
       </GlassCard>
     </div>
   );

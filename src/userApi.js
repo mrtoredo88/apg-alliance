@@ -128,7 +128,7 @@ function normalizeEventFromAction(action, payload = {}, result = {}) {
   };
 }
 
-export async function userAction(action, payload = {}) {
+export async function userAction(action, payload = {}, options = {}) {
   const current = apgIdentity.getCurrentIdentity();
   if (!current) {
     const error = new Error('Требуется авторизация.');
@@ -136,22 +136,44 @@ export async function userAction(action, payload = {}) {
     throw error;
   }
   const version = await getPwaVersion();
+  const timeoutMs = Math.max(0, Number(options.timeoutMs) || 0);
   const send = async forceRefresh => {
     const token = forceRefresh
       ? await apgIdentity.getSessionToken({ forceRefresh: true })
       : await apgIdentity.getSessionToken();
-    const response = await fetch(`${API_BASE_URL}/api/user-actions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-APG-Auth': token,
-        'X-APG-Version': version,
-      },
-      body: JSON.stringify({ action, ...payload }),
-    });
-    return { response, data: await response.json().catch(() => ({})) };
+    const controller = timeoutMs > 0 ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/user-actions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-APG-Auth': token,
+          'X-APG-Version': version,
+        },
+        body: JSON.stringify({ action, ...payload }),
+        ...(controller ? { signal: controller.signal } : {}),
+      });
+      return { response, data: await response.json().catch(() => ({})) };
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        const timeoutError = new Error('Сохранение заняло слишком много времени. Повторяем попытку.');
+        timeoutError.code = 'REQUEST_TIMEOUT';
+        throw timeoutError;
+      }
+      throw error;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
   };
-  let { response, data } = await send(false);
+  let response;
+  let data;
+  try {
+    ({ response, data } = await send(false));
+  } catch (error) {
+    if (error?.code !== 'REQUEST_TIMEOUT' || options.retryOnTimeout !== true) throw error;
+    ({ response, data } = await send(true));
+  }
   if (response.status === 401) {
     updateAuthSessionDiagnostics({
       last401At: new Date().toISOString(),

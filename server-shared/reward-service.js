@@ -232,46 +232,53 @@ async function awardVisitTransaction(store, accountCore, context) {
     scanDate: dateKey,
   });
   const keyBonus = awarded.replayed ? 0 : awarded.operation.delta;
-  const reputationBonus = awarded.alreadyAwarded || awarded.replayed ? 0 : baseReward.reputation;
+  const alreadyAwarded = awarded.alreadyAwarded || awarded.replayed;
+  const reputationBonus = alreadyAwarded ? 0 : baseReward.reputation;
 
-  await Promise.all([
-    incrementDocument(store, context.subject.collectionName, context.subjectId, 'totalVisits', 1),
-    incrementDocument(store, 'stats', 'global', 'totalScans', 1),
-    store.addDocument(context.subjectType === 'partner' ? 'scans' : 'expertScans', {
-      userId: context.userId,
-      subjectType: context.subjectType,
-      partnerId: context.subjectType === 'partner' ? context.subjectId : null,
-      expertId: context.subjectType === 'expert' ? context.subjectId : null,
-      source: context.source,
-	      isNew: !alreadyAwarded,
-	      keysAwarded: keyBonus,
-	      reputationAwarded: reputationBonus,
-	      economyVersion: ECONOMY_VERSION,
-	      monthKey: monthKeyFromToday(dateKey),
-      scannedBy: context.scannerUserId,
-      scannedAt: new Date().toISOString(),
-    }),
-    context.tokenId ? store.updateDocument('visitTokens', context.tokenId, {
-        used: true,
-        usedAt: new Date().toISOString(),
-	        usedBy: context.scannerUserId,
-	        keysAwarded: keyBonus,
-	        reputationAwarded: reputationBonus,
-    }) : Promise.resolve(),
-  ]);
+  const bookkeeping = [];
+  if (!awarded.replayed) {
+    bookkeeping.push(
+      incrementDocument(store, context.subject.collectionName, context.subjectId, 'totalVisits', 1),
+      incrementDocument(store, 'stats', 'global', 'totalScans', 1),
+      store.addDocument(context.subjectType === 'partner' ? 'scans' : 'expertScans', {
+        userId: context.userId,
+        subjectType: context.subjectType,
+        partnerId: context.subjectType === 'partner' ? context.subjectId : null,
+        expertId: context.subjectType === 'expert' ? context.subjectId : null,
+        source: context.source,
+        isNew: !alreadyAwarded,
+        keysAwarded: keyBonus,
+        reputationAwarded: reputationBonus,
+        economyVersion: ECONOMY_VERSION,
+        monthKey: monthKeyFromToday(dateKey),
+        scannedBy: context.scannerUserId,
+        scannedAt: new Date().toISOString(),
+      }),
+    );
+  }
+  if (context.tokenId) {
+    bookkeeping.push(store.updateDocument('visitTokens', context.tokenId, {
+      used: true,
+      usedAt: new Date().toISOString(),
+      usedBy: context.scannerUserId,
+      keysAwarded: keyBonus,
+      reputationAwarded: reputationBonus,
+    }));
+  }
+  await Promise.allSettled(bookkeeping);
 
   return {
-      awardedKeys: keyBonus,
-      awardedReputation: reputationBonus,
-      targetUserId: context.userId,
-      balanceAfter: awarded.operation.balanceAfter,
-      alreadyAwarded: awarded.alreadyAwarded || awarded.replayed,
-      streak: awarded.streak,
-      scanDates: awarded.scanDates,
-      visitCount: awarded.visitCount,
-      subjectName: subject.name ?? '',
-      subjectType: context.subjectType,
-      subjectId: context.subjectId,
+    awardedKeys: keyBonus,
+    awardedReputation: reputationBonus,
+    targetUserId: context.userId,
+    balanceAfter: awarded.operation.balanceAfter,
+    alreadyAwarded,
+    streak: awarded.streak,
+    scanDates: awarded.scanDates,
+    visitCount: awarded.visitCount,
+    subjectName: subject.name ?? '',
+    subjectType: context.subjectType,
+    subjectId: context.subjectId,
   };
 }
 
@@ -289,7 +296,7 @@ export async function awardVisit(store, { qrValue, scannerUserId, accountCore })
         return { ok: false, status: 400, code: 'BAD_TOKEN', message: 'QR повреждён' };
       }
       if (parsed.exp < Date.now()) {
-      await writeQrLog(store, { event: 'qr_rejected', reason: 'expired', scannerUserId: scannerId, userId: parsed.userId, subjectType: parsed.subjectType, subjectId: parsed.subjectId, nonce: parsed.nonce });
+        await writeQrLog(store, { event: 'qr_rejected', reason: 'expired', scannerUserId: scannerId, userId: parsed.userId, subjectType: parsed.subjectType, subjectId: parsed.subjectId, nonce: parsed.nonce });
         return { ok: false, status: 410, code: 'TOKEN_EXPIRED', message: 'QR истёк. Сгенерируйте новый.' };
       }
       const subject = await loadSubject(store, parsed.subjectType, parsed.subjectId);
@@ -337,10 +344,10 @@ export async function awardVisit(store, { qrValue, scannerUserId, accountCore })
       userId: context.userId,
       subjectType: context.subjectType,
       subjectId: context.subjectId,
-	      keysAwarded: result.awardedKeys,
-	      reputationAwarded: result.awardedReputation,
-	      economyVersion: ECONOMY_VERSION,
-	      alreadyAwarded: result.alreadyAwarded,
+      keysAwarded: result.awardedKeys,
+      reputationAwarded: result.awardedReputation,
+      economyVersion: ECONOMY_VERSION,
+      alreadyAwarded: result.alreadyAwarded,
     });
     return {
       ok: true,

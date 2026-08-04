@@ -151,6 +151,27 @@ async function writeAccountProfileBestEffort(userId, profile = {}, extra = {}) {
   });
 }
 
+async function writeAccountProfileRequired(userId, profile = {}, extra = {}) {
+  if (!accountCoreWriteEnabled()) return null;
+  const safeProfile = withoutAccountCoreEconomy(profile);
+  try {
+    return await serverFoundation.account.upsertProfile({
+      ...safeProfile,
+      ...extra,
+      id: userId,
+      userId,
+      canonicalUserId: safeProfile.canonicalUserId || userId,
+    });
+  } catch (error) {
+    serverFoundation.account.metrics.recordError(error);
+    throw Object.assign(new Error('Не удалось завершить создание аккаунта. Повторите попытку.'), {
+      statusCode: 503,
+      code: 'ACCOUNT_PROFILE_SYNC_FAILED',
+      cause: error,
+    });
+  }
+}
+
 async function writeIdentityProfileBestEffort(userId, patch = {}) {
   const identityFields = Object.fromEntries(
     Object.entries(patch).filter(([key]) => ['displayName', 'firstName', 'lastName', 'photo', 'email'].includes(key)),
@@ -949,7 +970,7 @@ async function actionProfileSync(db, req, actor) {
       'lastBonusDate',
     ].forEach(field => delete accountProfileForSync[field]);
   }
-  await writeAccountProfileBestEffort(userId, accountProfileForSync, { bootstrap: { profileSync: true, created } });
+  await writeAccountProfileRequired(userId, accountProfileForSync, { bootstrap: { profileSync: true, created } });
   if (accountCoreWriteEnabled()) {
     const cabinetLinks = [
       ...Array.from(new Set([
@@ -1233,6 +1254,16 @@ async function actionProfileAcceptConsent(db, req, actor) {
     tx.set(ref, patch, { merge: true });
     if (created) tx.set(db.collection('stats').doc('global'), { userCount: FieldValue.increment(1) }, { merge: true });
   });
+  await writeAccountProfileRequired(userId, {
+    ...profile,
+    consents: { ...consent, acceptedAt: new Date().toISOString() },
+    consentAcceptedAt: new Date().toISOString(),
+    consentDocsVersion: consent.docsVersion || null,
+    consentLegalVersion: consent.legalVersion || null,
+    legalVersion: consent.legalVersion || null,
+    notificationConsent: Boolean(consent.notificationsAccepted),
+  }, { bootstrap: { consentAccepted: true, created } });
+  await writeIdentityProfileBestEffort(userId, profile);
   await audit(db, req, actor, 'profile:acceptConsent', 'users', userId, 'success', {
     created,
     docsVersion: consent.docsVersion || null,
