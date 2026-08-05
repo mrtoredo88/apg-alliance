@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { getNewsImage, getNewsTitle } from './newsUtils.js';
 import { selectActualEvents, selectEventsForPeriod } from './eventSchedule.js';
@@ -62,11 +62,24 @@ export function HomeMobileRedesign({
   onOpenExperts, onOpenEvents, onOpenNearby, onOpenOffers, onToggleFavorite, isOffline = false,
 }) {
   const [eventFilter, setEventFilter] = useState('today');
+  const [heroIndex, setHeroIndex] = useState(0);
   const actualEvents = useMemo(() => selectActualEvents(events), [events]);
-  const featuredNews = news.find(item => imageOf(item) && !/^clip by\b/i.test(getNewsTitle(item))) || news[0] || null;
-  const featuredPlace = partners.find(item => imageOf(item) && compactOffer(item)) || partners[0] || null;
-  const hero = featuredPlace || featuredNews;
-  const heroIsPlace = hero === featuredPlace && Boolean(featuredPlace);
+  const heroSlides = useMemo(() => {
+    const placeSlides = partners.filter(item => imageOf(item)).slice(0, 2).map(item => ({ item, type: 'place' }));
+    const newsSlides = news.filter(item => imageOf(item) && !/^clip by\b/i.test(getNewsTitle(item))).slice(0, 2).map(item => ({ item, type: 'news' }));
+    const mixed = [];
+    const maxLength = Math.max(placeSlides.length, newsSlides.length);
+    for (let index = 0; index < maxLength; index += 1) {
+      if (placeSlides[index]) mixed.push(placeSlides[index]);
+      if (newsSlides[index]) mixed.push(newsSlides[index]);
+    }
+    if (!mixed.length && partners[0]) mixed.push({ item: partners[0], type: 'place' });
+    if (!mixed.length && news[0]) mixed.push({ item: news[0], type: 'news' });
+    return mixed.slice(0, 3);
+  }, [news, partners]);
+  const heroSlide = heroSlides[heroIndex] || null;
+  const hero = heroSlide?.item || null;
+  const heroIsPlace = heroSlide?.type === 'place';
   const places = partners.slice(0, 6);
   const offers = partners.filter(item => item?.offer || item?.discount || item?.promo).slice(0, 7);
   const eventPreview = useMemo(() => selectEventsForPeriod(actualEvents, eventFilter).slice(0, 6), [actualEvents, eventFilter]);
@@ -76,6 +89,15 @@ export function HomeMobileRedesign({
     { id: 'event-placeholder-3', title: 'Городские события', category: 'Афиша', address: 'Скоро в приложении', placeholder: true },
   ];
   const favoriteIds = useMemo(() => new Set(favorites.map(value => String(value?.id || value))), [favorites]);
+
+  useEffect(() => {
+    setHeroIndex(current => heroSlides.length ? current % heroSlides.length : 0);
+    if (heroSlides.length < 2) return undefined;
+    const timer = window.setInterval(() => {
+      setHeroIndex(current => (current + 1) % heroSlides.length);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [heroSlides.length]);
 
   const stats = [
     { icon: '📰', label: 'Новости', action: onOpenNews },
@@ -123,7 +145,7 @@ export function HomeMobileRedesign({
             <span style={{ marginTop: 5, maxWidth: '88%', color: '#282328', fontSize: 10.5, lineHeight: '13px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{heroIsPlace ? compactOffer(hero) : (hero?.summary || 'Главные события города')}</span>
             <span style={{ marginTop: 'auto', minWidth: 88, padding: '7px 13px', borderRadius: 16, boxSizing: 'border-box', background: 'linear-gradient(135deg,#d9aa42,#c58a16)', color: '#fff', textAlign: 'center', fontSize: 10.5, fontWeight: 900 }}>Получить</span>
           </div>
-          <div aria-hidden="true" style={{ position: 'absolute', left: '45%', bottom: 9, display: 'flex', gap: 5 }}><i style={{ width: 7, height: 7, borderRadius: 4, background: '#d29b21' }} /><i style={{ width: 7, height: 7, borderRadius: 4, background: '#ddd8d0' }} /><i style={{ width: 7, height: 7, borderRadius: 4, background: '#ddd8d0' }} /></div>
+          {heroSlides.length > 1 && <div aria-hidden="true" style={{ position: 'absolute', left: '45%', bottom: 9, display: 'flex', gap: 5 }}>{heroSlides.map((slide, index) => <i key={`${slide.type}-${slide.item?.id || index}`} style={{ width: 7, height: 7, borderRadius: 4, background: index === heroIndex ? '#d29b21' : '#ddd8d0', transition: 'background 220ms ease' }} />)}</div>}
         </button>
 
         <section style={{ marginTop: 12 }}>

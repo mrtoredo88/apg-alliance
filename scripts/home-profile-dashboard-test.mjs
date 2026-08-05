@@ -3,6 +3,8 @@ import path from 'node:path';
 
 const root = process.cwd();
 const homeSource = fs.readFileSync(path.join(root, 'src/HomePanelV2.jsx'), 'utf8');
+const mobileHomeSource = fs.readFileSync(path.join(root, 'src/HomeMobileRedesign.jsx'), 'utf8');
+const userAppSource = fs.readFileSync(path.join(root, 'src/UserApp.jsx'), 'utf8');
 const desktopSource = fs.readFileSync(path.join(root, 'src/components/DesktopUI.jsx'), 'utf8');
 
 const requiredDesktopProps = [
@@ -49,6 +51,18 @@ if (!homeSource.includes("['Ключи', userKeys") || !homeSource.includes("['�
 const partnerPropOccurrences = homeSource.match(/partners=\{partners\}/g) || [];
 if (partnerPropOccurrences.length < 3 || !homeSource.includes('function V2FirstScreenMobile({') || !homeSource.includes('partners = [],')) {
   throw new Error('Partner catalog must be passed through HomePanelV2, V2FirstScreen and V2FirstScreenMobile.');
+}
+
+if (!mobileHomeSource.includes('window.setInterval') || !mobileHomeSource.includes('}, 5000)') || !mobileHomeSource.includes('heroSlides.map')) {
+  throw new Error('Mobile home hero must automatically rotate slides every five seconds and update its indicators.');
+}
+
+if (!userAppSource.includes('title="Места"') || !userAppSource.includes('showAllPartners') || !userAppSource.includes("subtitle={`${enrichedPartners.length} мест в каталоге АПГ`}")) {
+  throw new Error('Mobile Places action must open the complete mobile partner catalog.');
+}
+
+if (!userAppSource.includes("opacity: active ? 1 : 0.92") || !userAppSource.includes("color: isActive ? '#b47c13' : '#5f5a60', opacity: 1")) {
+  throw new Error('Inactive bottom-island icons and labels must remain visible.');
 }
 
 console.log('home-profile-dashboard-test: ok');

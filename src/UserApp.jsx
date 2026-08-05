@@ -4458,7 +4458,7 @@ export function UserApp() {
   // ─── TabBar ─────────────────────────────────────────────────────────────────
 
   const tabIconStyle = (active) => ({
-    opacity: active ? 1 : 0.58,
+    opacity: active ? 1 : 0.92,
     filter: active ? 'drop-shadow(0 0 10px rgba(214,183,102,0.28))' : 'none',
     transition: 'opacity 0.3s ease, filter 0.3s ease',
   });
@@ -4466,22 +4466,22 @@ export function UserApp() {
   const TabHomeIcon    = ({ active }) => (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" style={tabIconStyle(active)}>
       <path d="M3 10.5L12 3L21 10.5V21H15V15H9V21H3V10.5Z"
-        fill={active ? T.gold : 'none'} stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinejoin="round" />
+        fill={active ? T.gold : 'none'} stroke={active ? T.gold : '#5f5a60'} strokeWidth="1.8" strokeLinejoin="round" />
     </svg>
   );
   const TabExpertsIcon = ({ active }) => (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" style={tabIconStyle(active)}>
-      <circle cx="12" cy="7" r="3.5" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
-      <path d="M5 20C5 16.5 8 14 12 14C16 14 19 16.5 19 20" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
-      <path d="M16 10L17.5 11.5L20 9" stroke={active ? T.gold : T.textSec} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="12" cy="7" r="3.5" stroke={active ? T.gold : '#5f5a60'} strokeWidth="1.8"/>
+      <path d="M5 20C5 16.5 8 14 12 14C16 14 19 16.5 19 20" stroke={active ? T.gold : '#5f5a60'} strokeWidth="1.8" strokeLinecap="round"/>
+      <path d="M16 10L17.5 11.5L20 9" stroke={active ? T.gold : '#5f5a60'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
   const TabPartnersIcon = ({ active }) => (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" style={tabIconStyle(active)}>
-      <path d="M4 10.5L5.2 5.5C5.4 4.6 6.2 4 7.1 4H17C18 4 18.8 4.6 19 5.5L20 10.5" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M5 10.5V20H19V10.5" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinejoin="round"/>
-      <path d="M9 20V15H15V20" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinejoin="round"/>
-      <path d="M4 10.5C5 12.2 7.1 12.2 8 10.5C9 12.2 11.1 12.2 12 10.5C13 12.2 15.1 12.2 16 10.5C17 12.2 19 12.2 20 10.5" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M4 10.5L5.2 5.5C5.4 4.6 6.2 4 7.1 4H17C18 4 18.8 4.6 19 5.5L20 10.5" stroke={active ? T.gold : '#5f5a60'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M5 10.5V20H19V10.5" stroke={active ? T.gold : '#5f5a60'} strokeWidth="1.8" strokeLinejoin="round"/>
+      <path d="M9 20V15H15V20" stroke={active ? T.gold : '#5f5a60'} strokeWidth="1.8" strokeLinejoin="round"/>
+      <path d="M4 10.5C5 12.2 7.1 12.2 8 10.5C9 12.2 11.1 12.2 12 10.5C13 12.2 15.1 12.2 16 10.5C17 12.2 19 12.2 20 10.5" stroke={active ? T.gold : '#5f5a60'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
   const TabTasksIcon   = ({ active }) => (
@@ -4498,14 +4498,14 @@ export function UserApp() {
   );
   const TabProfileIcon = ({ active }) => (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" style={tabIconStyle(active)}>
-      <circle cx="12" cy="8" r="4" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
-      <path d="M4 20C4 17 7.6 14 12 14C16.4 14 20 17 20 20" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
+      <circle cx="12" cy="8" r="4" stroke={active ? T.gold : '#5f5a60'} strokeWidth="1.8"/>
+      <path d="M4 20C4 17 7.6 14 12 14C16.4 14 20 17 20 20" stroke={active ? T.gold : '#5f5a60'} strokeWidth="1.8" strokeLinecap="round"/>
     </svg>
   );
   const TabEventsIcon = ({ active }) => (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" style={tabIconStyle(active)}>
-      <rect x="3.5" y="5" width="17" height="16" rx="3" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
-      <path d="M7.5 3V7M16.5 3V7M3.5 9.5H20.5M8 14H16M8 17H13" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
+      <rect x="3.5" y="5" width="17" height="16" rx="3" stroke={active ? T.gold : '#5f5a60'} strokeWidth="1.8"/>
+      <path d="M7.5 3V7M16.5 3V7M3.5 9.5H20.5M8 14H16M8 17H13" stroke={active ? T.gold : '#5f5a60'} strokeWidth="1.8" strokeLinecap="round"/>
     </svg>
   );
 
@@ -4795,7 +4795,7 @@ export function UserApp() {
                 <div style={{ position: 'absolute', top: -3, right: -4, width: 8, height: 8, borderRadius: '50%', background: '#E64646', border: '1.5px solid rgba(8,8,24,0.9)' }} />
               )}
             </div>
-            <span style={{ fontSize: 8.5, fontWeight: isActive ? 850 : 720, letterSpacing: 0, textTransform: 'none', color: isActive ? '#b47c13' : '#777176', opacity: isActive ? 1 : .76, transition: 'color 0.25s ease, opacity 0.25s ease', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span style={{ fontSize: 8.5, fontWeight: isActive ? 850 : 760, letterSpacing: 0, textTransform: 'none', color: isActive ? '#b47c13' : '#5f5a60', opacity: 1, transition: 'color 0.25s ease, opacity 0.25s ease', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {tab.label}
             </span>
           </button>
@@ -5773,19 +5773,33 @@ export function UserApp() {
 
               <Panel id="partners">
                 <Suspense fallback={<LazyFallback />}>
-                  <PartnersPage
-                    partners={enrichedPartners}
-                    events={events}
-                    news={news}
-                    favorites={favorites}
-                    onBack={goBackPanel}
-                    onOpenPartner={openPartner}
-                    onAskQuestion={(partner) => openContextDialog('partner', partner, 'partners-catalog')}
-                    onBook={(partner) => openBookingFlow('partner', partner)}
-                    onOpenMap={() => goPanel('map')}
-                    desktopOverview={desktopOverview}
-                    desktopMode={desktopDevice}
-                  />
+                  {desktopDevice ? (
+                    <PartnersPage
+                      partners={enrichedPartners}
+                      events={events}
+                      news={news}
+                      favorites={favorites}
+                      onBack={goBackPanel}
+                      onOpenPartner={openPartner}
+                      onAskQuestion={(partner) => openContextDialog('partner', partner, 'partners-catalog')}
+                      onBook={(partner) => openBookingFlow('partner', partner)}
+                      onOpenMap={() => goPanel('map')}
+                      desktopOverview={desktopOverview}
+                      desktopMode
+                    />
+                  ) : (
+                    <OffersPage
+                      variant="v2"
+                      title="Места"
+                      subtitle={`${enrichedPartners.length} мест в каталоге АПГ`}
+                      showAllPartners
+                      partners={enrichedPartners}
+                      onOpenPartner={openPartner}
+                      onAskQuestion={(partner) => openContextDialog('partner', partner, 'partners-catalog')}
+                      onBack={goBackPanel}
+                      desktopMode={false}
+                    />
+                  )}
                 </Suspense>
               </Panel>
 
