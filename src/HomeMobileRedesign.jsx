@@ -57,12 +57,37 @@ function SectionTitle({ icon, children, action, label = 'Смотреть все
 }
 
 export function HomeMobileRedesign({
+  appearance = 'light',
   user, partners = [], experts = [], events = [], news = [], favorites = [],
   onOpenRewards, onOpenOnboarding, onOpenNews, onOpenNewsItem, onOpenPartners, onOpenPartner,
   onOpenExperts, onOpenEvents, onOpenNearby, onOpenOffers, onToggleFavorite, isOffline = false,
 }) {
   const [eventFilter, setEventFilter] = useState('today');
   const [heroIndex, setHeroIndex] = useState(0);
+  const isDark = appearance === 'dark';
+  const themeVars = isDark ? {
+    '--hm-bg': '#101011',
+    '--hm-text': '#f7f2e8',
+    '--hm-muted': '#aaa39a',
+    '--hm-card': '#1c1b1d',
+    '--hm-card-soft': '#252326',
+    '--hm-border': 'rgba(255,255,255,.09)',
+    '--hm-shadow': '0 9px 25px rgba(0,0,0,.28)',
+    '--hm-hero-gradient': 'linear-gradient(90deg,#211f20 0%,#211f20 39%,rgba(33,31,32,.90) 51%,rgba(33,31,32,.12) 78%)',
+    '--hm-offer-bg': 'rgba(201,153,49,.18)',
+    '--hm-offer-text': '#efd28d',
+  } : {
+    '--hm-bg': '#fbfaf6',
+    '--hm-text': '#171519',
+    '--hm-muted': '#777176',
+    '--hm-card': '#fff',
+    '--hm-card-soft': '#eee9df',
+    '--hm-border': 'rgba(50,39,29,.06)',
+    '--hm-shadow': '0 9px 25px rgba(59,43,29,.07)',
+    '--hm-hero-gradient': 'linear-gradient(90deg,#f7f2e9 0%,#f7f2e9 39%,rgba(247,242,233,.88) 50%,rgba(247,242,233,.1) 77%)',
+    '--hm-offer-bg': '#fff1cf',
+    '--hm-offer-text': '#604716',
+  };
   const actualEvents = useMemo(() => selectActualEvents(events), [events]);
   const heroSlides = useMemo(() => {
     const placeSlides = partners.filter(item => imageOf(item)).slice(0, 2).map(item => ({ item, type: 'place' }));
@@ -107,20 +132,20 @@ export function HomeMobileRedesign({
 
   return (
     <Panel id="home" data-home-version="reference-exact-v2">
-      <main style={s.page}>
+      <main data-mobile-home-theme={appearance} style={{ ...s.page, ...themeVars, color: 'var(--hm-text)', background: 'var(--hm-bg)', colorScheme: isDark ? 'dark' : 'light' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <picture style={{ flexShrink: 0 }}>
             <source srcSet="/logo.webp" type="image/webp" />
             <img src="/logo.png" alt="АПГ" style={{ width: 48, height: 48, borderRadius: 15, objectFit: 'cover', boxShadow: '0 7px 18px rgba(43,18,52,.16)' }} />
           </picture>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h1 style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 18, lineHeight: '22px', fontWeight: 900 }}>{greetingOf(user)}</h1>
-            <div style={{ marginTop: 1, color: '#777176', fontSize: 11.5, lineHeight: '15px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Рады видеть вас в Зеленограде 👋</div>
+            <h1 style={{ margin: 0, color: 'var(--hm-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 18, lineHeight: '22px', fontWeight: 900 }}>{greetingOf(user)}</h1>
+            <div style={{ marginTop: 1, color: 'var(--hm-muted)', fontSize: 11.5, lineHeight: '15px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Рады видеть вас в Зеленограде 👋</div>
           </div>
-          <button type="button" aria-label="Подарки" onClick={onOpenRewards} style={{ ...s.roundButton, overflow: 'hidden', ...GIFT_SHIMMER_STYLE }}>
+          <button type="button" aria-label="Подарки" onClick={onOpenRewards} style={{ ...s.roundButton, color: 'var(--hm-text)', background: 'var(--hm-card)', borderColor: 'var(--hm-border)', overflow: 'hidden', ...GIFT_SHIMMER_STYLE }}>
             <span aria-hidden="true" style={{ position: 'relative', zIndex: 1, fontSize: 22 }}>🎁</span>
           </button>
-          <button type="button" aria-label="Открыть помощь и онбординг" onClick={onOpenOnboarding} style={{ ...s.roundButton, color: '#b8871f', fontSize: 24, fontWeight: 950 }}>
+          <button type="button" aria-label="Открыть помощь и онбординг" onClick={onOpenOnboarding} style={{ ...s.roundButton, background: 'var(--hm-card)', borderColor: 'var(--hm-border)', color: '#d2a13d', fontSize: 24, fontWeight: 950 }}>
             <span aria-hidden="true">?</span>
           </button>
         </header>
@@ -129,20 +154,20 @@ export function HomeMobileRedesign({
 
         <nav aria-label="Разделы главной" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 7, marginBottom: 11 }}>
           {stats.map(item => (
-            <button key={item.label} type="button" onClick={item.action} style={{ height: 50, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '5px 7px', borderRadius: 15, border: '1px solid rgba(44,34,24,.05)', background: '#fff', boxShadow: '0 7px 20px rgba(62,47,32,.07)', color: '#171519', cursor: 'pointer' }}>
+            <button key={item.label} type="button" onClick={item.action} style={{ height: 50, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '5px 7px', borderRadius: 15, border: '1px solid var(--hm-border)', background: 'var(--hm-card)', boxShadow: 'var(--hm-shadow)', color: 'var(--hm-text)', cursor: 'pointer' }}>
               <span aria-hidden="true" style={{ fontSize: 20, lineHeight: 1 }}>{item.icon}</span>
               <strong style={{ minWidth: 0, fontSize: 11.5, lineHeight: '14px', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</strong>
             </button>
           ))}
         </nav>
 
-        <button type="button" onClick={() => heroIsPlace ? onOpenPartner?.(hero) : hero ? onOpenNewsItem?.(hero) : onOpenOffers?.()} style={{ width: '100%', height: 155, margin: 0, padding: 0, overflow: 'hidden', position: 'relative', borderRadius: 21, border: '1px solid rgba(83,59,37,.08)', background: '#f3eee4', boxShadow: '0 9px 25px rgba(59,43,29,.07)', color: '#171519', textAlign: 'left', cursor: 'pointer' }}>
+        <button type="button" onClick={() => heroIsPlace ? onOpenPartner?.(hero) : hero ? onOpenNewsItem?.(hero) : onOpenOffers?.()} style={{ width: '100%', height: 155, margin: 0, padding: 0, overflow: 'hidden', position: 'relative', borderRadius: 21, border: '1px solid var(--hm-border)', background: 'var(--hm-card-soft)', boxShadow: 'var(--hm-shadow)', color: 'var(--hm-text)', textAlign: 'left', cursor: 'pointer' }}>
           <div style={{ position: 'absolute', inset: '0 0 0 42%' }}><Picture item={hero} fallback="АПГ" /></div>
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,#f7f2e9 0%,#f7f2e9 39%,rgba(247,242,233,.88) 50%,rgba(247,242,233,.1) 77%)' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--hm-hero-gradient)' }} />
           <div style={{ position: 'relative', zIndex: 1, width: '64%', height: '100%', boxSizing: 'border-box', padding: '12px 0 11px 13px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
             <span style={{ padding: '5px 8px', borderRadius: 9, background: '#f26e2b', color: '#fff', fontSize: 8.5, lineHeight: 1, fontWeight: 850, whiteSpace: 'nowrap' }}>🔥 Сегодня нельзя пропустить</span>
-            <strong style={{ marginTop: 8, maxWidth: '100%', color: '#171519', fontSize: 16, lineHeight: '18px', fontWeight: 900, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{heroIsPlace ? (hero?.name || 'Предложение дня') : (getNewsTitle(hero) || 'Главное сегодня')}</strong>
-            <span style={{ marginTop: 5, maxWidth: '88%', color: '#282328', fontSize: 10.5, lineHeight: '13px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{heroIsPlace ? compactOffer(hero) : (hero?.summary || 'Главные события города')}</span>
+            <strong style={{ marginTop: 8, maxWidth: '100%', color: 'var(--hm-text)', fontSize: 16, lineHeight: '18px', fontWeight: 900, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{heroIsPlace ? (hero?.name || 'Предложение дня') : (getNewsTitle(hero) || 'Главное сегодня')}</strong>
+            <span style={{ marginTop: 5, maxWidth: '88%', color: 'var(--hm-text)', opacity: .86, fontSize: 10.5, lineHeight: '13px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{heroIsPlace ? compactOffer(hero) : (hero?.summary || 'Главные события города')}</span>
             <span style={{ marginTop: 'auto', minWidth: 88, padding: '7px 13px', borderRadius: 16, boxSizing: 'border-box', background: 'linear-gradient(135deg,#d9aa42,#c58a16)', color: '#fff', textAlign: 'center', fontSize: 10.5, fontWeight: 900 }}>Получить</span>
           </div>
           {heroSlides.length > 1 && <div aria-hidden="true" style={{ position: 'absolute', left: '45%', bottom: 9, display: 'flex', gap: 5 }}>{heroSlides.map((slide, index) => <i key={`${slide.type}-${slide.item?.id || index}`} style={{ width: 7, height: 7, borderRadius: 4, background: index === heroIndex ? '#d29b21' : '#ddd8d0', transition: 'background 220ms ease' }} />)}</div>}
@@ -155,17 +180,17 @@ export function HomeMobileRedesign({
               const id = String(place.id || place.name);
               const favorite = favoriteIds.has(id);
               return (
-                <article key={id} onClick={() => onOpenPartner?.(place)} style={{ flex: '0 0 126px', height: 116, overflow: 'hidden', position: 'relative', borderRadius: 15, border: '1px solid rgba(50,39,29,.06)', background: '#fff', boxShadow: '0 7px 18px rgba(62,47,32,.07)', scrollSnapAlign: 'start', cursor: 'pointer' }}>
-                  <div style={{ height: 53, background: '#eee9df' }}><Picture item={place} alt={place.name || ''} fallback="Место" /></div>
+                <article key={id} onClick={() => onOpenPartner?.(place)} style={{ flex: '0 0 126px', height: 116, overflow: 'hidden', position: 'relative', borderRadius: 15, border: '1px solid var(--hm-border)', background: 'var(--hm-card)', boxShadow: 'var(--hm-shadow)', scrollSnapAlign: 'start', cursor: 'pointer' }}>
+                  <div style={{ height: 53, background: 'var(--hm-card-soft)' }}><Picture item={place} alt={place.name || ''} fallback="Место" /></div>
                   <button type="button" aria-label={favorite ? 'Убрать из избранного' : 'В избранное'} onClick={event => { event.stopPropagation(); onToggleFavorite?.(place); }} style={{ position: 'absolute', top: 6, right: 6, width: 25, height: 25, padding: 0, borderRadius: 13, border: 0, background: 'rgba(255,255,255,.92)', color: favorite ? '#c69123' : '#777', fontSize: 17, cursor: 'pointer' }}>{favorite ? '★' : '♡'}</button>
                   <div style={{ padding: '7px 7px 6px' }}>
                     <strong style={{ display: 'block', fontSize: 11, lineHeight: '13px', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place.name || 'Место АПГ'}</strong>
-                    <span style={{ display: 'block', marginTop: 3, color: '#777176', fontSize: 8.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place.distance || place.categoryLabel || place.category || 'Зеленоград'}</span>
-                    <span style={{ display: 'block', marginTop: 5, padding: '4px 5px', borderRadius: 7, background: '#fff1cf', color: '#604716', fontSize: 7.8, lineHeight: '9px', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🎁 {compactOffer(place)}</span>
+                    <span style={{ display: 'block', marginTop: 3, color: 'var(--hm-muted)', fontSize: 8.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place.distance || place.categoryLabel || place.category || 'Зеленоград'}</span>
+                    <span style={{ display: 'block', marginTop: 5, padding: '4px 5px', borderRadius: 7, background: 'var(--hm-offer-bg)', color: 'var(--hm-offer-text)', fontSize: 7.8, lineHeight: '9px', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🎁 {compactOffer(place)}</span>
                   </div>
                 </article>
               );
-            }) : <div style={{ padding: 16, borderRadius: 17, background: '#fff', color: '#777' }}>Места скоро появятся.</div>}
+            }) : <div style={{ padding: 16, borderRadius: 17, background: 'var(--hm-card)', color: 'var(--hm-muted)' }}>Места скоро появятся.</div>}
           </div>
         </section>
 
@@ -194,10 +219,10 @@ export function HomeMobileRedesign({
           </div>
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 1px 7px', scrollbarWidth: 'none', scrollSnapType: 'x mandatory' }}>
             {displayedEvents.map(event => (
-              <button key={event.id || event.title} type="button" onClick={() => event.placeholder ? onOpenEvents?.() : onOpenEvents?.(event)} style={{ flex: '0 0 120px', height: 106, overflow: 'hidden', position: 'relative', borderRadius: 14, border: '1px solid rgba(50,39,29,.06)', padding: 0, background: '#fff', color: '#171519', boxShadow: '0 7px 18px rgba(62,47,32,.07)', textAlign: 'left', scrollSnapAlign: 'start', cursor: 'pointer' }}>
-                <div style={{ height: 52, position: 'relative', background: '#eee9df' }}><Picture item={event} fallback="Афиша" /><span style={{ position: 'absolute', left: 6, bottom: -7, padding: '3px 5px', borderRadius: 6, background: '#ffe414', color: '#241f12', fontSize: 8, fontWeight: 900 }}>{event.placeholder ? 'Скоро' : eventTime(event)}</span></div>
+              <button key={event.id || event.title} type="button" onClick={() => event.placeholder ? onOpenEvents?.() : onOpenEvents?.(event)} style={{ flex: '0 0 120px', height: 106, overflow: 'hidden', position: 'relative', borderRadius: 14, border: '1px solid var(--hm-border)', padding: 0, background: 'var(--hm-card)', color: 'var(--hm-text)', boxShadow: 'var(--hm-shadow)', textAlign: 'left', scrollSnapAlign: 'start', cursor: 'pointer' }}>
+                <div style={{ height: 52, position: 'relative', background: 'var(--hm-card-soft)' }}><Picture item={event} fallback="Афиша" /><span style={{ position: 'absolute', left: 6, bottom: -7, padding: '3px 5px', borderRadius: 6, background: '#ffe414', color: '#241f12', fontSize: 8, fontWeight: 900 }}>{event.placeholder ? 'Скоро' : eventTime(event)}</span></div>
                 <span aria-hidden="true" style={{ position: 'absolute', top: 6, right: 6, width: 25, height: 25, display: 'grid', placeItems: 'center', borderRadius: 13, background: 'rgba(255,255,255,.92)', color: '#777', fontSize: 17 }}>♡</span>
-                <div style={{ padding: '10px 7px 5px' }}><span style={{ display: 'block', color: '#777176', fontSize: 7.5 }}>{event.category || 'Событие'}</span><strong style={{ display: '-webkit-box', marginTop: 2, fontSize: 9.5, lineHeight: '11px', fontWeight: 900, WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{event.title || 'Событие АПГ'}</strong><span style={{ display: 'block', marginTop: 2, color: '#777176', fontSize: 7.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.address || event.partner || 'Зеленоград'}</span></div>
+                <div style={{ padding: '10px 7px 5px' }}><span style={{ display: 'block', color: 'var(--hm-muted)', fontSize: 7.5 }}>{event.category || 'Событие'}</span><strong style={{ display: '-webkit-box', marginTop: 2, fontSize: 9.5, lineHeight: '11px', fontWeight: 900, WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{event.title || 'Событие АПГ'}</strong><span style={{ display: 'block', marginTop: 2, color: 'var(--hm-muted)', fontSize: 7.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.address || event.partner || 'Зеленоград'}</span></div>
               </button>
             ))}
           </div>

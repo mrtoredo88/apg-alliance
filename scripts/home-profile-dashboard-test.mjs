@@ -57,6 +57,10 @@ if (!mobileHomeSource.includes('window.setInterval') || !mobileHomeSource.includ
   throw new Error('Mobile home hero must automatically rotate slides every five seconds and update its indicators.');
 }
 
+if (!mobileHomeSource.includes("appearance = 'light'") || !mobileHomeSource.includes("appearance === 'dark'") || !mobileHomeSource.includes("data-mobile-home-theme={appearance}") || !mobileHomeSource.includes("'--hm-bg': '#101011'")) {
+  throw new Error('Mobile home must preserve separate light and dark theme palettes.');
+}
+
 if (!userAppSource.includes('title="Места"') || !userAppSource.includes('showAllPartners') || !userAppSource.includes("subtitle={`${enrichedPartners.length} мест в каталоге АПГ`}")) {
   throw new Error('Mobile Places action must open the complete mobile partner catalog.');
 }

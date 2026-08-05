@@ -3101,6 +3101,7 @@ export function HomePanelV2({
   if (!desktopMode) {
     return (
       <HomeMobileRedesign
+        appearance={appearance}
         user={user}
         userKeys={userKeys}
         unreadCount={unreadCount}
