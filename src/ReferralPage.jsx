@@ -3,7 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 
 import { T, GLASS } from './design.js';
 import vkBridge from './vk.js';
-import { buildPersonalQrLink, buildReferralInviteText, buildReferralLink } from './referralInvite.js';
+import { buildPersonalQrLink, buildReferralInviteText, buildReferralLink, buildReferralShareData } from './referralInvite.js';
 import { APG2_PROFILE, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, GlassSection, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 
 const MILESTONES = [
@@ -45,7 +45,7 @@ export function ReferralPage({ variant = 'v2', user, referralCount = 0, complete
   const handleShare = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'АПГ — Альянс Партнёров Города', text: inviteText });
+        await navigator.share(buildReferralShareData(refLink));
         return;
       } catch (err) {
         if (err.name === 'AbortError') return;

@@ -47,6 +47,7 @@ for (const type of [
 }
 
 const main = fs.readFileSync('src/main.jsx', 'utf8');
+const userApp = fs.readFileSync('src/UserApp.jsx', 'utf8');
 const referralDiagnostics = fs.readFileSync('src/referralDiagnostics.js', 'utf8');
 const emailAuth = fs.readFileSync('src/EmailAuth.jsx', 'utf8');
 const profilePanel = fs.readFileSync('src/ProfilePanel.jsx', 'utf8');
@@ -62,6 +63,7 @@ assert.ok(server.includes('referralSessionRoutes'), 'server must register referr
 assert.ok(main.includes('__APG_REFERRAL_SESSION_PROMISE__'), 'main must create referral session before React render');
 assert.ok(referralDiagnostics.includes('apg_referral_session_id'), 'client must cache server referral session id');
 assert.ok(referralDiagnostics.includes('/api/referral-session'), 'client must create/restore server referral session');
+assert.ok(!userApp.includes('referralSessionId: existingReferralContext.referralSessionId || existingReferralContext.sessionId'), 'profile sync must not send a local-only session id as a server referral session');
 assert.ok(emailAuth.includes('referralSessionId'), 'EmailAuth must send referralSessionId');
 assert.ok(emailAuthServer.includes('resolveReferralSessionReferrer'), 'email auth must resolve referrer from server session');
 assert.ok(profilePanel.includes('telegram_auth_start') && profilePanel.includes('referralSessionId'), 'Telegram auth start must include referral session');

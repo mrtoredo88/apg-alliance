@@ -18,7 +18,7 @@ import { DesktopTopOverview } from './components/DesktopUI.jsx';
 import { formatNewsDate, getNewsLegacyIds, getNewsTitle } from './newsUtils.js';
 import { buildCabinetDiagnostics } from './utils/profileOwnership.js';
 import { CAPABILITIES, hasCapability } from './roleEngine.js';
-import { buildPersonalQrLink, buildReferralInviteText, buildReferralLink } from './referralInvite.js';
+import { buildPersonalQrLink, buildReferralInviteText, buildReferralLink, buildReferralShareData } from './referralInvite.js';
 import { ensureServerReferralSession, getReferralContext, readPendingReferral } from './referralDiagnostics.js';
 import { groupBookingsForProfile, normalizeBooking } from '../server-shared/booking.js';
 import { SOCIAL_PRIVACY, normalizeSocialPrivacy } from './messaging/ConversationEligibility.js';
@@ -2087,7 +2087,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 const msg = buildReferralInviteText(link);
                 setShowShareModal(false);
                 if (navigator.share) {
-                  try { await navigator.share({ title: 'АПГ — Альянс Партнёров Города', text: msg }); return; } catch (err) { if (err.name === 'AbortError') return; }
+                  try { await navigator.share(buildReferralShareData(link)); return; } catch (err) { if (err.name === 'AbortError') return; }
                 }
                 vkBridge.send('VKWebAppShare', { link, text: msg }).catch(() => {});
               }}
@@ -4410,7 +4410,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             const msg = buildReferralInviteText(link);
             setShowShareModal(false);
             if (navigator.share) {
-              try { await navigator.share({ title: 'АПГ — Альянс Партнёров Города', text: msg }); return; } catch (err) { if (err.name === 'AbortError') return; }
+              try { await navigator.share(buildReferralShareData(link)); return; } catch (err) { if (err.name === 'AbortError') return; }
             }
             vkBridge.send('VKWebAppShare', { link, text: msg }).catch(() => {});
           }}
