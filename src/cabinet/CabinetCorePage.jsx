@@ -25,6 +25,7 @@ import { BOOKING_STATUSES, buildBookingCalendar, buildBookingProfile, groupBooki
 
 const MODULES = [
   ['showcase-builder', 'Витрина'],
+  ['qr', 'QR-коды и ссылки'],
   ['dashboard', 'Дашборд'],
   ['dialogs', 'Диалоги'],
   ['tasks', 'Задачи'],
@@ -693,8 +694,16 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
     return [...new Set(ordered)].filter(id => allowed.has(id));
   }, [activeRole]);
   const visibleNavGroups = useMemo(() => CABINET_NAV_GROUPS
-    .map(group => ({ ...group, modules: group.modules.filter(id => moduleIds.includes(id) || id === 'qr') }))
-    .filter(group => group.modules.length), [moduleIds]);
+    .map(group => {
+      if (activeRole?.id === 'partner' && group.id === 'showcase') {
+        return { ...group, label: 'QR-коды и ссылки', icon: '▦', modules: ['qr'] };
+      }
+      if (activeRole?.id === 'partner' && group.id === 'promotion') {
+        return { ...group, modules: group.modules.filter(id => id !== 'qr' && moduleIds.includes(id)) };
+      }
+      return { ...group, modules: group.modules.filter(id => moduleIds.includes(id) || id === 'qr') };
+    })
+    .filter(group => group.modules.length), [activeRole?.id, moduleIds]);
   const activeNavGroup = visibleNavGroups.find(group => group.modules.includes(activeModule)) || visibleNavGroups[0];
 
   useEffect(() => {
@@ -806,7 +815,7 @@ export function CabinetCorePage({ nav = 'cabinet', user, partner, expert, prefer
     if (activeModule === 'subscription') return <SubscriptionModule role={activeRole} snapshot={snapshot} />;
     if (activeModule === 'settings') return <SettingsModule role={activeRole} snapshot={snapshot} onSaved={handleSaved} onToast={onToast} />;
     if (activeModule === 'history') return <HistoryModule snapshot={snapshot} />;
-    if (activeModule === 'qr') return <GlassSection title="QR"><GlassCard style={{ borderRadius: 32 }}>{activeRole.id === 'expert' ? <ExpertQRSection expert={currentProfile} /> : <PartnerQRSection partner={currentProfile} />}</GlassCard></GlassSection>;
+    if (activeModule === 'qr') return <GlassSection title={activeRole.id === 'partner' ? 'QR-коды и ссылки' : 'QR-коды'}><GlassCard style={{ borderRadius: 32 }}>{activeRole.id === 'expert' ? <ExpertQRSection expert={currentProfile} /> : <PartnerQRSection partner={currentProfile} />}</GlassCard></GlassSection>;
     if (activeModule === 'events') return <WorkspaceEventsManager role={activeRole} profile={currentProfile} events={events} actions={cabinetActions} onOpenPublicEvents={() => onOpenPanel?.('events')} onEventChanged={onEventCreated} onToast={onToast} />;
     if (activeModule === 'promotions') return <WorkspacePromotionsCenter role={activeRole} profile={currentProfile} events={events} news={news} actions={cabinetActions} onOpenPanel={onOpenPanel} onToast={onToast} compact />;
     return <RoleSpecificModule id={activeModule} snapshot={snapshot} onOpenModule={setActiveModule} />;

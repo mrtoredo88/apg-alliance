@@ -11,9 +11,26 @@ const fail = message => {
 const userApp = read('src/UserApp.jsx');
 const qrSection = read('src/PartnerQRSection.jsx');
 const partnerPage = read('src/PartnerPage.jsx');
+const cabinetCore = read('src/cabinet/CabinetCorePage.jsx');
 
 if (!qrSection.includes("shareLink('partner', partner.id)")) {
   fail('public partner QR must be generated from shareLink(partner, partner.id)');
+}
+
+if (!cabinetCore.includes("label: 'QR-коды и ссылки'") || !cabinetCore.includes("modules: ['qr']")) {
+  fail('partner cabinet showcase button must open the QR codes and links module');
+}
+
+if (!qrSection.includes("tabLabel: '👥 Приглашение'") || !qrSection.includes("tabLabel: '🔑 Начисление ключа'")) {
+  fail('partner QR module must separate invitation and key-award materials');
+}
+
+if (!qrSection.includes('const serviceLink = `${APP_URL}/?scan=${encodeURIComponent(partner.id)}`')) {
+  fail('partner service material must expose a working key-award deep link');
+}
+
+if (!qrSection.includes("{ id: 'poster', label: '🖼️ Плакат' }") || !qrSection.includes('handleGeneratePoster')) {
+  fail('partner QR module must keep the generated poster flow');
 }
 
 if (!/if\s*\(section === 'partner' && id\)\s*{[\s\S]*return \{ type: 'partner', id \};[\s\S]*}/.test(userApp)) {
@@ -60,6 +77,18 @@ const displayLocationDeclaration = partnerPage.indexOf('const displayLocation = 
 const submitReviewDeclaration = partnerPage.indexOf('const submitReview = useCallback');
 if (displayLocationDeclaration === -1 || submitReviewDeclaration === -1 || displayLocationDeclaration > submitReviewDeclaration) {
   fail('PartnerPage must declare displayLocation before submitReview dependencies to avoid production TDZ crashes.');
+}
+
+if (!/collection\(db, 'reviews'\)[\s\S]*where\('partnerId', '==', partnerId\)/.test(partnerPage)) {
+  fail('PartnerPage must load canonical public reviews by partnerId.');
+}
+
+if (!partnerPage.includes("collection(db, 'partners', partnerId, 'reviews')") || !partnerPage.includes('mergePartnerReviews(publicReviews, nestedReviews)')) {
+  fail('PartnerPage must preserve nested reviews as a migration fallback and deduplicate both sources.');
+}
+
+if (!partnerPage.includes('reviewBelongsToUser(review, userId)')) {
+  fail('Canonical review ids must preserve own-review editing through the userId field.');
 }
 
 console.log('partner-deeplink-test: ok');

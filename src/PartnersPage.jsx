@@ -384,7 +384,7 @@ export function PartnersPage({ partners = [], events = [], news = [], favorites 
       topOverview={desktopOverview ? <DesktopTopOverview {...desktopOverview} activeSection="partners" /> : null}
       header={
         <DesktopHeader
-          title="Партнёры"
+          title="Места"
           subtitle={`Каталог организаций АПГ · ${filtered.length} из ${visiblePartners.length}`}
           kicker="Бизнес-витрина"
           onBack={onBack}

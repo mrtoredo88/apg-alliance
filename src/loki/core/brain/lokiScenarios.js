@@ -8,7 +8,7 @@ export const LOKI_SCENARIO_CATEGORIES = [
   { id: 'family', title: 'Семья' },
   { id: 'kids', title: 'Дети' },
   { id: 'business', title: 'Бизнес' },
-  { id: 'partners', title: 'Партнёры' },
+  { id: 'partners', title: 'Места' },
   { id: 'experts', title: 'Эксперты' },
   { id: 'apg', title: 'Возможности АПГ' },
 ];

@@ -122,6 +122,49 @@ export function selectActualEvents(events, now = Date.now()) {
     });
 }
 
+function eventStartDate(event) {
+  const interval = getEventInterval(event);
+  if (interval?.start) return interval.start;
+  const raw = event?.eventDate || event?.date || event?.startDate;
+  return toDate(raw);
+}
+
+function dayBounds(date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start, end };
+}
+
+export function selectEventsForPeriod(events, period = 'today', now = Date.now()) {
+  const base = now instanceof Date ? new Date(now) : new Date(now);
+  if (Number.isNaN(base.getTime())) return [];
+
+  let { start, end } = dayBounds(base);
+  if (period === 'tomorrow') {
+    start.setDate(start.getDate() + 1);
+    end.setDate(end.getDate() + 1);
+  } else if (period === 'weekend') {
+    const day = start.getDay();
+    if (day === 0) {
+      // В воскресенье показываем оставшуюся часть текущих выходных.
+    } else if (day === 6) {
+      end.setDate(end.getDate() + 1);
+    } else {
+      const daysUntilSaturday = 6 - day;
+      start.setDate(start.getDate() + daysUntilSaturday);
+      end = new Date(start);
+      end.setDate(end.getDate() + 2);
+    }
+  }
+
+  return selectActualEvents(events, base.getTime()).filter(event => {
+    const eventStart = eventStartDate(event);
+    if (!eventStart) return false;
+    return eventStart.getTime() >= start.getTime() && eventStart.getTime() < end.getTime();
+  });
+}
+
 export function formatConflictLabel(event) {
   const interval = getEventInterval(event);
   const time = interval

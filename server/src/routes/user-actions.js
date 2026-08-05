@@ -2309,6 +2309,27 @@ async function actionWorkspaceNewsArchive(db, req, actor) {
   return { ok: true, id: ref.id, patch: { status: 'archived', lifecycleStatus: 'archived', contentStatus: 'archived', active: false, archived: true }, news: { ...news, id: ref.id, status: 'archived', lifecycleStatus: 'archived', contentStatus: 'archived', active: false, archived: true, updatedAt: new Date().toISOString() } };
 }
 
+async function actionWorkspaceNewsDelete(db, req, actor) {
+  const { ref, news, profile } = await assertWorkspaceNewsAccess(db, req, actor);
+  const patch = {
+    ...buildLifecyclePatch({
+      item: news,
+      resource: 'news',
+      nextStatus: 'deleted',
+      actorId: actor.userId,
+      reason: safeString(req.body?.reason || 'Удалено владельцем публикации из Workspace', 500),
+    }),
+    status: 'deleted',
+    active: false,
+    archived: true,
+    deleted: true,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await ref.set(patch, { merge: true });
+  await audit(db, req, actor, 'workspaceNews:delete', 'news', ref.id, 'success', { profileId: profile.id });
+  return { ok: true, id: ref.id };
+}
+
 async function actionWorkspaceNewsFromEvent(db, req, actor) {
   const role = safeString(req.body?.role, 40) === 'expert' ? 'expert' : 'partner';
   const profileId = safeString(req.body?.profileId, 180);
@@ -5923,6 +5944,23 @@ async function actionPushCleanupSubscriptions(db, req, actor) {
   return { ok: true, userId, deviceId, keptSubscriptions: subscriptions.length, removedSubscriptions: Math.max(before - subscriptions.length, 0) };
 }
 
+async function actionPushDisableNotifications(db, req, actor) {
+  const userId = await assertOwn(actor, req.body?.userId || actor.userId);
+  const userRef = db.collection('users').doc(userId);
+  await userRef.set({
+    notificationsEnabled: false,
+    notificationConsent: false,
+    webPushSubscriptions: [],
+    rustorePushTokens: [],
+    pushDevices: {},
+    notificationProvider: '',
+    pushDisabledAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await audit(db, req, actor, 'push:disableNotifications', 'users', userId, 'success');
+  return { ok: true, userId };
+}
+
 async function actionPushTestDevice(db, req, actor) {
   const userId = await assertOwn(actor, req.body?.userId || actor.userId);
   const deviceId = safeString(req.body?.deviceId, 120);
@@ -6042,6 +6080,7 @@ async function routeAction(db, req, actor) {
   if (action === 'push:registerNative') return actionPushRegisterNative(db, req, actor);
   if (action === 'push:unregisterNative') return actionPushUnregisterNative(db, req, actor);
   if (action === 'push:cleanupSubscriptions') return actionPushCleanupSubscriptions(db, req, actor);
+  if (action === 'push:disableNotifications') return actionPushDisableNotifications(db, req, actor);
   if (action === 'push:testDevice') return actionPushTestDevice(db, req, actor);
   if (action === 'favorites:toggle') return actionFavoritesToggle(db, req, actor);
   if (action === 'news:saved') return actionUserListSet(db, req, actor, 'savedNews', action);
@@ -6066,6 +6105,7 @@ async function routeAction(db, req, actor) {
   if (action === 'workspaceNews:save') return actionWorkspaceNewsSave(db, req, actor);
   if (action === 'workspaceNews:submit') return actionWorkspaceNewsSubmit(db, req, actor);
   if (action === 'workspaceNews:archive') return actionWorkspaceNewsArchive(db, req, actor);
+  if (action === 'workspaceNews:delete') return actionWorkspaceNewsDelete(db, req, actor);
   if (action === 'workspaceNews:fromEvent') return actionWorkspaceNewsFromEvent(db, req, actor);
   if (action === 'workspacePromotion:list') return actionWorkspacePromotionList(db, req, actor);
   if (action === 'workspacePromotion:save') return actionWorkspacePromotionSave(db, req, actor);

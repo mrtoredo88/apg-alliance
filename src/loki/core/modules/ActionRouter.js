@@ -6,7 +6,7 @@ const SCREEN_ACTIONS = [
   { id: 'prizes', words: ['приз', 'подар', 'розыгрыш'], action: LOKI_APP_ACTIONS.OPEN_PRIZE, title: 'Призы', text: 'Открою раздел призов и розыгрышей.' },
   { id: 'achievements', words: ['достижен', 'задани', 'прогресс'], action: LOKI_APP_ACTIONS.OPEN_TASKS, title: 'Достижения и задания', text: 'Открою задания, где виден прогресс.' },
   { id: 'settings', words: ['настройк', 'тема', 'профиль настро'], action: LOKI_APP_ACTIONS.OPEN_SETTINGS, title: 'Настройки', text: 'Открою профиль и настройки приложения.' },
-  { id: 'partners', words: ['партнер', 'партнёр', 'места', 'акци', 'скидк'], action: LOKI_APP_ACTIONS.OPEN_PARTNERS, title: 'Партнёры', text: 'Открою подходящий раздел партнёров и акций АПГ.' },
+  { id: 'partners', words: ['партнер', 'партнёр', 'места', 'акци', 'скидк'], action: LOKI_APP_ACTIONS.OPEN_PARTNERS, title: 'Места', text: 'Открою подходящие места и предложения АПГ.' },
   { id: 'experts', words: ['эксперт', 'специалист', 'консультац', 'психолог', 'юрист'], action: LOKI_APP_ACTIONS.OPEN_EXPERTS, title: 'Эксперты', text: 'Открою каталог экспертов.' },
   { id: 'events', words: ['мероприят', 'событ', 'афиш', 'выходн'], action: LOKI_APP_ACTIONS.OPEN_EVENTS, title: 'События', text: 'Открою ближайшие мероприятия.' },
   { id: 'news', words: ['новост', 'что нового', 'лента'], action: LOKI_APP_ACTIONS.OPEN_NEWS_FEED, title: 'Новости', text: 'Открою ленту новостей АПГ.' },

@@ -6,7 +6,7 @@ import {
 } from '../src/workspace/WorkspaceCore.js';
 import { getPrimaryRole, normalizeRole } from '../src/roleEngine.js';
 
-const expectedUserModePanels = ['home', 'offers', null, 'experts', 'profile'];
+const expectedUserModePanels = ['home', 'offers', null, 'events', 'profile'];
 
 for (const role of ['user', 'owner', 'super_admin', 'administrator']) {
   const nav = getWorkspaceNavigation({ mode: WORKSPACE_MODES.mobile, role });

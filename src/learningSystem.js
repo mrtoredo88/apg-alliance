@@ -125,7 +125,7 @@ export const LEARNING_HINTS = {
   home: {
     id: 'home_overview',
     title: 'Главная собирает самое важное',
-    text: 'Отсюда удобно перейти к событиям, партнёрам, новостям, заданиям и Локи.',
+    text: 'Отсюда удобно перейти к событиям, местам, новостям, экспертам и Локи.',
   },
   offers: {
     id: 'partners_catalog',
@@ -202,7 +202,7 @@ export const LEARNING_KNOWLEDGE_SECTIONS = [
   },
   {
     audience: 'partners',
-    label: 'Партнёры',
+    label: 'Места',
     categories: ['Кабинет', 'Новости', 'События', 'AI'],
     articles: [
       {

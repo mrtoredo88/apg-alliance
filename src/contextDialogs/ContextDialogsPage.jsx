@@ -731,7 +731,7 @@ export function ContextDialogsPage({ user, initialRequest, initialDialogId = '',
         <div data-messaging-filter-chips style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 2 }}>
           {[
             { id: 'all', label: 'Все' },
-            { id: 'partners', label: 'Партнёры' },
+            { id: 'partners', label: 'Места' },
             { id: 'personal', label: 'Друзья' },
             { id: 'events', label: 'Мероприятия' },
             { id: 'groups', label: 'Группы' },

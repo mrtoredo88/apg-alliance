@@ -16,7 +16,7 @@ function formatProfileDate(value) {
   return date ? date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
 }
 import { db } from './platformDataAuth.js';
-import { collection, getDocs, query, orderBy } from './postgres/documentApi.js';
+import { collection, getDocs, query, orderBy, where } from './postgres/documentApi.js';
 
 import { T, GLASS, GLASS_STRONG, GLASS_GOLD } from './design.js';
 import { logError } from './errorLogger.js';
@@ -52,6 +52,34 @@ import {
   DesktopSidebarCard,
   DesktopStickyActions,
 } from './components/DesktopUI.jsx';
+
+function reviewTimestamp(review) {
+  return toDate(review?.createdAt)?.getTime() || 0;
+}
+
+function reviewBelongsToUser(review, userId) {
+  return Boolean(userId) && String(review?.userId || review?.id || '') === String(userId);
+}
+
+function mergePartnerReviews(primary = [], fallback = []) {
+  const merged = new Map();
+  [...fallback, ...primary].forEach(review => {
+    const key = String(review?.userId || review?.id || '').trim();
+    if (key) merged.set(key, review);
+  });
+  return [...merged.values()].sort((left, right) => reviewTimestamp(right) - reviewTimestamp(left));
+}
+
+async function loadPartnerReviews(partnerId) {
+  const [publicResult, nestedResult] = await Promise.allSettled([
+    getDocs(query(collection(db, 'reviews'), where('partnerId', '==', partnerId), orderBy('createdAt', 'desc'))),
+    getDocs(query(collection(db, 'partners', partnerId, 'reviews'), orderBy('createdAt', 'desc'))),
+  ]);
+  if (publicResult.status === 'rejected' && nestedResult.status === 'rejected') throw publicResult.reason;
+  const publicReviews = publicResult.status === 'fulfilled' ? publicResult.value.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+  const nestedReviews = nestedResult.status === 'fulfilled' ? nestedResult.value.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+  return mergePartnerReviews(publicReviews, nestedReviews);
+}
 
 // ─── Лайтбокс ─────────────────────────────────────────────────────────────────
 
@@ -193,7 +221,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
   const userId = user?.id ? String(user.id) : null;
   const canReview = userId && userId !== 'guest' && partner && scannedPartnerIds[partner.id];
-  const myReview = userId ? reviews.find(r => r.id === userId) : null;
+  const myReview = userId ? reviews.find(review => reviewBelongsToUser(review, userId)) : null;
   const isProfileOwner = Boolean(userId && [
     partner?.ownerId,
     partner?.userId,
@@ -274,11 +302,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
 
     (async () => {
       try {
-        const snap = await getDocs(query(
-          collection(db, 'partners', partner.id, 'reviews'),
-          orderBy('createdAt', 'desc'),
-        ));
-        if (!cancelled) setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const loadedReviews = await loadPartnerReviews(partner.id);
+        if (!cancelled) setReviews(loadedReviews);
       } catch (e) { logError(e, 'PartnerPage.fetchReviews'); }
       if (!cancelled) setReviewsLoading(false);
     })();
@@ -299,8 +324,11 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
   const photos = partner?.photos ?? [];
   const gallery = partner?.gallery ?? partner?.photos ?? [];
   const similar = partner ? partners.filter(p => p.id !== partner.id && p.category === partner.category).slice(0, 6) : [];
-  const avgRating = partner?.avgRating ?? 0;
-  const reviewCount = partner?.reviewCount ?? reviews.length;
+  const loadedAvgRating = reviews.length
+    ? reviews.reduce((sum, item) => sum + (Number(item.stars || item.rating || 0) || 0), 0) / reviews.length
+    : 0;
+  const avgRating = reviewsLoading ? (partner?.avgRating ?? 0) : loadedAvgRating;
+  const reviewCount = reviewsLoading ? (partner?.reviewCount ?? 0) : reviews.length;
   const locations = partner ? getProfileLocations(partner) : [];
   const mainLocation = partner ? getMainLocation(partner) : null;
   const multipleLocations = partner ? hasMultipleLocations(partner) : false;
@@ -366,11 +394,8 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
       const msg = `Побывал у партнёра АПГ «${partner.name}» — ${stars}\n${formText.trim() ? formText.trim() + '\n' : ''}\n#АПГ_Зеленоград`;
       vkBridge.send('VKWebAppShowWallPostBox', { message: msg }).catch(() => {});
 
-      getDocs(query(
-        collection(db, 'partners', partner.id, 'reviews'),
-        orderBy('createdAt', 'desc'),
-      )).then(snap => {
-        if (mountedRef.current) setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      loadPartnerReviews(partner.id).then(loadedReviews => {
+        if (mountedRef.current) setReviews(loadedReviews);
       }).catch(error => logError(error, 'PartnerPage.refreshReviewsAfterSubmit'));
     } catch (e) { logError(e, 'PartnerPage.submitReview'); setReviewError('Ошибка отправки. Проверьте соединение.'); }
     if (mountedRef.current) setSubmitting(false);
@@ -881,7 +906,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                   />
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
-                    {scopedReviews.map(r => <ProfileReviewCard key={r.id} review={r} isOwn={r.id === userId} textFallback="Гость оценил место без комментария." />)}
+                    {scopedReviews.map(r => <ProfileReviewCard key={r.id} review={r} isOwn={reviewBelongsToUser(r, userId)} textFallback="Гость оценил место без комментария." />)}
                   </div>
                 )}
               </DesktopSection>
@@ -1077,7 +1102,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
                 </div>
               ) : (
                 <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, scrollSnapType: 'x mandatory' }} onTouchStart={e => e.stopPropagation()}>
-                  {scopedReviews.map(r => <ProfileReviewCard key={r.id} review={r} isOwn={r.id === userId} textFallback="Гость оценил место без комментария." />)}
+                  {scopedReviews.map(r => <ProfileReviewCard key={r.id} review={r} isOwn={reviewBelongsToUser(r, userId)} textFallback="Гость оценил место без комментария." />)}
                 </div>
               )}
             </GlassSection>
@@ -1374,7 +1399,7 @@ export function PartnerPage({ partner, variant = 'v2', isFavorite, onBack, onTog
           ) : (
             <div style={{ ...GLASS, borderRadius:24, overflow:'hidden' }}>
               {reviews.map(r => (
-                <ReviewCard key={r.id} review={r} isOwn={r.id === userId} />
+                <ReviewCard key={r.id} review={r} isOwn={reviewBelongsToUser(r, userId)} />
               ))}
             </div>
           )}

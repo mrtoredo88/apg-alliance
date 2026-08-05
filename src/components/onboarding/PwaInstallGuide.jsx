@@ -130,13 +130,9 @@ export function PwaInstallGuide({ open, onClose }) {
     setShowInstructions(true);
   };
 
-  const startInstall = async () => {
-    if (platform === 'android' && ANDROID_INSTALL_SOURCE.provider === 'rustore') {
-      window.location.assign(ANDROID_INSTALL_SOURCE.url);
-      close({ remember: true });
-      return;
-    }
-    await startPwaInstall();
+  const startRuStoreInstall = () => {
+    window.location.assign(ANDROID_INSTALL_SOURCE.url);
+    close({ remember: true });
   };
 
   return (
@@ -150,6 +146,13 @@ export function PwaInstallGuide({ open, onClose }) {
               Для лучшей работы установите АПГ как приложение на свой телефон. Это займёт меньше минуты и позволит быстрее открывать сервис, получать обновления и пользоваться всеми возможностями.
             </p>
           </div>
+
+          {platform === 'android' && ANDROID_INSTALL_SOURCE.provider === 'rustore' && (
+            <div style={{ borderRadius: 22, padding: '12px 14px', background: 'rgba(215,184,106,0.14)', border: '1px solid rgba(215,184,106,0.32)', display: 'grid', gap: 5 }}>
+              <div style={{ color: APG2_PROFILE.gold, fontSize: 13.5, lineHeight: '18px', fontWeight: 900 }}>Актуальная версия — веб-приложение</div>
+              <div style={{ color: APG2_PROFILE.textSoft, fontSize: 12.5, lineHeight: '18px', fontWeight: 630 }}>Обновление для RuStore ещё проходит модерацию. В магазине временно доступна предыдущая стабильная версия АПГ.</div>
+            </div>
+          )}
 
           {showInstructions ? (
             <div style={{ display: 'grid', gap: 10, borderRadius: 24, padding: 14, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)' }}>
@@ -175,12 +178,12 @@ export function PwaInstallGuide({ open, onClose }) {
           )}
 
           <div style={{ display: 'grid', gap: 10 }}>
-            <GlassButton data-pwa-install-action tone="gold" onClick={startInstall} style={{ minHeight: 54, borderRadius: 22, color: '#17120a', fontSize: 15.5, fontWeight: 880 }}>
-              📲 {platform === 'android' && ANDROID_INSTALL_SOURCE.provider === 'rustore' ? ANDROID_INSTALL_SOURCE.buttonLabel : canUseInstallPrompt ? 'Установить веб-приложение' : platform === 'ios' ? 'Показать инструкцию установки' : 'Как добавить на главный экран'}
+            <GlassButton data-pwa-install-action tone="gold" onClick={startPwaInstall} style={{ minHeight: 54, borderRadius: 22, color: '#17120a', fontSize: 15.5, fontWeight: 880 }}>
+              📲 {platform === 'android' ? 'Установить актуальную веб-версию' : canUseInstallPrompt ? 'Установить веб-приложение' : platform === 'ios' ? 'Показать инструкцию установки' : 'Как добавить на главный экран'}
             </GlassButton>
             {platform === 'android' && ANDROID_INSTALL_SOURCE.provider === 'rustore' && (
-              <GlassButton onClick={startPwaInstall} style={{ minHeight: 46, borderRadius: 18, color: APG2_PROFILE.textSoft }}>
-                Установить веб-версию вместо приложения
+              <GlassButton onClick={startRuStoreInstall} style={{ minHeight: 46, borderRadius: 18, color: APG2_PROFILE.textSoft }}>
+                Открыть RuStore · предыдущая версия
               </GlassButton>
             )}
             <GlassButton onClick={() => close()} style={{ minHeight: 50, borderRadius: 20, color: APG2_PROFILE.textSoft }}>

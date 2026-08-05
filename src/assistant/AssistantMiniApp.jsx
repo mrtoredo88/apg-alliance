@@ -16,7 +16,7 @@ const SECTIONS = [
   { id: 'news', label: 'Новости', icon: '📰' },
   { id: 'events', label: 'События', icon: '🎉' },
   { id: 'directory', label: 'Справочник', icon: '⌕' },
-  { id: 'partners', label: 'Партнёры', icon: '🏪' },
+  { id: 'partners', label: 'Места', icon: '🏪' },
   { id: 'experts', label: 'Эксперты', icon: '🎓' },
   { id: 'rewards', label: 'Призы', icon: '🎁' },
   { id: 'profile', label: 'Профиль', icon: '👤' },
@@ -301,7 +301,7 @@ function EcosystemSection({ section, tg, onOpenDirectory }) {
   const titleMap = {
     news: 'Новости АПГ',
     events: 'События города',
-    partners: 'Партнёры',
+    partners: 'Места',
     experts: 'Эксперты',
     rewards: 'Призы и ключи',
     profile: 'Профиль',

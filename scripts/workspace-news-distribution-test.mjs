@@ -80,6 +80,10 @@ assert.equal(isProfileOnlyNews(eventPublication), true, 'publication created fro
 assert.equal(isApgNewsPublication(eventPublication), false, 'publication created from event must not enter common APG feed automatically');
 
 const editorSource = fs.readFileSync(new URL('../src/workspace/WorkspaceNewsCenter.jsx', import.meta.url), 'utf8');
+const actionSource = fs.readFileSync(new URL('../server/src/routes/user-actions.js', import.meta.url), 'utf8');
+assert.match(editorSource, /workspaceNews:delete/, 'partner and expert workspace must expose feed deletion');
+assert.match(actionSource, /actionWorkspaceNewsDelete[\s\S]*assertWorkspaceNewsAccess/, 'deletion must enforce publication ownership on the server');
+assert.match(actionSource, /status:\s*'deleted'[\s\S]*active:\s*false/, 'deleted publication must be hidden from active feeds');
 const autosaveEffect = editorSource.slice(
   editorSource.indexOf("setStatus('Сохраняем черновик...')"),
   editorSource.indexOf('useEffect(() => {', editorSource.indexOf("setStatus('Сохраняем черновик...')") + 1),

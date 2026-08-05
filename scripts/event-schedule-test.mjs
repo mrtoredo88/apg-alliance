@@ -5,6 +5,7 @@ import {
   getEventInterval,
   isEventFinished,
   selectActualEvents,
+  selectEventsForPeriod,
 } from '../src/eventSchedule.js';
 
 let failed = 0;
@@ -114,6 +115,17 @@ check('легаси-событие по eventDate завершено', isEventFi
 check('selectActualEvents: только идущие/будущие, ближайшие первыми',
   selectActualEvents([pastEvent, futureEvent, deletedFuture, archivedFuture, ongoingEvent, legacyPast], NOW).map(e => e.id),
   ['ongoing', 'future']);
+
+const PERIOD_NOW = new Date('2026-08-06T10:00:00+03:00');
+const periodEvents = [
+  { id: 'today', startAt: '2026-08-06T18:00:00+03:00', active: true },
+  { id: 'tomorrow', startAt: '2026-08-07T12:00:00+03:00', active: true },
+  { id: 'saturday', startAt: '2026-08-08T11:00:00+03:00', active: true },
+  { id: 'sunday', startAt: '2026-08-09T15:00:00+03:00', active: true },
+];
+check('selectEventsForPeriod: сегодня', selectEventsForPeriod(periodEvents, 'today', PERIOD_NOW).map(e => e.id), ['today']);
+check('selectEventsForPeriod: завтра', selectEventsForPeriod(periodEvents, 'tomorrow', PERIOD_NOW).map(e => e.id), ['tomorrow']);
+check('selectEventsForPeriod: выходные', selectEventsForPeriod(periodEvents, 'weekend', PERIOD_NOW).map(e => e.id), ['saturday', 'sunday']);
 
 if (failed) {
   console.error(`\n${failed} проверок провалено`);

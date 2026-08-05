@@ -105,7 +105,6 @@ const Onboarding        = lazy(() => import('./Onboarding.jsx').then(m => ({ def
 const NotificationsPage = lazy(() => import('./NotificationsPage.jsx').then(m => ({ default: m.NotificationsPage })));
 const ContextDialogsPage = lazy(() => import('./contextDialogs/ContextDialogsPage.jsx').then(m => ({ default: m.ContextDialogsPage })));
 const BookingFlow = lazy(() => import('./booking/BookingFlow.jsx').then(m => ({ default: m.BookingFlow })));
-const LokiAssistant = lazy(() => import('./loki/LokiAssistant.jsx').then(m => ({ default: m.LokiAssistant })));
 
 // Lazy-loaded pages (рендерят <Panel> внутри себя)
 const EventsPage      = lazy(() => import('./EventsPage.jsx').then(m => ({ default: m.EventsPage })));
@@ -1649,15 +1648,6 @@ export function UserApp() {
   }, []);
 
   useEffect(() => {
-    if (!isVK() || !user || loading) return;
-    const key = `apg_loki_vk_entry_${user.id ?? 'guest'}`;
-    if (sessionStorage.getItem(key) === '1') return;
-    sessionStorage.setItem(key, '1');
-    const t = setTimeout(() => showLokiMessage(LOKI_EVENTS.VK_ENTRY, { source: 'vk_miniapp' }), 1800);
-    return () => clearTimeout(t);
-  }, [loading, user]);
-
-  useEffect(() => {
     const handler = (event) => {
       showLokiMessage(LOKI_EVENTS.VK_EXTERNAL_LINK, { source: 'vk_safe_link', host: event.detail?.host });
     };
@@ -2954,6 +2944,9 @@ export function UserApp() {
 
   const activeLearningHint = useMemo(() => {
     if (!learningHintsEnabled) return null;
+    // The redesigned home is self-explanatory. Do not cover it on first open
+    // or bring Loki into view unless the user explicitly asks for the assistant.
+    if (activePanel === 'home') return null;
     const hint = LEARNING_HINTS[activePanel];
     if (!hint) return null;
     if (learningProgress?.seenHints?.[hint.id]) return null;
@@ -4360,6 +4353,36 @@ export function UserApp() {
     requestWebPushPermission();
   }, [user, showToast, requestWebPushPermission]);
 
+  const handleToggleNotifications = useCallback(async () => {
+    if (!notifEnabled) {
+      handleEnableNotifications();
+      return;
+    }
+    const uid = user?.id ? String(user.id) : '';
+    try {
+      if (isVK()) {
+        await vkBridge.send('VKWebAppDenyNotifications').catch(() => {});
+      } else {
+        await unregisterNativePush(uid).catch(() => {});
+        if ('serviceWorker' in navigator) {
+          const registration = await navigator.serviceWorker.ready.catch(() => null);
+          const subscription = await registration?.pushManager?.getSubscription?.().catch(() => null);
+          await subscription?.unsubscribe?.().catch(() => false);
+        }
+      }
+      if (uid) {
+        await userAction('push:disableNotifications', { userId: uid });
+      }
+      localStorage.removeItem('apg_notif_enabled');
+      setNotifEnabled(false);
+      setUser(prev => prev ? { ...prev, notificationsEnabled: false, notificationConsent: false } : prev);
+      showToast('Уведомления выключены', 'success');
+    } catch (error) {
+      logError(error, 'UserApp.handleToggleNotifications');
+      showToast('Не удалось выключить уведомления. Попробуйте ещё раз.', 'error');
+    }
+  }, [handleEnableNotifications, notifEnabled, showToast, user?.id]);
+
   useEffect(() => {
     if (!user?.notificationsEnabled) return;
     if (isVK() || (typeof Notification !== 'undefined' && Notification.permission === 'granted')) {
@@ -4479,6 +4502,12 @@ export function UserApp() {
       <path d="M4 20C4 17 7.6 14 12 14C16.4 14 20 17 20 20" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
     </svg>
   );
+  const TabEventsIcon = ({ active }) => (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" style={tabIconStyle(active)}>
+      <rect x="3.5" y="5" width="17" height="16" rx="3" stroke={active ? T.gold : T.textSec} strokeWidth="1.8"/>
+      <path d="M7.5 3V7M16.5 3V7M3.5 9.5H20.5M8 14H16M8 17H13" stroke={active ? T.gold : T.textSec} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  );
 
   const workspaceMode = getWorkspaceMode(workspaceWidth);
   const roleIdentity = useMemo(() => ({
@@ -4538,6 +4567,7 @@ export function UserApp() {
     partners: TabPartnersIcon,
     messages: TabMessagesIcon,
     experts: TabExpertsIcon,
+    events: TabEventsIcon,
     profile: TabProfileIcon,
   };
   const TABS = mobileNavigationItems.map(item => ({
@@ -4690,17 +4720,17 @@ export function UserApp() {
 
   const tabBarShellStyle = {
     position: 'fixed',
-    bottom: 'calc(6px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))',
+    bottom: 'calc(8px + max(env(safe-area-inset-bottom, 0px), var(--apg-vv-bottom, 0px)))',
     left: 0, right: 0, margin: '0 auto',
     transform: 'translate3d(0, var(--apg-island-y, 0px), 0)',
-    width: 'calc(100% - 32px)', maxWidth: 360, height: 'var(--apg-island-height, 64px)', minHeight: 'var(--apg-island-height, 64px)',
-    padding: 'var(--apg-island-pad, 8px)',
-    background: 'radial-gradient(circle at 50% 0%, rgba(244,217,140,0.10), transparent 50%), linear-gradient(145deg, var(--apg2-island-bg1, rgba(42,42,38,var(--apg-island-bg-alpha, 0.34))), var(--apg2-island-bg2, rgba(15,15,16,0.46)))',
-    backdropFilter: 'blur(var(--apg-island-blur, 58px)) saturate(1.55)', WebkitBackdropFilter: 'blur(var(--apg-island-blur, 58px)) saturate(1.55)',
-    border: '1px solid var(--apg2-glass-border, rgba(255,255,255,0.17))',
-    borderRadius: 30,
-    boxShadow: '0 var(--apg-island-shadow-y, 22px) 52px var(--apg2-elev-shadow, rgba(0,0,0,0.34)), 0 0 34px rgba(216,184,103,0.08), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -18px 34px rgba(255,255,255,0.035)',
-    display: 'flex', alignItems: 'stretch', gap: 4,
+    width: 'calc(100% - 20px)', maxWidth: 380, height: 66, minHeight: 66,
+    padding: '4px 7px', boxSizing: 'border-box',
+    background: 'rgba(255,253,249,.94)',
+    backdropFilter: 'blur(28px) saturate(1.35)', WebkitBackdropFilter: 'blur(28px) saturate(1.35)',
+    border: '1px solid rgba(91,67,36,.10)',
+    borderRadius: 25,
+    boxShadow: '0 13px 34px rgba(61,43,26,.16), inset 0 1px 0 rgba(255,255,255,.94)',
+    display: 'flex', alignItems: 'stretch', gap: 0,
     zIndex: 10000, overflow: 'visible',
     transition: `transform ${MOTION.duration.base}ms ${MOTION.ease.standard}, min-height ${MOTION.duration.base}ms ${MOTION.ease.standard}, padding ${MOTION.duration.base}ms ${MOTION.ease.standard}, box-shadow ${MOTION.duration.base}ms ${MOTION.ease.standard}, backdrop-filter ${MOTION.duration.base}ms ${MOTION.ease.standard}, -webkit-backdrop-filter ${MOTION.duration.base}ms ${MOTION.ease.standard}`,
     willChange: 'transform, min-height, padding, backdrop-filter',
@@ -4716,15 +4746,15 @@ export function UserApp() {
           data-apg-tab-indicator="true"
           style={{
             position: 'absolute',
-            top: 'var(--apg-island-pad, 8px)',
-            bottom: 'var(--apg-island-pad, 8px)',
+            top: 4,
+            bottom: 4,
             left: tabIndicator.ready ? tabIndicator.center : '10%',
             width: tabIndicator.ready ? tabIndicator.width : 'calc(20% - 8px)',
             boxSizing: 'border-box',
-            borderRadius: 23,
-            background: 'radial-gradient(circle at 50% 0%, rgba(255,245,203,0.26), transparent 56%), linear-gradient(145deg, rgba(244,217,140,0.19), rgba(255,255,255,0.07))',
-            border: '1px solid rgba(244,217,140,0.24)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.24), 0 10px 26px var(--apg2-elev-shadow, rgba(0,0,0,0.16))',
+            borderRadius: 18,
+            background: 'linear-gradient(145deg, rgba(246,225,169,.62), rgba(255,250,235,.88))',
+            border: '1px solid rgba(202,154,47,.15)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,.82), 0 5px 14px rgba(164,117,24,.10)',
             transform: 'translate3d(-50%,0,0)',
             transition: `left ${MOTION.duration.base}ms ${MOTION.ease.standard}, width ${MOTION.duration.base}ms ${MOTION.ease.standard}, opacity ${MOTION.duration.fast}ms ${MOTION.ease.standard}`,
             opacity: tabIndicator.ready ? 1 : 0,
@@ -4735,16 +4765,15 @@ export function UserApp() {
       {TABS.map((tab, i) => {
         if (tab.workspaceId === 'scan' || !tab.id) return (
           <button key="scan" ref={node => { tabSlotRefs.current[i] = node; }} data-apg-tab-slot="scan" aria-label="Открыть сканер" onClick={() => { openScanner('tabbar'); }}
-            style={{ flex: 1.34, background: 'linear-gradient(145deg, rgba(232,70,70,0.98), rgba(174,28,38,0.94))', border: '1px solid rgba(255,138,138,0.72)', borderRadius: 23, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.30), 0 12px 30px rgba(194,36,48,0.30)', cursor: 'pointer', display: 'flex', flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', padding: '0 8px', position: 'relative', zIndex: 2, transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease' }}>
+            style={{ flex: '0 0 58px', alignSelf: 'center', width: 58, height: 58, marginTop: 0, background: 'linear-gradient(145deg, #f05b63, #c82635)', border: '4px solid #fffdf9', borderRadius: 19, boxShadow: '0 8px 18px rgba(188,35,50,.24), inset 0 1px 0 rgba(255,255,255,.28)', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 0, alignItems: 'center', justifyContent: 'center', padding: '0 5px', position: 'relative', zIndex: 2, transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}>
             <div style={{
-              width: 46, height: 46, marginTop: 0, borderRadius: 19,
-              background: isScannerOpen ? 'rgba(255,255,255,0.16)' : 'linear-gradient(145deg, #FF7777, #D92F3E)',
-              boxShadow: isScannerOpen ? 'none' : '0 12px 26px rgba(91,8,18,0.30), inset 0 1px 0 rgba(255,255,255,0.38), inset 0 -8px 18px rgba(91,8,18,0.24)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#FFFFFF',
+              width: 32, height: 32, marginTop: 0, borderRadius: 11,
+              background: 'transparent', boxShadow: 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 23, color: '#FFFFFF',
               transition: `transform ${MOTION.duration.modal}ms ${MOTION.ease.standard}, box-shadow ${MOTION.duration.modal}ms ${MOTION.ease.standard}`,
               transform: isScannerOpen ? 'scale(0.88)' : 'scale(1)',
             }}>◎</div>
-            <span style={{ fontSize: 12, fontWeight: 900, color: '#FFFFFF', letterSpacing: 0, textTransform: 'none' }}>Скан</span>
+            <span style={{ fontSize: 12, fontWeight: 900, color: '#FFFFFF', letterSpacing: 0, textTransform: 'none' }}>QR</span>
           </button>
         );
 
@@ -4759,14 +4788,14 @@ export function UserApp() {
             data-apg-tab-slot={tab.id}
             aria-label={`Открыть раздел ${tab.label}`}
             onClick={() => { goPanel(tab.id); }}
-            style={{ flex: 1, background: 'none', border: '1px solid transparent', borderRadius: 23, boxShadow: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 0, position: 'relative', zIndex: 1, minWidth: 0, transform: isActive ? 'translateY(-0.5px)' : 'translateY(0)', transition: motionTransition(['transform', 'background', 'border-color', 'box-shadow'], 'base') }}>
+            style={{ flex: 1, background: 'none', border: '1px solid transparent', borderRadius: 18, boxShadow: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 0, position: 'relative', zIndex: 1, minWidth: 0, transform: isActive ? 'translateY(-0.5px)' : 'translateY(0)', transition: motionTransition(['transform', 'background', 'border-color', 'box-shadow'], 'base') }}>
             <div style={{ position: 'relative' }}>
               <Icon active={isActive} />
               {hasNotif && (
                 <div style={{ position: 'absolute', top: -3, right: -4, width: 8, height: 8, borderRadius: '50%', background: '#E64646', border: '1.5px solid rgba(8,8,24,0.9)' }} />
               )}
             </div>
-            <span style={{ fontSize: 8.5, fontWeight: 780, letterSpacing: 0, textTransform: 'none', color: isActive ? T.gold : T.textSec, opacity: isActive ? 1 : 0.58, transition: 'color 0.25s ease, opacity 0.25s ease', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span style={{ fontSize: 8.5, fontWeight: isActive ? 850 : 720, letterSpacing: 0, textTransform: 'none', color: isActive ? '#b47c13' : '#777176', opacity: isActive ? 1 : .76, transition: 'color 0.25s ease, opacity 0.25s ease', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {tab.label}
             </span>
           </button>
@@ -5074,7 +5103,7 @@ export function UserApp() {
       { id: 'home', label: 'Главная', onClick: handleOpenHome },
       { id: 'news', label: 'Новости', onClick: handleOpenNews },
       { id: 'events', label: 'Мероприятия', onClick: handleOpenEvents },
-      { id: 'partners', label: 'Партнёры', onClick: handleOpenPartners },
+      { id: 'partners', label: 'Места', onClick: handleOpenPartners },
       { id: 'experts', label: 'Эксперты', onClick: handleOpenExperts },
       { id: 'offers', label: 'Акции', onClick: handleOpenOffers },
       { id: 'rewards', label: 'Подарки', onClick: handleOpenRewards },
@@ -5613,7 +5642,7 @@ export function UserApp() {
                     onOpenActivity={() => goPanel('activity')}
                     onOpenKeyHistory={() => setShowKeyHistory(true)}
                     onOpenFavorites={() => goPanel('favorites')}
-                    onEnableNotifications={handleEnableNotifications}
+                    onEnableNotifications={handleToggleNotifications}
                     onOpenReferral={() => goPanel('referral')}
                     onOpenRewards={() => goPanel('rewards')}
                     onShare={handleShare}
@@ -6234,17 +6263,6 @@ export function UserApp() {
               setToast(null);
             }}
           />
-          {splashDone && !isScannerOpen && !eventSheetOpen && (CONSENT_SCREEN_DISABLED_FOR_DEMO || !consentRequest) && (
-            <Suspense fallback={null}>
-              <LokiAssistant
-                desktopMode={desktopDevice}
-                onOpenPeople={handleOpenPeople}
-                onOpenMessages={handleOpenMessages}
-                messageUnreadCount={messageUnreadCount}
-                hideCommunicationButtons={activePanel === 'dialogs' || peopleOverlayOpen}
-              />
-            </Suspense>
-          )}
           </LokiProvider>
         </AppRoot>
       </AdaptivityProvider>

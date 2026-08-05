@@ -61,7 +61,7 @@ function StepContent({ stepId, onEmailLogin, onAskLoki, onOpenRewards, onOpenPan
   if (stepId === 'explore') {
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
-        <ExploreCard icon="🏪" title="Партнёры" onClick={() => onOpenPanel?.('partners')} />
+        <ExploreCard icon="🏪" title="Места" onClick={() => onOpenPanel?.('partners')} />
         <ExploreCard icon="📅" title="Мероприятия" onClick={() => onOpenPanel?.('events')} />
         <ExploreCard icon="💬" title="Сообщения" onClick={() => onOpenPanel?.('dialogs')} />
         <ExploreCard icon="🎁" title="Подарки" onClick={() => onOpenPanel?.('rewards')} />

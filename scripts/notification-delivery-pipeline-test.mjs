@@ -49,7 +49,12 @@ assert.match(userApp, /browser's current PushManager[\s\S]*subscription is autho
 assert.doesNotMatch(userApp, /hasStoredPushChannel[\s\S]{0,800}setNotifEnabled\(false\)/, 'a lagging server profile cannot disable a working PWA subscription');
 assert.match(constants, /WEB_PUSH_VAPID_PUBLIC_KEY = 'BIY6fBBaGoouByjJosD9BKLXBRVoChXSpwgkXTwDJZs_gykj9gr8Fe5LVnTKCs8hseG5iJGLR-rqprfbS3Y3YLs'/, 'frontend uses the active backend VAPID public key');
 assert.match(pushDiagnostics, /registeredVapidKey !== WEB_PUSH_VAPID_PUBLIC_KEY[\s\S]*?subscription\.unsubscribe\(\)[\s\S]*?subscription rotated/, 'stale subscriptions are rotated after a VAPID key change');
-assert.doesNotMatch(userApp, /UserApp\.requestWebPushPermission[\s\S]*?localStorage\.removeItem\('apg_notif_enabled'\);[\s\S]*?setNotifEnabled\(false\)/, 'a transient registration failure does not erase an already configured device');
+const webPushPermissionHandler = userApp.slice(
+  userApp.indexOf('const requestWebPushPermission'),
+  userApp.indexOf('const handleToggleNotifications'),
+);
+assert.doesNotMatch(webPushPermissionHandler, /localStorage\.removeItem\('apg_notif_enabled'\);[\s\S]*?setNotifEnabled\(false\)/, 'a transient registration failure does not erase an already configured device');
+assert.match(userApp, /push:disableNotifications/, 'profile notification switch disables every account push channel on the server');
 assert.match(userApp, /Разрешение на уведомления заблокировано[\s\S]*Сервис уведомлений ещё загружается/, 'push failures explain the actual browser or service-worker cause');
 assert.equal(pkg.scripts['test:notification-delivery'], 'node scripts/notification-delivery-pipeline-test.mjs');
 

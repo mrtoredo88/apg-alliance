@@ -461,24 +461,25 @@ export function CabinetQRSection({ entityId, entityName, qr1, qr2 }) {
 // ─── Partner wrapper (backward compat) ────────────────────────────────────────
 export function PartnerQRSection({ partner }) {
   const publicVal = shareLink('partner', partner.id);
+  const serviceLink = `${APP_URL}/?scan=${encodeURIComponent(partner.id)}`;
   return (
     <CabinetQRSection
       entityId={partner.id}
       entityName={partner.name}
       qr1={{
-        tabLabel: '🌐 Публичный',
+        tabLabel: '👥 Приглашение',
         value: publicVal,
         linkText: publicVal,
-        desc: 'Размещается на стойке. При сканировании новый пользователь видит регистрацию, зарегистрированный — карточку партнёра. Ключи не начисляются.',
+        desc: 'QR-код и ссылка для приглашения в АПГ через страницу партнёра. Новый пользователь сможет зарегистрироваться, действующий — открыть карточку.',
         downloadPrefix: 'qr-public',
         pdfTitle: `Публичный QR — ${partner.name}`,
         pdfSub: 'Размещается на стойке. Ключи не начисляются.',
       }}
       qr2={{
-        tabLabel: '🔑 Служебный',
+        tabLabel: '🔑 Начисление ключа',
         value: partner.id,
-        linkText: `Код: ${partner.id}`,
-        desc: 'Используется только после оказания услуги. При сканировании начисляются ключи, штампы и открывается форма отзыва.',
+        linkText: serviceLink,
+        desc: 'Служебный QR-код и ссылка для подтверждения визита. Используйте только после оказания услуги: пользователю начисляется ключ и открывается форма отзыва.',
         downloadPrefix: 'qr-service',
         pdfTitle: `Служебный QR — ${partner.name}`,
         pdfSub: 'Только после оказания услуги. Начисляет ключи.',

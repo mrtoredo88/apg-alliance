@@ -17,6 +17,7 @@ import { getCanonicalNewsId } from '../src/newsUtils.js';
 
 const root = new URL('../', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
+const profilePanel = read('src/ProfilePanel.jsx');
 
 const profile = {
   id: 'partner-1',
@@ -312,6 +313,9 @@ assert.match(expertsPage, /ProfilePhotoGrid/, 'Expert profile must use the share
 assert.match(expertsPage, /ProfileVideoGrid/, 'Expert profile must use the shared Living Profile video grid');
 assert.match(expertsPage, /ProfilePhotoViewer/, 'Expert profile must open photos over the current profile');
 assert.match(expertsPage, /ProfileVideoViewer/, 'Expert profile must open videos over the current profile');
+assert.match(expertsPage, /collection\(db, 'expertReviews'\), where\('expertId', '==', expert\.id\)/, 'Expert profile must load canonical reviews by expertId');
+assert.match(expertsPage, /const actualReviewCount = reviewsLoading[\s\S]*reviews\.length/, 'Expert profile must replace stale stored counters with loaded review totals');
+assert.match(expertsPage, /const actualAvgRating = reviewsLoading[\s\S]*reviews\.reduce/, 'Expert profile must calculate the visible rating from loaded reviews');
 assert.match(profileMediaViewer, /MediaPreview/, 'Living Profile gallery must use Smart Media Framework previews');
 assert.match(profileMediaViewer, /createPortal/, 'Living Profile media viewer must open above the profile without unmounting it');
 assert.match(profileMediaViewer, /Escape/, 'Living Profile media viewer must support ESC close');
@@ -359,5 +363,9 @@ const sharedNews = read('server-shared/workspace-news.js');
 const adminActions = read('server/src/routes/admin-actions.js');
 assert.match(sharedNews, /publicationType/, 'workspace sanitizer must allow publication type');
 assert.match(adminActions, /publicationType/, 'admin news allowlist must keep publication type');
+
+assert.match(profilePanel, /data-profile-favorites[^>]*width: '100%'[^>]*maxWidth: '100%'/, 'profile favorites section must stay within the mobile viewport');
+assert.match(profilePanel, /data-profile-favorite-card[^>]*gridTemplateColumns: '44px minmax\(0, 1fr\) auto'/, 'legacy favorite cards must keep the title column shrinkable');
+assert.match(profilePanel, /gridTemplateColumns: '48px minmax\(0, 1fr\) auto'[^>]*overflow: 'hidden'/, 'current favorite cards must not create horizontal overflow');
 
 console.log('profile-timeline-test: ok');

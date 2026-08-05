@@ -602,7 +602,7 @@ function FaqSection() {
 
 function FavoriteCard({ partner, onOpen, onRemove }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+    <div data-profile-favorite-card style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: '12px 14px', display: 'grid', gridTemplateColumns: '44px minmax(0, 1fr) auto', alignItems: 'center', gap: 10, width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', overflow: 'hidden', marginBottom: 8 }}>
       {partner.logoUrl
         ? <Avatar size={44} src={partner.logoUrl} />
         : <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(201,168,76,0.09)', border: '2px solid rgba(201,168,76,0.27)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{partner.emoji ?? '🏪'}</div>
@@ -611,9 +611,9 @@ function FavoriteCard({ partner, onOpen, onRemove }) {
         <div style={{ fontSize: 13, fontWeight: 700, color: APG2.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partner.name}</div>
         {partner.categoryLabel && <div style={{ fontSize: 11, color: APG2.gold, marginTop: 2 }}>{partner.categoryLabel}</div>}
       </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <button onClick={() => onOpen(partner)} style={{ padding: '7px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', color: '#0F0F1A', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Открыть</button>
-        <button onClick={() => onRemove(partner.id)} style={{ padding: '7px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.08)', color: APG2.textSoft, fontSize: 12, cursor: 'pointer' }}>✕</button>
+      <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+        <button onClick={() => onOpen(partner)} style={{ padding: '7px 9px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', color: '#0F0F1A', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Открыть</button>
+        <button aria-label={`Удалить ${partner.name || 'место'} из избранного`} onClick={() => onRemove(partner.id)} style={{ width: 32, height: 32, padding: 0, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.08)', color: APG2.textSoft, fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>✕</button>
       </div>
     </div>
   );
@@ -2445,7 +2445,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 8, marginTop: 10 }}>
               <GlassButton onClick={onToggleTheme} style={{ minHeight: 40 }}><span>{isDark ? '☀️' : '🌙'}</span>{isDark ? 'Светлая тема' : 'Тёмная тема'}</GlassButton>
-              <GlassButton onClick={onEnableNotifications} style={{ minHeight: 40 }}><span>{notificationsEnabled ? '✓' : '🔔'}</span>{notificationsEnabled ? 'Уведомления вкл' : 'Уведомления'}</GlassButton>
+              <GlassButton onClick={onEnableNotifications} role="switch" aria-checked={notificationsEnabled} aria-label={`Уведомления ${notificationsEnabled ? 'включены' : 'выключены'}`} style={{ minHeight: 40, justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span>🔔</span><span>Уведомления</span></span>
+                <span aria-hidden="true" style={{ width: 34, height: 20, borderRadius: 10, padding: 2, boxSizing: 'border-box', background: notificationsEnabled ? '#4BB34B' : 'rgba(120,120,120,.32)', display: 'flex', justifyContent: notificationsEnabled ? 'flex-end' : 'flex-start', transition: 'background .2s ease' }}><span style={{ width: 16, height: 16, borderRadius: 8, background: '#fff', boxShadow: '0 2px 5px rgba(0,0,0,.22)' }} /></span>
+              </GlassButton>
               {primaryActions.map(action => (
                 <GlassButton
                   key={action.label}
@@ -3013,10 +3016,10 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
               <div style={{ color: APG2.textMuted, fontSize: 14, lineHeight: '20px' }}>Добавляйте места сердцем, чтобы быстро возвращаться к ним.</div>
             </GlassCard>
           ) : (
-            <div style={{ display: 'grid', gap: 10 }}>
+            <div data-profile-favorites style={{ display: 'grid', gap: 10, width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
               {favoritePartners.slice(0, 6).map(p => (
-                <GlassCard key={p.id} onClick={() => onOpenPartner(p)} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {p.logoUrl ? <img src={p.logoUrl} alt="" loading="lazy" style={{ width: 48, height: 48, borderRadius: 18, objectFit: 'cover' }} /> : <div style={{ width: 48, height: 48, borderRadius: 18, background: APG2.goldSoft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>◆</div>}
+                <GlassCard key={p.id} onClick={() => onOpenPartner(p)} style={{ display: 'grid', gridTemplateColumns: '48px minmax(0, 1fr) auto', alignItems: 'center', gap: 12, width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', overflow: 'hidden' }}>
+                  {p.logoUrl ? <img src={p.logoUrl} alt="" loading="lazy" style={{ width: 48, height: 48, borderRadius: 18, objectFit: 'cover', maxWidth: '100%' }} /> : <div style={{ width: 48, height: 48, borderRadius: 18, background: APG2.goldSoft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>◆</div>}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: APG2.text, fontSize: 15, fontWeight: 820, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
                     <div style={{ color: APG2.textMuted, fontSize: 12, marginTop: 3 }}>{p.categoryLabel || 'Партнер АПГ'}</div>
@@ -3585,7 +3588,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
       </div>
 
       {/* ── Избранное ── */}
-      <div style={{ padding: '16px 16px 0' }}>
+      <div data-profile-favorites style={{ padding: '16px 16px 0', width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 13, color: APG2.gold, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>✦ Избранное</div>
           {favoritePartners.length > 0 && <div style={{ fontSize: 11, color: APG2.textSoft, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)' }}>{favoritePartners.length}</div>}
@@ -3611,7 +3614,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
                 <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>Добавляй партнёров в избранное — они появятся здесь</div>
               </div>
             </div>
-          : <div>{favoritePartners.map(p => <FavoriteCard key={p.id} partner={p} onOpen={onOpenPartner} onRemove={onToggleFavorite} />)}</div>
+          : <div style={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>{favoritePartners.map(p => <FavoriteCard key={p.id} partner={p} onOpen={onOpenPartner} onRemove={onToggleFavorite} />)}</div>
         }
       </div>
 
@@ -3778,21 +3781,24 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
             { icon: '⌕', label: 'Справочник',        action: onOpenReference,        right: null },
             { icon: '🎓', label: 'Повторить обучение', action: onRestartLearning,      right: '1 мин' },
             { icon: '📋', label: 'История активности', action: onOpenActivity,         right: null },
-            { icon: '🔔', label: 'Уведомления',        action: onEnableNotifications,  right: notificationsEnabled ? 'вкл' : null },
+            { id: 'notifications', icon: '🔔', label: 'Уведомления', action: onEnableNotifications, right: null },
             { icon: '🎁', label: 'Подарки',           action: onOpenRewards,          right: null },
             { icon: '🧭', label: 'Диагностика профиля', action: () => setShowDiagnostics(true), right: null },
             showIdentityDiagnosticButton && { icon: '🪪', label: 'Диагностика Identity', action: openIdentityDiagnostics, right: user?.canonicalUserId ? 'core' : null },
             showWorkspaceDiagnosticButton && { icon: '🖥', label: 'Диагностика Workspace', action: () => setShowWorkspaceDiagnostics(true), right: workspaceDiagnostics?.currentMode },
             { icon: '⚙️', label: 'Настройки профиля',  action: () => setShowProfileEditor(true), right: null },
           ].filter(item => typeof item.action === 'function').map((item, i, arr) => (
-            <button key={item.label} onClick={item.action} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', ...(isGiftAction(item) ? GIFT_SHIMMER_STYLE : {}) }}>
+            <button key={item.label} onClick={item.action} role={item.id === 'notifications' ? 'switch' : undefined} aria-checked={item.id === 'notifications' ? notificationsEnabled : undefined} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left', ...(isGiftAction(item) ? GIFT_SHIMMER_STYLE : {}) }}>
               <span style={{ fontSize: 20 }}>{item.icon}</span>
               <span style={{ fontSize: 15, color: APG2.text, fontWeight: 500 }}>{item.label}</span>
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
                 {item.right && (
                   <span style={{ fontSize: 11, fontWeight: 700, color: '#4BB34B', background: 'rgba(75,179,75,0.09)', padding: '3px 8px', borderRadius: 10 }}>{item.right}</span>
                 )}
-                <span style={{ color: APG2.textSoft, fontSize: 16 }}>›</span>
+                {item.id === 'notifications' && (
+                  <span aria-hidden="true" style={{ width: 42, height: 24, borderRadius: 12, padding: 3, boxSizing: 'border-box', background: notificationsEnabled ? '#4BB34B' : 'rgba(120,120,120,.32)', display: 'flex', justifyContent: notificationsEnabled ? 'flex-end' : 'flex-start', transition: 'background .2s ease' }}><span style={{ width: 18, height: 18, borderRadius: 9, background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,.24)' }} /></span>
+                )}
+                {item.id !== 'notifications' && <span style={{ color: APG2.textSoft, fontSize: 16 }}>›</span>}
               </div>
             </button>
           ))}

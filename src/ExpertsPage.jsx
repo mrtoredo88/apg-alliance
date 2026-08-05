@@ -394,6 +394,11 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
     finally { if (mountedRef.current) setSubmitting(false); }
   };
 
+  const actualReviewCount = reviewsLoading ? Number(expert.reviewCount || 0) : reviews.length;
+  const actualAvgRating = reviewsLoading
+    ? Number(expert.avgRating || 0)
+    : (reviews.length ? reviews.reduce((sum, review) => sum + Number(review.rating || review.stars || 0), 0) / reviews.length : 0);
+
   const hasScanned = scannedExperts?.[expert.id];
   const canBook = expert.bookingUrl || expert.vkUrl || expert.phone;
   const canUseApgBooking = canOpenBookingFlow(expert, 'expert') && typeof onBook === 'function';
@@ -405,7 +410,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
     const status = expert.verified ? 'Проверенный эксперт' : expert.premium ? 'Premium' : 'Эксперт АПГ';
     const heroBadges = [
       ...expert.categories.map(value => getExpertCategory(value)).filter(Boolean).map(value => `${value.emoji} ${value.label}`),
-      (expert.avgRating ?? 0) > 0 ? `★ ${expert.avgRating.toFixed(1)} · ${expert.reviewCount ?? reviews.length}` : null,
+      actualAvgRating > 0 ? `★ ${actualAvgRating.toFixed(1)} · ${actualReviewCount}` : null,
     ].filter(Boolean);
     const cta = [
       expert.telHref && { label: 'Позвонить', icon: '📞', onClick: callExpert, tone: 'gold' },
@@ -424,7 +429,7 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
       galleryItems,
       videos: expert.videos,
       reviews,
-      reviewCount: expert.reviewCount ?? reviews.length,
+      reviewCount: actualReviewCount,
     });
     const handleProfileTabChange = (id) => {
       setDesktopTab(id);
@@ -444,8 +449,8 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
       const categoryLabels = expert.categories.map(value => getExpertCategory(value)).filter(Boolean);
       const offerEndLabel = formatProfileDate(expert.offerUntil || expert.promoUntil || expert.discountUntil || expert.endsAt);
       const kpiItems = [
-        (expert.avgRating ?? 0) > 0 && { id: 'rating', label: 'Рейтинг', value: expert.avgRating.toFixed(1), icon: '★', tone: 'gold' },
-        (expert.reviewCount ?? reviews.length) > 0 && { id: 'reviews', label: 'Отзывы', value: expert.reviewCount ?? reviews.length, icon: '💬' },
+        actualAvgRating > 0 && { id: 'rating', label: 'Рейтинг', value: actualAvgRating.toFixed(1), icon: '★', tone: 'gold' },
+        actualReviewCount > 0 && { id: 'reviews', label: 'Отзывы', value: actualReviewCount, icon: '💬' },
         expert.experience && { id: 'experience', label: 'Опыт', value: expert.experience, icon: '🏅' },
         expert.formats?.length > 0 && { id: 'formats', label: 'Форматы', value: expert.formats.length, icon: '●' },
         galleryItems.length > 0 && { id: 'photos', label: 'Фото', value: galleryItems.length, icon: '▣' },
@@ -656,12 +661,12 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
 
               {activeTab === 'reviews' && (
                 <DesktopSection title={`Отзывы${reviews.length ? ` · ${reviews.length}` : ''}`}>
-                  {(expert.reviewCount ?? reviews.length) > 0 && (
+                  {actualReviewCount > 0 && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 0.36fr) minmax(0, 1fr)', gap: 12, marginBottom: 12 }}>
                       <div style={{ borderRadius: 22, padding: 16, background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.26)' }}>
-                        <div style={{ color: APG2.gold, fontSize: 32, lineHeight: '36px', fontWeight: 940 }}>{(expert.avgRating ?? 0) > 0 ? expert.avgRating.toFixed(1) : '—'}</div>
-                        <div style={{ color: '#FFD700', fontSize: 13, letterSpacing: 1, marginTop: 4 }}>{(expert.avgRating ?? 0) > 0 ? '★'.repeat(Math.round(expert.avgRating)) : '★★★★★'}</div>
-                        <div style={{ color: APG2.textSoft, fontSize: 12, lineHeight: '16px', marginTop: 6 }}>{expert.reviewCount ?? reviews.length} отзывов</div>
+                        <div style={{ color: APG2.gold, fontSize: 32, lineHeight: '36px', fontWeight: 940 }}>{actualAvgRating > 0 ? actualAvgRating.toFixed(1) : '—'}</div>
+                        <div style={{ color: '#FFD700', fontSize: 13, letterSpacing: 1, marginTop: 4 }}>{actualAvgRating > 0 ? '★'.repeat(Math.round(actualAvgRating)) : '★★★★★'}</div>
+                        <div style={{ color: APG2.textSoft, fontSize: 12, lineHeight: '16px', marginTop: 6 }}>{actualReviewCount} отзывов</div>
                       </div>
                       <div style={{ borderRadius: 22, padding: 16, background: 'rgba(var(--apg2-glass-a,255,255,255),0.055)', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.10)', color: APG2.textSoft, fontSize: 13, lineHeight: '19px' }}>
                         Отзывы помогают выбрать специалиста и понять, какой опыт консультации получили участники АПГ.
@@ -864,12 +869,12 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
 
             <div id="expert-profile-reviews" style={{ scrollMarginTop: 'calc(116px + var(--safe-top, 0px))' }}>
             <GlassSection title={`Отзывы${reviews.length ? ` · ${reviews.length}` : ''}`}>
-              {(expert.reviewCount ?? reviews.length) > 0 && (
+              {actualReviewCount > 0 && (
                 <div style={{ ...APG2.glass, borderRadius: 28, padding: 15, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 56, height: 56, borderRadius: 22, display: 'grid', placeItems: 'center', color: APG2.gold, background: APG2.goldSoft, fontSize: 20, fontWeight: 920 }}>{(expert.avgRating ?? 0) > 0 ? expert.avgRating.toFixed(1) : '★'}</div>
+                  <div style={{ width: 56, height: 56, borderRadius: 22, display: 'grid', placeItems: 'center', color: APG2.gold, background: APG2.goldSoft, fontSize: 20, fontWeight: 920 }}>{actualAvgRating > 0 ? actualAvgRating.toFixed(1) : '★'}</div>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ color: '#FFD700', fontSize: 13, letterSpacing: 1 }}>{(expert.avgRating ?? 0) > 0 ? '★'.repeat(Math.round(expert.avgRating)) : '★★★★★'}</div>
-                    <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '18px', marginTop: 3 }}>На основе {expert.reviewCount ?? reviews.length} отзывов</div>
+                    <div style={{ color: '#FFD700', fontSize: 13, letterSpacing: 1 }}>{actualAvgRating > 0 ? '★'.repeat(Math.round(actualAvgRating)) : '★★★★★'}</div>
+                    <div style={{ color: APG2.textSoft, fontSize: 13, lineHeight: '18px', marginTop: 3 }}>На основе {actualReviewCount} отзывов</div>
                   </div>
                 </div>
               )}
@@ -982,10 +987,10 @@ function ExpertModal({ expert, user, scannedExperts, news = [], events = [], onC
         </div>
 
         {/* Rating */}
-        {(expert.avgRating ?? 0) > 0 && (
+        {actualAvgRating > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <StarDisplay value={expert.avgRating} size={15} />
-            <span style={{ fontSize: 13, color: T.textSec }}>{expert.avgRating?.toFixed(1)} · {pluralReviews(expert.reviewCount ?? 0)}</span>
+            <StarDisplay value={actualAvgRating} size={15} />
+            <span style={{ fontSize: 13, color: T.textSec }}>{actualAvgRating.toFixed(1)} · {pluralReviews(actualReviewCount)}</span>
           </div>
         )}
 

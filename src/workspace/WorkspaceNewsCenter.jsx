@@ -133,7 +133,7 @@ function Empty({ title, text }) {
   );
 }
 
-function NewsRow({ item, view, selected, onOpen, onSubmit, onArchive, compactMode = false }) {
+function NewsRow({ item, view, selected, onOpen, onSubmit, onArchive, onDelete, compactMode = false }) {
   const stats = getNewsStats(item);
   const image = getNewsImage(item);
   const status = workspaceNewsStatus(item);
@@ -164,6 +164,7 @@ function NewsRow({ item, view, selected, onOpen, onSubmit, onArchive, compactMod
       <div style={{ display: 'flex', gap: 6, justifyContent: compact ? 'flex-start' : 'flex-end', flexWrap: 'wrap' }}>
         {!apgPublication && status !== 'archived' && <span onClick={event => { event.stopPropagation(); onSubmit(item); }} style={button('primary', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>Опубликовать в АПГ</span>}
         {status !== 'archived' && <span onClick={event => { event.stopPropagation(); onArchive(item); }} style={button('light', { minHeight: 30, padding: '5px 8px', fontSize: 12 })}>Архив</span>}
+        <span onClick={event => { event.stopPropagation(); onDelete(item); }} style={button('light', { minHeight: 30, padding: '5px 8px', fontSize: 12, color: UI.red, borderColor: 'rgba(217,93,84,.28)', background: 'rgba(217,93,84,.08)' })}>Удалить</span>
       </div>
     </button>
   );
@@ -477,6 +478,14 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
     onToast?.('Новость отправлена в архив.', 'success');
   };
 
+  const remove = async item => {
+    if (!window.confirm('Удалить публикацию из ленты? Это действие потребует восстановления администратором.')) return;
+    await userAction('workspaceNews:delete', { id: item.id, profileId: profile.id, role: role.id });
+    setItems(prev => prev.filter(row => row.id !== item.id));
+    setSelected(prev => prev?.id === item.id ? null : prev);
+    onToast?.('Публикация удалена из ленты.', 'success');
+  };
+
   const createFromEvent = async eventId => {
     const result = await userAction('workspaceNews:fromEvent', { eventId, profileId: profile.id, role: role.id });
     upsert(result.news);
@@ -546,7 +555,7 @@ export function WorkspaceNewsCenter({ role, profile, events = [], actions, onOpe
               <select value={view} onChange={event => setView(event.target.value)} style={button('light')}><option value="cards">Карточки</option><option value="table">Таблица</option><option value="calendar">Календарь публикаций</option></select>
             </div>
           </div>
-          {loading ? <div style={card({ padding: 18, color: UI.soft })}>Загружаем публикации...</div> : !filtered.length ? <Empty title="Публикаций нет" text="Создайте первую новость или измените фильтры." /> : filtered.map(item => <NewsRow key={item.id} item={item} view={view} selected={selected?.id === item.id} onOpen={setSelected} onSubmit={submit} onArchive={archive} compactMode={compact} />)}
+          {loading ? <div style={card({ padding: 18, color: UI.soft })}>Загружаем публикации...</div> : !filtered.length ? <Empty title="Публикаций нет" text="Создайте первую новость или измените фильтры." /> : filtered.map(item => <NewsRow key={item.id} item={item} view={view} selected={selected?.id === item.id} onOpen={setSelected} onSubmit={submit} onArchive={archive} onDelete={remove} compactMode={compact} />)}
         </div>
         <div style={{ display: 'grid', gap: 10 }}>
           {!compact && editor}

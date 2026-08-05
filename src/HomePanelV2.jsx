@@ -18,6 +18,7 @@ import { haversine, formatDistance } from './utils/geo.js';
 import { countRender, markPerformanceStage } from './performance/index.js';
 import { createInitialHomeHydrationState, HOME_HYDRATION_STAGES, startHomeHydration } from './home/index.js';
 import { GIFT_SHIMMER_STYLE } from './giftShimmer.js';
+import { HomeMobileRedesign } from './HomeMobileRedesign.jsx';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -461,7 +462,7 @@ function V2FirstScreen({
         onOpenPartnerCabinet={onOpenPartnerCabinet}
         hasPartnerCabinet={hasPartnerCabinet}
         onOpenOffers={onOpenOffers}
-        onOpenPartners={onOpenPartners}
+        onOpenPartners={onOpenOffers || onOpenPartners}
         onOpenNews={onOpenNews}
         onOpenMap={onOpenMap}
         onOpenExperts={onOpenExperts}
@@ -3096,6 +3097,37 @@ export function HomePanelV2({
       window.removeEventListener('offline', updateConnection);
     };
   }, []);
+
+  if (!desktopMode) {
+    return (
+      <HomeMobileRedesign
+        user={user}
+        userKeys={userKeys}
+        unreadCount={unreadCount}
+        partners={adaptiveHome.partners}
+        experts={adaptiveHome.experts}
+        events={adaptiveHome.events}
+        news={adaptiveHome.news}
+        favorites={favorites}
+        onOpenNotifications={onOpenNotifications}
+        onOpenProfile={onOpenProfile}
+        onOpenRewards={onOpenRewards}
+        onOpenOnboarding={onOpenOnboarding}
+        onOpenKeyHistory={onOpenKeyHistory}
+        onOpenNews={onOpenNews}
+        onOpenNewsItem={onOpenNewsItem}
+        onOpenPartners={onOpenPartners}
+        onOpenPartner={onOpenPartner}
+        onOpenExperts={onOpenExperts}
+        onOpenEvents={onOpenEvents}
+        onOpenNearby={onOpenNearby}
+        onOpenOffers={onOpenOffers}
+        onToggleFavorite={onToggleFavorite}
+        onRefresh={onRefresh}
+        isOffline={isOffline}
+      />
+    );
+  }
 
   return (
     <Panel id="home" data-home-version="v2">

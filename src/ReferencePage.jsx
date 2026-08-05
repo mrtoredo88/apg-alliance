@@ -73,7 +73,7 @@ export function ReferencePage({ onBack, onOpenLoki, onOpenPanel }) {
   }, [query]);
 
   const quickActions = [
-    { label: 'Партнёры', panel: 'offers' },
+    { label: 'Места', panel: 'offers' },
     { label: 'Эксперты', panel: 'experts' },
     { label: 'События', panel: 'events' },
     { label: 'Призы', panel: 'rewards' },
