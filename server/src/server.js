@@ -60,7 +60,9 @@ await fastify.register(cors, {
     /^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/,
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-push-secret', 'Authorization', 'X-APG-Auth', 'X-Idempotency-Key', 'X-APG-Version'],
+  // RuStore 1.3.x sends the native APG bearer in X-Firebase-Auth. Keep the
+  // legacy name accepted until every installed build has moved to X-APG-Auth.
+  allowedHeaders: ['Content-Type', 'x-push-secret', 'Authorization', 'X-APG-Auth', 'X-Firebase-Auth', 'X-Idempotency-Key', 'X-APG-Version'],
 });
 
 fastify.addHook('onSend', async (request, reply) => {

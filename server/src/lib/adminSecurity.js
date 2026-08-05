@@ -30,7 +30,7 @@ function hasPermission(role, permission) {
 }
 
 function getBearerToken(request) {
-  const direct = String(request.headers['x-apg-auth'] || '').trim();
+  const direct = String(request.headers['x-apg-auth'] || request.headers['x-firebase-auth'] || '').trim();
   if (direct) return direct.replace(/^Bearer\s+/i, '');
   const header = String(request.headers.authorization || '');
   const match = header.match(/^Bearer\s+(.+)$/i);

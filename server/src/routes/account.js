@@ -6,7 +6,7 @@ function safeString(value, max = 300) {
 }
 
 function getBearerToken(request) {
-  const direct = safeString(request.headers['x-apg-auth'] || '', 2000);
+  const direct = safeString(request.headers['x-apg-auth'] || request.headers['x-firebase-auth'] || '', 2000);
   if (direct) return direct.replace(/^Bearer\s+/i, '');
   const header = safeString(request.headers.authorization || '', 2200);
   const match = header.match(/^Bearer\s+(.+)$/i);
