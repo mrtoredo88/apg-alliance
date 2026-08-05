@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { API_BASE_URL } from './constants.js';
 import { APG2_PROFILE, GlassButton, GlassInput } from './components/Apg2ProfileGlass.jsx';
 import { logError } from './errorLogger.js';
@@ -136,6 +136,8 @@ export function EmailAuth({ onCancel, onSuccess }) {
   const [error, setError]   = useState('');
   const [loading, setLoading] = useState(false);
   const [attemptContext, setAttemptContext] = useState(buildEmailAttemptContext());
+  const sendInFlightRef = useRef(false);
+  const verifyInFlightRef = useRef(false);
 
   const normalizedEmail = email.trim().toLowerCase();
   const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
@@ -168,7 +170,8 @@ export function EmailAuth({ onCancel, onSuccess }) {
   };
 
   const handleSendCode = async () => {
-    if (!isValid || loading) return;
+    if (!isValid || loading || sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
     const newAttempt = buildEmailAttemptContext();
     setAttemptContext(newAttempt);
     const activeAttempt = newAttempt;
@@ -296,6 +299,7 @@ export function EmailAuth({ onCancel, onSuccess }) {
         },
       });
     } finally {
+      sendInFlightRef.current = false;
       recordEmailLoginStage('ui_end', {
         ...buildEmailAttemptPayload(newAttempt),
         durationMs: Date.now() - startedAt,
@@ -305,7 +309,8 @@ export function EmailAuth({ onCancel, onSuccess }) {
   };
 
   const handleVerifyCode = async () => {
-    if (!isValid || !codeValid || loading) return;
+    if (!isValid || !codeValid || loading || verifyInFlightRef.current) return;
+    verifyInFlightRef.current = true;
     const activeAttempt = attemptContext?.authAttemptId ? attemptContext : buildEmailAttemptContext();
     if (!attemptContext?.authAttemptId) {
       setAttemptContext(activeAttempt);
@@ -486,6 +491,7 @@ export function EmailAuth({ onCancel, onSuccess }) {
         },
       });
     } finally {
+      verifyInFlightRef.current = false;
       recordEmailLoginStage('ui_end', {
         ...buildEmailAttemptPayload(activeAttempt),
         durationMs: Date.now() - startedAt,

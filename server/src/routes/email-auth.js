@@ -821,9 +821,25 @@ export default async function emailAuthRoutes(fastify) {
       if (existing.data) {
         const created = otpCreatedMs(existing.data);
         if (Date.now() - created < 60_000) {
-          trace.mark('otp_send_failed', 'FAILED', { publicCode: 'EMAIL_RATE_LIMITED' });
-          trace.mark('email_auth_failed', 'FAILED', { publicCode: 'EMAIL_RATE_LIMITED', failedStage: 'otp_send_started' });
-          return reply.code(429).send({ ok: false, error: 'rate_limited', message: 'Подождите минуту перед повторным запросом' });
+          // A rapid repeated tap must not turn a successfully delivered code into
+          // an apparent login failure. Reuse the active OTP without sending mail again.
+          trace.mark('otp_send_succeeded', 'OK', { reusedActiveCode: true, stageDurationMs: Date.now() - trace.startedAt });
+          trace.mark('email_auth_completed', 'END', { reusedActiveCode: true, totalMs: Date.now() - trace.startedAt });
+          return {
+            ok: true,
+            reusedActiveCode: true,
+            diagnostics: {
+              requestId: trace.requestId,
+              authAttemptId: trace.authAttemptId,
+              loginSessionId: trace.loginSessionId,
+              timeline: trace.timeline.map(item => ({ stage: item.stage, status: item.status, durationMs: item.durationMs })),
+              identityPath: trace.identityPath,
+              identityResolved: false,
+              customTokenIssued: false,
+              backendRevision: EMAIL_AUTH_BACKEND_REVISION,
+              frontendVersion: trace.frontendVersion,
+            },
+          };
         }
       }
 

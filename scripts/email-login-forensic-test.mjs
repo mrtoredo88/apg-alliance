@@ -42,8 +42,8 @@ ok(serverRoute.includes('withEmailLoginStage'), 'backend wraps email login stage
 ok(serverRoute.includes('resolve_email_user'), 'backend traces identity resolution');
 ok(serverRoute.includes('load_user_profile'), 'backend traces user profile load');
 ok(serverRoute.includes('create_custom_token'), 'backend traces custom token creation');
-ok(serverRoute.includes("resolveEmailUser(db, email, ref ?? null, { createIfMissing: false })"), 'plain backend login cannot create missing identity');
-ok(serverRoute.includes("resolveEmailUser(db, email, ref ?? null, { createIfMissing: true })"), 'verified email code can create missing identity');
+ok(/resolveEmailUser\(\s*db,\s*email,\s*ref \?\? null,\s*\{\s*createIfMissing: false,?\s*\}\s*\)/.test(serverRoute), 'plain backend login cannot create missing identity');
+ok(/resolveEmailUser\(\s*db,\s*email,\s*ref \?\? null,\s*\{\s*createIfMissing: true,?\s*\}\s*\)/.test(serverRoute), 'verified email code can create missing identity');
 ok(serverRoute.includes('EMAIL_ACCOUNT_NOT_FOUND'), 'backend exposes public missing-account code');
 ok(serverRoute.includes('EMAIL_IDENTITY_CREATE_FAILED'), 'backend exposes public identity-create-failed code');
 ok(serverRoute.includes('EMAIL_CODE_INVALID'), 'backend exposes public invalid-code code');

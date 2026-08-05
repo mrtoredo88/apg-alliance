@@ -5,6 +5,8 @@ import { awardVisit } from '../server-shared/reward-service.js';
 const consentScreen = readFileSync(new URL('../src/ConsentScreen.jsx', import.meta.url), 'utf8');
 const userApp = readFileSync(new URL('../src/UserApp.jsx', import.meta.url), 'utf8');
 const userActions = readFileSync(new URL('../server/src/routes/user-actions.js', import.meta.url), 'utf8');
+const emailAuth = readFileSync(new URL('../src/EmailAuth.jsx', import.meta.url), 'utf8');
+const emailAuthRoute = readFileSync(new URL('../server/src/routes/email-auth.js', import.meta.url), 'utf8');
 
 assert.match(consentScreen, /type="checkbox"/);
 assert.match(consentScreen, /onSubmit=/);
@@ -13,6 +15,9 @@ assert.match(userApp, /timeoutMs: 10000/);
 assert.match(userApp, /retryOnTimeout: true/);
 assert.match(userActions, /writeAccountProfileRequired\(userId, accountProfileForSync/);
 assert.match(userActions, /bootstrap: \{ consentAccepted: true, created \}/);
+assert.match(emailAuth, /sendInFlightRef\.current/, 'rapid repeated OTP taps are blocked synchronously');
+assert.match(emailAuth, /verifyInFlightRef\.current/, 'rapid repeated OTP verification taps are blocked synchronously');
+assert.match(emailAuthRoute, /reusedActiveCode: true/, 'an already-sent active OTP is reused without a false auth error');
 
 const documents = new Map([
   ['partners/seiuna', { name: 'SEIUNA', totalVisits: 0 }],
