@@ -20,8 +20,8 @@ android {
         applicationId "ru.myapg.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 20100
-        versionName "2.1.0"
+        versionCode 20101
+        versionName "2.1.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "String", "RUSTORE_PUSH_PROJECT_ID", "\"${rustorePushProjectId}\""
         aaptOptions {

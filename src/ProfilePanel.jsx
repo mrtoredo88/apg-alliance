@@ -1637,7 +1637,7 @@ export function ProfilePanel({ user, variant = 'v2', userKeys = 0, favorites = [
   }, [achievements, dismissToast]);
   useEffect(() => () => clearTimeout(dismissTimerRef.current), []);
   const unlockedCount = achievements.filter(a => a.unlocked).length;
-  const favoritePartnerIds = useMemo(() => new Set((favorites || []).map((id) => String(id))), [favorites]);
+  const favoritePartnerIds = useMemo(() => new Set((favorites || []).map((value) => String(value?.id || value?.partnerId || value))), [favorites]);
   const favoritePartners = useMemo(
     () => (Array.isArray(partners) ? partners.filter((p) => favoritePartnerIds.has(String(p?.id))) : []),
     [partners, favoritePartnerIds]

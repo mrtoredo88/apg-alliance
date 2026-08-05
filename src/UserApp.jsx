@@ -2980,7 +2980,7 @@ export function UserApp() {
     });
     try {
       const result = await userAction('favorites:toggle', { userId: String(user.id), partnerId, isAdding });
-      if (Array.isArray(result.favorites)) setFavorites(result.favorites);
+      if (Array.isArray(result.favorites)) setFavorites(result.favorites.map(value => String(value?.id || value?.partnerId || value)).filter(Boolean));
     } catch (e) {
       setFavorites(prev);
       console.error('[APG-FAVORITES] toggle error', { partnerId, userId: String(user.id), errorCode: e?.code, errorStatus: e?.status, isAuthError: e?.isAuthError });
@@ -5766,7 +5766,7 @@ export function UserApp() {
                     title="Избранное"
                     subtitle={`${favorites.length} сохранённых партнёров`}
                     showAllPartners
-                    partners={enrichedPartners.filter((partner) => favorites.some((favoriteId) => String(favoriteId) === String(partner?.id)))}
+                    partners={enrichedPartners.filter((partner) => favorites.some((favoriteValue) => String(favoriteValue?.id || favoriteValue?.partnerId || favoriteValue) === String(partner?.id)))}
                     onOpenPartner={openPartner}
                     onAskQuestion={(partner) => openContextDialog('partner', partner, 'favorites')}
                     onBack={goBackPanel}

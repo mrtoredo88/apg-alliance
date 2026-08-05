@@ -1403,23 +1403,31 @@ async function actionFavoritesToggle(db, req, actor) {
   const partnerRef = db.collection('partners').doc(partnerId);
   let favorites = [];
   let isAdding = false;
+  let changed = false;
+  const requestedAdding = typeof req.body?.isAdding === 'boolean' ? req.body.isAdding : null;
   await db.runTransaction(async tx => {
     const snap = await tx.get(userRef);
     const before = Array.isArray(snap.data()?.favorites) ? snap.data().favorites.map(String) : [];
-    isAdding = !before.includes(partnerId);
-    favorites = isAdding ? [...before, partnerId] : before.filter(id => id !== partnerId);
+    const alreadyFavorite = before.includes(partnerId);
+    isAdding = requestedAdding ?? !alreadyFavorite;
+    changed = isAdding !== alreadyFavorite;
+    favorites = isAdding
+      ? (alreadyFavorite ? before : [...before, partnerId])
+      : (alreadyFavorite ? before.filter(id => id !== partnerId) : before);
     tx.set(userRef, { favorites, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-    tx.set(partnerRef, { favoritesCount: FieldValue.increment(isAdding ? 1 : -1) }, { merge: true });
-    tx.set(userRef.collection('activity').doc(), {
-      type: isAdding ? 'favorite_add' : 'favorite_remove',
-      icon: isAdding ? '⭐' : '✕',
-      text: isAdding ? `Добавлено в избранное: ${partnerId}` : `Убрано из избранного: ${partnerId}`,
-      partnerId,
-      ts: FieldValue.serverTimestamp(),
-    });
+    if (changed) {
+      tx.set(partnerRef, { favoritesCount: FieldValue.increment(isAdding ? 1 : -1) }, { merge: true });
+      tx.set(userRef.collection('activity').doc(), {
+        type: isAdding ? 'favorite_add' : 'favorite_remove',
+        icon: isAdding ? '⭐' : '✕',
+        text: isAdding ? `Добавлено в избранное: ${partnerId}` : `Убрано из избранного: ${partnerId}`,
+        partnerId,
+        ts: FieldValue.serverTimestamp(),
+      });
+    }
   });
-  await audit(db, req, actor, isAdding ? 'favorites:add' : 'favorites:remove', 'partners', partnerId, 'success', { partnerName: partner.name || '' });
-  return { ok: true, favorites, isAdding };
+  await audit(db, req, actor, isAdding ? 'favorites:add' : 'favorites:remove', 'partners', partnerId, 'success', { partnerName: partner.name || '', changed });
+  return { ok: true, favorites, isAdding, changed };
 }
 
 async function actionUserListSet(db, req, actor, field, action) {

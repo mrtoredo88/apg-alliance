@@ -5,6 +5,7 @@ const root = process.cwd();
 const homeSource = fs.readFileSync(path.join(root, 'src/HomePanelV2.jsx'), 'utf8');
 const mobileHomeSource = fs.readFileSync(path.join(root, 'src/HomeMobileRedesign.jsx'), 'utf8');
 const userAppSource = fs.readFileSync(path.join(root, 'src/UserApp.jsx'), 'utf8');
+const userActionsSource = fs.readFileSync(path.join(root, 'server/src/routes/user-actions.js'), 'utf8');
 const desktopSource = fs.readFileSync(path.join(root, 'src/components/DesktopUI.jsx'), 'utf8');
 
 const requiredDesktopProps = [
@@ -71,6 +72,14 @@ if (!userAppSource.includes("opacity: active ? 1 : 0.92") || !userAppSource.incl
 
 if (!mobileHomeSource.includes('onToggleFavorite?.(id)') || !userAppSource.includes("String(partnerOrId?.id || partnerOrId || '').trim()")) {
   throw new Error('Nearby favorite actions must send a normalized partner id to the API.');
+}
+
+if (!userAppSource.includes('result.favorites.map(value => String(value?.id || value?.partnerId || value))')) {
+  throw new Error('Favorite API responses must be normalized before rendering the profile list.');
+}
+
+if (!userActionsSource.includes("typeof req.body?.isAdding === 'boolean'") || !userActionsSource.includes('changed = isAdding !== alreadyFavorite')) {
+  throw new Error('Favorite API must honor explicit add/remove intent idempotently.');
 }
 
 console.log('home-profile-dashboard-test: ok');

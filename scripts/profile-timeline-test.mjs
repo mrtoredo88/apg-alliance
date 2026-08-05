@@ -367,5 +367,6 @@ assert.match(adminActions, /publicationType/, 'admin news allowlist must keep pu
 assert.match(profilePanel, /data-profile-favorites[^>]*width: '100%'[^>]*maxWidth: '100%'/, 'profile favorites section must stay within the mobile viewport');
 assert.match(profilePanel, /data-profile-favorite-card[^>]*gridTemplateColumns: '44px minmax\(0, 1fr\) auto'/, 'legacy favorite cards must keep the title column shrinkable');
 assert.match(profilePanel, /gridTemplateColumns: '48px minmax\(0, 1fr\) auto'[^>]*overflow: 'hidden'/, 'current favorite cards must not create horizontal overflow');
+assert.match(profilePanel, /String\(value\?\.id \|\| value\?\.partnerId \|\| value\)/, 'profile favorites must support canonical ids and legacy object values');
 
 console.log('profile-timeline-test: ok');
