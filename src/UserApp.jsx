@@ -24,6 +24,7 @@ import { onAuthStateChanged } from './nativeAuth.js';
 import { apgIdentity } from './apg/index.js';
 import { HomePanelV2 }       from './HomePanelV2.jsx';
 import { EmailAuth } from './EmailAuth.jsx';
+import { TelegramAuth } from './TelegramAuth.jsx';
 import { recordEmailLoginStage } from './auth/emailLoginDiagnostics.js';
 import { SplashScreen }      from './SplashScreen.jsx';
 import { ConsentScreen, CONSENT_DOCS, CONSENT_DOCS_VERSION, LEGAL_VERSION } from './ConsentScreen.jsx';
@@ -3694,6 +3695,22 @@ export function UserApp() {
     loadData(mountedRef);
   }, [loadData]);
 
+  const completeTelegramLogin = useCallback((telegramUser) => {
+    if (!telegramUser?.id) return;
+    localStorage.removeItem('manualLogout');
+    localStorage.setItem('apg_tg_user', JSON.stringify(telegramUser));
+    if (mountedRef.current) {
+      loggedOutRef.current = false;
+      panelHistoryRef.current = ['home'];
+      setActivePanel('home');
+      setError(null);
+      setNetworkError(false);
+      setLoggedOut(false);
+      setLoading(true);
+    }
+    loadData(mountedRef);
+  }, [loadData]);
+
   const handleEmailAuthSuccess = useCallback(async (emailUser, authPayload = {}) => {
     if (!emailUser?.id) return;
     const attempt = startEmailAuthAttemptTracking(emailUser, authPayload);
@@ -5232,8 +5249,14 @@ export function UserApp() {
                 <div style={{ width: 86, height: 86, borderRadius: 32, margin: '0 auto 18px', background: APG2_PROFILE.goldSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 42 }}>🔐</div>
                 <GlassBadge tone="gold" style={{ marginBottom: 14 }}>Авторизация</GlassBadge>
                 <div style={{ fontSize: 27, lineHeight: '31px', fontWeight: 900, color: APG2_PROFILE.text, marginBottom: 10 }}>Войдите в АПГ</div>
-                <div style={{ fontSize: 14, color: APG2_PROFILE.textSoft, lineHeight: '21px', marginBottom: 20 }}>Введите почту — мы отправим код для входа.</div>
+                <div style={{ fontSize: 14, color: APG2_PROFILE.textSoft, lineHeight: '21px', marginBottom: 20 }}>Войдите по почте или подтвердите вход через Telegram.</div>
                 <EmailAuth onSuccess={handleEmailAuthSuccess} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '16px 0', color: APG2_PROFILE.textSoft, fontSize: 12 }}>
+                  <span style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.12)' }} />
+                  или
+                  <span style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.12)' }} />
+                </div>
+                <TelegramAuth onSuccess={completeTelegramLogin} />
               </GlassCard>
             </div>
           </AppRoot>
