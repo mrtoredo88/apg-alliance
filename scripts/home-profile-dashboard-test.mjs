@@ -69,4 +69,8 @@ if (!userAppSource.includes("opacity: active ? 1 : 0.92") || !userAppSource.incl
   throw new Error('Inactive bottom-island icons and labels must remain visible.');
 }
 
+if (!mobileHomeSource.includes('onToggleFavorite?.(id)') || !userAppSource.includes("String(partnerOrId?.id || partnerOrId || '').trim()")) {
+  throw new Error('Nearby favorite actions must send a normalized partner id to the API.');
+}
+
 console.log('home-profile-dashboard-test: ok');

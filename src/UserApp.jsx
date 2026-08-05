@@ -2955,15 +2955,20 @@ export function UserApp() {
 
   // ─── Избранное ──────────────────────────────────────────────────────────────
 
-  const toggleFavorite = useCallback(async (partnerId) => {
+  const toggleFavorite = useCallback(async (partnerOrId) => {
     if (!user) return;
+    const partnerId = String(partnerOrId?.id || partnerOrId || '').trim();
+    if (!partnerId || partnerId === '[object Object]') {
+      showToast('Не удалось определить место.', 'error');
+      return;
+    }
     const prev = favorites;
-    const isAdding = !favorites.includes(partnerId);
+    const isAdding = !favorites.some(id => String(id) === partnerId);
     const next = isAdding
       ? [...favorites, partnerId]
-      : favorites.filter(id => id !== partnerId);
+      : favorites.filter(id => String(id) !== partnerId);
     setFavorites(next);
-    const partner = enrichedPartners.find(p => p.id === partnerId);
+    const partner = enrichedPartners.find(p => String(p.id) === partnerId);
     if (partner) recordInterest({ type: isAdding ? 'favorite_add' : 'favorite_remove', itemType: 'partner', item: partner });
     trackAppEvent(isAdding ? 'partner:favorite_add' : 'partner:favorite_remove', {
       type: APG_EVENT_TYPES.RECOMMENDATION_INTERACTED,
