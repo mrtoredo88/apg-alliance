@@ -3684,6 +3684,8 @@ export function UserApp() {
     localStorage.setItem('apg_email_user', JSON.stringify(emailUser));
     if (mountedRef.current) {
       loggedOutRef.current = false;
+      panelHistoryRef.current = ['home'];
+      setActivePanel('home');
       setError(null);
       setNetworkError(false);
       setLoggedOut(false);
@@ -4111,26 +4113,6 @@ export function UserApp() {
       }
     }
   }, [applyLogoutGuestState, user]);
-
-  const handleLoginAfterLogout = useCallback(() => {
-    traceAuthStage('auth_session_restart', {
-      source: 'handleLoginAfterLogout',
-      previousRun: logoutFlowRef.current.runId,
-    });
-    authLoadRunRef.current += 1;
-    loggedOutRef.current = false;
-    logoutFlowRef.current.inProgress = false;
-    localStorage.removeItem('manualLogout');
-    clearUserAuthStorage();
-    setError(null);
-    setNetworkError(false);
-    setLoggedOut(false);
-    panelHistoryRef.current = ['profile'];
-    setActivePanel('profile');
-    setErrorLoggerUser(null);
-    setLoading(true);
-    loadData(mountedRef);
-  }, [loadData]);
 
   const handleDeleteProfile = useCallback(async () => {
     if (!user || String(user.id).startsWith('guest_')) return;
@@ -5240,18 +5222,18 @@ export function UserApp() {
     );
   }
 
-  if (loggedOut) {
+  if (loggedOut && !consentRequest) {
     return (
       <ConfigProvider appearance={appearance}>
         <AdaptivityProvider>
           <AppRoot>
             <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: APG2_PROFILE.bg, color: APG2_PROFILE.text }}>
-              <GlassCard style={{ width: '100%', maxWidth: 360, borderRadius: 38, padding: 24, textAlign: 'center' }}>
-                <div style={{ width: 86, height: 86, borderRadius: 32, margin: '0 auto 18px', background: APG2_PROFILE.goldSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 42 }}>👋</div>
-                <GlassBadge tone="gold" style={{ marginBottom: 14 }}>Сессия завершена</GlassBadge>
-                <div style={{ fontSize: 27, lineHeight: '31px', fontWeight: 900, color: APG2_PROFILE.text, marginBottom: 10 }}>Вы вышли из аккаунта</div>
-                <div style={{ fontSize: 14, color: APG2_PROFILE.textSoft, lineHeight: '21px', marginBottom: 20 }}>Нажмите кнопку ниже, чтобы вернуться в АПГ.</div>
-                <GlassButton onClick={handleLoginAfterLogout} tone="gold" style={{ width: '100%', color: '#17120a' }}>Войти</GlassButton>
+              <GlassCard data-logged-out-auth style={{ width: '100%', maxWidth: 390, borderRadius: 38, padding: 24, textAlign: 'center' }}>
+                <div style={{ width: 86, height: 86, borderRadius: 32, margin: '0 auto 18px', background: APG2_PROFILE.goldSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 42 }}>🔐</div>
+                <GlassBadge tone="gold" style={{ marginBottom: 14 }}>Авторизация</GlassBadge>
+                <div style={{ fontSize: 27, lineHeight: '31px', fontWeight: 900, color: APG2_PROFILE.text, marginBottom: 10 }}>Войдите в АПГ</div>
+                <div style={{ fontSize: 14, color: APG2_PROFILE.textSoft, lineHeight: '21px', marginBottom: 20 }}>Введите почту — мы отправим код для входа.</div>
+                <EmailAuth onSuccess={handleEmailAuthSuccess} />
               </GlassCard>
             </div>
           </AppRoot>
@@ -5361,6 +5343,7 @@ export function UserApp() {
     onOpenPartners: handleOpenPartners,
     onOpenOffers: () => goPanel('offers'),
     onOpenProfile: () => goPanel('profile'),
+    onOpenOnboarding: () => setShowOnboarding(true),
     onOpenKeyHistory: () => setShowKeyHistory(true),
     onOpenFavorites: () => goPanel('favorites'),
     hasPartnerCabinet: Boolean(ownedPartner),

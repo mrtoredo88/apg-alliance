@@ -540,12 +540,14 @@ export function EmailAuth({ onCancel, onSuccess }) {
           Изменить email
         </button>
       )}
-      <GlassButton
-        onClick={onCancel}
-        style={{ width: '100%', minHeight: 46, color: APG2_PROFILE.textSoft }}
-      >
-        Отмена
-      </GlassButton>
+      {typeof onCancel === 'function' && (
+        <GlassButton
+          onClick={onCancel}
+          style={{ width: '100%', minHeight: 46, color: APG2_PROFILE.textSoft }}
+        >
+          Отмена
+        </GlassButton>
+      )}
     </div>
   );
 }

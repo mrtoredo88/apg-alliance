@@ -53,9 +53,11 @@ assertContains(userApp, "traceAuthStage('user_state_cleared'", 'logout lifecycle
 assertContains(userApp, 'traceAuthStage(\'loadData_aborted\'', 'logout lifecycle: loadData abort during logout flow');
 assertContains(userApp, 'isAuthLoadAborted', 'logout lifecycle: runtime abort helper');
 assertNo(userApp, "setError('Не удалось выйти. Проверьте подключение и попробуйте ещё раз.'", 'logout lifecycle: no hard error message');
-assertContains(userApp, "traceAuthStage('auth_session_restart'", 'logout restart trace');
-assertContains(userApp, "panelHistoryRef.current = ['profile'];", 'login after logout opens the authentication section');
-assertContains(userApp, "setActivePanel('profile');", 'login after logout does not silently return to the home screen');
+assertContains(userApp, 'data-logged-out-auth', 'logout lifecycle: authorization form is rendered immediately');
+assertContains(userApp, '<EmailAuth onSuccess={handleEmailAuthSuccess} />', 'logout lifecycle: authorization form has no dismiss action');
+assertContains(userApp, "panelHistoryRef.current = ['home'];", 'login after logout resets navigation to home');
+assertContains(userApp, "setActivePanel('home');", 'successful login returns to the home screen');
+assertNo(userApp, 'handleLoginAfterLogout', 'logout lifecycle: obsolete intermediate login button is removed');
 assertContains(userApp, 'waitForInitialFirebaseAuth(4500)', 'email restore: extended restore wait for strong identities');
 assertContains(userApp, 'loadData_strong_identity_required', 'strong identity mismatch handled via guest-state fallback');
 assertNo(userApp, 'window.location.reload();', 'email bootstrap path does not force full-page reload');

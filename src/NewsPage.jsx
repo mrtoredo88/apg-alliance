@@ -1322,11 +1322,11 @@ export function ArticleView({
           </div>
 
           {/* ── hero image ── */}
-          <NewsImage item={item} height={300} radius={0} mode="article" onOpen={() => photos.length && setLightboxIndex(0)}>
+          {!videos.length && <NewsImage item={item} height={300} radius={0} mode="article" onOpen={() => photos.length && setLightboxIndex(0)}>
             {(item.isPinned || item.pinned) && (
               <div style={{ position: 'absolute', left: 16, top: 16, padding: '7px 12px', borderRadius: 999, background: 'rgba(8,8,10,0.56)', border: '1px solid rgba(215,184,106,0.34)', color: APG2_PROFILE.gold, fontSize: 12, fontWeight: 900, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>📌 Закреплено</div>
             )}
-          </NewsImage>
+          </NewsImage>}
 
           {/* ── article head ── */}
           <div style={{ padding: '0 18px' }}>

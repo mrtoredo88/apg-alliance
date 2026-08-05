@@ -21,6 +21,14 @@ const partner = {
   ],
 };
 
+const bakery = {
+  id: 'partner-bakery',
+  name: 'Булочная №1',
+  category: 'Пекарня',
+  description: 'Свежая выпечка и десерты',
+  catalogPublished: true,
+};
+
 const expert = {
   id: 'expert-psy',
   name: 'Анна Миронова',
@@ -161,3 +169,7 @@ for (const query of questions) {
 assert.ok(answered >= 92, `Expected at least 92 answered questions, got ${answered}`);
 
 console.log(`Loki Knowledge Engine v1: ${answered}/100 questions answered from APG data`);
+
+const coffeeResult = runLokiKnowledgeEngine({ text: 'Где выпить кофе?', appState: { ...appState, partners: [partner, bakery] } });
+assert.ok(coffeeResult.cards?.some(card => card.id === bakery.id), 'Coffee search must include related bakery/cafe categories.');
+assert.doesNotMatch(coffeeResult.text, /не наш[её]л/i, 'Coffee search must return a useful related-category result.');

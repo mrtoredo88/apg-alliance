@@ -13,8 +13,6 @@ import { buildAdaptiveHomeData } from './interestEngine.js';
 import { APG2_PROFILE } from './components/Apg2ProfileGlass.jsx';
 import { DesktopTopOverview } from './components/DesktopUI.jsx';
 import { FirstJourneyCard } from './components/onboarding/FirstJourneyCard.jsx';
-import { LokiIdentity } from './loki/LokiIdentity.jsx';
-import { useLoki } from './loki/LokiProvider.jsx';
 import { selectActualEvents } from './eventSchedule.js';
 import { haversine, formatDistance } from './utils/geo.js';
 import { countRender, markPerformanceStage } from './performance/index.js';
@@ -415,6 +413,7 @@ function V2FirstScreen({
   onOpenReference,
   onOpenLoki,
   onOpenProfile,
+  onOpenOnboarding,
   onOpenKeyHistory,
   onOpenFavorites,
   onOpenPartnerCabinet,
@@ -497,6 +496,7 @@ function V2FirstScreen({
       onOpenReference={onOpenReference}
       onOpenLoki={onOpenLoki}
       onOpenProfile={onOpenProfile}
+      onOpenOnboarding={onOpenOnboarding}
       onOpenKeyHistory={onOpenKeyHistory}
       onOpenFavorites={onOpenFavorites}
       onOpenPartnerCabinet={onOpenPartnerCabinet}
@@ -531,6 +531,7 @@ function V2FirstScreenMobile({
   onOpenReference,
   onOpenLoki,
   onOpenProfile,
+  onOpenOnboarding,
   onOpenKeyHistory,
   onOpenFavorites,
   onOpenPartnerCabinet,
@@ -538,7 +539,6 @@ function V2FirstScreenMobile({
   desktopMode = false,
   isOffline = false,
 }) {
-  const loki = useLoki();
   const heroPartner = partnerOfMonth ?? featuredPartner ?? null;
   const heroEvent = events.find(e => contentImageOf(e)) ?? events[0] ?? null;
   const heroImage = heroEvent ? contentImageOf(heroEvent) : profileImageOf(heroPartner);
@@ -649,17 +649,11 @@ function V2FirstScreenMobile({
             </button>
             <button
               type="button"
-              aria-label={loki.settings.dockedToHeader ? 'Открыть Локи' : 'Профиль'}
-              onClick={loki.settings.dockedToHeader ? () => loki.openContextExperience() : onOpenProfile}
-              style={{ width: 44, height: 44, padding: 0, borderRadius: 18, overflow: 'hidden', ...V2.glass, color: V2.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 850, cursor: 'pointer', position: 'relative' }}
+              aria-label="Показать приветственный онбординг"
+              onClick={onOpenOnboarding}
+              style={{ width: 44, height: 44, padding: 0, borderRadius: 18, overflow: 'hidden', ...V2.glass, color: V2.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 900, cursor: 'pointer', position: 'relative' }}
             >
-              {loki.settings.dockedToHeader
-                ? <LokiIdentity size={42} state="ready" showText={false} style={{ width: '100%', height: '100%', placeItems: 'center' }} />
-                : avatarUrl
-                  ? <img src={avatarUrl} alt="" loading="eager" fetchPriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
-                  : initials
-              }
-              {loki.settings.dockedToHeader && <span aria-hidden="true" style={{ position: 'absolute', right: 3, bottom: 3, width: 8, height: 8, borderRadius: '50%', background: '#4BB34B', border: '2px solid #101012' }} />}
+              <span aria-hidden="true">?</span>
             </button>
           </div>
         </header>
@@ -2935,6 +2929,7 @@ export function HomePanelV2({
   desktopMode = false,
   onOpenPartner, onToggleFavorite, onScan, onShare, onOpenEvents, onOpenExperts, onOpenPartners, onOpenOffers, onOpenTasks, onOpenLeaderboard, onRetry, onOpenNotifications, onOpenMessages, onRefresh, onOpenMap, onOpenNearby, onOpenRewards, onOpenReference, onOpenLoki, onOpenNews, onOpenNewsItem,
   onOpenProfile,
+  onOpenOnboarding,
   onOpenKeyHistory,
   onOpenFavorites,
   onOpenPartnerCabinet,
@@ -3133,6 +3128,7 @@ export function HomePanelV2({
         onOpenReference={onOpenReference}
         onOpenLoki={onOpenLoki}
         onOpenProfile={onOpenProfile}
+        onOpenOnboarding={onOpenOnboarding}
         onOpenKeyHistory={onOpenKeyHistory}
         onOpenFavorites={onOpenFavorites}
         onOpenPartnerCabinet={onOpenPartnerCabinet}

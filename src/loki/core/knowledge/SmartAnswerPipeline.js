@@ -59,7 +59,15 @@ function cardsFromRows(knowledge, rows) {
 }
 
 function answerSearch({ intent, knowledge }) {
-  const rows = searchKnowledge(knowledge, intent.query, intent.types, 4);
+  const coffeeRequest = /(кофе|кофейн|капучино|латте)/i.test(intent.query);
+  const relatedCoffeeTerms = ['кофе', 'кофейня', 'кафе', 'ресторан', 'кондитерская', 'пекарня', 'выпечка', 'десерт', 'завтрак'];
+  const rows = coffeeRequest
+    ? relatedCoffeeTerms
+      .flatMap(query => searchKnowledge(knowledge, query, ['partner'], 4))
+      .filter((row, index, all) => all.findIndex(candidate => `${candidate.type}:${candidate.id}` === `${row.type}:${row.id}`) === index)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 4)
+    : searchKnowledge(knowledge, intent.query, intent.types, 4);
   const cards = cardsFromRows(knowledge, rows);
   const labels = {
     'search.partners': 'партнёров',
@@ -73,7 +81,9 @@ function answerSearch({ intent, knowledge }) {
   if (!cards.length) {
     return {
       intent: intent.id,
-      text: `Я проверил данные АПГ, но сейчас не нашёл подходящие ${labels[intent.id] || 'объекты'}. Ничего не придумываю.`,
+      text: coffeeRequest
+        ? 'Среди партнёров АПГ сейчас не нашлось места с кофе. Можно посмотреть кафе, рестораны, кондитерские и пекарни в каталоге — новые места появляются регулярно.'
+        : `Я проверил данные АПГ, но сейчас не нашёл подходящие ${labels[intent.id] || 'объекты'}. Попробуйте уточнить категорию или район.`,
       card: null,
       cards: [],
       knowledge,
@@ -81,7 +91,9 @@ function answerSearch({ intent, knowledge }) {
   }
   return {
     intent: intent.id,
-    text: `Нашёл ${cards.length} ${labels[intent.id] || 'варианта'} в данных АПГ. Начал бы с «${cards[0].title}».`,
+    text: coffeeRequest
+      ? `Нашёл ${cards.length} ${cards.length === 1 ? 'подходящее место' : 'подходящих места'} среди кофеен, кафе, ресторанов, кондитерских и пекарен. Начал бы с «${cards[0].title}».`
+      : `Нашёл ${cards.length} ${labels[intent.id] || 'варианта'} в данных АПГ. Начал бы с «${cards[0].title}».`,
     card: cards[0],
     cards,
     knowledge,

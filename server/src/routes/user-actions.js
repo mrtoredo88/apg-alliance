@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { FieldValue } from '../lib/documentValues.js';
 import { getDb } from '../lib/documentStore.js';
 import { serverFoundation } from '../apg/index.js';
@@ -189,6 +190,11 @@ async function writeIdentityProfileBestEffort(userId, patch = {}) {
 
 function safeString(value, max = 300) {
   return String(value ?? '').trim().slice(0, max);
+}
+
+function diagnosticHash(value, length = 16) {
+  const normalized = safeString(value, 300);
+  return normalized ? crypto.createHash('sha256').update(normalized).digest('hex').slice(0, length) : '';
 }
 
 const URL_FIELD_PLATFORMS = {
@@ -6149,6 +6155,15 @@ export default async function userActionsRoutes(fastify) {
       }
       await audit(db, req, actor, safeString(req.body?.action || 'unknown'), 'unknown', req.body?.id || req.body?.userId || '', 'error', { message: String(error?.message || error).slice(0, 500) }).catch(() => {});
       const statusCode = error.statusCode || 500;
+      if (statusCode >= 500) {
+        req.log.error({
+          action: safeString(req.body?.action || 'unknown', 80),
+          code: safeString(error?.code || 'USER_ACTION_ERROR', 120),
+          errorName: safeString(error?.name || 'Error', 80),
+          requestId: safeString(req.id, 120),
+          actorIdHash: diagnosticHash(actor?.userId, 16),
+        }, 'user action failed');
+      }
       const publicMessage = statusCode >= 500
         ? 'Сервис временно недоступен. Попробуйте ещё раз через несколько секунд.'
         : error.message || 'Не удалось выполнить действие.';

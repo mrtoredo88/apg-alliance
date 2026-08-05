@@ -6,7 +6,12 @@ const ADMIN_ROLES = new Set(['owner', 'super_admin', 'admin', 'editor', 'moderat
 const clean = (value, max = 700) => String(value ?? '').trim().slice(0, max);
 
 function bearer(request) {
-  return clean(request.headers['x-apg-auth'] || request.headers.authorization?.replace(/^Bearer\s+/i, ''), 2200);
+  return clean(
+    request.headers['x-apg-auth']
+    || request.headers['x-firebase-auth']
+    || request.headers.authorization?.replace(/^Bearer\s+/i, ''),
+    2200,
+  ).replace(/^Bearer\s+/i, '');
 }
 
 async function actorFor(request) {
@@ -29,8 +34,18 @@ function assertAccess(collectionName, parentPath, actor) {
   throw Object.assign(new Error('Нет доступа к данным.'), { statusCode: 403 });
 }
 
-function failure(reply, error, code) {
-  return reply.code(error?.statusCode || 500).send({
+function failure(request, reply, error, code) {
+  const statusCode = error?.statusCode || 500;
+  if (statusCode >= 500) {
+    request.log.error({
+      route: request.url,
+      operation: clean(request.body?.collection ? `${request.body?.collection}:${request.body?.id ? 'get' : 'query'}` : 'unknown', 220),
+      code: clean(error?.code || code, 120),
+      errorName: clean(error?.name || 'Error', 80),
+      requestId: clean(request.id, 120),
+    }, 'app data request failed');
+  }
+  return reply.code(statusCode).send({
     ok: false,
     code: error?.code || code,
     error: error?.statusCode ? error.message : 'Не удалось загрузить данные.',
@@ -51,7 +66,7 @@ export default async function appDataRoutes(fastify) {
       });
       return { ok: true, storage: 'postgres', documents };
     } catch (error) {
-      return failure(reply, error, 'APP_DATA_QUERY_FAILED');
+      return failure(request, reply, error, 'APP_DATA_QUERY_FAILED');
     }
   });
 
@@ -66,7 +81,7 @@ export default async function appDataRoutes(fastify) {
       const document = await serverFoundation.data.adapter.getDocument(collectionName, id, { parentPath });
       return { ok: true, storage: 'postgres', document };
     } catch (error) {
-      return failure(reply, error, 'APP_DATA_GET_FAILED');
+      return failure(request, reply, error, 'APP_DATA_GET_FAILED');
     }
   });
 }

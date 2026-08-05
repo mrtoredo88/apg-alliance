@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import process from 'node:process';
 import { chromium } from 'playwright';
 
 const urlList = (process.env.AUTH_LIFECYCLE_URLS || process.env.SMOKE_URL || 'https://myapg.ru/').split(',').map((url) => url.trim()).filter(Boolean);
@@ -83,7 +84,7 @@ async function getScenarioRunner(page) {
   });
 
   const hasLogoutScreen = async () => {
-    const marker = page.getByText('Вы вышли из аккаунта');
+    const marker = page.locator('[data-logged-out-auth]');
     try {
       await marker.waitFor({ state: 'visible', timeout: 25000 });
       return true;
@@ -148,23 +149,10 @@ async function getScenarioRunner(page) {
     await run();
 
     if (!(await hasLogoutScreen())) {
-      throw new Error('После установки manualLogout не показан экран «Вы вышли из аккаунта».');
+      throw new Error('После установки manualLogout не показана форма авторизации.');
     }
     if ((await getLocalStorageValue('manualLogout')) !== 'true') {
       throw new Error('manualLogout не сохранился после перезагрузки.');
-    }
-  };
-
-  const clickReLoginButton = async () => {
-    const loginButton = page.getByRole('button', { name: 'Войти' }).first();
-    await loginButton.click({ timeout: 5000 });
-    await page.waitForTimeout(1200);
-    await page.reload({ waitUntil: 'domcontentloaded', timeout: timeoutMs });
-    await run();
-
-    const loginFlag = await getLocalStorageValue('manualLogout');
-    if (loginFlag === 'true') {
-      throw new Error('После нажатия «Войти» manualLogout не сброшен.');
     }
   };
 
@@ -178,7 +166,6 @@ async function getScenarioRunner(page) {
     errors,
     run,
     simulateManualLogout,
-    clickReLoginButton,
     goDeep,
     hasLogoutScreen,
     getBodyText,
@@ -208,11 +195,7 @@ async function runForTarget(baseUrl) {
 
     // Scenario: Logout (через принудительный флаг).  Автоматизируем, потому что login flow в e2e неэмулируется полностью.
     await runner.simulateManualLogout();
-    autoScenarios.push('Сценарий Logout via manualLogout и проверка экрана выхода');
-
-    // Scenario: Login after logout button.  Проверяем корректное снятие флага и восстановление не-logout рендера.
-    await runner.clickReLoginButton();
-    autoScenarios.push('Сценарий Войти после выхода');
+    autoScenarios.push('Сценарий Logout via manualLogout и немедленное открытие формы авторизации');
 
     // Scenario: Logout → refresh.
     await runner.simulateManualLogout();
@@ -228,9 +211,9 @@ async function runForTarget(baseUrl) {
     await runner.simulateManualLogout();
     await runner.goDeep('/profile');
     if (!(await runner.hasLogoutScreen())) {
-      throw new Error('Глубокая ссылка после logout открыла защищённый UI вместо экрана выхода.');
+      throw new Error('Глубокая ссылка после logout открыла защищённый UI вместо формы авторизации.');
     }
-    autoScenarios.push('Сценарий Logout → deep link → открытие экрана выхода');
+    autoScenarios.push('Сценарий Logout → deep link → открытие формы авторизации');
 
     // Проверка отсутствия фатальных маркеров в тексте и консоли при разных шагах.
     const bodyText = await runner.getBodyText();
@@ -256,8 +239,8 @@ async function runForTarget(baseUrl) {
       automaticScenarios: autoScenarios,
       manualScenarios,
       checks: {
-        logoutScreenShown: true,
-        manualLogoutFlag: 'true on logout / false on relogin attempt',
+        authorizationFormShown: true,
+        manualLogoutFlag: 'true until successful authorization',
         deepLinkAfterLogout: await runner.hasLogoutScreen(),
         bodyTextLength: bodySample.length,
         runtimeErrors: runner.errors.length,

@@ -436,7 +436,10 @@ export function LokiAssistant({ desktopMode = false, onOpenPeople, onOpenMessage
               </div>
               <button
                 type="button"
-                onClick={() => loki.executeAction(loki.card.action)}
+                onClick={() => {
+                  if (loki.card.action?.type === LOKI_APP_ACTIONS.OPEN_LOKI) loki.openExperience();
+                  else loki.executeAction(loki.card.action);
+                }}
                 style={{
                   minHeight: 34,
                   borderRadius: 14,
@@ -480,7 +483,7 @@ export function LokiAssistant({ desktopMode = false, onOpenPeople, onOpenMessage
         )}
         {menuOpen && (
           <div style={{ ...lokiPanelStyle, position: 'absolute', right: 0, bottom: 88, width: 190, borderRadius: 24, padding: 9, display: 'grid', gap: 7, border: '1px solid rgba(215,184,106,0.28)', animation: 'lokiBubbleIn var(--motion-fast, 180ms) var(--motion-ease-standard, cubic-bezier(0.22,1,0.36,1)) both' }}>
-            <button type="button" onClick={() => { loki.executeAction(createLokiAction(LOKI_APP_ACTIONS.OPEN_LOKI)); setMenuOpen(false); }} style={menuButtonStyle}>Открыть Локи</button>
+            <button type="button" onClick={() => { loki.openExperience(); setMenuOpen(false); }} style={menuButtonStyle}>Открыть Локи</button>
             <button type="button" onClick={() => { setBrainOpen(v => !v); setHistoryOpen(false); setMenuOpen(false); }} style={menuButtonStyle}>Спросить Локи</button>
             <button type="button" onClick={() => { setHistoryOpen(v => !v); setMenuOpen(false); }} style={menuButtonStyle}>История Локи</button>
             <button type="button" onClick={() => { loki.handleCharacterTap(); setMenuOpen(false); }} style={menuButtonStyle}>Поздороваться</button>

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import process from 'node:process';
 
 const source = readFileSync(new URL('../src/loki/LokiAssistant.jsx', import.meta.url), 'utf8');
 const positionSource = readFileSync(new URL('../src/loki/lokiPosition.js', import.meta.url), 'utf8');
@@ -37,10 +38,11 @@ assert.doesNotMatch(source, /data-loki-dock-button="true"/, 'Floating Loki must 
 assert.match(source, /data-floating-communication-buttons="true"[\s\S]*\{peopleFab\}[\s\S]*\{messageFab\}/, 'People and Messages keep an independent shared floating root while Loki is docked.');
 assert.match(source, /data-floating-people-button="true"/, 'People must have its own floating button.');
 assert.match(source, /data-floating-messages-button="true"/, 'Messages must keep its own floating button.');
-assert.match(homeSource, /loki\.openContextExperience\(\)/, 'Docked Loki must open from the mobile header.');
-assert.match(homeSource, /Открыть Локи/, 'Docked Loki header button must keep an accessible label.');
-assert.match(homeSource, /LokiIdentity size=\{42\}/, 'Docked Loki must replace the profile avatar artwork.');
-assert.match(experienceSource, /Вернуть Локи на экран/, 'Open Loki experience must allow restoring the floating character.');
+assert.match(homeSource, /aria-label="Показать приветственный онбординг"/, 'Mobile header must expose the onboarding help action.');
+assert.match(homeSource, /onClick=\{onOpenOnboarding\}/, 'Mobile header help action must open onboarding.');
+assert.doesNotMatch(homeSource, /LokiIdentity size=\{42\}/, 'Mobile header must not be replaced by a docked Loki avatar.');
+assert.match(experienceSource, /> в сети</, 'Open Loki experience must show the compact online status.');
+assert.doesNotMatch(experienceSource.slice(experienceSource.lastIndexOf('<div className="loki-office-shell">')), /Локи помнит|Профессиональный|СЕГОДНЯ В КАБИНЕТЕ/, 'Open Loki experience must not render dashboard, mode, or memory clutter.');
 
 const lokiButtonStart = source.indexOf('data-floating-loki-button="true"');
 const lokiButtonEnd = source.indexOf('aria-label="Настройки Локи"', lokiButtonStart);

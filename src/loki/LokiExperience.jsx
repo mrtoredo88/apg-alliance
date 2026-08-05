@@ -418,98 +418,15 @@ export function LokiExperience({ loki }) {
       <div className="loki-office-shell">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div style={{ color: APG2_PROFILE.gold, fontSize: 13, lineHeight: '17px', fontWeight: 900 }}>Кабинет Локи</div>
-            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '16px', fontWeight: 680, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6FDB9A', boxShadow: '0 0 0 4px rgba(111,219,154,.12)' }} /> На связи · готов помочь</div>
+            <div style={{ color: APG2_PROFILE.text, fontSize: 18, lineHeight: '22px', fontWeight: 900 }}>Локи</div>
+            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 12, lineHeight: '16px', fontWeight: 680, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6FDB9A', boxShadow: '0 0 0 4px rgba(111,219,154,.12)' }} /> в сети</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {loki.settings.dockedToHeader && (
-              <button
-                type="button"
-                onClick={() => loki.setDockedToHeader(false)}
-                aria-label="Вернуть Локи на экран"
-                title="Вернуть Локи на экран"
-                style={{ width: 42, height: 42, borderRadius: 17, border: '1px solid rgba(215,184,106,0.28)', background: 'rgba(215,184,106,0.12)', color: APG2_PROFILE.gold, fontSize: 18, fontFamily: 'inherit' }}
-              >
-                ↗
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                loki.resetUserMemory();
-                setConversation(prev => [...prev, { id: `memory-clear-${Date.now()}`, from: 'loki', text: 'Я очистил личную память. Буду заново учиться тому, что тебе интересно.', cards: [] }]);
-              }}
-              aria-label="Очистить память Локи"
-              style={{ width: 42, height: 42, borderRadius: 17, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.textSoft, fontSize: 17, fontFamily: 'inherit' }}
-            >
-              ♻
-            </button>
             <button type="button" onClick={loki.closeExperience} aria-label="Закрыть Локи" style={{ width: 42, height: 42, borderRadius: 17, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.18)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.08)', color: APG2_PROFILE.textSoft, fontSize: 24, lineHeight: '36px', fontFamily: 'inherit' }}>×</button>
           </div>
         </div>
 
         <div ref={scrollerRef} style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'grid', alignContent: 'start', gap: 12, paddingBottom: 4 }}>
-          {!activeNewsContext && <OfficeDashboard loki={loki} onAsk={ask} />}
-          {activeNewsContext && <LokiAvatar thinking={loki.brainThinking || voiceState === 'thinking' || loki.action === LOKI_ACTIONS.LOOK_AROUND} listening={voiceState === 'listening'} speaking={voiceState === 'speaking'} />}
-          <div style={{ textAlign: 'center', display: 'grid', gap: 5 }}>
-            <div style={{ color: APG2_PROFILE.text, fontSize: 23, lineHeight: '28px', fontWeight: 900 }}>{activeNewsContext ? 'Обсуждаем новость' : 'Спросите Локи'}</div>
-            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 13, lineHeight: '18px', fontWeight: 650 }}>{voiceState === 'listening' ? 'Слушаю внимательно...' : voiceState === 'speaking' ? 'Отвечаю голосом и показываю результат.' : activeNewsContext ? `Контекст: «${getShortTitle(contextTitle)}». Можно задавать вопросы прямо по статье.` : 'Можно написать или сказать обычными словами. Я покажу результат, а не длинную инструкцию.'}</div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 7, flexWrap: 'wrap' }}>
-            {[
-              ['professional', 'Профессиональный'],
-              ['friendly', 'Дружелюбный'],
-              ['charismatic', 'Харизматичный'],
-            ].map(([mode, label]) => {
-              const active = loki.settings.personalityMode === mode;
-              return (
-                <button key={mode} type="button" onClick={() => loki.setPersonalityMode(mode)} style={{ minHeight: 34, borderRadius: 999, padding: '0 11px', border: active ? '1px solid rgba(215,184,106,0.42)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: active ? 'rgba(215,184,106,0.16)' : 'rgba(var(--apg2-glass-a,255,255,255),0.05)', color: active ? APG2_PROFILE.gold : APG2_PROFILE.textMuted, fontSize: 10.5, fontWeight: 780, fontFamily: 'inherit' }}>{label}</button>
-              );
-            })}
-          </div>
-
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '2px 0 4px', scrollbarWidth: 'none' }}>
-            {activeNewsContext && (
-              <button
-                type="button"
-                onClick={() => speak(summaryToSpeak)}
-                style={{ ...APG2_PROFILE.glass, minHeight: 42, flex: '0 0 auto', borderRadius: 999, padding: '0 13px', color: APG2_PROFILE.gold, border: '1px solid rgba(215,184,106,0.24)', fontSize: 12.5, lineHeight: '16px', fontWeight: 820, fontFamily: 'inherit', whiteSpace: 'nowrap' }}
-              >
-                ▶ Прослушать
-              </button>
-            )}
-            {quickActions.map(item => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => ask(item.text, item.action)}
-                style={{ ...APG2_PROFILE.glass, minHeight: 42, flex: '0 0 auto', borderRadius: 999, padding: '0 13px', color: APG2_PROFILE.text, border: '1px solid rgba(215,184,106,0.18)', fontSize: 12.5, lineHeight: '16px', fontWeight: 780, fontFamily: 'inherit', whiteSpace: 'nowrap' }}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          {!!memoryChips.length && (
-            <div style={{ ...APG2_PROFILE.glass, borderRadius: 20, padding: 10, display: 'grid', gap: 8, border: '1px solid rgba(215,184,106,0.13)' }}>
-              <div style={{ color: APG2_PROFILE.gold, fontSize: 11, lineHeight: '15px', fontWeight: 860 }}>Локи помнит</div>
-              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
-                {memoryChips.map(item => (
-                  <button
-                    key={`${item.type}-${item.value}`}
-                    type="button"
-                    onClick={() => loki.clearUserMemoryItem?.(item.type, item.value)}
-                    title="Удалить из памяти"
-                    style={{ flex: '0 0 auto', minHeight: 30, borderRadius: 999, border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2_PROFILE.textSoft, fontSize: 10.5, lineHeight: '14px', fontWeight: 760, padding: '0 10px', fontFamily: 'inherit', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                  >
-                    {item.label} ×
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {conversation.map(item => (
             <div key={item.id} style={{ display: 'grid', justifyItems: item.from === 'user' ? 'end' : 'start', gap: 8 }}>
               <div style={{ ...APG2_PROFILE.glass, maxWidth: item.from === 'user' ? '82%' : '92%', borderRadius: item.from === 'user' ? '22px 22px 6px 22px' : '22px 22px 22px 6px', padding: '11px 13px', color: APG2_PROFILE.text, border: item.from === 'user' ? '1px solid rgba(215,184,106,0.30)' : '1px solid rgba(var(--apg2-glass-a,255,255,255),0.16)', background: item.from === 'user' ? 'linear-gradient(135deg, rgba(215,184,106,0.24), rgba(var(--apg2-glass-a,255,255,255),0.08))' : APG2_PROFILE.glass.background }}>
@@ -522,73 +439,6 @@ export function LokiExperience({ loki }) {
                   ))}
                 </div>
               )}
-              {!!item.comparison?.length && (
-                <div style={{ width: '100%', overflowX: 'auto', border: '1px solid rgba(215,184,106,.16)', borderRadius: 18, background: 'rgba(255,255,255,.035)' }}>
-                  <div style={{ minWidth: 520, display: 'grid', gridTemplateColumns: '1.5fr repeat(4,1fr)', fontSize: 10.5, lineHeight: '14px' }}>
-                    {['Вариант', 'Рейтинг', 'Расстояние', 'Цена', 'Выгода'].map(label => <strong key={label} style={{ padding: 9, color: APG2_PROFILE.gold, borderBottom: '1px solid rgba(255,255,255,.08)' }}>{label}</strong>)}
-                    {item.comparison.flatMap(row => [
-                      <span key={`${row.id}-title`} style={{ padding: 9, color: APG2_PROFILE.text, fontWeight: 800 }}>{getShortTitle(row.title)}</span>,
-                      <span key={`${row.id}-rating`} style={{ padding: 9, color: APG2_PROFILE.textMuted }}>{row.rating}</span>,
-                      <span key={`${row.id}-distance`} style={{ padding: 9, color: APG2_PROFILE.textMuted }}>{row.distance}</span>,
-                      <span key={`${row.id}-price`} style={{ padding: 9, color: APG2_PROFILE.textMuted }}>{row.price}</span>,
-                      <span key={`${row.id}-benefit`} style={{ padding: 9, color: APG2_PROFILE.textMuted }}>{row.benefit}</span>,
-                    ])}
-                  </div>
-                </div>
-              )}
-              {item.cards?.length > 1 && !item.decisionMade && (
-                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-                  <button type="button" onClick={() => compareResults(item.cards)} style={{ minHeight: 34, borderRadius: 999, padding: '0 12px', border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.055)', color: APG2_PROFILE.textSoft, fontSize: 11, fontWeight: 800, fontFamily: 'inherit' }}>Сравнить</button>
-                  <button type="button" onClick={() => decideForUser(item.cards)} style={{ minHeight: 34, borderRadius: 999, padding: '0 12px', border: '1px solid rgba(215,184,106,.28)', background: 'rgba(215,184,106,.13)', color: APG2_PROFILE.gold, fontSize: 11, fontWeight: 850, fontFamily: 'inherit' }}>Реши за меня</button>
-                </div>
-              )}
-              {item.from === 'loki' && item.taskSuccess?.id && (
-                <div style={{ width: '100%', display: 'grid', gap: 7, justifyItems: 'start', paddingLeft: 4 }}>
-                  {item.feedback ? (
-                    <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '15px', fontWeight: 700 }}>
-                      {item.feedback.value === 'positive' ? 'Спасибо — это поможет Локи стать точнее.' : 'Понял. Учту это в следующих рекомендациях.'}
-                    </span>
-                  ) : feedbackPromptId === item.id ? (
-                    <>
-                      <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '15px', fontWeight: 700 }}>Что оказалось не так?</span>
-                      <span style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {FEEDBACK_REASONS.map(([reason, label]) => (
-                          <button
-                            key={reason}
-                            type="button"
-                            onClick={() => submitFeedback(item.id, item.taskSuccess.id, 'negative', reason)}
-                            style={{ minHeight: 30, borderRadius: 999, padding: '0 10px', border: '1px solid rgba(var(--apg2-glass-a,255,255,255),0.14)', background: 'rgba(var(--apg2-glass-a,255,255,255),0.06)', color: APG2_PROFILE.textSoft, fontSize: 10.5, fontWeight: 760, fontFamily: 'inherit' }}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </span>
-                    </>
-                  ) : (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <span style={{ color: APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '15px', fontWeight: 700 }}>Помогло?</span>
-                      <button type="button" aria-label="Ответ Локи помог" onClick={() => submitFeedback(item.id, item.taskSuccess.id, 'positive')} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid rgba(111,219,154,.22)', background: 'rgba(111,219,154,.08)', color: APG2_PROFILE.textSoft, fontSize: 14, fontFamily: 'inherit' }}>👍</button>
-                      <button type="button" aria-label="Ответ Локи не помог" onClick={() => setFeedbackPromptId(item.id)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', color: APG2_PROFILE.textSoft, fontSize: 14, fontFamily: 'inherit' }}>👎</button>
-                    </span>
-                  )}
-                </div>
-              )}
-              {showDebug && item.debug && (
-                <div style={{ ...APG2_PROFILE.glass, width: '100%', borderRadius: 18, padding: 10, border: '1px solid rgba(215,184,106,0.14)', color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '15px', display: 'grid', gap: 4 }}>
-                  <span style={{ color: APG2_PROFILE.gold, fontWeight: 850 }}>Loki Core debug · {item.debug.provider} · {item.debug.totalMs}ms</span>
-                  {item.debug.trace?.slice(0, 8).map(step => (
-                    <span key={`${item.id}-${step.module}-${step.decision}`}>{step.module}: {step.decision} · {step.ms}ms</span>
-                  ))}
-                  {!!item.debug.pipelineTimeline?.length && (
-                    <>
-                      <span style={{ color: APG2_PROFILE.gold, fontWeight: 850, marginTop: 4 }}>Pipeline Timeline</span>
-                      {item.debug.pipelineTimeline.slice(-10).map((step, index) => (
-                        <span key={`${item.id}-timeline-${index}`}>{step.step}: {step.status} · {JSON.stringify(step.output || {}).slice(0, 96)}</span>
-                      ))}
-                    </>
-                  )}
-                </div>
-              )}
             </div>
           ))}
 
@@ -599,9 +449,6 @@ export function LokiExperience({ loki }) {
             </div>
           )}
 
-          {!!visibleCards.length && (
-            <div style={{ color: APG2_PROFILE.textMuted, fontSize: 11, lineHeight: '15px', textAlign: 'center', marginTop: 2 }}>Карточки можно открыть прямо из разговора.</div>
-          )}
         </div>
 
         <form
