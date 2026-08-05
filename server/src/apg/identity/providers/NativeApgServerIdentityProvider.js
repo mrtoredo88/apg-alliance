@@ -13,6 +13,7 @@ export class NativeApgServerIdentityProvider extends ServerIdentityProvider {
       device: input.device || {},
       platform: input.platform || 'web-app',
       ttlDays: input.ttlDays || 30,
+      claims: input.claims || {},
     });
   }
 
@@ -30,6 +31,11 @@ export class NativeApgServerIdentityProvider extends ServerIdentityProvider {
       userId: identity.uid,
       device: input.device,
       platform: input.platform,
+      claims: {
+        ...(identity.claims || {}),
+        role: identity.role || 'user',
+        roles: Array.isArray(identity.roles) ? identity.roles : ['user'],
+      },
     });
   }
 

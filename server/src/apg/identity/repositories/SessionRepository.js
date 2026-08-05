@@ -6,6 +6,29 @@ function hash(value) {
   return raw ? crypto.createHash('sha256').update(raw).digest('hex') : '';
 }
 
+function encodeTokenPart(value) {
+  return Buffer.from(JSON.stringify(value)).toString('base64url');
+}
+
+export function createCompatibleBearerToken(userId, claims = {}, ttlDays = 30) {
+  const now = Math.floor(Date.now() / 1000);
+  const safeClaims = { ...(claims || {}) };
+  for (const key of ['iss', 'aud', 'sub', 'uid', 'iat', 'exp', 'jti']) delete safeClaims[key];
+  const ttlSeconds = Math.max(1, Number(ttlDays) || 30) * 86_400;
+  const header = encodeTokenPart({ alg: 'APG-STATEFUL', typ: 'APG' });
+  const payload = encodeTokenPart({
+    iss: 'apg',
+    aud: 'ru.myapg.app',
+    sub: String(userId),
+    uid: String(userId),
+    iat: now,
+    exp: now + ttlSeconds,
+    jti: crypto.randomBytes(12).toString('hex'),
+    ...safeClaims,
+  });
+  return `${header}.${payload}.${crypto.randomBytes(32).toString('base64url')}`;
+}
+
 export class SessionRepository {
   constructor(adapter) {
     this.adapter = adapter;
@@ -21,8 +44,10 @@ export class SessionRepository {
     return { id, userId: safeString(userId, 260), status: 'active', expiresAt };
   }
 
-  async createBearerSession({ userId, device = {}, platform = '', ttlDays = 30 }) {
-    const token = `apg_${crypto.randomBytes(32).toString('base64url')}`;
+  async createBearerSession({ userId, device = {}, platform = '', ttlDays = 30, claims = {} }) {
+    // The stateful database hash remains the source of truth. The decodable
+    // envelope keeps RuStore 1.3.x clients working after the native-session cutover.
+    const token = createCompatibleBearerToken(userId, claims, ttlDays);
     const expiresAt = new Date(Date.now() + Math.max(1, Number(ttlDays) || 30) * 86_400_000);
     const session = await this.create({ userId, refreshToken: token, device, platform, expiresAt });
     return { ...session, token };
@@ -57,9 +82,9 @@ export class SessionRepository {
     };
   }
 
-  async rotateBearerSession({ token, userId, device = {}, platform = '', ttlDays = 30 }) {
+  async rotateBearerSession({ token, userId, device = {}, platform = '', ttlDays = 30, claims = {} }) {
     const currentHash = hash(token);
-    const nextToken = `apg_${crypto.randomBytes(32).toString('base64url')}`;
+    const nextToken = createCompatibleBearerToken(userId, claims, ttlDays);
     const nextHash = hash(nextToken);
     const expiresAt = new Date(Date.now() + Math.max(1, Number(ttlDays) || 30) * 86_400_000);
     const result = await this.adapter.query(`
