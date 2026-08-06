@@ -1567,12 +1567,15 @@ function MigrationCenterPanel({ data, loading, busy, lastResult, onRefresh, onAc
   );
 }
 
-function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
+function AdminAccessPanel({ security, users = [], loading, onRefresh, onAction }) {
   const [queryText, setQueryText] = useState('');
   const [auditQuery, setAuditQuery] = useState('');
   const [auditResult, setAuditResult] = useState('all');
   const [selectedRole, setSelectedRole] = useState('owner');
   const [showCreate, setShowCreate] = useState(false);
+  const [assignQuery, setAssignQuery] = useState('');
+  const [assignUserId, setAssignUserId] = useState('');
+  const [assignRole, setAssignRole] = useState('admin');
   const [passwordReset, setPasswordReset] = useState({ adminId: '', password: '' });
   const [adminForm, setAdminForm] = useState({
     firstName: '', lastName: '', email: '', password: '', password2: '', position: '', photo: '', role: 'admin',
@@ -1592,6 +1595,15 @@ function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
     return !q || [item.label, item.action, item.actorName, item.actorId, item.targetId, item.reason].some(value => String(value || '').toLowerCase().includes(q));
   });
   const canManage = ['owner', 'super_admin'].includes(security?.actor?.role);
+  const adminIds = new Set(admins.map(item => String(item.id || '')));
+  const adminEmails = new Set(admins.map(item => String(item.email || '').trim().toLowerCase()).filter(Boolean));
+  const assignCandidates = (Array.isArray(users) ? users : []).filter(user => {
+    const id = String(user?.id || user?.firebaseUid || user?.authUid || '');
+    const email = String(user?.email || '').trim().toLowerCase();
+    if (!id || adminIds.has(id) || (email && adminEmails.has(email))) return false;
+    const q = assignQuery.trim().toLowerCase();
+    return !q || [user?.name, user?.firstName, user?.lastName, user?.email, user?.login, id].some(value => String(value || '').toLowerCase().includes(q));
+  }).slice(0, 30);
   const setAdminField = (key, value) => setAdminForm(prev => ({ ...prev, [key]: value }));
   const submitAdmin = async () => {
     if (!adminForm.email.trim() || !adminForm.password) {
@@ -1624,6 +1636,29 @@ function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
         <StatTile label="Записей аудита" value={audit.length} icon="📜" color="#A78BFA" sub="adminActivity + security log" />
         <StatTile label="Управление" value={canManage ? 'Доступно' : 'Только просмотр'} icon="🔐" color={canManage ? '#4BB34B' : A.textSec} sub="owner / super_admin" />
       </div>
+
+      {canManage && (
+        <div style={s.card}>
+          <h2 style={{ ...s.h2, marginBottom: 5 }}>Назначить администратора из пользователей</h2>
+          <div style={{ color: A.textSec, fontSize: 12, lineHeight: '18px', marginBottom: 12 }}>Выберите существующий аккаунт — второй профиль и новый пароль создаваться не будут.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) minmax(220px, 1.4fr) minmax(170px, .7fr) auto', gap: 8, alignItems: 'center' }}>
+            <input value={assignQuery} onChange={event => { setAssignQuery(event.target.value); setAssignUserId(''); }} placeholder="Найти по имени или email" style={{ ...s.input, marginBottom: 0 }} />
+            <select value={assignUserId} onChange={event => setAssignUserId(event.target.value)} style={{ ...s.select, marginBottom: 0 }}>
+              <option value="">Выберите пользователя</option>
+              {assignCandidates.map(user => {
+                const id = String(user.id || user.firebaseUid || user.authUid || '');
+                const name = user.name || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || id;
+                return <option key={id} value={id}>{name}{user.email && name !== user.email ? ` · ${user.email}` : ''}</option>;
+              })}
+            </select>
+            <select value={assignRole} onChange={event => setAssignRole(event.target.value)} style={{ ...s.select, marginBottom: 0 }}>
+              {Object.keys(roles).filter(role => ['super_admin', 'admin', 'editor', 'moderator', 'analyst'].includes(role)).map(role => <option key={role} value={role}>{ADMIN_ROLE_LABELS[role] || role}</option>)}
+            </select>
+            <button type="button" disabled={loading || !assignUserId} onClick={async () => { await onAction('admin:updateRole', { id: assignUserId }, { role: assignRole }); setAssignQuery(''); setAssignUserId(''); }} style={{ ...s.btn, ...s.btnPri, opacity: loading || !assignUserId ? 0.55 : 1 }}>Назначить</button>
+          </div>
+          {assignQuery && assignCandidates.length === 0 && <div style={{ color: A.textSec, fontSize: 12, marginTop: 9 }}>Подходящих пользователей без административной роли не найдено.</div>}
+        </div>
+      )}
 
       {canManage && (
         <div style={s.card}>
@@ -1700,7 +1735,7 @@ function AdminAccessPanel({ security, loading, onRefresh, onAction }) {
                 <div>Последний вход: {admin.lastLoginAt ? new Date(admin.lastLoginAt).toLocaleString('ru-RU') : 'нет данных'}</div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7 }}>
-                <select disabled={!canManage || admin.role === 'owner'} value={admin.role} onChange={e => onAction('admin:updateRole', admin, { role: e.target.value })} style={{ ...s.select, marginBottom: 0, fontSize: 12, padding: '8px 9px' }}>
+                <select disabled={!canManage || (admin.role === 'owner' && (security?.actor?.role !== 'owner' || admin.id === security?.actor?.userId))} value={admin.role} onChange={e => onAction('admin:updateRole', admin, { role: e.target.value })} style={{ ...s.select, marginBottom: 0, fontSize: 12, padding: '8px 9px' }}>
                   {Object.keys(roles).filter(role => ADMIN_ROLE_LABELS[role]).map(role => <option key={role} value={role}>{ADMIN_ROLE_LABELS[role]}</option>)}
                 </select>
                 <button type="button" disabled={!canManage || admin.role === 'owner'} onClick={() => onAction(admin.status === 'active' ? 'admin:block' : 'admin:unblock', admin)} style={{ ...s.btn, ...(admin.status === 'active' ? s.btnDanger : s.btnGray), padding: '8px 9px', fontSize: 12 }}>{admin.status === 'active' ? 'Блок' : 'Разблок'}</button>
@@ -11810,6 +11845,7 @@ export const AdminPanel = () => {
       {activeTab === 'access' && (
         <AdminAccessPanel
           security={adminSecurity || { actor: adminSession, roles: {} }}
+          users={adminMetrics.users}
           loading={adminSecurityLoading}
           onRefresh={loadAdminSecurity}
           onAction={runAdminSecurityAction}

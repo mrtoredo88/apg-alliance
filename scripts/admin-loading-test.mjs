@@ -8,6 +8,7 @@ const adminPanel = fs.readFileSync(path.join(root, 'src/AdminPanel.jsx'), 'utf8'
 const adminActions = fs.readFileSync(path.join(root, 'server/src/routes/admin-actions.js'), 'utf8');
 const adminLogin = fs.readFileSync(path.join(root, 'server/src/routes/admin-login.js'), 'utf8');
 const adminSecurity = fs.readFileSync(path.join(root, 'server/src/lib/adminSecurity.js'), 'utf8');
+const adminSecurityRoute = fs.readFileSync(path.join(root, 'server/src/routes/admin-security.js'), 'utf8');
 
 const bootstrapSlice = adminPanel.slice(
   adminPanel.indexOf('const specs = ['),
@@ -57,5 +58,8 @@ assert.ok(adminLogin.includes('const role = getPrimaryRole(combinedUser);'), 'Ad
 assert.ok(adminLogin.includes('const uid = String(userId || combinedUser.id'), 'Native APG admin sessions must use the canonical Identity user id.');
 assert.ok(adminLogin.includes('combinedUser.firebaseUid') && adminLogin.includes('combinedUser.authUid'), 'Legacy credential ids must remain available during the native Identity transition.');
 assert.ok(adminSecurity.includes('findUserByIdentityUid'), 'AdminGuard must resolve native APG session identities by canonical uid.');
+assert.ok(adminPanel.includes('Назначить администратора из пользователей') && adminPanel.includes("onAction('admin:updateRole', { id: assignUserId }"), 'Access center must promote an existing user without creating a duplicate account.');
+assert.ok(adminPanel.includes('users={adminMetrics.users}'), 'Access center must receive the existing user directory.');
+assert.ok(adminSecurityRoute.includes('Нельзя снять роль у последнего активного Owner.') && adminSecurityRoute.includes("snap.id === actor.userId"), 'Owner demotion must protect the current and last active owner.');
 
 console.log('Admin loading pipeline regression passed');

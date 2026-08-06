@@ -123,11 +123,6 @@ async function assertCanManage(actor, currentData, nextRole = '') {
     error.statusCode = 403;
     throw error;
   }
-  if (currentRole === 'owner' && nextRole && normalizeRole(nextRole) !== 'owner') {
-    const error = new Error('Нельзя случайно ограничить Owner.');
-    error.statusCode = 403;
-    throw error;
-  }
 }
 
 function requireStrongPassword(password) {
@@ -292,6 +287,20 @@ export default async function adminSecurityRoutes(fastify) {
       if (action === 'admin:updateRole') {
         const nextRole = normalizeRole(request.body?.role);
         await assertCanManage(actor, currentData, nextRole);
+        if (getPrimaryRole(currentData || {}) === ROLES.owner && nextRole !== ROLES.owner) {
+          const targetUid = String(currentData.firebaseUid || currentData.authUid || snap.id);
+          if (snap.id === actor.userId || targetUid === actor.uid) {
+            const error = new Error('Нельзя снять роль Owner у собственной активной учётной записи.');
+            error.statusCode = 409;
+            throw error;
+          }
+          const otherOwners = (await listAdmins(db)).filter(item => item.id !== snap.id && item.role === ROLES.owner && item.status === 'active');
+          if (!otherOwners.length) {
+            const error = new Error('Нельзя снять роль у последнего активного Owner.');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
         const patch = {
           role: nextRole,
           userRole: nextRole,
