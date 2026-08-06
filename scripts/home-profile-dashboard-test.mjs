@@ -90,6 +90,10 @@ if (!mobileHomeSource.includes('function HorizontalRail') || !mobileHomeSource.i
   throw new Error('Mobile home rails must suppress the synthetic card click emitted after an iOS swipe.');
 }
 
+if (!mobileHomeSource.includes('data-horizontal-gesture-boundary="true"') || !userAppSource.includes('[data-apg-horizontal-scroll="true"], [data-apg-gesture-ignore]') || !userAppSource.includes('edgeSwipeRef.current = !gestureBoundary')) {
+  throw new Error('Horizontal home rails must be excluded from global tab and edge-swipe navigation.');
+}
+
 if (!userAppSource.includes('const failedSnap = { docs: [], loadFailed: true }') || !userAppSource.includes('if (!pSnap.loadFailed)') || !userAppSource.includes('if (isMounted.current && !exSnap.loadFailed)')) {
   throw new Error('Transient public-data failures must not erase restored catalogs for individual accounts.');
 }

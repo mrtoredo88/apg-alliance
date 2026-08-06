@@ -4164,12 +4164,12 @@ export function UserApp() {
 
   const handleSwipeStart = useCallback((e) => {
     const touch = e.touches[0];
-    const gestureBoundary = e.target?.closest?.('[data-horizontal-gesture-boundary="true"], [data-apg-horizontal-scroll="true"]');
+    const gestureBoundary = e.target?.closest?.('[data-horizontal-gesture-boundary="true"], [data-apg-horizontal-scroll="true"], [data-apg-gesture-ignore]');
     const pullState = getPullStartState(e, activePanel, pullRefreshing);
     setPullDistance(0);
     swipeTouchX.current = gestureBoundary ? null : touch.clientX;
     swipeTouchY.current = gestureBoundary ? null : touch.clientY;
-    edgeSwipeRef.current = touch.clientX <= 24 && (activePanel !== 'home' || panelHistoryRef.current.length > 1);
+    edgeSwipeRef.current = !gestureBoundary && touch.clientX <= 24 && (activePanel !== 'home' || panelHistoryRef.current.length > 1);
     pullTouchRef.current = {
       active: pullState.active,
       startY: touch.clientY,

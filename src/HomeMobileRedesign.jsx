@@ -107,6 +107,7 @@ function HorizontalRail({ children }) {
   return (
     <div
       data-apg-gesture-ignore="true"
+      data-horizontal-gesture-boundary="true"
       data-horizontal-rail="true"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
