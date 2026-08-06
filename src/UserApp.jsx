@@ -1113,6 +1113,7 @@ export function UserApp() {
   const [pullDistance, setPullDistance]         = useState(0);
   const [pullRefreshing, setPullRefreshing]     = useState(false);
   const [activePartner, setActivePartner]       = useState(null);
+  const [offerExpertTarget, setOfferExpertTarget] = useState(null);
   const [pendingLokiNewsTarget, setPendingLokiNewsTarget] = useState(() => initialDeepLink.type === 'news' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
   const [pendingLokiEventTarget, setPendingLokiEventTarget] = useState(() => initialDeepLink.type === 'event' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
   const [pendingPeopleAction, setPendingPeopleAction] = useState(null);
@@ -1685,6 +1686,11 @@ export function UserApp() {
       visitCount: visitCounts[p.id] ?? 0,
     }));
   }, [partners, visitCounts]);
+
+  const offerProviders = useMemo(() => [
+    ...enrichedPartners.map(item => ({ ...item, offerEntityType: 'partner' })),
+    ...experts.map(item => ({ ...item, offerEntityType: 'expert' })),
+  ], [enrichedPartners, experts]);
 
   const resolvePartnerDeepLink = useCallback(async (rawPartnerId) => {
     const partnerId = normalizeDeepLinkId(rawPartnerId);
@@ -5077,7 +5083,10 @@ export function UserApp() {
   const handleOpenHome = useCallback(() => goPanel('home'), [goPanel]);
   const handleOpenNews = useCallback(() => goPanel('news'), [goPanel]);
   const handleOpenEvents = useCallback(() => goPanel('events'), [goPanel]);
-  const handleOpenExperts = useCallback(() => goPanel('experts'), [goPanel]);
+  const handleOpenExperts = useCallback(() => {
+    setOfferExpertTarget(null);
+    goPanel('experts');
+  }, [goPanel]);
   const handleOpenOffers = useCallback(() => goPanel('offers'), [goPanel]);
   const handleOpenRewards = useCallback(() => goPanel('rewards'), [goPanel]);
   const handleOpenNearby = useCallback(() => goPanel('nearby'), [goPanel]);
@@ -5759,9 +5768,16 @@ export function UserApp() {
                 <Suspense fallback={<LazyFallback />}>
                   <OffersPage
                     variant="v2"
-                    partners={enrichedPartners}
-                    onOpenPartner={openPartner}
-                    onAskQuestion={(partner) => openContextDialog('promotion', partner, 'promotion-card')}
+                    partners={offerProviders}
+                    onOpenPartner={(provider) => {
+                      if (provider?.offerEntityType === 'expert') {
+                        setOfferExpertTarget({ id: String(provider.id), nonce: Date.now() });
+                        goPanel('experts');
+                        return;
+                      }
+                      openPartner(provider);
+                    }}
+                    onAskQuestion={(provider) => openContextDialog(provider?.offerEntityType === 'expert' ? 'expert' : 'promotion', provider, 'promotion-card')}
                     onBack={goBackPanel}
                     desktopOverview={desktopOverview}
                     desktopMode={desktopDevice}
@@ -5937,6 +5953,7 @@ export function UserApp() {
               <Panel id="experts">
                 <Suspense fallback={<LazyFallback />}>
                   <ExpertsPage
+                    key={offerExpertTarget?.nonce || 'experts-directory'}
                     nav="experts"
                     variant="v2"
                     experts={experts}
@@ -5946,7 +5963,7 @@ export function UserApp() {
                     scannedExperts={scannedExperts}
                     onBack={goBackPanel}
                     isActive={activePanel === 'experts'}
-                    initialExpertId={pendingExpertId}
+                    initialExpertId={offerExpertTarget?.id || pendingExpertId}
                     onExpertOpen={(expert) => {
                       recordInterest({ type: 'expert_open', itemType: 'expert', item: expert });
                       trackAppEvent('expert:open', {

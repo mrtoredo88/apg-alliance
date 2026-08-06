@@ -7,6 +7,7 @@ const mobileHomeSource = fs.readFileSync(path.join(root, 'src/HomeMobileRedesign
 const userAppSource = fs.readFileSync(path.join(root, 'src/UserApp.jsx'), 'utf8');
 const userActionsSource = fs.readFileSync(path.join(root, 'server/src/routes/user-actions.js'), 'utf8');
 const desktopSource = fs.readFileSync(path.join(root, 'src/components/DesktopUI.jsx'), 'utf8');
+const offersSource = fs.readFileSync(path.join(root, 'src/OffersPage.jsx'), 'utf8');
 
 const requiredDesktopProps = [
   'profileToday',
@@ -96,6 +97,14 @@ if (!mobileHomeSource.includes('data-horizontal-gesture-boundary="true"') || !us
 
 if (!userAppSource.includes('const failedSnap = { docs: [], loadFailed: true }') || !userAppSource.includes('if (!pSnap.loadFailed)') || !userAppSource.includes('if (isMounted.current && !exSnap.loadFailed)')) {
   throw new Error('Transient public-data failures must not erase restored catalogs for individual accounts.');
+}
+
+if (!offersSource.includes("title = 'Акции'") || !offersSource.includes('return catalogItems.filter') || !offersSource.includes("showAllPartners ? 'Найти место' : 'Найти акцию'")) {
+  throw new Error('Bottom Actions must render the offer-only catalog while Places keeps the complete catalog.');
+}
+
+if (!userAppSource.includes("offerEntityType: 'expert'") || !userAppSource.includes('partners={offerProviders}') || !userAppSource.includes("provider?.offerEntityType === 'expert'")) {
+  throw new Error('Actions must combine partner and expert offers and open the correct public profile.');
 }
 
 console.log('home-profile-dashboard-test: ok');
