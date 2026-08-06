@@ -82,4 +82,12 @@ if (!userActionsSource.includes("typeof req.body?.isAdding === 'boolean'") || !u
   throw new Error('Favorite API must honor explicit add/remove intent idempotently.');
 }
 
+if (!mobileHomeSource.includes("scrollSnapType: 'x proximity'") || !mobileHomeSource.includes("touchAction: 'pan-x'") || !mobileHomeSource.includes('data-apg-gesture-ignore="true"')) {
+  throw new Error('Mobile home rails must keep horizontal gestures inside the rail without mandatory snap jumps.');
+}
+
+if (!userAppSource.includes('const failedSnap = { docs: [], loadFailed: true }') || !userAppSource.includes('if (!pSnap.loadFailed)') || !userAppSource.includes('if (isMounted.current && !exSnap.loadFailed)')) {
+  throw new Error('Transient public-data failures must not erase restored catalogs for individual accounts.');
+}
+
 console.log('home-profile-dashboard-test: ok');

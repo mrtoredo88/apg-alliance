@@ -43,6 +43,11 @@ const s = {
     boxShadow: '0 8px 24px rgba(65,48,30,.09)', cursor: 'pointer', flexShrink: 0,
   },
   goldLink: { border: 0, background: 'transparent', padding: '6px 0', color: '#b8861d', fontSize: 12, lineHeight: 1.2, fontWeight: 800, cursor: 'pointer' },
+  horizontalRail: {
+    display: 'flex', gap: 8, overflowX: 'auto', overflowY: 'hidden', padding: '0 1px 7px',
+    scrollbarWidth: 'none', scrollSnapType: 'x proximity', WebkitOverflowScrolling: 'touch',
+    overscrollBehaviorX: 'contain', overscrollBehaviorY: 'none', touchAction: 'pan-x',
+  },
 };
 
 function SectionTitle({ icon, children, action, label = 'Смотреть все' }) {
@@ -77,13 +82,13 @@ export function HomeMobileRedesign({
     '--hm-offer-bg': 'rgba(201,153,49,.18)',
     '--hm-offer-text': '#efd28d',
   } : {
-    '--hm-bg': '#fbfaf6',
+    '--hm-bg': '#f8f2e7',
     '--hm-text': '#171519',
     '--hm-muted': '#777176',
     '--hm-card': '#fff',
-    '--hm-card-soft': '#eee9df',
-    '--hm-border': 'rgba(50,39,29,.06)',
-    '--hm-shadow': '0 9px 25px rgba(59,43,29,.07)',
+    '--hm-card-soft': '#efe5d6',
+    '--hm-border': 'rgba(73,55,31,.10)',
+    '--hm-shadow': '0 9px 25px rgba(70,55,30,.10)',
     '--hm-hero-gradient': 'linear-gradient(90deg,#f7f2e9 0%,#f7f2e9 39%,rgba(247,242,233,.88) 50%,rgba(247,242,233,.1) 77%)',
     '--hm-offer-bg': '#fff1cf',
     '--hm-offer-text': '#604716',
@@ -175,7 +180,7 @@ export function HomeMobileRedesign({
 
         <section style={{ marginTop: 12 }}>
           <SectionTitle icon="●" action={onOpenNearby || onOpenPartners} label="Открыть">Рядом с вами</SectionTitle>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 1px 7px', scrollbarWidth: 'none', scrollSnapType: 'x mandatory' }}>
+          <div data-apg-gesture-ignore="true" style={s.horizontalRail}>
             {places.length ? places.map(place => {
               const id = String(place.id || place.name);
               const favorite = favoriteIds.has(id);
@@ -196,9 +201,9 @@ export function HomeMobileRedesign({
 
         <section style={{ marginTop: 11 }}>
           <SectionTitle action={onOpenOffers}>Горящие акции 🔥</SectionTitle>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 1px 7px', scrollbarWidth: 'none', scrollSnapType: 'x mandatory' }}>
+          <div data-apg-gesture-ignore="true" style={s.horizontalRail}>
             {(offers.length ? offers : places).map((place, index) => (
-              <button key={place.id || place.name || index} type="button" onClick={() => onOpenPartner?.(place)} style={{ flex: '0 0 94px', height: 84, overflow: 'hidden', position: 'relative', border: 0, borderRadius: 13, padding: 0, background: ['#ef7b2e','#612176','#23854f','#d6a33f'][index % 4], color: '#fff', textAlign: 'left', scrollSnapAlign: 'start', cursor: 'pointer' }}>
+              <button key={place.id || place.name || index} type="button" onClick={() => onOpenPartner?.(place)} style={{ flex: '0 0 94px', height: 84, overflow: 'hidden', position: 'relative', border: '1px solid var(--hm-border)', borderRadius: 13, padding: 0, background: ['#c99f45','#4a2454','#b98b32','#38203f'][index % 4], color: '#fff', textAlign: 'left', scrollSnapAlign: 'start', cursor: 'pointer' }}>
                 <div style={{ position: 'absolute', inset: 0 }}><Picture item={place} fallback="Акция" /></div>
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(21,12,19,.08),rgba(21,12,19,.82))' }} />
                 <div style={{ position: 'relative', height: '100%', boxSizing: 'border-box', padding: 7, display: 'flex', flexDirection: 'column' }}>
@@ -217,7 +222,7 @@ export function HomeMobileRedesign({
               {[['today','Сегодня'],['tomorrow','Завтра'],['weekend','На выходных']].map(([id,label]) => <button key={id} type="button" role="tab" aria-selected={eventFilter === id} onClick={() => setEventFilter(id)} style={{ border: 0, borderRadius: 9, padding: '6px 8px', background: eventFilter === id ? 'linear-gradient(135deg,#d7aa45,#c38b1d)' : 'transparent', color: eventFilter === id ? '#fff' : '#b8861d', fontSize: 9, fontWeight: 850, cursor: 'pointer' }}>{label}</button>)}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 1px 7px', scrollbarWidth: 'none', scrollSnapType: 'x mandatory' }}>
+          <div data-apg-gesture-ignore="true" style={s.horizontalRail}>
             {displayedEvents.map(event => (
               <button key={event.id || event.title} type="button" onClick={() => event.placeholder ? onOpenEvents?.() : onOpenEvents?.(event)} style={{ flex: '0 0 120px', height: 106, overflow: 'hidden', position: 'relative', borderRadius: 14, border: '1px solid var(--hm-border)', padding: 0, background: 'var(--hm-card)', color: 'var(--hm-text)', boxShadow: 'var(--hm-shadow)', textAlign: 'left', scrollSnapAlign: 'start', cursor: 'pointer' }}>
                 <div style={{ height: 52, position: 'relative', background: 'var(--hm-card-soft)' }}><Picture item={event} fallback="Афиша" /><span style={{ position: 'absolute', left: 6, bottom: -7, padding: '3px 5px', borderRadius: 6, background: '#ffe414', color: '#241f12', fontSize: 8, fontWeight: 900 }}>{event.placeholder ? 'Скоро' : eventTime(event)}</span></div>

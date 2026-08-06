@@ -2101,12 +2101,16 @@ export function UserApp() {
       }
 
       const emptySnap = { docs: [] };
+      // A failed public request must not replace a previously restored catalog
+      // with an empty array. This used to make the home screen depend on which
+      // account happened to hit a transient timeout during authorization.
+      const failedSnap = { docs: [], loadFailed: true };
       const _loadCritical = () => Promise.all([
-        safeLoad('partners', () => loadPublicSnap('partners', () => getDocs(query(collection(db, 'partners'), limit(100)))), emptySnap),
-        safeLoad('events', () => loadPublicSnap('events', () => getDocs(query(collection(db, 'events'), limit(100)))), emptySnap),
-        safeLoad('news', () => loadPublicSnap('news', () => getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'), limit(30)))), emptySnap),
+        safeLoad('partners', () => loadPublicSnap('partners', () => getDocs(query(collection(db, 'partners'), limit(100)))), failedSnap),
+        safeLoad('events', () => loadPublicSnap('events', () => getDocs(query(collection(db, 'events'), limit(100)))), failedSnap),
+        safeLoad('news', () => loadPublicSnap('news', () => getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'), limit(30)))), failedSnap),
         safeLoad('vkNews', fetchVkNewsPosts, []),
-        safeLoad('experts', () => loadPublicSnap('experts', () => getDocs(query(collection(db, 'experts'), limit(100)))), emptySnap),
+        safeLoad('experts', () => loadPublicSnap('experts', () => getDocs(query(collection(db, 'experts'), limit(100)))), failedSnap),
         safeLoad('stats', () => loadPublicStats(() => getDoc(doc(db, 'stats', 'global'))), null),
       ]);
       const _loadSecondary = () => Promise.all([
@@ -2126,8 +2130,10 @@ export function UserApp() {
       const loadedPartners = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const freshPartners = loadedPartners
         .filter(item => item.catalogPublished !== false && isNotArchived(item));
-      setIfChanged(setPartners, freshPartners);
-      refreshHomeCacheSection(HOME_CACHE_SECTIONS.PARTNERS, freshPartners);
+      if (!pSnap.loadFailed) {
+        setIfChanged(setPartners, freshPartners);
+        refreshHomeCacheSection(HOME_CACHE_SECTIONS.PARTNERS, freshPartners);
+      }
       if (userData && isMounted.current) {
         const owned = loadedPartners.find(p => (
           profileOwnedByUser(p, userData)
@@ -2166,8 +2172,10 @@ export function UserApp() {
           const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt ?? 0);
           return tb - ta;
         });
-      setIfChanged(setEvents, freshEvents);
-      refreshHomeCacheSection(HOME_CACHE_SECTIONS.EVENTS, freshEvents);
+      if (!eSnap.loadFailed) {
+        setIfChanged(setEvents, freshEvents);
+        refreshHomeCacheSection(HOME_CACHE_SECTIONS.EVENTS, freshEvents);
+      }
 
       const firestoreNews = nSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const getMs = n => n.createdAt?.toDate ? n.createdAt.toDate().getTime() : (n.createdAt ?? 0);
@@ -2188,8 +2196,10 @@ export function UserApp() {
           return dp !== 0 ? dp : getMs(b) - getMs(a);
         })
         .slice(0, 50);
-      setIfChanged(setNews, freshNews);
-      refreshHomeCacheSection(HOME_CACHE_SECTIONS.NEWS, freshNews);
+      if (!nSnap.loadFailed || vkPostsRaw.length) {
+        setIfChanged(setNews, freshNews);
+        refreshHomeCacheSection(HOME_CACHE_SECTIONS.NEWS, freshNews);
+      }
       markHomeCacheRefreshComplete({
         durationMs: Date.now() - homeCacheRefreshStartedAt,
         partners: freshPartners.length,
@@ -2199,7 +2209,7 @@ export function UserApp() {
       setHomeCacheSnapshot(getHomeCacheSnapshot());
 
       const freshExperts = exSnap.docs.map(d => normalizeExpertRecord({ id: d.id, ...d.data() })).filter(isNotArchived);
-      if (isMounted.current) {
+      if (isMounted.current && !exSnap.loadFailed) {
         setExperts(freshExperts);
         if (userData) {
           const ownedEx = freshExperts.find(e => profileOwnedByUser(e, userData));
