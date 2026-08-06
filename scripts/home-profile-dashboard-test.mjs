@@ -86,6 +86,10 @@ if (!mobileHomeSource.includes("scrollSnapType: 'x proximity'") || !mobileHomeSo
   throw new Error('Mobile home rails must keep horizontal gestures inside the rail without mandatory snap jumps.');
 }
 
+if (!mobileHomeSource.includes('function HorizontalRail') || !mobileHomeSource.includes('onClickCapture={handleClickCapture}') || !mobileHomeSource.includes('suppressUntil = Date.now() + 500')) {
+  throw new Error('Mobile home rails must suppress the synthetic card click emitted after an iOS swipe.');
+}
+
 if (!userAppSource.includes('const failedSnap = { docs: [], loadFailed: true }') || !userAppSource.includes('if (!pSnap.loadFailed)') || !userAppSource.includes('if (isMounted.current && !exSnap.loadFailed)')) {
   throw new Error('Transient public-data failures must not erase restored catalogs for individual accounts.');
 }

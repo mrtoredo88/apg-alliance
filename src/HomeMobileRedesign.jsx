@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { getNewsImage, getNewsTitle } from './newsUtils.js';
 import { selectActualEvents, selectEventsForPeriod } from './eventSchedule.js';
@@ -57,6 +57,69 @@ function SectionTitle({ icon, children, action, label = 'Смотреть все
         {icon && <span aria-hidden="true" style={{ color: '#bf8a20' }}>{icon}</span>}{children}
       </h2>
       {action && <button type="button" onClick={action} style={s.goldLink}>{label}</button>}
+    </div>
+  );
+}
+
+function HorizontalRail({ children }) {
+  const gestureRef = useRef({ x: 0, y: 0, moved: false, suppressUntil: 0 });
+
+  const handleTouchStart = event => {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    gestureRef.current.x = touch.clientX;
+    gestureRef.current.y = touch.clientY;
+    gestureRef.current.moved = false;
+  };
+
+  const handleTouchMove = event => {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    const dx = Math.abs(touch.clientX - gestureRef.current.x);
+    const dy = Math.abs(touch.clientY - gestureRef.current.y);
+    if (dx > 7 && dx > dy) gestureRef.current.moved = true;
+  };
+
+  const handleTouchEnd = () => {
+    if (gestureRef.current.moved) gestureRef.current.suppressUntil = Date.now() + 500;
+  };
+
+  const handlePointerStart = event => {
+    gestureRef.current.x = event.clientX;
+    gestureRef.current.y = event.clientY;
+    gestureRef.current.moved = false;
+  };
+
+  const handlePointerMove = event => {
+    if (!event.buttons && event.pointerType === 'mouse') return;
+    const dx = Math.abs(event.clientX - gestureRef.current.x);
+    const dy = Math.abs(event.clientY - gestureRef.current.y);
+    if (dx > 7 && dx > dy) gestureRef.current.moved = true;
+  };
+
+  const handleClickCapture = event => {
+    if (!gestureRef.current.moved && Date.now() > gestureRef.current.suppressUntil) return;
+    event.preventDefault();
+    event.stopPropagation();
+    gestureRef.current.moved = false;
+  };
+
+  return (
+    <div
+      data-apg-gesture-ignore="true"
+      data-horizontal-rail="true"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      onPointerDown={handlePointerStart}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handleTouchEnd}
+      onPointerCancel={handleTouchEnd}
+      onClickCapture={handleClickCapture}
+      style={s.horizontalRail}
+    >
+      {children}
     </div>
   );
 }
@@ -180,7 +243,7 @@ export function HomeMobileRedesign({
 
         <section style={{ marginTop: 12 }}>
           <SectionTitle icon="●" action={onOpenNearby || onOpenPartners} label="Открыть">Рядом с вами</SectionTitle>
-          <div data-apg-gesture-ignore="true" style={s.horizontalRail}>
+          <HorizontalRail>
             {places.length ? places.map(place => {
               const id = String(place.id || place.name);
               const favorite = favoriteIds.has(id);
@@ -196,12 +259,12 @@ export function HomeMobileRedesign({
                 </article>
               );
             }) : <div style={{ padding: 16, borderRadius: 17, background: 'var(--hm-card)', color: 'var(--hm-muted)' }}>Места скоро появятся.</div>}
-          </div>
+          </HorizontalRail>
         </section>
 
         <section style={{ marginTop: 11 }}>
           <SectionTitle action={onOpenOffers}>Горящие акции 🔥</SectionTitle>
-          <div data-apg-gesture-ignore="true" style={s.horizontalRail}>
+          <HorizontalRail>
             {(offers.length ? offers : places).map((place, index) => (
               <button key={place.id || place.name || index} type="button" onClick={() => onOpenPartner?.(place)} style={{ flex: '0 0 94px', height: 84, overflow: 'hidden', position: 'relative', border: '1px solid var(--hm-border)', borderRadius: 13, padding: 0, background: ['#c99f45','#4a2454','#b98b32','#38203f'][index % 4], color: '#fff', textAlign: 'left', scrollSnapAlign: 'start', cursor: 'pointer' }}>
                 <div style={{ position: 'absolute', inset: 0 }}><Picture item={place} fallback="Акция" /></div>
@@ -212,7 +275,7 @@ export function HomeMobileRedesign({
                 </div>
               </button>
             ))}
-          </div>
+          </HorizontalRail>
         </section>
 
         <section style={{ marginTop: 11 }}>
@@ -222,7 +285,7 @@ export function HomeMobileRedesign({
               {[['today','Сегодня'],['tomorrow','Завтра'],['weekend','На выходных']].map(([id,label]) => <button key={id} type="button" role="tab" aria-selected={eventFilter === id} onClick={() => setEventFilter(id)} style={{ border: 0, borderRadius: 9, padding: '6px 8px', background: eventFilter === id ? 'linear-gradient(135deg,#d7aa45,#c38b1d)' : 'transparent', color: eventFilter === id ? '#fff' : '#b8861d', fontSize: 9, fontWeight: 850, cursor: 'pointer' }}>{label}</button>)}
             </div>
           </div>
-          <div data-apg-gesture-ignore="true" style={s.horizontalRail}>
+          <HorizontalRail>
             {displayedEvents.map(event => (
               <button key={event.id || event.title} type="button" onClick={() => event.placeholder ? onOpenEvents?.() : onOpenEvents?.(event)} style={{ flex: '0 0 120px', height: 106, overflow: 'hidden', position: 'relative', borderRadius: 14, border: '1px solid var(--hm-border)', padding: 0, background: 'var(--hm-card)', color: 'var(--hm-text)', boxShadow: 'var(--hm-shadow)', textAlign: 'left', scrollSnapAlign: 'start', cursor: 'pointer' }}>
                 <div style={{ height: 52, position: 'relative', background: 'var(--hm-card-soft)' }}><Picture item={event} fallback="Афиша" /><span style={{ position: 'absolute', left: 6, bottom: -7, padding: '3px 5px', borderRadius: 6, background: '#ffe414', color: '#241f12', fontSize: 8, fontWeight: 900 }}>{event.placeholder ? 'Скоро' : eventTime(event)}</span></div>
@@ -230,7 +293,7 @@ export function HomeMobileRedesign({
                 <div style={{ padding: '10px 7px 5px' }}><span style={{ display: 'block', color: 'var(--hm-muted)', fontSize: 7.5 }}>{event.category || 'Событие'}</span><strong style={{ display: '-webkit-box', marginTop: 2, fontSize: 9.5, lineHeight: '11px', fontWeight: 900, WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{event.title || 'Событие АПГ'}</strong><span style={{ display: 'block', marginTop: 2, color: 'var(--hm-muted)', fontSize: 7.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.address || event.partner || 'Зеленоград'}</span></div>
               </button>
             ))}
-          </div>
+          </HorizontalRail>
         </section>
       </main>
     </Panel>
