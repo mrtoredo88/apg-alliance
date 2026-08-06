@@ -107,4 +107,8 @@ if (!userAppSource.includes("offerEntityType: 'expert'") || !userAppSource.inclu
   throw new Error('Actions must combine partner and expert offers and open the correct public profile.');
 }
 
+if (!offersSource.includes("import { EXPERT_CATEGORIES } from './constants.js'") || !offersSource.includes('label: categoryLabel(id)') || offersSource.includes('CATEGORY_LABELS[id] ?? id')) {
+  throw new Error('Action category filters must display Russian labels for partner and expert categories.');
+}
+
 console.log('home-profile-dashboard-test: ok');

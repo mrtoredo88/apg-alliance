@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 
 import { T, GLASS, GLASS_GOLD } from './design.js';
+import { EXPERT_CATEGORIES } from './constants.js';
 import { APG2_PROFILE, EmptyStateV2, GlassBadge, GlassButton, GlassCard, GlassListItem, GlassPanel, ScreenHeader, StatPill } from './components/Apg2ProfileGlass.jsx';
 import {
   DesktopContentGrid,
@@ -132,8 +133,17 @@ const CATEGORY_LABELS = {
   fashion:       '👗 Одежда',
   auto:          '🚗 Авто',
   services:      '💼 Услуги',
+  shopping:      '🛍️ Магазины',
   other:         '📦 Другое',
 };
+
+EXPERT_CATEGORIES.forEach(({ id, label, emoji }) => {
+  if (!CATEGORY_LABELS[id]) CATEGORY_LABELS[id] = `${emoji || '✨'} ${label}`;
+});
+
+function categoryLabel(id) {
+  return CATEGORY_LABELS[id] || '📦 Другое';
+}
 
 function OfferCardV2({ partner, onOpenPartner, onAskQuestion, index }) {
   const featuredTone = partner.featured;
@@ -189,7 +199,7 @@ export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartne
       counts[cat] = (counts[cat] || 0) + 1;
     });
     return Object.entries(counts).map(([id, count]) => ({
-      id, label: CATEGORY_LABELS[id] ?? id, count,
+      id, label: categoryLabel(id), count,
     }));
   }, [catalogItems]);
 
@@ -200,7 +210,7 @@ export function OffersPage({ variant = 'v2', partners = [], onBack, onOpenPartne
       counts[cat] = (counts[cat] || 0) + 1;
     });
     return Object.entries(counts).map(([id, count]) => ({
-      id, label: CATEGORY_LABELS[id] ?? id, count,
+      id, label: categoryLabel(id), count,
     }));
   }, [catalogItems]);
 
