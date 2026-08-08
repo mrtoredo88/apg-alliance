@@ -2848,9 +2848,9 @@ export function UserApp() {
 
   // ─── Onboarding ─────────────────────────────────────────────────────────────
 
-  const handleOnboardingComplete = async () => {
+  const handleOnboardingComplete = async ({ action = 'home', skipped = false } = {}) => {
     setShowOnboarding(false);
-    setShowScannerHint(true);
+    if (action !== 'home') navigatePanel(action);
     if (user) {
       try {
         await userAction('profile:update', {
@@ -2861,6 +2861,8 @@ export function UserApp() {
             learningAnalytics: {
               onboardingCompleted: true,
               onboardingCompletedAt: new Date().toISOString(),
+              onboardingFirstAction: action,
+              onboardingSkipped: skipped,
             },
           },
         });
