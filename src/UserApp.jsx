@@ -38,7 +38,8 @@ import {
   shouldShowPwaInstallGuide,
 } from './components/onboarding/PwaInstallGuide.jsx';
 import { MOTION, motionTransition } from './motion.js';
-import { LokiProvider } from './loki/LokiProvider.jsx';
+import { LokiProvider, useLoki } from './loki/LokiProvider.jsx';
+import { LokiExperience } from './loki/LokiExperience.jsx';
 import { LOKI_EVENTS } from './loki/lokiEvents.js';
 import { showLokiMessage } from './loki/lokiBus.js';
 import { LOKI_APP_ACTIONS } from './loki/lokiActionTypes.js';
@@ -1042,6 +1043,19 @@ function isFirebaseStartupOnlyError(error) {
 
 function LazyFallback() {
   return <SplashScreen isReady={false} autoTimeout={false} status="Подготавливаем экран АПГ…" />;
+}
+
+function LokiLogoDialog() {
+  const loki = useLoki();
+
+  useEffect(() => {
+    const openDialog = () => loki.openExperience();
+    window.addEventListener('apg:open-loki-dialog', openDialog);
+    return () => window.removeEventListener('apg:open-loki-dialog', openDialog);
+  }, [loki.openExperience]);
+
+  if (!loki.experienceOpen) return null;
+  return createPortal(<LokiExperience loki={loki} />, document.body);
 }
 
 export function UserApp() {
@@ -5449,6 +5463,7 @@ export function UserApp() {
       <AdaptivityProvider>
         <AppRoot>
           <LokiProvider user={user} activePanel={activePanel} appActions={lokiAppActions} appState={lokiAppState}>
+          <LokiLogoDialog />
           {desktopWorkspaceActive ? (
             <Suspense fallback={<LazyFallback />}>
               <DesktopWorkspace
