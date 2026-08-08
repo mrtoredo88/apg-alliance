@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { LokiLogoButton } from '../components/LokiLogoButton.jsx';
 import { BusinessHub } from '../businessHub/BusinessHub.jsx';
 import { canUseBusinessHub, getBusinessHubFlag } from '../businessHub/BusinessHubCore.js';
 import { getCabinetRoles } from '../cabinet/CabinetRoleEngine.js';
@@ -336,10 +337,7 @@ function WorkspaceHeader({ query, onQueryChange, onQuerySubmit, actions, unreadC
     <header data-workspace-v2-header style={{ position: 'sticky', top: 0, zIndex: 30, background: WS.header, backdropFilter: 'blur(28px) saturate(1.25)', WebkitBackdropFilter: 'blur(28px) saturate(1.25)', borderBottom: `1px solid ${WS.line}` }}>
       <div style={{ maxWidth: 1760, margin: '0 auto', minHeight: 72, padding: '0 24px', display: 'grid', gridTemplateColumns: '255px minmax(0,1fr) auto', gap: 18, alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-          <picture>
-            <source srcSet="/logo.webp" type="image/webp" />
-            <img src="/logo.png" alt="АПГ" style={{ width: 44, height: 44, borderRadius: 16, objectFit: 'cover', display: 'block', boxShadow: '0 14px 30px rgba(47,28,105,0.18)' }} />
-          </picture>
+          <LokiLogoButton onClick={actions.openLoki} radius={16} />
           <div style={{ minWidth: 0 }}>
             <div style={{ color: WS.text, fontSize: 19, lineHeight: '22px', fontWeight: 950, letterSpacing: 0, whiteSpace: 'nowrap' }}>АПГ: ЗЕЛЕНОГРАД</div>
             <div style={{ color: WS.soft, fontSize: 12, lineHeight: '15px', fontWeight: 820, textTransform: 'uppercase', letterSpacing: 0.4 }}>Альянс партнёров города</div>

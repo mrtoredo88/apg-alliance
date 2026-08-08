@@ -19,6 +19,7 @@ import { countRender, markPerformanceStage } from './performance/index.js';
 import { createInitialHomeHydrationState, HOME_HYDRATION_STAGES, startHomeHydration } from './home/index.js';
 import { GIFT_SHIMMER_STYLE } from './giftShimmer.js';
 import { HomeMobileRedesign } from './HomeMobileRedesign.jsx';
+import { LokiLogoButton } from './components/LokiLogoButton.jsx';
 
 const CATEGORIES = [
   { id: 'all',           label: 'Все',          emoji: '✦' },
@@ -622,10 +623,7 @@ function V2FirstScreenMobile({
       <div style={{ position: 'relative', zIndex: 1, maxWidth: desktopMode ? 1180 : 'none', margin: desktopMode ? '0 auto' : 0, ...revealMotion(0, 'splash') }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginBottom: 'clamp(10px, 1.6svh, 14px)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-            <picture>
-              <source srcSet="/logo.webp" type="image/webp" />
-              <img src="/logo.png" alt="АПГ" style={{ width: 44, height: 44, borderRadius: 18, objectFit: 'cover', boxShadow: '0 14px 34px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,255,255,0.18)' }} />
-            </picture>
+            <LokiLogoButton onClick={onOpenLoki} />
             <div style={{ minWidth: 0 }}>
               <div style={{ color: V2.text, fontSize: 17, lineHeight: '20px', fontWeight: 880, letterSpacing: 0 }}>АПГ: ЗЕЛЕНОГРАД</div>
               <div style={{ color: V2.textMuted, fontSize: 11, lineHeight: '14px', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Альянс партнёров города</div>
@@ -3114,6 +3112,7 @@ export function HomePanelV2({
         onOpenProfile={onOpenProfile}
         onOpenRewards={onOpenRewards}
         onOpenOnboarding={onOpenOnboarding}
+        onOpenLoki={onOpenLoki}
         onOpenKeyHistory={onOpenKeyHistory}
         onOpenNews={onOpenNews}
         onOpenNewsItem={onOpenNewsItem}

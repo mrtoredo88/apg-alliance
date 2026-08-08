@@ -3,6 +3,7 @@ import { Panel } from '@vkontakte/vkui';
 import { getNewsImage, getNewsTitle } from './newsUtils.js';
 import { selectActualEvents, selectEventsForPeriod } from './eventSchedule.js';
 import { GIFT_SHIMMER_STYLE } from './giftShimmer.js';
+import { LokiLogoButton } from './components/LokiLogoButton.jsx';
 
 const imageOf = (item = {}) => {
   const source = item || {};
@@ -128,7 +129,7 @@ function HorizontalRail({ children }) {
 export function HomeMobileRedesign({
   appearance = 'light',
   user, partners = [], experts = [], events = [], news = [], favorites = [],
-  onOpenRewards, onOpenOnboarding, onOpenNews, onOpenNewsItem, onOpenPartners, onOpenPartner,
+  onOpenRewards, onOpenOnboarding, onOpenLoki, onOpenNews, onOpenNewsItem, onOpenPartners, onOpenPartner,
   onOpenExperts, onOpenEvents, onOpenNearby, onOpenOffers, onToggleFavorite, isOffline = false,
 }) {
   const [eventFilter, setEventFilter] = useState('today');
@@ -203,10 +204,7 @@ export function HomeMobileRedesign({
     <Panel id="home" data-home-version="reference-exact-v2">
       <main data-mobile-home-theme={appearance} style={{ ...s.page, ...themeVars, color: 'var(--hm-text)', background: 'var(--hm-bg)', colorScheme: isDark ? 'dark' : 'light' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <picture style={{ flexShrink: 0 }}>
-            <source srcSet="/logo.webp" type="image/webp" />
-            <img src="/logo.png" alt="АПГ" style={{ width: 48, height: 48, borderRadius: 15, objectFit: 'cover', boxShadow: '0 7px 18px rgba(43,18,52,.16)' }} />
-          </picture>
+          <LokiLogoButton onClick={onOpenLoki} size={48} radius={15} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={{ margin: 0, color: 'var(--hm-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 18, lineHeight: '22px', fontWeight: 900 }}>{greetingOf(user)}</h1>
             <div style={{ marginTop: 1, color: 'var(--hm-muted)', fontSize: 11.5, lineHeight: '15px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Рады видеть вас в Зеленограде 👋</div>

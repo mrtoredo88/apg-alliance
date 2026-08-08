@@ -1,4 +1,5 @@
 import React from 'react';
+import { LokiLogoButton } from './LokiLogoButton.jsx';
 import { APG2_PROFILE, GlassButton, GlassCard } from './Apg2ProfileGlass.jsx';
 import {
   ContentGrid,
@@ -391,10 +392,7 @@ export function DesktopTopOverview({
       )}
       <header style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: 12, alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-          <picture>
-            <source srcSet="/logo.webp" type="image/webp" />
-            <img src="/logo.png" alt="АПГ" style={{ width: 40, height: 40, borderRadius: 16, objectFit: 'cover', boxShadow: '0 12px 30px rgba(0,0,0,0.22), 0 0 0 1px rgba(var(--apg2-glass-a,255,255,255),0.18)' }} />
-          </picture>
+          <LokiLogoButton onClick={onOpenLoki} size={40} radius={16} />
           <div style={{ minWidth: 0 }}>
             <div style={{ color: APG2_PROFILE.text, fontSize: 16, lineHeight: '19px', fontWeight: 880 }}>АПГ: ЗЕЛЕНОГРАД</div>
             <div style={{ color: APG2_PROFILE.textMuted, fontSize: 10.5, lineHeight: '13px', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Альянс партнёров города</div>
