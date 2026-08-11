@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Panel } from '@vkontakte/vkui';
 import { getNewsImage, getNewsTitle } from './newsUtils.js';
-import { selectActualEvents, selectEventsForPeriod } from './eventSchedule.js';
+import { getEventInterval, selectActualEvents } from './eventSchedule.js';
 import { GIFT_SHIMMER_STYLE } from './giftShimmer.js';
 import { LokiLogoButton } from './components/LokiLogoButton.jsx';
 
@@ -23,7 +23,22 @@ const greetingOf = user => {
   return `${greeting}${firstName ? `, ${firstName}` : ''}!`;
 };
 
-const eventTime = event => String(event?.time || event?.startTime || '').match(/\b\d{1,2}:\d{2}\b/)?.[0] || 'Скоро';
+const eventTime = event => {
+  const explicit = String(event?.time || event?.startTime || '').match(/\b\d{1,2}:\d{2}\b/)?.[0];
+  if (explicit) return explicit;
+  const start = getEventInterval(event)?.start;
+  if (!start) return 'Скоро';
+  const now = new Date();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const eventDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  if (eventDay.getTime() === new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) {
+    return `Сегодня, ${start.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  if (eventDay.getTime() === tomorrow.getTime()) {
+    return `Завтра, ${start.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  return start.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+};
 const compactOffer = place => place?.offer || place?.discount || place?.promo || 'Предложение для участников АПГ';
 
 function Picture({ item, alt = '', fallback = 'АПГ' }) {
@@ -132,7 +147,6 @@ export function HomeMobileRedesign({
   onOpenRewards, onOpenOnboarding, onOpenLoki, onOpenNews, onOpenNewsItem, onOpenPartners, onOpenPartner,
   onOpenExperts, onOpenEvents, onOpenNearby, onOpenOffers, onToggleFavorite, isOffline = false,
 }) {
-  const [eventFilter, setEventFilter] = useState('today');
   const [heroIndex, setHeroIndex] = useState(0);
   const isDark = appearance === 'dark';
   const themeVars = isDark ? {
@@ -177,7 +191,7 @@ export function HomeMobileRedesign({
   const heroIsPlace = heroSlide?.type === 'place';
   const places = partners.slice(0, 6);
   const offers = partners.filter(item => item?.offer || item?.discount || item?.promo).slice(0, 7);
-  const eventPreview = useMemo(() => selectEventsForPeriod(actualEvents, eventFilter).slice(0, 6), [actualEvents, eventFilter]);
+  const eventPreview = useMemo(() => actualEvents.slice(0, 8), [actualEvents]);
   const displayedEvents = eventPreview.length ? eventPreview : [
     { id: 'event-placeholder-1', title: 'События скоро', category: 'Афиша', address: 'Следите за обновлениями', placeholder: true },
     { id: 'event-placeholder-2', title: 'Новые встречи', category: 'Афиша', address: 'Зеленоград', placeholder: true },
@@ -278,12 +292,7 @@ export function HomeMobileRedesign({
         </section>
 
         <section style={{ marginTop: 11 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 11 }}>
-            <h2 style={{ margin: 0, fontSize: 17, lineHeight: '21px', fontWeight: 900 }}>Афиша</h2>
-            <div role="tablist" aria-label="Период афиши" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {[['today','Сегодня'],['tomorrow','Завтра'],['weekend','На выходных']].map(([id,label]) => <button key={id} type="button" role="tab" aria-selected={eventFilter === id} onClick={() => setEventFilter(id)} style={{ border: 0, borderRadius: 9, padding: '6px 8px', background: eventFilter === id ? 'linear-gradient(135deg,#d7aa45,#c38b1d)' : 'transparent', color: eventFilter === id ? '#fff' : '#b8861d', fontSize: 9, fontWeight: 850, cursor: 'pointer' }}>{label}</button>)}
-            </div>
-          </div>
+          <SectionTitle action={onOpenEvents}>Афиша</SectionTitle>
           <HorizontalRail>
             {displayedEvents.map(event => (
               <button key={event.id || event.title} type="button" onClick={() => event.placeholder ? onOpenEvents?.() : onOpenEvents?.(event)} style={{ flex: '0 0 120px', height: 106, overflow: 'hidden', position: 'relative', borderRadius: 14, border: '1px solid var(--hm-border)', padding: 0, background: 'var(--hm-card)', color: 'var(--hm-text)', boxShadow: 'var(--hm-shadow)', textAlign: 'left', scrollSnapAlign: 'start', cursor: 'pointer' }}>
