@@ -309,7 +309,7 @@ function WorkspaceEventEditor({ event, events, profileType, profile, onClose, on
     if (!event?.id) return;
     setSaving(true);
     try {
-      const result = await userAction('workspace:eventUpdate', { eventId: event.id, profileId: profile.id, profileType, patch });
+      const result = await userAction('workspace:eventUpdate', { eventId: event.id, profileId: profile.id, profileType, patch, publishImmediately: true });
       setServerConflicts(result.conflicts || []);
       onSaved(result.event);
       setAutosave(result.pendingModeration ? 'Правки ждут модерации' : 'Сохранено');
@@ -396,6 +396,11 @@ function WorkspaceEventEditor({ event, events, profileType, profile, onClose, on
               <select style={input} value={draft.priceType} onChange={e => set('priceType', e.target.value)}><option value="free">Бесплатно</option><option value="paid">Платно</option></select>
               <input style={input} type="number" min="0" value={draft.price} onChange={e => set('price', e.target.value)} disabled={draft.priceType !== 'paid'} />
             </div>
+            {draft.priceType === 'paid' && (
+              <label style={{ ...label, display: 'flex', alignItems: 'center', gap: 8, textTransform: 'none' }}>
+                <input type="checkbox" checked={draft.priceIsFrom} onChange={e => set('priceIsFrom', e.target.checked)} /> Цена «от»
+              </label>
+            )}
             <label style={{ ...label, display: 'flex', alignItems: 'center', gap: 8, textTransform: 'none' }}><input type="checkbox" checked={draft.isPrivate} onChange={e => set('isPrivate', e.target.checked)} /> Закрытое мероприятие по ключам</label>
             {draft.isPrivate && <input style={input} type="number" min="0" value={draft.minKeys} onChange={e => set('minKeys', e.target.value)} placeholder="Минимум ключей" />}
           </div>

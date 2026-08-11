@@ -1739,15 +1739,39 @@ async function actionWorkspaceEventUpdate(db, req, actor) {
   const { profile, ref, event } = await assertWorkspaceEventAccess(db, actor, eventId, profileType, req.body?.profileId);
   const patch = workspaceEventNormalizePatch(req.body?.patch || {});
   const status = workspaceEventStatus(event);
-  const publicEvent = ['published', 'approved'].includes(status) || event.active === true;
-  const next = publicEvent
-    ? { pendingWorkspacePatch: patch, moderationStatus: 'pending_review', submissionStatus: 'pending_review', workspacePendingAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }
+  const publicEvent = status === 'published' || event.active === true || event.published === true;
+  const publishImmediately = publicEvent && req.body?.publishImmediately === true;
+  const next = publishImmediately
+    ? {
+      ...patch,
+      status: 'published', lifecycleStatus: 'published', contentStatus: 'published',
+      moderationStatus: 'published', submissionStatus: 'published',
+      active: true, published: true, pendingWorkspacePatch: null,
+      lastPublishedEditAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
+    }
+    : publicEvent
+      ? { pendingWorkspacePatch: patch, workspacePendingAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }
     : { ...patch, updatedAt: FieldValue.serverTimestamp(), draftSavedAt: FieldValue.serverTimestamp() };
   const conflicts = await workspaceEventConflictsForProfile(db, profile, profileType, { ...event, ...patch }, eventId);
   await ref.set(next, { merge: true });
-  await audit(db, req, actor, 'workspace:eventUpdate', 'events', eventId, 'success', { profileType, fields: Object.keys(patch), conflicts: conflicts.length, publicEvent });
+  await audit(db, req, actor, 'workspace:eventUpdate', 'events', eventId, 'success', { profileType, fields: Object.keys(patch), conflicts: conflicts.length, publicEvent, publishImmediately });
   const now = new Date().toISOString();
-  return { ok: true, event: { ...event, ...patch, id: eventId, updatedAt: now, draftSavedAt: publicEvent ? event.draftSavedAt || null : now, pendingWorkspacePatch: publicEvent ? patch : event.pendingWorkspacePatch || null, moderationStatus: publicEvent ? 'pending_review' : event.moderationStatus || 'draft', submissionStatus: publicEvent ? 'pending_review' : event.submissionStatus || 'draft' }, conflicts, pendingModeration: publicEvent };
+  return {
+    ok: true,
+    event: {
+      ...event, ...patch, id: eventId, updatedAt: now,
+      draftSavedAt: publicEvent ? event.draftSavedAt || null : now,
+      pendingWorkspacePatch: publishImmediately ? null : publicEvent ? patch : event.pendingWorkspacePatch || null,
+      ...(publishImmediately ? {
+        status: 'published', lifecycleStatus: 'published', contentStatus: 'published',
+        moderationStatus: 'published', submissionStatus: 'published', active: true, published: true,
+        lastPublishedEditAt: now,
+      } : {}),
+    },
+    conflicts,
+    pendingModeration: publicEvent && !publishImmediately,
+    publishedImmediately: publishImmediately,
+  };
 }
 
 async function actionWorkspaceEventSubmit(db, req, actor) {
