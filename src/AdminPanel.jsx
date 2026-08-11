@@ -7468,7 +7468,11 @@ export const AdminPanel = () => {
 
   const saveEvent = async () => {
     if (eSaving) return;
-    if (!eTitle.trim()) return;
+    const text = value => String(value ?? '').trim();
+    if (!text(eTitle)) {
+      window.alert('Укажите название события.');
+      return;
+    }
     if (ePriceType === 'paid' && (!Number(ePrice) || Number(ePrice) <= 0)) {
       window.alert('Для платного мероприятия укажите корректную стоимость.');
       return;
@@ -7487,35 +7491,35 @@ export const AdminPanel = () => {
         if (!ok) return;
       }
     }
-    const data = {
-      title: eTitle.trim(), date: eDate.trim(), partner: ePartner.trim(),
-      emoji: eEmoji, description: eDesc.trim(),
-      socialUrl: normalizeUrl(eSocial), address: eAddress.trim(),
-      deadline: eDeadline.trim(),
-      isPrivate: eIsPrivate,
-      minKeys: eMinKeys !== '' ? Number(eMinKeys) : 0,
-      maxParticipants: eMaxParticipants !== '' ? Number(eMaxParticipants) : 0,
-      eventDate: eEventDate.trim(),
-      isExpertEvent: eIsExpert,
-      priceClub: ePriceClub.trim(),
-      pricePublic: ePricePublic.trim(),
-      partnerId: ePartnerId || null,
-      linkLabel: eLinkLabel.trim(),
-      linkUrl:   normalizeUrl(eLinkUrl),
-      priority:  Number(ePriority) || 0,
-      category:  eCategory || null,
-      coverPhoto: eCoverPhoto.trim(),
-      startAt:   eStartAt ? new Date(eStartAt) : null,
-      endAt:     eEndAt ? new Date(eEndAt) : null,
-      location:  eLocation.trim(),
-      priceType: ePriceType,
-      price:     ePriceType === 'paid' ? Number(ePrice) : 0,
-      currency:  '₽',
-      priceIsFrom: ePriceType === 'paid' ? ePriceIsFrom : false,
-      ...(!editingEvent ? { active: false, published: false, status: 'draft', lifecycleStatus: 'draft', contentStatus: 'draft', verified: false } : {}),
-    };
     setESaving(true);
     try {
+      const data = {
+        title: text(eTitle), date: text(eDate), partner: text(ePartner),
+        emoji: text(eEmoji) || '🎉', description: text(eDesc),
+        socialUrl: normalizeUrl(eSocial), address: text(eAddress),
+        deadline: text(eDeadline),
+        isPrivate: eIsPrivate,
+        minKeys: eMinKeys !== '' ? Number(eMinKeys) : 0,
+        maxParticipants: eMaxParticipants !== '' ? Number(eMaxParticipants) : 0,
+        eventDate: text(eEventDate),
+        isExpertEvent: eIsExpert,
+        priceClub: text(ePriceClub),
+        pricePublic: text(ePricePublic),
+        partnerId: ePartnerId || null,
+        linkLabel: text(eLinkLabel),
+        linkUrl: normalizeUrl(eLinkUrl),
+        priority: Number(ePriority) || 0,
+        category: eCategory || null,
+        coverPhoto: text(eCoverPhoto),
+        startAt: eStartAt ? new Date(eStartAt) : null,
+        endAt: eEndAt ? new Date(eEndAt) : null,
+        location: text(eLocation),
+        priceType: ePriceType,
+        price: ePriceType === 'paid' ? Number(ePrice) : 0,
+        currency: '₽',
+        priceIsFrom: ePriceType === 'paid' ? ePriceIsFrom : false,
+        ...(!editingEvent ? { active: false, published: false, status: 'draft', lifecycleStatus: 'draft', contentStatus: 'draft', verified: false } : {}),
+      };
       if (editingEvent) {
         await runAdminEntityAction('events', 'update', {
           id: editingEvent.id,
@@ -7528,16 +7532,15 @@ export const AdminPanel = () => {
           idempotencyKey: `event_create_${data.title}_${eStartAt || eDate}`,
         });
       }
+      clearAdminDraft('event');
+      resetEventForm();
+      fetchData();
     } catch (err) {
       logError(err, 'AdminPanel.saveEvent');
       window.alert(`Не удалось сохранить событие: ${err.message || 'проверьте соединение'}`);
+    } finally {
       setESaving(false);
-      return;
     }
-    setESaving(false);
-    clearAdminDraft('event');
-    resetEventForm();
-    fetchData();
   };
 
   const deleteEvent = async (id) => {

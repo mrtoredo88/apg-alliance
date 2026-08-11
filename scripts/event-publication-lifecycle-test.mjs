@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { eventPublicationReadiness } from '../server-shared/event-publication.js';
 import { isLifecyclePublic, normalizeContentStatus } from '../server-shared/content-lifecycle.js';
+
+const [eventSheetSource, adminSource] = await Promise.all([
+  readFile(new URL('../src/EventDetailSheet.jsx', import.meta.url), 'utf8'),
+  readFile(new URL('../src/AdminPanel.jsx', import.meta.url), 'utf8'),
+]);
+
+assert.match(eventSheetSource, /isRegistered \? 'Вы идёте · отменить' : 'Я пойду'/);
+assert.doesNotMatch(eventSheetSource, /Зарегистрироваться/);
+assert.match(adminSource, /const text = value => String\(value \?\? ''\)\.trim\(\);/);
+assert.match(adminSource, /setESaving\(true\);\s*try \{\s*const data = \{/);
+assert.match(adminSource, /finally \{\s*setESaving\(false\);\s*\}/);
+assert.match(adminSource, /window\.alert\(`Не удалось сохранить событие:/);
 
 const vedogonEvent = {
   title: 'Спектакль театра «Ведогонь»',

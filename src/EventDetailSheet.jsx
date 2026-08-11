@@ -585,7 +585,7 @@ function UserActionsSection({ event, isRegistered, onRegister, onClose, onAskQue
       <h3 style={SECTION_TITLE}>Действия</h3>
       <div style={{ display: 'grid', gap: 10 }}>
         <button onClick={() => onRegister?.(event)} style={{ ...BUTTON, width: '100%', background: isRegistered ? 'rgba(75,179,75,0.16)' : A.gold, color: isRegistered ? '#4BB34B' : '#1A1208', border: isRegistered ? '1px solid rgba(75,179,75,0.36)' : 'none' }}>
-          {isRegistered ? 'Вы записаны · отменить' : 'Зарегистрироваться'}
+          {isRegistered ? 'Вы идёте · отменить' : 'Я пойду'}
         </button>
         {seatsLeft !== null && <div style={{ color: A.textSec, fontSize: 12, textAlign: 'center' }}>Свободно мест: {seatsLeft}</div>}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
