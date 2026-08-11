@@ -10,6 +10,7 @@ import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, buildLifecyclePatch, contentT
 import { hasRole, ROLES } from '../../../server-shared/role-engine.js';
 import { telegramUrl } from '../../../server-shared/telegram.js';
 import { buildApgNewsDistributionPatch } from '../../../server-shared/workspace-news.js';
+import { eventPublicationReadiness } from '../../../server-shared/event-publication.js';
 import { becamePublicContent, isPublicContent, notifyContentPublished } from '../lib/contentNotifications.js';
 import {
   aggregateReferralEvents,
@@ -2132,8 +2133,66 @@ async function runIdempotent(db, actor, key, fn) {
 
 async function handleNewsAction(db, request, actor) {
   const action = String(request.body?.action || '').trim();
-  const id = String(request.body?.id || request.body?.targetId || '').trim();
+  const id = String(request.body?.id || request.body?.eventId || request.body?.targetId || '').trim();
   const idempotencyKey = String(request.headers['x-idempotency-key'] || request.body?.idempotencyKey || '').trim();
+
+  if (['event:approve', 'event:request_changes', 'event:reject', 'event:publish'].includes(action)) {
+    await requireAdminPermission(request, 'events:update');
+    if (!id) throw Object.assign(new Error('Не указан id события.'), { statusCode: 400 });
+    const ref = db.collection('events').doc(id);
+    const snap = await ref.get();
+    if (!snap.exists) throw Object.assign(new Error('Событие не найдено.'), { statusCode: 404 });
+    const before = snap.data() || {};
+    const now = FieldValue.serverTimestamp();
+    let patch;
+    let auditAction;
+
+    if (action === 'event:approve') {
+      patch = {
+        ...buildLifecyclePatch({ item: before, resource: 'events', nextStatus: 'draft', actorId: actor.userId || actor.uid, reason: 'Событие проверено администратором.', serverTimestamp: now }),
+        status: 'approved', moderationStatus: 'approved', submissionStatus: 'approved',
+        verified: true, approvedAt: now, approvedBy: actor.userId || actor.uid,
+        active: false, published: false, updatedAt: now,
+      };
+      auditAction = 'approve';
+    } else if (action === 'event:request_changes') {
+      patch = { status: 'revision_requested', moderationStatus: 'revision_requested', submissionStatus: 'revision_requested', active: false, published: false, moderationComment: String(request.body?.comment || '').slice(0, 1000), reviewedAt: now, reviewedBy: actor.userId || actor.uid, updatedAt: now };
+      auditAction = 'request-changes';
+    } else if (action === 'event:reject') {
+      patch = { status: 'rejected', lifecycleStatus: 'draft', contentStatus: 'draft', moderationStatus: 'rejected', submissionStatus: 'rejected', active: false, published: false, rejectionReason: String(request.body?.comment || '').slice(0, 1000), rejectedAt: now, rejectedBy: actor.userId || actor.uid, updatedAt: now };
+      auditAction = 'reject';
+    } else {
+      if (before.verified !== true && !['approved', 'published'].includes(String(before.submissionStatus || before.moderationStatus || before.status || '').toLowerCase())) {
+        throw Object.assign(new Error('Сначала событие должен проверить администратор.'), { statusCode: 409, code: 'EVENT_NOT_VERIFIED' });
+      }
+      const readiness = eventPublicationReadiness(before);
+      if (!readiness.ready) {
+        throw Object.assign(new Error(`Нельзя опубликовать событие: ${readiness.blockers.map(item => item.label).join(', ')}.`), { statusCode: 409, code: 'EVENT_NOT_READY', readiness });
+      }
+      if (readiness.warnings.length && request.body?.acceptWarnings !== true) {
+        throw Object.assign(new Error('Подтвердите публикацию с предупреждениями.'), { statusCode: 409, code: 'EVENT_WARNINGS', readiness });
+      }
+      patch = {
+        ...buildLifecyclePatch({ item: before, resource: 'events', nextStatus: 'published', actorId: actor.userId || actor.uid, reason: 'Опубликовано администратором в афише.', serverTimestamp: now }),
+        status: 'published', moderationStatus: 'approved', submissionStatus: 'approved',
+        verified: true, published: true, publishedAt: before.publishedAt || now, publishedBy: actor.userId || actor.uid, updatedAt: now,
+      };
+      auditAction = 'publish';
+    }
+
+    await ref.set(patch, { merge: true });
+    await writeAuditLog(db, request, actor, `events:${auditAction}`, 'events', id, { label: `${auditAction === 'publish' ? 'Опубликовано' : auditAction === 'approve' ? 'Проверено' : 'Промодерировано'} событие: ${before.title || id}` });
+    if (action === 'event:publish') await dispatchPublishedContentNotification(db, request, 'events', id, { ...before, ...patch });
+    return {
+      ok: true,
+      id,
+      patch: action === 'event:publish'
+        ? { active: true, published: true, verified: true, status: 'published', lifecycleStatus: 'published', contentStatus: 'published', moderationStatus: 'approved', submissionStatus: 'approved', publishedAt: before.publishedAt || new Date().toISOString() }
+        : action === 'event:approve'
+          ? { active: false, published: false, verified: true, status: 'approved', lifecycleStatus: 'draft', contentStatus: 'draft', moderationStatus: 'approved', submissionStatus: 'approved', approvedAt: new Date().toISOString() }
+          : { active: false, published: false, status: action === 'event:reject' ? 'rejected' : 'revision_requested', moderationStatus: action === 'event:reject' ? 'rejected' : 'revision_requested', submissionStatus: action === 'event:reject' ? 'rejected' : 'revision_requested' },
+    };
+  }
 
   if (action === 'news:create') {
     await requireAdminPermission(request, 'news:create');

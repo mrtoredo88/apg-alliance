@@ -152,7 +152,7 @@ const EVENT_MODE_META = {
 const MODERATION_STATUS_META = {
   draft: { label: 'Черновик', tone: '#9CA3AF' },
   pending_review: { label: 'На модерации', tone: '#C9A84C' },
-  approved: { label: 'Опубликовано', tone: '#4BB34B' },
+  approved: { label: 'Проверено', tone: '#4BB34B' },
   published: { label: 'Опубликовано', tone: '#4BB34B' },
   revision_requested: { label: 'На доработке', tone: '#f59e0b' },
   rejected: { label: 'Отклонено', tone: '#E64646' },

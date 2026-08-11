@@ -23,6 +23,7 @@ import { hasExpertAmbassadorAccess, hasPartnerAllianceAccess, hasPartnerPremiumA
 import { listCustomExpertCategories, normalizeCustomExpertCategory, normalizeExpertCategory, normalizeExpertPhone, registerCustomExpertCategories, validateExpertCategories } from '../server-shared/expert-directory.js';
 import { buildAiImportValidation } from './aiImportValidation.js';
 import { CONTENT_RESOURCES, CONTENT_STATUS_LABELS, filterByLifecycleView, getLifecycleAutoRecommendation, lifecycleBucket, normalizeContentStatus, summarizeLifecycle } from './contentLifecycle.js';
+import { eventPublicationReadiness } from '../server-shared/event-publication.js';
 import { useAdminFormDraft, formatDraftTime, clearAdminDraft } from './adminFormDrafts.js';
 import { findEventConflicts, formatConflictLabel } from './eventSchedule.js';
 import { formatEventPrice, isPaidEvent } from './eventPrice.js';
@@ -7511,6 +7512,7 @@ export const AdminPanel = () => {
       price:     ePriceType === 'paid' ? Number(ePrice) : 0,
       currency:  '₽',
       priceIsFrom: ePriceType === 'paid' ? ePriceIsFrom : false,
+      ...(!editingEvent ? { active: false, published: false, status: 'draft', lifecycleStatus: 'draft', contentStatus: 'draft', verified: false } : {}),
     };
     setESaving(true);
     try {
@@ -7576,6 +7578,29 @@ export const AdminPanel = () => {
     setEvents(prev => prev.map(item => item.id === event.id ? { ...item, ...patch } : item));
     setSelectedEventForSheet(prev => prev?.id === event.id ? { ...prev, ...patch } : prev);
     fetchData();
+  };
+
+  const publishEvent = async (event) => {
+    if (!event?.id) return;
+    const readiness = eventPublicationReadiness(event);
+    if (readiness.blockers.length) {
+      window.alert(`Событие пока нельзя опубликовать:\n\n${readiness.blockers.map(item => `• ${item.label}`).join('\n')}\n\nЗаполните карточку и повторите публикацию.`);
+      return;
+    }
+    let acceptWarnings = false;
+    if (readiness.warnings.length) {
+      acceptWarnings = window.confirm(`Локи нашёл замечания:\n\n${readiness.warnings.map(item => `• ${item.label}`).join('\n')}\n\nОпубликовать событие несмотря на них?`);
+      if (!acceptWarnings) return;
+    } else if (!window.confirm(`Опубликовать «${event.title || 'событие'}» в афише?`)) return;
+    try {
+      const result = await runAdminAction('event:publish', { eventId: event.id, acceptWarnings });
+      const patch = reviveAdminValue(result.patch || {});
+      setEvents(prev => prev.map(item => item.id === event.id ? { ...item, ...patch } : item));
+      setSelectedEventForSheet(prev => prev?.id === event.id ? { ...prev, ...patch } : prev);
+      fetchData();
+    } catch (err) {
+      window.alert(err.message || 'Не удалось опубликовать событие.');
+    }
   };
 
   const cleanEventCopyPatch = (event, extra = {}) => {
@@ -8139,7 +8164,7 @@ export const AdminPanel = () => {
     pending_review: 'На модерации',
     revision_requested: 'На доработке',
     rejected: 'Отклонено',
-    approved: 'Опубликовано',
+    approved: 'Проверено',
     published: 'Опубликовано',
   }[eventProposalStatus(event)] || event.status || 'Черновик');
   const eventProposals = events
@@ -10378,6 +10403,11 @@ export const AdminPanel = () => {
                 .map((e, idx, arr) => {
                 const pri = e.priority ?? 0;
                 const previewImage = contentImageOf(e);
+                const lifecycleStatus = normalizeContentStatus(e);
+                const isPublishedEvent = lifecycleStatus === 'published' && e.active !== false;
+                const isVerifiedEvent = e.verified === true || ['approved', 'published'].includes(String(e.submissionStatus || e.moderationStatus || e.status || '').toLowerCase());
+                const publicationLabel = isPublishedEvent ? 'В афише' : isVerifiedEvent ? 'Проверено' : lifecycleStatus === 'moderation' ? 'На проверке' : 'Черновик';
+                const publicationColor = isPublishedEvent ? '#6AABEC' : isVerifiedEvent ? '#4ade80' : lifecycleStatus === 'moderation' ? '#f59e0b' : A.textSec;
                 return (
                 <div key={e.id} style={s.row}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
@@ -10395,6 +10425,7 @@ export const AdminPanel = () => {
                           : <span title="Не проверено" style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, flexShrink: 0 }}>⚠</span>}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 2 }}>
+                        <span style={{ fontSize: 10, fontWeight: 800, color: publicationColor, background: `${publicationColor}18`, border: `1px solid ${publicationColor}55`, borderRadius: 8, padding: '1px 6px', flexShrink: 0 }}>{publicationLabel}</span>
                         {e.category && (() => { const cat = CONTENT_CATEGORIES.find(c => c.id === e.category); return cat ? <span style={{ fontSize: 10, fontWeight: 700, color: cat.color, background: cat.color + '22', border: `1px solid ${cat.color}55`, borderRadius: 8, padding: '1px 6px', flexShrink: 0 }}>{cat.label}</span> : null; })()}
                         {(() => { const priceLabel = formatEventPrice(e); return priceLabel ? <span style={{ fontSize: 10, fontWeight: 700, color: isPaidEvent(e) ? A.gold : '#4ade80', background: isPaidEvent(e) ? A.goldDim : 'rgba(75,179,75,0.10)', border: `1px solid ${isPaidEvent(e) ? A.goldBrd : 'rgba(75,179,75,0.25)'}`, borderRadius: 8, padding: '1px 6px', flexShrink: 0 }}>{priceLabel}</span> : null; })()}
                       </div>
@@ -10406,6 +10437,7 @@ export const AdminPanel = () => {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginLeft: 8 }}>
+                    {isVerifiedEvent && !isPublishedEvent && <button title="Опубликовать в афише" style={{ ...s.btn, ...s.btnPri, padding: '6px 10px', fontSize: 12 }} onClick={() => publishEvent(e)}>В афишу</button>}
                     <button disabled={idx === 0} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 13, opacity: idx === 0 ? 0.3 : 1 }} onClick={() => moveItem('events', events, setEvents, e, -1)}>↑</button>
                     <button disabled={idx === arr.length - 1} style={{ ...s.btn, ...s.btnGray, padding: '4px 8px', fontSize: 13, opacity: idx === arr.length - 1 ? 0.3 : 1 }} onClick={() => moveItem('events', events, setEvents, e, 1)}>↓</button>
                     <button title="Отметить ссылки как проверенные" style={{ ...s.btn, ...s.btnGray, padding: '6px 10px', fontSize: 12, color: isCheckedRecently(e.linksCheckedAt) ? '#4ade80' : A.textSec }} onClick={() => markLinksChecked('events', e.id, setEvents)}>✓</button>

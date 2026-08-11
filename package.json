@@ -98,6 +98,7 @@
     "test:roles": "node scripts/role-engine-test.mjs",
     "test:identity": "node scripts/identity-core-test.mjs",
     "test:content-lifecycle": "node scripts/content-lifecycle-test.mjs",
+    "test:event-publication": "node scripts/event-publication-lifecycle-test.mjs",
     "test:schedule": "node scripts/event-schedule-test.mjs",
     "test:booking": "node scripts/booking-test.mjs",
     "test:partner-locations": "node scripts/partner-locations-test.mjs",
