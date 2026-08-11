@@ -9,6 +9,7 @@
     "android:aab": "npm run android:sync && cd android && ./gradlew bundleRelease",
     "android:apk": "npm run android:sync && cd android && ./gradlew assembleRelease",
     "test:android-release": "node scripts/android-release-test.mjs",
+    "test:pull-refresh": "node scripts/pull-to-refresh-test.mjs",
     "build": "node scripts/architecture-guard.mjs && vite build",
     "quality:test": "node scripts/quality/quality-platform-test.mjs",
     "quality:ui": "node scripts/quality/ui-scanner.mjs",

@@ -515,7 +515,10 @@ function PostVisitMoment({ booking, provider, user, userKeys, onClose, onSubmitR
 initErrorLogger();
 
 const SWIPE_TABS = ['home', 'offers', 'experts', 'profile'];
-const PULL_REFRESH_PANELS = new Set(['home', 'offers', 'experts', 'events', 'news']);
+const PULL_REFRESH_PANELS = new Set([
+  'home', 'offers', 'experts', 'events', 'news', 'partners', 'nearby',
+  'favorites', 'notifications', 'rewards', 'activity', 'profile', 'tasks', 'leaderboard',
+]);
 const PUBLIC_CARD_BACK_TARGETS = {
   partner: { desktop: 'partners', mobile: 'offers' },
   expert: { desktop: 'experts', mobile: 'experts' },
@@ -557,7 +560,7 @@ function getScrollableGestureParent(target) {
 
 function isInteractiveGestureTarget(target) {
   const node = target instanceof Element ? target : null;
-  return Boolean(node?.closest?.('button,a,input,textarea,select,[role="button"],[data-apg-gesture-ignore]'));
+  return Boolean(node?.closest?.('input,textarea,select,[contenteditable="true"],[data-apg-gesture-ignore]'));
 }
 
 function getPullStartState(event, activePanel, pullRefreshing) {
@@ -604,7 +607,7 @@ function isLocalHost() {
 }
 
 async function fetchVkNewsPosts() {
-  const response = await fetch(`${API_BASE_URL}/api/vk-news?count=30`);
+  const response = await fetch(`${API_BASE_URL}/api/vk-news?count=30`, { cache: 'no-store' });
   const data = await response.json().catch(() => ({}));
   return Array.isArray(data.posts) ? data.posts : [];
 }
@@ -625,6 +628,12 @@ async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 5200) {
 }
 
 const publicDataDiag = { source: 'pending', fallbacks: [], errors: 0, at: null };
+
+function invalidatePublicBootstrap() {
+  publicBootstrapPromise = null;
+  publicDataDiag.source = 'refreshing';
+  publicDataDiag.fallbacks = [];
+}
 
 async function fetchPublicBootstrap() {
   if (!publicBootstrapPromise) {
@@ -1126,6 +1135,7 @@ export function UserApp() {
   const [tabIndicator, setTabIndicator]         = useState({ center: 0, width: 0, ready: false });
   const [pullDistance, setPullDistance]         = useState(0);
   const [pullRefreshing, setPullRefreshing]     = useState(false);
+  const [pullFeedback, setPullFeedback]         = useState('idle');
   const [activePartner, setActivePartner]       = useState(null);
   const [offerExpertTarget, setOfferExpertTarget] = useState(null);
   const [pendingLokiNewsTarget, setPendingLokiNewsTarget] = useState(() => initialDeepLink.type === 'news' ? { id: initialDeepLink.id, nonce: Date.now() } : null);
@@ -1805,7 +1815,9 @@ export function UserApp() {
     return false;
   };
 
-  const loadData = useCallback(async (isMounted) => {
+  const loadData = useCallback(async (isMounted, options = {}) => {
+    const background = options.background === true;
+    let loadSucceeded = true;
     const runId = ++authLoadRunRef.current;
     markPerformanceStage('userapp_load_start', { activePanel }, 'react');
     traceAuthStage('loadData_start', {
@@ -1816,42 +1828,45 @@ export function UserApp() {
     });
     if (isAuthLoadAborted(runId, 'preconditions', { activePanel })) {
       if (isMounted.current && isManualLogoutFromStorage()) setLoading(false);
-      return;
+      return { ok: false, aborted: true };
     }
     if (publicSubmitRoute) {
       if (isMounted.current) {
         markFirebase('firebase_ready', { source: 'public_submit' });
         setLoading(false);
       }
-      return;
+      return { ok: false, aborted: true };
     }
     if (isManualLogoutFromStorage()) {
       traceAuthStage('logout_start', { source: 'loadData_manual_flag', reason: 'manualLogout_flag', runId });
       authLoadRunRef.current += 1;
       if (isMounted.current) { setLoading(false); setLoggedOut(true); }
-      return;
+      return { ok: false, aborted: true };
     }
-    setLoading(true); setError(null); setNetworkError(false); setLoggedOut(false);
-    const restoredHomeCache = restoreHomeCache();
-    setHomeCacheSnapshot(restoredHomeCache.snapshot);
-    const cachedPartners = Array.isArray(restoredHomeCache.values.partners)
-      ? restoredHomeCache.values.partners.filter(item => item.catalogPublished !== false && isNotArchived(item))
-      : [];
-    if (cachedPartners.length) setIfChanged(setPartners, cachedPartners);
+    if (!background) {
+      setLoading(true);
+      const restoredHomeCache = restoreHomeCache();
+      setHomeCacheSnapshot(restoredHomeCache.snapshot);
+      const cachedPartners = Array.isArray(restoredHomeCache.values.partners)
+        ? restoredHomeCache.values.partners.filter(item => item.catalogPublished !== false && isNotArchived(item))
+        : [];
+      if (cachedPartners.length) setIfChanged(setPartners, cachedPartners);
 
-    const cachedEvents = Array.isArray(restoredHomeCache.values.events)
-      ? restoredHomeCache.values.events.filter(item => isNotArchived(item) && (isPublicContent(item) || normalizeContentStatus(item) === 'completed'))
-      : [];
-    if (cachedEvents.length) setIfChanged(setEvents, cachedEvents);
+      const cachedEvents = Array.isArray(restoredHomeCache.values.events)
+        ? restoredHomeCache.values.events.filter(item => isNotArchived(item) && (isPublicContent(item) || normalizeContentStatus(item) === 'completed'))
+        : [];
+      if (cachedEvents.length) setIfChanged(setEvents, cachedEvents);
 
-    const cachedNews = Array.isArray(restoredHomeCache.values.news)
-      ? restoredHomeCache.values.news.filter(item => isNotArchived(item) && isPublicContent(item))
-      : [];
-    if (cachedNews.length) setIfChanged(setNews, cachedNews);
+      const cachedNews = Array.isArray(restoredHomeCache.values.news)
+        ? restoredHomeCache.values.news.filter(item => isNotArchived(item) && isPublicContent(item))
+        : [];
+      if (cachedNews.length) setIfChanged(setNews, cachedNews);
 
-    const cachedNotifications = readCachedArray('apg_notif_cache').filter(isNotArchived);
-    if (cachedNotifications.length) setNotifications(cachedNotifications);
-    writeCachedArray('apg_notif_cache', cachedNotifications);
+      const cachedNotifications = readCachedArray('apg_notif_cache').filter(isNotArchived);
+      if (cachedNotifications.length) setNotifications(cachedNotifications);
+      writeCachedArray('apg_notif_cache', cachedNotifications);
+    }
+    setError(null); setNetworkError(false); setLoggedOut(false);
 
     fetch('/manifest.json').catch(error => logError(error, 'UserApp.staticManifest'));
 
@@ -2592,6 +2607,7 @@ export function UserApp() {
         })();
       }
     } catch (e) {
+      loadSucceeded = false;
       logError(e, 'UserApp.loadData.fatal');
       if (isFirebaseStartupOnlyError(e)) {
         markFirebaseStartup('firebase_retry', {
@@ -2606,6 +2622,7 @@ export function UserApp() {
       markFirebase('firebase_ready', { source: 'UserApp.loadData.finally' });
       if (isMounted.current) setLoading(false);
     }
+    return { ok: loadSucceeded };
   }, [pendingRefId, publicSubmitRoute]);
 
   useEffect(() => {
@@ -2814,18 +2831,33 @@ export function UserApp() {
   }, [loadData]);
 
   const handleRefresh = useCallback(async () => {
-    await loadData(mountedRef);
+    invalidatePublicBootstrap();
+    return await loadData(mountedRef, { background: true });
   }, [loadData]);
 
+  const pullRefreshInFlightRef = useRef(false);
   const triggerPullRefresh = useCallback(async () => {
-    if (pullRefreshing || !PULL_REFRESH_PANELS.has(activePanel)) return;
+    if (pullRefreshInFlightRef.current || pullRefreshing || !PULL_REFRESH_PANELS.has(activePanel)) return;
+    pullRefreshInFlightRef.current = true;
+    setPullFeedback('idle');
     setPullRefreshing(true);
     try {
-      await handleRefresh();
+      const result = await handleRefresh();
+      if (mountedRef.current) setPullFeedback(result?.ok === false ? 'error' : 'success');
+    } catch (error) {
+      logError(error, 'UserApp.pullRefresh');
+      if (mountedRef.current) setPullFeedback('error');
     } finally {
       if (mountedRef.current) {
-        setPullRefreshing(false);
-        setPullDistance(0);
+        window.setTimeout(() => {
+          if (!mountedRef.current) return;
+          setPullRefreshing(false);
+          setPullDistance(0);
+          setPullFeedback('idle');
+          pullRefreshInFlightRef.current = false;
+        }, 520);
+      } else {
+        pullRefreshInFlightRef.current = false;
       }
     }
   }, [activePanel, handleRefresh, pullRefreshing]);
@@ -4183,6 +4215,7 @@ export function UserApp() {
   const swipeTouchY  = useRef(null);
   const edgeSwipeRef = useRef(false);
   const pullTouchRef = useRef({ active: false, startY: 0, startX: 0, started: false, reason: 'init' });
+  const pullClickSuppressUntilRef = useRef(0);
 
   const handleSwipeStart = useCallback((e) => {
     const touch = e.touches[0];
@@ -4227,17 +4260,21 @@ export function UserApp() {
     if (dy < PULL_ACTIVATE_DY_PX) return;
     if (!pull.started) {
       pullTouchRef.current = { ...pull, started: true };
+      pullClickSuppressUntilRef.current = Date.now() + 700;
       logGestureDebug('pull_started', { dx, dy, scrollParent: pull.scrollParentTag, startScrollTop: pull.startScrollTop });
     }
     setPullDistance(Math.min(86, Math.round(dy * 0.42)));
   }, [pullRefreshing]);
 
   const handleSwipeEnd = useCallback((e) => {
-    if (swipeTouchX.current === null) return;
-    const dx = e.changedTouches[0].clientX - swipeTouchX.current;
-    const dy = e.changedTouches[0].clientY - swipeTouchY.current;
-    const wasEdgeSwipe = edgeSwipeRef.current;
+    const changedTouch = e.changedTouches?.[0];
+    if (!changedTouch) return;
     const pull = pullTouchRef.current;
+    const gestureStartX = swipeTouchX.current ?? pull.startX;
+    const gestureStartY = swipeTouchY.current ?? pull.startY;
+    const dx = changedTouch.clientX - gestureStartX;
+    const dy = changedTouch.clientY - gestureStartY;
+    const wasEdgeSwipe = edgeSwipeRef.current;
     swipeTouchX.current = null;
     swipeTouchY.current = null;
     edgeSwipeRef.current = false;
@@ -4250,6 +4287,7 @@ export function UserApp() {
     }
 
     if (pull.active && pull.started && dy > PULL_TRIGGER_DY_PX && Math.abs(dx) < 54) {
+      pullClickSuppressUntilRef.current = Date.now() + 900;
       logGestureDebug('pull_refresh', { dx, dy, scrollParent: pull.scrollParentTag, startScrollTop: pull.startScrollTop });
       triggerPullRefresh();
       return;
@@ -4264,6 +4302,20 @@ export function UserApp() {
     if (dx < 0 && idx < SWIPE_TABS.length - 1) { goPanel(SWIPE_TABS[idx + 1]); }
     if (dx > 0 && idx > 0)                      { goPanel(SWIPE_TABS[idx - 1]); }
   }, [activePanel, goBackPanel, goPanel, triggerPullRefresh]);
+
+  const handleSwipeCancel = useCallback(() => {
+    swipeTouchX.current = null;
+    swipeTouchY.current = null;
+    edgeSwipeRef.current = false;
+    pullTouchRef.current = { active: false, startY: 0, startX: 0, started: false, reason: 'cancel' };
+    setPullDistance(0);
+  }, []);
+
+  const suppressClickAfterPull = useCallback((event) => {
+    if (Date.now() > pullClickSuppressUntilRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
 
   // ─── Уведомления ────────────────────────────────────────────────────────────
 
@@ -5505,6 +5557,8 @@ export function UserApp() {
             onTouchStart={handleSwipeStart}
             onTouchMove={handleSwipeMove}
             onTouchEnd={handleSwipeEnd}
+            onTouchCancel={handleSwipeCancel}
+            onClickCapture={suppressClickAfterPull}
           >
 
             {(pullDistance > 0 || pullRefreshing) && (
@@ -5520,7 +5574,9 @@ export function UserApp() {
               }}>
                 <div style={{ ...APG2_PROFILE.glass, height: 44, minWidth: 128, borderRadius: 999, padding: '0 15px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, color: APG2_PROFILE.text, boxShadow: '0 16px 42px var(--apg2-elev-shadow, rgba(0,0,0,0.24)), inset 0 1px 0 rgba(var(--apg2-glass-a,255,255,255),0.30)' }}>
                   <span style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(215,184,106,0.22)', borderTopColor: APG2_PROFILE.gold, animation: pullRefreshing ? 'spin 0.82s linear infinite' : 'none', transform: pullRefreshing ? 'none' : `rotate(${pullDistance * 4}deg)` }} />
-                  <span style={{ fontSize: 12, fontWeight: 780, color: APG2_PROFILE.textSoft }}>{pullRefreshing ? 'Обновляем' : 'Потяните ещё'}</span>
+                  <span style={{ fontSize: 12, fontWeight: 780, color: pullFeedback === 'error' ? '#E64646' : pullFeedback === 'success' ? '#4BB34B' : APG2_PROFILE.textSoft }}>
+                    {pullFeedback === 'success' ? 'Обновлено' : pullFeedback === 'error' ? 'Не удалось обновить' : pullRefreshing ? 'Обновляем' : pullDistance >= 50 ? 'Отпустите, чтобы обновить' : 'Потяните ещё'}
+                  </span>
                 </div>
               </div>
             )}
