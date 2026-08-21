@@ -1,53 +1,107 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { API_BASE_URL } from '../constants.js';
+import { apgIdentity } from '../apg/index.js';
 import { enrichLead, nextBestAction, SALES_STAGE_LABELS, SALES_STAGES, summarizePipeline } from './salesAgentCore.js';
 
-const STORAGE_KEY = 'apg_ai_sales_leads_v1';
-
-function loadLeads() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveLeads(leads) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(leads)); } catch {}
-}
-
 const initialForm = {
-  name: '', category: 'food', website: '', vk: '', telegram: '', contact: '',
+  name: '', category: 'food', website: '', vk: '', telegram: '', contact: '', city: 'Зеленоград', district: '', source: '', sourceUrl: '',
   local: true, hasOfflinePoint: true, activeSocials: true, runsEvents: false,
   hasRepeatCustomers: true, canBringAudience: true, decisionMakerFound: false,
 };
 
+async function adminSalesRequest(action, payload = {}) {
+  const token = await apgIdentity.getSessionToken?.().catch(() => '');
+  if (!token) throw new Error('Требуется административная авторизация.');
+  const response = await fetch(`${API_BASE_URL}/api/admin-actions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-apg-auth': token },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) throw new Error(data.error || 'Не удалось выполнить действие AI-отдела продаж.');
+  return data;
+}
+
+function normalizeForDuplicate(value) {
+  return String(value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+}
+
+function duplicateOf(leads, candidate) {
+  const name = normalizeForDuplicate(candidate.name);
+  const website = normalizeForDuplicate(candidate.website);
+  const vk = normalizeForDuplicate(candidate.vk);
+  const telegram = normalizeForDuplicate(candidate.telegram);
+  return leads.find(lead => {
+    if (website && website === normalizeForDuplicate(lead.website)) return true;
+    if (vk && vk === normalizeForDuplicate(lead.vk)) return true;
+    if (telegram && telegram === normalizeForDuplicate(lead.telegram)) return true;
+    return name && name === normalizeForDuplicate(lead.name) && normalizeForDuplicate(candidate.city) === normalizeForDuplicate(lead.city);
+  });
+}
+
 export function SalesAiDashboard() {
-  const [leads, setLeads] = useState(loadLeads);
+  const [leads, setLeads] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [selectedId, setSelectedId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
   const stats = useMemo(() => summarizePipeline(leads), [leads]);
   const selected = leads.find(lead => lead.id === selectedId) || leads[0] || null;
 
-  const commit = updater => {
-    setLeads(current => {
-      const next = typeof updater === 'function' ? updater(current) : updater;
-      saveLeads(next);
-      return next;
-    });
+  const loadLeads = async () => {
+    setLoading(true); setNotice('');
+    try {
+      const result = await adminSalesRequest('sales-ai:list');
+      const rows = Array.isArray(result.leads) ? result.leads : [];
+      setLeads(rows);
+      if (!selectedId && rows[0]?.id) setSelectedId(rows[0].id);
+    } catch (error) {
+      setNotice(`Ошибка загрузки: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const addLead = event => {
+  useEffect(() => { loadLeads(); }, []);
+
+  const addLead = async event => {
     event.preventDefault();
-    if (!form.name.trim()) return;
-    const lead = enrichLead({ ...form, name: form.name.trim() });
-    commit(current => [lead, ...current]);
-    setSelectedId(lead.id);
-    setForm(initialForm);
+    if (!form.name.trim() || busy) return;
+    const existing = duplicateOf(leads, form);
+    if (existing) {
+      setSelectedId(existing.id);
+      setNotice(`Похожий лид уже есть: ${existing.name}. Открыл существующую карточку.`);
+      return;
+    }
+    setBusy(true); setNotice('');
+    try {
+      const prepared = enrichLead({ ...form, name: form.name.trim(), source: form.source.trim() || 'manual', sourceUrl: form.sourceUrl.trim() });
+      const result = await adminSalesRequest('sales-ai:create', { lead: prepared });
+      const lead = result.lead;
+      setLeads(current => [lead, ...current]);
+      setSelectedId(lead.id);
+      setForm(initialForm);
+      setNotice('Лид сохранён в системе АПГ и передан Аналитику.');
+    } catch (error) {
+      setNotice(`Не удалось сохранить лид: ${error.message}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const updateLead = (id, patch) => {
-    commit(current => current.map(lead => lead.id === id ? { ...lead, ...patch, updatedAt: new Date().toISOString() } : lead));
+  const updateLead = async (id, patch) => {
+    const before = leads.find(lead => lead.id === id);
+    if (!before) return;
+    const optimistic = { ...before, ...patch, updatedAt: new Date().toISOString() };
+    setLeads(current => current.map(lead => lead.id === id ? optimistic : lead));
+    try {
+      const result = await adminSalesRequest('sales-ai:update', { id, patch });
+      setLeads(current => current.map(lead => lead.id === id ? result.lead : lead));
+    } catch (error) {
+      setLeads(current => current.map(lead => lead.id === id ? before : lead));
+      setNotice(`Изменение не сохранено: ${error.message}`);
+    }
   };
 
   return (
@@ -56,9 +110,12 @@ export function SalesAiDashboard() {
         <div>
           <div style={styles.eyebrow}>АПГ · AI-отдел продаж</div>
           <h1 style={styles.h1}>Разведка → анализ → оффер → контакт → результат</h1>
-          <p style={styles.muted}>MVP работает как безопасный конвейер: ИИ готовит решения, а отправка остаётся под контролем человека.</p>
+          <p style={styles.muted}>Лиды хранятся на backend АПГ. ИИ готовит решения, а отправка остаётся под контролем человека.</p>
         </div>
+        <button type="button" onClick={loadLeads} disabled={loading} style={styles.secondary}>{loading ? 'Загрузка…' : '↻ Обновить'}</button>
       </header>
+
+      {notice && <div style={styles.noticeTop}>{notice}</div>}
 
       <section style={styles.stats}>
         <Stat label="Лидов" value={stats.total} />
@@ -77,12 +134,20 @@ export function SalesAiDashboard() {
             <select style={styles.input} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
               <option value="food">Еда</option><option value="beauty">Красота</option><option value="sport">Спорт</option>
               <option value="education">Образование</option><option value="entertainment">Развлечения</option>
-              <option value="health">Здоровье</option><option value="pets">Животные</option><option value="other">Другое</option>
+              <option value="health">Здоровье</option><option value="pets">Животные</option><option value="services">Услуги</option><option value="other">Другое</option>
             </select>
+            <div style={styles.twoCols}>
+              <input style={styles.input} placeholder="Город" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
+              <input style={styles.input} placeholder="Район / локация" value={form.district} onChange={e => setForm({ ...form, district: e.target.value })} />
+            </div>
             <input style={styles.input} placeholder="Сайт" value={form.website} onChange={e => setForm({ ...form, website: e.target.value })} />
             <input style={styles.input} placeholder="VK" value={form.vk} onChange={e => setForm({ ...form, vk: e.target.value })} />
             <input style={styles.input} placeholder="Telegram" value={form.telegram} onChange={e => setForm({ ...form, telegram: e.target.value })} />
             <input style={styles.input} placeholder="Контакт / ЛПР" value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value, decisionMakerFound: Boolean(e.target.value.trim()) })} />
+            <div style={styles.twoCols}>
+              <input style={styles.input} placeholder="Источник: поиск, рекомендация…" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })} />
+              <input style={styles.input} placeholder="Ссылка на источник" value={form.sourceUrl} onChange={e => setForm({ ...form, sourceUrl: e.target.value })} />
+            </div>
             <div style={styles.checks}>
               <Check label="Офлайн-точка" checked={form.hasOfflinePoint} onChange={value => setForm({ ...form, hasOfflinePoint: value })} />
               <Check label="Активные соцсети" checked={form.activeSocials} onChange={value => setForm({ ...form, activeSocials: value })} />
@@ -90,17 +155,18 @@ export function SalesAiDashboard() {
               <Check label="Повторные клиенты" checked={form.hasRepeatCustomers} onChange={value => setForm({ ...form, hasRepeatCustomers: value })} />
               <Check label="Может привести аудиторию" checked={form.canBringAudience} onChange={value => setForm({ ...form, canBringAudience: value })} />
             </div>
-            <button style={styles.primary} type="submit">Добавить и проанализировать</button>
+            <button style={styles.primary} disabled={busy} type="submit">{busy ? 'Сохраняю…' : 'Добавить и проанализировать'}</button>
           </form>
         </div>
 
         <div style={styles.card}>
           <h2 style={styles.h2}>🧠 Очередь лидов</h2>
           <div style={{ display: 'grid', gap: 8 }}>
-            {leads.length === 0 && <div style={styles.empty}>Добавь первый бизнес. Здесь появится приоритет и следующий шаг.</div>}
+            {loading && <div style={styles.empty}>Загружаю серверную очередь…</div>}
+            {!loading && leads.length === 0 && <div style={styles.empty}>Добавь первый бизнес. Здесь появится приоритет и следующий шаг.</div>}
             {leads.map(lead => (
               <button key={lead.id} onClick={() => setSelectedId(lead.id)} style={{ ...styles.leadButton, borderColor: selected?.id === lead.id ? '#d8b75d' : '#303243' }}>
-                <span><strong>{lead.name}</strong><br /><small style={styles.muted}>{SALES_STAGE_LABELS[lead.stage]}</small></span>
+                <span><strong>{lead.name}</strong><br /><small style={styles.muted}>{[lead.city, lead.district, SALES_STAGE_LABELS[lead.stage]].filter(Boolean).join(' · ')}</small></span>
                 <span style={scoreStyle(lead.priority)}>{lead.score}</span>
               </button>
             ))}
@@ -114,6 +180,7 @@ export function SalesAiDashboard() {
               <div>
                 <div style={styles.scoreRow}><span style={scoreStyle(selected.priority)}>{selected.score}/100</span><strong>{selected.name}</strong></div>
                 <p style={styles.muted}>{selected.reasons?.join(' · ') || 'Недостаточно сигналов для подробной оценки'}</p>
+                {(selected.source || selected.sourceUrl) && <div style={styles.meta}>Источник: {selected.source || 'не указан'}{selected.sourceUrl ? ` · ${selected.sourceUrl}` : ''}</div>}
                 <label style={styles.label}>Статус</label>
                 <select style={styles.input} value={selected.stage} onChange={e => updateLead(selected.id, { stage: e.target.value })}>
                   {SALES_STAGES.map(stage => <option key={stage} value={stage}>{SALES_STAGE_LABELS[stage]}</option>)}
@@ -139,18 +206,19 @@ function scoreStyle(priority) { return { minWidth: 46, height: 34, padding: '0 9
 
 const styles = {
   page: { minHeight: '100vh', background: '#0d0e16', color: '#f7f4ea', padding: 24, fontFamily: 'Inter, system-ui, sans-serif' },
-  header: { maxWidth: 1180, margin: '0 auto 18px' }, eyebrow: { color: '#d8b75d', fontWeight: 850, letterSpacing: '.08em', fontSize: 12 },
+  header: { maxWidth: 1180, margin: '0 auto 18px', display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'flex-start' }, eyebrow: { color: '#d8b75d', fontWeight: 850, letterSpacing: '.08em', fontSize: 12 },
   h1: { margin: '6px 0 8px', fontSize: 'clamp(25px,4vw,42px)' }, h2: { margin: '0 0 14px', fontSize: 17 }, muted: { color: '#aeb1bf' },
+  noticeTop: { maxWidth: 1180, margin: '0 auto 12px', padding: '10px 12px', borderRadius: 12, background: '#181b28', border: '1px solid #343748', color: '#d8b75d', fontSize: 12 },
   stats: { maxWidth: 1180, margin: '0 auto 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 10 },
   stat: { border: '1px solid #2d3040', background: '#151722', borderRadius: 16, padding: 14, display: 'grid', gap: 3 },
   grid: { maxWidth: 1180, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 14 },
   card: { border: '1px solid #2d3040', background: '#151722', borderRadius: 20, padding: 18 },
-  input: { width: '100%', boxSizing: 'border-box', height: 42, borderRadius: 12, border: '1px solid #343748', background: '#0f111a', color: '#fff', padding: '0 11px' },
+  input: { width: '100%', boxSizing: 'border-box', height: 42, borderRadius: 12, border: '1px solid #343748', background: '#0f111a', color: '#fff', padding: '0 11px' }, twoCols: { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 },
   checks: { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 7 }, check: { color: '#c8cad3', fontSize: 13 },
-  primary: { height: 42, border: 0, borderRadius: 12, background: '#d8b75d', color: '#15120a', fontWeight: 900, cursor: 'pointer' },
+  primary: { height: 42, border: 0, borderRadius: 12, background: '#d8b75d', color: '#15120a', fontWeight: 900, cursor: 'pointer' }, secondary: { minHeight: 38, borderRadius: 11, border: '1px solid #343748', background: '#151722', color: '#d8b75d', padding: '0 12px', cursor: 'pointer' },
   leadButton: { width: '100%', border: '1px solid', background: '#10121b', color: '#fff', borderRadius: 14, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', cursor: 'pointer' },
   empty: { padding: 18, borderRadius: 14, background: '#10121b', color: '#858999' }, detailGrid: { display: 'grid', gridTemplateColumns: 'minmax(0,.8fr) minmax(0,1.2fr)', gap: 18 },
-  scoreRow: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 20 }, label: { display: 'block', margin: '12px 0 6px', color: '#aeb1bf', fontSize: 12, fontWeight: 800 },
+  scoreRow: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 20 }, label: { display: 'block', margin: '12px 0 6px', color: '#aeb1bf', fontSize: 12, fontWeight: 800 }, meta: { fontSize: 11, color: '#858999', wordBreak: 'break-word' },
   textarea: { width: '100%', minHeight: 220, resize: 'vertical', boxSizing: 'border-box', borderRadius: 14, border: '1px solid #343748', background: '#0f111a', color: '#fff', padding: 12, lineHeight: 1.45 },
   nextAction: { marginTop: 12, borderRadius: 12, padding: 11, background: '#10121b', color: '#d8b75d', fontWeight: 750 }, notice: { marginTop: 10, color: '#9ca0ae', fontSize: 12, lineHeight: 1.45 },
 };
