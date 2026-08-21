@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apgIdentity } from '../apg/index.js';
 import { SalesAiDashboard } from './SalesAiDashboard.jsx';
+import { SalesAiAgentOps } from './SalesAiAgentOps.jsx';
 
 function roleFromClaims(result) {
   const claims = result?.claims || result || {};
@@ -32,6 +33,7 @@ export function SalesAiAdminPage() {
 
   if (state.loading) return <Gate title="Проверяем доступ…" />;
   if (!state.allowed) return <Gate title="Доступ закрыт" text={state.error} />;
+  if (window.location.pathname.endsWith('/agents')) return <SalesAiAgentOps />;
   return <SalesAiDashboard />;
 }
 
