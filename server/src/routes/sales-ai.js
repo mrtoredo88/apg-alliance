@@ -34,7 +34,7 @@ function serialize(value) {
 
 function sanitizeLead(input = {}, update = false) {
   const out = {};
-  for (const key of ['name', 'category', 'city', 'district', 'contact', 'source']) {
+  for (const key of ['name', 'category', 'city', 'district', 'contact', 'source', 'email', 'telegramChatId', 'vkPeerId']) {
     if (!update || Object.prototype.hasOwnProperty.call(input, key)) out[key] = cleanText(input[key], key === 'name' ? 180 : 300);
   }
   for (const key of ['website', 'vk', 'telegram', 'sourceUrl']) {

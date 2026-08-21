@@ -4,7 +4,7 @@ import { apgIdentity } from '../apg/index.js';
 import { enrichLead, nextBestAction, SALES_STAGE_LABELS, SALES_STAGES, summarizePipeline } from './salesAgentCore.js';
 
 const initialForm = {
-  name: '', category: 'food', website: '', vk: '', telegram: '', contact: '', city: 'Зеленоград', district: '', source: '', sourceUrl: '',
+  name: '', category: 'food', website: '', vk: '', telegram: '', email: '', telegramChatId: '', vkPeerId: '', contact: '', city: 'Зеленоград', district: '', source: '', sourceUrl: '',
   local: true, hasOfflinePoint: true, activeSocials: true, runsEvents: false,
   hasRepeatCustomers: true, canBringAudience: true, decisionMakerFound: false,
 };
@@ -24,6 +24,23 @@ async function salesRequest(action, payload = {}) {
     const error = new Error(data.error || 'Не удалось выполнить действие AI-отдела продаж.');
     error.code = data.code;
     error.duplicate = data.duplicate;
+    throw error;
+  }
+  return data;
+}
+
+async function salesAgentRequest(action, payload = {}) {
+  const token = await apgIdentity.getSessionToken?.().catch(() => '');
+  if (!token) throw new Error('Требуется административная авторизация.');
+  const response = await fetch(`${API_BASE_URL}/api/sales-ai-agents`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-apg-auth': token },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) {
+    const error = new Error(data.error || 'Не удалось отправить сообщение.');
+    error.code = data.code;
     throw error;
   }
   return data;
@@ -57,6 +74,7 @@ export function SalesAiDashboard() {
   const [scoutCandidates, setScoutCandidates] = useState([]);
   const [scoutLoading, setScoutLoading] = useState(false);
   const [scoutProvider, setScoutProvider] = useState('');
+  const [copiedLeadId, setCopiedLeadId] = useState(null);
   const stats = useMemo(() => summarizePipeline(leads), [leads]);
   const selected = leads.find(lead => lead.id === selectedId) || leads[0] || null;
 
@@ -194,6 +212,40 @@ export function SalesAiDashboard() {
     }
   };
 
+  const copyOffer = async lead => {
+    const text = String(lead?.offerDraft || '').trim();
+    if (!text) {
+      setNotice('У этого лида пока нет текста предложения.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedLeadId(lead.id);
+      setNotice(`Текст для «${lead.name}» скопирован. Вставь его в сообщение компании, отправь и затем отметь лид как «Связались».`);
+      window.setTimeout(() => setCopiedLeadId(current => current === lead.id ? null : current), 3000);
+    } catch {
+      setNotice('Браузер не разрешил копирование. Выдели текст в поле предложения и скопируй его через ⌘C.');
+    }
+  };
+
+  const sendOfferAutomatically = async lead => {
+    if (busy || !lead?.offerDraft) return;
+    if (!window.confirm(`Отправить предложение для «${lead.name}» через первый доступный канал?`)) return;
+    setBusy(true);
+    setNotice(`Проверяю доступные каналы для «${lead.name}»…`);
+    try {
+      const data = await salesAgentRequest('communication:send', { leadId: lead.id, text: lead.offerDraft, channel: 'auto' });
+      setLeads(current => current.map(item => item.id === lead.id ? { ...item, stage: data.stage, lastOutreachChannel: data.delivery?.channel } : item));
+      setNotice(`Сообщение для «${lead.name}» отправлено через ${data.delivery?.channel || 'доступный канал'}. Статус изменён на «Связались».`);
+    } catch (error) {
+      setNotice(error.code === 'sales-ai/no-outreach-channel'
+        ? 'Автоотправка недоступна: добавь email, VK peer ID или Telegram chat ID в карточку лида.'
+        : `Автоотправка не выполнена: ${error.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <main style={styles.page}>
       <header style={styles.header}>
@@ -279,6 +331,11 @@ export function SalesAiDashboard() {
             <input style={styles.input} placeholder="Сайт" value={form.website} onChange={e => setForm({ ...form, website: e.target.value })} />
             <input style={styles.input} placeholder="VK" value={form.vk} onChange={e => setForm({ ...form, vk: e.target.value })} />
             <input style={styles.input} placeholder="Telegram" value={form.telegram} onChange={e => setForm({ ...form, telegram: e.target.value })} />
+            <input style={styles.input} type="email" placeholder="Email для предложения" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+            <div style={styles.twoCols}>
+              <input style={styles.input} placeholder="VK peer ID" value={form.vkPeerId} onChange={e => setForm({ ...form, vkPeerId: e.target.value })} />
+              <input style={styles.input} placeholder="Telegram chat ID" value={form.telegramChatId} onChange={e => setForm({ ...form, telegramChatId: e.target.value })} />
+            </div>
             <input style={styles.input} placeholder="Контакт / ЛПР" value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value, decisionMakerFound: Boolean(e.target.value.trim()) })} />
             <div style={styles.twoCols}>
               <input style={styles.input} placeholder="Источник" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })} />
@@ -318,6 +375,12 @@ export function SalesAiDashboard() {
                 <p style={styles.muted}>{selected.reasons?.join(' · ') || 'Недостаточно сигналов для подробной оценки'}</p>
                 {(selected.source || selected.sourceUrl) && <div style={styles.meta}>Источник: {selected.source || 'не указан'}{selected.sourceUrl ? ` · ${selected.sourceUrl}` : ''}</div>}
                 {selected.confidence != null && <div style={styles.meta}>Scout confidence: {Math.round(Number(selected.confidence) * 100)}%</div>}
+                <label style={styles.label}>Каналы автоотправки</label>
+                <div style={styles.channelFields} key={selected.id}>
+                  <input style={styles.input} type="email" defaultValue={selected.email || ''} placeholder="Email" onBlur={e => { if (e.target.value !== (selected.email || '')) updateLead(selected.id, { email: e.target.value }); }} />
+                  <input style={styles.input} defaultValue={selected.vkPeerId || ''} placeholder="VK peer ID" onBlur={e => { if (e.target.value !== (selected.vkPeerId || '')) updateLead(selected.id, { vkPeerId: e.target.value }); }} />
+                  <input style={styles.input} defaultValue={selected.telegramChatId || ''} placeholder="Telegram chat ID" onBlur={e => { if (e.target.value !== (selected.telegramChatId || '')) updateLead(selected.id, { telegramChatId: e.target.value }); }} />
+                </div>
                 <label style={styles.label}>Статус</label>
                 <select style={styles.input} value={selected.stage} onChange={e => updateLead(selected.id, { stage: e.target.value })}>
                   {SALES_STAGES.map(stage => <option key={stage} value={stage}>{SALES_STAGE_LABELS[stage]}</option>)}
@@ -327,7 +390,16 @@ export function SalesAiDashboard() {
               <div>
                 <label style={styles.label}>Черновик предложения</label>
                 <textarea style={styles.textarea} value={selected.offerDraft || ''} onChange={e => updateLead(selected.id, { offerDraft: e.target.value })} />
-                <div style={styles.notice}>📬 Агент-коммуникатор пока не отправляет сообщения сам. После проверки текст можно скопировать и отправить вручную.</div>
+                <div style={styles.offerActions}>
+                  <button type="button" style={styles.primarySmall} disabled={busy || selected.stage !== 'offer_ready'} onClick={() => sendOfferAutomatically(selected)}>
+                    {busy ? 'Отправляю…' : 'Отправить автоматически'}
+                  </button>
+                  <button type="button" style={styles.primarySmall} onClick={() => copyOffer(selected)}>
+                    {copiedLeadId === selected.id ? '✓ Текст скопирован' : 'Скопировать текст'}
+                  </button>
+                  {selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noreferrer" style={styles.linkButton}>Открыть источник</a>}
+                </div>
+                <div style={styles.notice}>📬 Автоотправка выбирает первый настроенный канал: email → VK → Telegram, а при ошибке пробует следующий. Повторная отправка уже связанному лиду блокируется. Для ручного варианта скопируй текст, отправь самостоятельно и выбери статус «Связались».</div>
               </div>
             </div>
           )}
@@ -371,7 +443,10 @@ const styles = {
   leadButton: { width: '100%', border: '1px solid', background: '#10121b', color: '#fff', borderRadius: 14, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', cursor: 'pointer', gap: 10 },
   empty: { padding: 18, borderRadius: 14, background: '#10121b', color: '#858999' },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,330px),1fr))', gap: 18 },
+  channelFields: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 7 },
   scoreRow: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 20 }, label: { display: 'block', margin: '12px 0 6px', color: '#aeb1bf', fontSize: 12, fontWeight: 800 }, meta: { fontSize: 11, color: '#858999', wordBreak: 'break-word', marginTop: 5 },
   textarea: { width: '100%', minHeight: 220, resize: 'vertical', boxSizing: 'border-box', borderRadius: 14, border: '1px solid #343748', background: '#0f111a', color: '#fff', padding: 12, lineHeight: 1.45 },
+  offerActions: { display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' },
+  linkButton: { minHeight: 36, borderRadius: 10, border: '1px solid #343748', background: '#151722', color: '#d8b75d', padding: '0 11px', display: 'inline-flex', alignItems: 'center', textDecoration: 'none', fontSize: 13 },
   nextAction: { marginTop: 12, borderRadius: 12, padding: 11, background: '#10121b', color: '#d8b75d', fontWeight: 750 }, notice: { marginTop: 10, color: '#9ca0ae', fontSize: 12, lineHeight: 1.45 },
 };
