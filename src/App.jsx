@@ -45,6 +45,11 @@ export function App() {
               <SalesAiAdminPage />
             </Suspense>
           } />
+          <Route path="/admin/sales-ai/agents" element={
+            <Suspense fallback={<AppFallback label="Загрузка AI-агентов продаж..." />}>
+              <SalesAiAdminPage />
+            </Suspense>
+          } />
           <Route path="/news/:id" element={
             <Suspense fallback={<AppFallback label="Открываем новость..." />}>
               <UserApp />
