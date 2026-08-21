@@ -8,7 +8,7 @@ export const QUALITY_VIEWPORTS = [
 export const QUALITY_ROUTES = [
   '/', '/#/home', '/#/partners', '/#/experts', '/#/events', '/#/news',
   '/#/people', '/#/messages', '/#/profile', '/#/scanner', '/#/notifications',
-  '/#/admin', '/#/health',
+  '/#/admin', '/#/health', '/admin/sales-ai', '/admin/sales-ai/agents',
 ];
 
 export const CRITICAL_USER_JOURNEYS = [
@@ -48,6 +48,8 @@ export const CRITICAL_USER_JOURNEYS = [
   ['admin.events', 'admin', 'Редактирование события'],
   ['admin.permissions', 'owner', 'Проверка матрицы ролей'],
   ['admin.health', 'owner', 'Открытие APG Health и отчёта качества'],
+  ['admin.sales-ai.scout', 'admin', 'Открытие Разведчика и очереди кандидатов'],
+  ['admin.sales-ai.agents', 'admin', 'Открытие Коммуникатора и сводки Руководителя'],
 ].map(([id, role, title]) => ({ id, role, title, critical: true }));
 
 export const SAFE_CONTROL_PATTERN = /^(отмена|закрыть|назад|готово|понятно|обновить|повторить|проверить|найти|поиск|фильтр|активные|архив|дубли|карточка)/i;

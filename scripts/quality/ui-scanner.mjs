@@ -73,10 +73,27 @@ export async function runUiScanner(options = {}) {
             return top === node || node.contains(top);
           }).catch(() => false);
           if (!isTopmost) continue;
-          await button.click({ trial: true, timeout: 750 }).catch(error => findings.push(finding({
+
+          let trialError = null;
+          await button.click({ trial: true, timeout: 750 }).catch(error => { trialError = error; });
+          if (trialError) {
+            // React overlays and onboarding transitions can move a safe control between layout frames.
+            // Re-check once after layout settles; report only a persistent failure.
+            await page.waitForTimeout(250);
+            const retry = page.getByRole('button', { name: label, exact: true }).first();
+            const retryVisible = await retry.isVisible().catch(() => false);
+            const retryEnabled = retryVisible && !(await retry.isDisabled().catch(() => true));
+            if (retryEnabled) {
+              trialError = null;
+              await retry.click({ trial: true, timeout: 1000 }).catch(error => { trialError = error; });
+            } else {
+              trialError = null;
+            }
+          }
+          if (trialError) findings.push(finding({
             scanner: 'ui', category: 'control', fingerprint: `unclickable:${route}:${label}`,
-            message: `Control is not clickable: ${label}`, location: target, evidence: error.message,
-          })));
+            message: `Control is not clickable: ${label}`, location: target, evidence: trialError.message,
+          }));
         }
       }
       await context.close();
