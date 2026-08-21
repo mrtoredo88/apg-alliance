@@ -1,4 +1,5 @@
 import { lookupSalesLead } from './salesScout.js';
+import { findOsmBusiness } from './salesOsmContacts.js';
 
 const clean = (value, max = 1000) => String(value ?? '').trim().slice(0, max);
 const SOCIAL_HOSTS = new Set(['vk.com', 'www.vk.com', 't.me', 'telegram.me']);
@@ -42,20 +43,23 @@ async function fetchWebsiteContacts(website) {
 }
 
 export async function enrichSalesLeadContacts(lead = {}) {
-  const provider = await lookupSalesLead(lead);
-  const website = clean(provider?.website || lead.website, 1500);
+  const [provider, osm] = await Promise.all([
+    lookupSalesLead(lead).catch(() => null),
+    findOsmBusiness(lead).catch(() => null),
+  ]);
+  const website = clean(provider?.website || osm?.website || lead.website, 1500);
   const web = website ? await fetchWebsiteContacts(website).catch(() => ({})) : {};
   const patch = {
-    contact: clean(provider?.contact || lead.contact, 300),
+    contact: clean(provider?.contact || osm?.phone || lead.contact, 300),
     website,
-    email: clean(provider?.email || web.email || lead.email, 320),
-    vk: clean(provider?.vk || web.vk || lead.vk, 1500),
-    telegram: clean(provider?.telegram || web.telegram || lead.telegram, 1500),
+    email: clean(provider?.email || osm?.email || web.email || lead.email, 320),
+    vk: clean(provider?.vk || osm?.vk || web.vk || lead.vk, 1500),
+    telegram: clean(provider?.telegram || osm?.telegram || web.telegram || lead.telegram, 1500),
     contactEnrichedAt: new Date().toISOString(),
-    contactEnrichmentSource: [provider ? '2gis' : '', web.email || web.vk || web.telegram ? 'website' : ''].filter(Boolean).join('+') || 'none',
+    contactEnrichmentSource: [provider ? '2gis' : '', osm ? 'openstreetmap' : '', web.email || web.vk || web.telegram ? 'website' : ''].filter(Boolean).join('+') || 'none',
+    osmExternalId: clean(osm?.externalId, 180),
   };
   return { patch, found: ['email', 'vk', 'telegram', 'contact'].filter(key => Boolean(patch[key])) };
 }
 
 export const __test = { contactsFromHtml };
-

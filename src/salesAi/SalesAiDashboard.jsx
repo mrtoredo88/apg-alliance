@@ -75,8 +75,18 @@ export function SalesAiDashboard() {
   const [scoutLoading, setScoutLoading] = useState(false);
   const [scoutProvider, setScoutProvider] = useState('');
   const [copiedLeadId, setCopiedLeadId] = useState(null);
+  const [leadQuery, setLeadQuery] = useState('');
+  const [stageFilter, setStageFilter] = useState('all');
   const stats = useMemo(() => summarizePipeline(leads), [leads]);
   const selected = leads.find(lead => lead.id === selectedId) || leads[0] || null;
+  const filteredLeads = useMemo(() => {
+    const query = leadQuery.trim().toLowerCase();
+    return leads.filter(lead => {
+      const matchesQuery = !query || [lead.name, lead.city, lead.district, lead.email, lead.contact].some(value => String(value || '').toLowerCase().includes(query));
+      const matchesStage = stageFilter === 'all' || lead.stage === stageFilter || (stageFilter === 'ready' && Boolean(lead.email || lead.vkPeerId || lead.telegramChatId));
+      return matchesQuery && matchesStage;
+    });
+  }, [leads, leadQuery, stageFilter]);
 
   const loadLeads = async () => {
     setLoading(true);
@@ -246,6 +256,23 @@ export function SalesAiDashboard() {
     }
   };
 
+  const enrichOneContact = async lead => {
+    if (busy || !lead) return;
+    setBusy(true);
+    setNotice(`Ищу открытые контакты для «${lead.name}»…`);
+    try {
+      const data = await salesAgentRequest('contacts:enrich', { leadId: lead.id });
+      setLeads(current => current.map(item => item.id === lead.id ? data.lead : item));
+      setNotice(data.found?.length
+        ? `Для «${lead.name}» обновлены: ${data.found.join(', ')}. Сообщения не отправлялись.`
+        : `Для «${lead.name}» открытые контакты не найдены. Сообщения не отправлялись.`);
+    } catch (error) {
+      setNotice(`Не удалось проверить контакты «${lead.name}»: ${error.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const enrichAllContacts = async () => {
     if (busy || !leads.length) return;
     const targets = leads.filter(lead => !lead.email && !lead.vkPeerId && !lead.telegramChatId);
@@ -350,9 +377,83 @@ export function SalesAiDashboard() {
           </div>
         </div>
 
-        <div style={styles.card}>
-          <h2 style={styles.h2}>➕ Добавить лид вручную</h2>
-          <form onSubmit={addLead} style={{ display: 'grid', gap: 10 }}>
+        <div style={styles.workspace}>
+          <aside style={styles.leadSidebar}>
+            <div style={styles.sidebarHead}>
+              <div><h2 style={styles.h2}>Лиды</h2><div style={styles.meta}>Показано {filteredLeads.length} из {leads.length}</div></div>
+            </div>
+            <input style={styles.input} value={leadQuery} onChange={e => setLeadQuery(e.target.value)} placeholder="Поиск по названию или контакту" />
+            <div style={styles.filterRow}>
+              {[['all', 'Все'], ['offer_ready', 'Оффер готов'], ['ready', 'Есть адресат'], ['contacted', 'Связались']].map(([value, label]) => (
+                <button type="button" key={value} onClick={() => setStageFilter(value)} style={stageFilter === value ? styles.filterActive : styles.filterButton}>{label}</button>
+              ))}
+            </div>
+            <div style={styles.leadList}>
+              {loading && <div style={styles.empty}>Загружаю лиды…</div>}
+              {!loading && filteredLeads.length === 0 && <div style={styles.empty}>По этому фильтру лидов нет.</div>}
+              {filteredLeads.map(lead => {
+                const hasRecipient = Boolean(lead.email || lead.vkPeerId || lead.telegramChatId);
+                const hasPublicContact = Boolean(lead.email || lead.vk || lead.telegram || lead.contact || lead.website);
+                return (
+                  <button key={lead.id} onClick={() => setSelectedId(lead.id)} style={{ ...styles.leadButton, borderColor: selected?.id === lead.id ? '#d8b75d' : '#303243', background: selected?.id === lead.id ? '#1b1b20' : '#10121b' }}>
+                    <span style={{ minWidth: 0 }}><strong>{lead.name}</strong><br /><small style={styles.muted}>{SALES_STAGE_LABELS[lead.stage] || lead.stage}</small><div style={styles.badgeRow}><span style={hasPublicContact ? styles.goodBadge : styles.dimBadge}>{hasPublicContact ? 'контакты' : 'нет контактов'}</span><span style={hasRecipient ? styles.goodBadge : styles.warnBadge}>{hasRecipient ? 'готов к отправке' : 'нужен адресат'}</span></div></span>
+                    <span style={scoreStyle(lead.priority)}>{lead.score}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+
+          <section style={styles.leadDetail}>
+            {!selected ? <div style={styles.empty}>Выбери лид, чтобы увидеть анализ и предложение.</div> : (
+              <>
+                <div style={styles.detailHeader}>
+                  <div><div style={styles.scoreRow}><span style={scoreStyle(selected.priority)}>{selected.score}/100</span><strong>{selected.name}</strong></div><div style={styles.meta}>{[selected.city, selected.district, SALES_STAGE_LABELS[selected.stage]].filter(Boolean).join(' · ')}</div></div>
+                  <button type="button" style={styles.secondary} disabled={busy} onClick={() => enrichOneContact(selected)}>Обновить контакты</button>
+                </div>
+                <div style={styles.detailGrid}>
+                  <div>
+                    <h3 style={styles.sectionTitle}>Анализ</h3>
+                    <p style={styles.muted}>{selected.reasons?.join(' · ') || 'Недостаточно сигналов для подробной оценки'}</p>
+                    {(selected.source || selected.sourceUrl) && <div style={styles.meta}>Источник: {selected.source || 'не указан'}{selected.sourceUrl ? ` · ${selected.sourceUrl}` : ''}</div>}
+                    {selected.confidence != null && <div style={styles.meta}>Scout confidence: {Math.round(Number(selected.confidence) * 100)}%</div>}
+                    <h3 style={styles.sectionTitle}>Контакты</h3>
+                    {(selected.email || selected.vk || selected.telegram || selected.contact || selected.website)
+                      ? <div style={styles.contactStack}>{[['Email', selected.email], ['Телефон', selected.contact], ['Сайт', selected.website], ['VK', selected.vk], ['Telegram', selected.telegram]].filter(([, value]) => value).map(([label, value]) => <div key={label}><span style={styles.contactLabel}>{label}</span><span style={styles.contactValue}>{value}</span></div>)}</div>
+                      : <div style={styles.emptyCompact}>Открытые контакты пока не найдены.</div>}
+                    {selected.contactEnrichedAt && <div style={styles.meta}>Проверено: {new Date(selected.contactEnrichedAt).toLocaleString('ru-RU')} · {selected.contactEnrichmentSource || 'источник не найден'}</div>}
+                    {selected.contactEnrichmentSource?.includes('openstreetmap') && <div style={styles.meta}>Данные: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" style={styles.inlineLink}>© OpenStreetMap contributors</a></div>}
+                    <details style={styles.advancedBox}>
+                      <summary style={styles.summary}>Настройки каналов</summary>
+                      <div style={styles.channelFields} key={selected.id}>
+                        <input style={styles.input} type="email" defaultValue={selected.email || ''} placeholder="Email" onBlur={e => { if (e.target.value !== (selected.email || '')) updateLead(selected.id, { email: e.target.value }); }} />
+                        <input style={styles.input} defaultValue={selected.vkPeerId || ''} placeholder="VK peer ID" onBlur={e => { if (e.target.value !== (selected.vkPeerId || '')) updateLead(selected.id, { vkPeerId: e.target.value }); }} />
+                        <input style={styles.input} defaultValue={selected.telegramChatId || ''} placeholder="Telegram chat ID" onBlur={e => { if (e.target.value !== (selected.telegramChatId || '')) updateLead(selected.id, { telegramChatId: e.target.value }); }} />
+                      </div>
+                    </details>
+                    <label style={styles.label}>Статус</label>
+                    <select style={styles.input} value={selected.stage} onChange={e => updateLead(selected.id, { stage: e.target.value })}>{SALES_STAGES.map(stage => <option key={stage} value={stage}>{SALES_STAGE_LABELS[stage]}</option>)}</select>
+                    <div style={styles.nextAction}>Следующий шаг: {nextBestAction(selected)}</div>
+                  </div>
+                  <div style={styles.offerPane}>
+                    <h3 style={styles.sectionTitle}>Предложение</h3>
+                    <textarea style={styles.textarea} value={selected.offerDraft || ''} onChange={e => updateLead(selected.id, { offerDraft: e.target.value })} />
+                    <div style={styles.offerActions}>
+                      <button type="button" style={styles.primary} disabled={busy || selected.stage !== 'offer_ready'} onClick={() => sendOfferAutomatically(selected)}>{busy ? 'Подождите…' : 'Отправить автоматически'}</button>
+                      <button type="button" style={styles.secondary} onClick={() => copyOffer(selected)}>{copiedLeadId === selected.id ? '✓ Скопировано' : 'Скопировать'}</button>
+                      {selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noreferrer" style={styles.linkButton}>Источник</a>}
+                    </div>
+                    <div style={styles.notice}>Автоотправка использует первый доступный адресат и не дублирует сообщение. Ручной способ: скопировать текст, отправить и изменить статус на «Связались».</div>
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+
+        <details style={styles.manualCard}>
+          <summary style={styles.manualSummary}>➕ Добавить лид вручную</summary>
+          <form onSubmit={addLead} style={styles.manualForm}>
             <input style={styles.input} placeholder="Название компании" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             <select style={styles.input} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
               <option value="food">Еда</option><option value="beauty">Красота</option><option value="sport">Спорт</option>
@@ -385,62 +486,7 @@ export function SalesAiDashboard() {
             </div>
             <button style={styles.primary} disabled={busy} type="submit">{busy ? 'Сохраняю…' : 'Добавить и проанализировать'}</button>
           </form>
-        </div>
-
-        <div style={styles.card}>
-          <h2 style={styles.h2}>🧠 Очередь лидов</h2>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {loading && <div style={styles.empty}>Загружаю серверную очередь…</div>}
-            {!loading && leads.length === 0 && <div style={styles.empty}>Лидов пока нет.</div>}
-            {leads.map(lead => (
-              <button key={lead.id} onClick={() => setSelectedId(lead.id)} style={{ ...styles.leadButton, borderColor: selected?.id === lead.id ? '#d8b75d' : '#303243' }}>
-                <span><strong>{lead.name}</strong><br /><small style={styles.muted}>{[lead.city, lead.district, SALES_STAGE_LABELS[lead.stage]].filter(Boolean).join(' · ')}</small></span>
-                <span style={scoreStyle(lead.priority)}>{lead.score}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={styles.fullCard}>
-          <h2 style={styles.h2}>✍️ Агент-продажник</h2>
-          {!selected ? <div style={styles.empty}>Выбери лид, чтобы увидеть анализ и персональный оффер.</div> : (
-            <div style={styles.detailGrid}>
-              <div>
-                <div style={styles.scoreRow}><span style={scoreStyle(selected.priority)}>{selected.score}/100</span><strong>{selected.name}</strong></div>
-                <p style={styles.muted}>{selected.reasons?.join(' · ') || 'Недостаточно сигналов для подробной оценки'}</p>
-                {(selected.source || selected.sourceUrl) && <div style={styles.meta}>Источник: {selected.source || 'не указан'}{selected.sourceUrl ? ` · ${selected.sourceUrl}` : ''}</div>}
-                {selected.confidence != null && <div style={styles.meta}>Scout confidence: {Math.round(Number(selected.confidence) * 100)}%</div>}
-                {(selected.email || selected.vk || selected.telegram || selected.contact) && <div style={styles.contactSummary}>Найдено: {[selected.email, selected.vk, selected.telegram, selected.contact].filter(Boolean).join(' · ')}</div>}
-                {selected.contactEnrichedAt && <div style={styles.meta}>Контакты проверены: {new Date(selected.contactEnrichedAt).toLocaleString('ru-RU')} · источник: {selected.contactEnrichmentSource || 'не найден'}</div>}
-                <label style={styles.label}>Каналы автоотправки</label>
-                <div style={styles.channelFields} key={selected.id}>
-                  <input style={styles.input} type="email" defaultValue={selected.email || ''} placeholder="Email" onBlur={e => { if (e.target.value !== (selected.email || '')) updateLead(selected.id, { email: e.target.value }); }} />
-                  <input style={styles.input} defaultValue={selected.vkPeerId || ''} placeholder="VK peer ID" onBlur={e => { if (e.target.value !== (selected.vkPeerId || '')) updateLead(selected.id, { vkPeerId: e.target.value }); }} />
-                  <input style={styles.input} defaultValue={selected.telegramChatId || ''} placeholder="Telegram chat ID" onBlur={e => { if (e.target.value !== (selected.telegramChatId || '')) updateLead(selected.id, { telegramChatId: e.target.value }); }} />
-                </div>
-                <label style={styles.label}>Статус</label>
-                <select style={styles.input} value={selected.stage} onChange={e => updateLead(selected.id, { stage: e.target.value })}>
-                  {SALES_STAGES.map(stage => <option key={stage} value={stage}>{SALES_STAGE_LABELS[stage]}</option>)}
-                </select>
-                <div style={styles.nextAction}>📌 {nextBestAction(selected)}</div>
-              </div>
-              <div>
-                <label style={styles.label}>Черновик предложения</label>
-                <textarea style={styles.textarea} value={selected.offerDraft || ''} onChange={e => updateLead(selected.id, { offerDraft: e.target.value })} />
-                <div style={styles.offerActions}>
-                  <button type="button" style={styles.primarySmall} disabled={busy || selected.stage !== 'offer_ready'} onClick={() => sendOfferAutomatically(selected)}>
-                    {busy ? 'Отправляю…' : 'Отправить автоматически'}
-                  </button>
-                  <button type="button" style={styles.primarySmall} onClick={() => copyOffer(selected)}>
-                    {copiedLeadId === selected.id ? '✓ Текст скопирован' : 'Скопировать текст'}
-                  </button>
-                  {selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noreferrer" style={styles.linkButton}>Открыть источник</a>}
-                </div>
-                <div style={styles.notice}>📬 Автоотправка выбирает первый настроенный канал: email → VK → Telegram, а при ошибке пробует следующий. Повторная отправка уже связанному лиду блокируется. Для ручного варианта скопируй текст, отправь самостоятельно и выбери статус «Связались».</div>
-              </div>
-            </div>
-          )}
-        </div>
+        </details>
       </section>
     </main>
   );
@@ -463,6 +509,30 @@ const styles = {
   grid: { maxWidth: 1180, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,420px),1fr))', gap: 14 },
   card: { border: '1px solid #2d3040', background: '#151722', borderRadius: 20, padding: 18, minWidth: 0 },
   fullCard: { gridColumn: '1 / -1', border: '1px solid #2d3040', background: '#151722', borderRadius: 20, padding: 18, minWidth: 0 },
+  workspace: { gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,420px),1fr))', border: '1px solid #2d3040', background: '#151722', borderRadius: 20, overflow: 'hidden', minHeight: 620 },
+  leadSidebar: { padding: 16, borderRight: '1px solid #2d3040', minWidth: 0, background: '#12141d' },
+  sidebarHead: { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', marginBottom: 10 },
+  filterRow: { display: 'flex', gap: 6, margin: '10px 0', flexWrap: 'wrap' },
+  filterButton: { border: '1px solid #303243', background: '#10121b', color: '#9ca0ae', borderRadius: 999, padding: '6px 9px', fontSize: 11, cursor: 'pointer' },
+  filterActive: { border: '1px solid #d8b75d', background: '#4b4229', color: '#fff', borderRadius: 999, padding: '6px 9px', fontSize: 11, cursor: 'pointer' },
+  leadList: { display: 'grid', gap: 7, maxHeight: 510, overflowY: 'auto', paddingRight: 3 },
+  leadDetail: { padding: 20, minWidth: 0 },
+  detailHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, paddingBottom: 15, marginBottom: 4, borderBottom: '1px solid #292c3a', flexWrap: 'wrap' },
+  sectionTitle: { margin: '16px 0 8px', fontSize: 13, textTransform: 'uppercase', letterSpacing: '.06em', color: '#d8b75d' },
+  badgeRow: { display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6 },
+  goodBadge: { borderRadius: 999, padding: '3px 6px', background: '#1f3d2a', color: '#82d99a', fontSize: 9, fontWeight: 800 },
+  warnBadge: { borderRadius: 999, padding: '3px 6px', background: '#493b25', color: '#e8c76d', fontSize: 9, fontWeight: 800 },
+  dimBadge: { borderRadius: 999, padding: '3px 6px', background: '#252735', color: '#858999', fontSize: 9, fontWeight: 800 },
+  contactStack: { display: 'grid', gap: 7, padding: 11, borderRadius: 12, background: '#10121b', border: '1px solid #292c3a', marginBottom: 8 },
+  contactLabel: { display: 'inline-block', minWidth: 72, color: '#858999', fontSize: 10, textTransform: 'uppercase' },
+  contactValue: { color: '#e6e2d8', fontSize: 12, wordBreak: 'break-all' },
+  emptyCompact: { padding: 11, borderRadius: 12, background: '#10121b', color: '#858999', fontSize: 12 },
+  advancedBox: { marginTop: 10, border: '1px solid #292c3a', borderRadius: 12, padding: '9px 10px' },
+  summary: { cursor: 'pointer', color: '#aeb1bf', fontSize: 12, fontWeight: 750 },
+  offerPane: { minWidth: 0, borderLeft: '1px solid #292c3a', paddingLeft: 18 },
+  manualCard: { gridColumn: '1 / -1', border: '1px solid #2d3040', background: '#151722', borderRadius: 16, padding: 15 },
+  manualSummary: { cursor: 'pointer', color: '#d8b75d', fontWeight: 850 },
+  manualForm: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10, marginTop: 14 },
   input: { width: '100%', boxSizing: 'border-box', height: 42, borderRadius: 12, border: '1px solid #343748', background: '#0f111a', color: '#fff', padding: '0 11px' },
   twoCols: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 8 },
   checks: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 7 }, check: { color: '#c8cad3', fontSize: 13 },
@@ -487,5 +557,6 @@ const styles = {
   textarea: { width: '100%', minHeight: 220, resize: 'vertical', boxSizing: 'border-box', borderRadius: 14, border: '1px solid #343748', background: '#0f111a', color: '#fff', padding: 12, lineHeight: 1.45 },
   offerActions: { display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' },
   linkButton: { minHeight: 36, borderRadius: 10, border: '1px solid #343748', background: '#151722', color: '#d8b75d', padding: '0 11px', display: 'inline-flex', alignItems: 'center', textDecoration: 'none', fontSize: 13 },
+  inlineLink: { color: '#d8b75d', textDecoration: 'underline' },
   nextAction: { marginTop: 12, borderRadius: 12, padding: 11, background: '#10121b', color: '#d8b75d', fontWeight: 750 }, notice: { marginTop: 10, color: '#9ca0ae', fontSize: 12, lineHeight: 1.45 },
 };
