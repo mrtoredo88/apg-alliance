@@ -31,6 +31,7 @@ jobs:
         run: |
           npm run preview -- --host 127.0.0.1 --port 4175 &
           for attempt in {1..30}; do curl --fail --silent http://127.0.0.1:4175 >/dev/null && break; sleep 1; done
+          AUTH_LIFECYCLE_URLS=http://127.0.0.1:4175/ npm run test:auth-lifecycle
           npm run quality:browser
       - name: Upload quality report
         if: always()
