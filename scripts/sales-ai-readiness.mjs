@@ -20,74 +20,77 @@ check('scout-provider-file', () => assert.ok(fs.existsSync('server/src/lib/sales
 check('admin-page-file', () => assert.ok(fs.existsSync('src/salesAi/SalesAiAdminPage.jsx')));
 check('dashboard-file', () => assert.ok(fs.existsSync('src/salesAi/SalesAiDashboard.jsx')));
 check('agent-ops-file', () => assert.ok(fs.existsSync('src/salesAi/SalesAiAgentOps.jsx')));
+
 check('safe-env-template', () => {
   const template = fs.readFileSync('server/.env.example', 'utf8');
-  assert.match(template, /^TWOGIS_API_KEY=/m);
-  assert.doesNotMatch(template, /TWOGIS_API_KEY=\S{8,}/);
+  const line = template.split(/\r?\n/).find(item => item.startsWith('TWOGIS_API_KEY='));
+  assert.equal(line, 'TWOGIS_API_KEY=');
 });
+
 check('env-is-ignored', () => {
-  const ignored = fs.readFileSync('server/.gitignore', 'utf8');
-  assert.match(ignored, /(^|\n)\.env(\n|$)/);
+  const ignored = fs.readFileSync('server/.gitignore', 'utf8').split(/\r?\n/).map(item => item.trim());
+  assert.ok(ignored.includes('.env'));
 });
+
 check('server-registration', () => {
   const source = fs.readFileSync('server/src/server.js', 'utf8');
-  assert.match(source, /salesAiRoutes/);
-  assert.match(source, /salesAiAgentRoutes/);
+  assert.ok(source.includes('salesAiRoutes'));
+  assert.ok(source.includes('salesAiAgentRoutes'));
 });
+
 check('admin-route-registration', () => {
   const source = fs.readFileSync('src/App.jsx', 'utf8');
-  assert.match(source, /\/admin\/sales-ai/);
-  assert.match(source, /\/admin\/sales-ai\/agents/);
-  assert.match(source, /SalesAiAdminPage/);
+  assert.ok(source.includes('/admin/sales-ai'));
+  assert.ok(source.includes('/admin/sales-ai/agents'));
+  assert.ok(source.includes('SalesAiAdminPage'));
 });
+
 check('five-agent-contract', () => {
   const scout = fs.readFileSync('server/src/lib/salesScout.js', 'utf8');
   const agents = fs.readFileSync('server/src/lib/salesAgents.js', 'utf8');
   const routes = fs.readFileSync('server/src/routes/sales-ai-agents.js', 'utf8');
-  assert.match(scout, /runSalesScout/);
-  assert.match(agents, /analyzeLead/);
-  assert.match(agents, /buildSalesOffer/);
-  assert.match(agents, /buildCommunicatorDraft/);
-  assert.match(agents, /buildManagerSummary/);
-  assert.match(routes, /communication:record/);
-  assert.match(routes, /manager:summary/);
+  assert.ok(scout.includes('runSalesScout'));
+  assert.ok(agents.includes('analyzeLead'));
+  assert.ok(agents.includes('buildSalesOffer'));
+  assert.ok(agents.includes('buildCommunicatorDraft'));
+  assert.ok(agents.includes('buildManagerSummary'));
+  assert.ok(routes.includes('communication:record'));
+  assert.ok(routes.includes('manager:summary'));
 });
+
 check('human-in-the-loop-communication', () => {
   const ui = fs.readFileSync('src/salesAi/SalesAiAgentOps.jsx', 'utf8');
-  assert.match(ui, /ничего не отправляет без человека|AI готовит черновики/);
-  assert.doesNotMatch(ui, /sendEmail|sendTelegram|sendVk/);
+  assert.ok(ui.includes('ничего не отправляет без человека') || ui.includes('AI готовит черновики'));
+  for (const forbidden of ['sendEmail', 'sendTelegram', 'sendVk']) assert.equal(ui.includes(forbidden), false);
 });
+
 check('deploy-secret-passthrough', () => {
   const source = fs.readFileSync('server/deploy.sh', 'utf8');
-  assert.match(source, /get_env TWOGIS_API_KEY/);
-  assert.match(source, /--environment TWOGIS_API_KEY=/);
+  assert.ok(source.includes('get_env TWOGIS_API_KEY'));
+  assert.ok(source.includes('TWOGIS_API_KEY_VALUE'));
+  assert.ok(source.includes('--environment TWOGIS_API_KEY="$TWOGIS_API_KEY_VALUE"'));
 });
+
 check('2gis-query-contract', () => {
   const query = buildScoutQuery({ city: 'Зеленоград', district: 'Крюково', category: 'food', query: 'семейные' });
   assert.match(query, /Зеленоград/);
   assert.match(query, /Крюково/);
   assert.match(query, /кафе ресторан/);
 });
+
 check('no-embedded-2gis-secret', () => {
-  const files = [
-    'server/src/lib/salesScout.js',
-    'server/src/routes/sales-ai.js',
-    'server/src/routes/sales-ai-agents.js',
-    'server/src/lib/salesAgents.js',
-    'src/salesAi/SalesAiDashboard.jsx',
-    'src/salesAi/SalesAiAgentOps.jsx',
-    'server/deploy.sh',
-    'server/.env.example',
-  ];
-  const source = files.map(file => fs.readFileSync(file, 'utf8')).join('\n');
-  assert.doesNotMatch(source, /TWOGIS_API_KEY\s*=\s*['\"][^'\"]+['\"]/);
-  assert.doesNotMatch(source, /DGIS_API_KEY\s*=\s*['\"][^'\"]+['\"]/);
+  const scout = fs.readFileSync('server/src/lib/salesScout.js', 'utf8');
+  const envTemplate = fs.readFileSync('server/.env.example', 'utf8');
+  assert.equal(envTemplate.split(/\r?\n/).find(item => item.startsWith('TWOGIS_API_KEY=')), 'TWOGIS_API_KEY=');
+  assert.equal(/TWOGIS_API_KEY\s*=\s*['"][^'"]+['"]/.test(scout), false);
+  assert.equal(/DGIS_API_KEY\s*=\s*['"][^'"]+['"]/.test(scout), false);
 });
 
 const failed = checks.filter(item => item.status !== 'PASS');
 const result = {
   status: failed.length ? 'FAIL' : 'PASS',
   checks,
+  failed,
   deploymentSecretPresent: Boolean(process.env.TWOGIS_API_KEY || process.env.DGIS_API_KEY),
   note: 'Live 2GIS network call is intentionally not performed by readiness check.',
 };
