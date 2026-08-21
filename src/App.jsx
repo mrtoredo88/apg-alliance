@@ -14,6 +14,30 @@ function AppFallback({ label = 'Загрузка...' }) {
   return <SplashScreen isReady={false} autoTimeout={false} status={label} />;
 }
 
+function AdminPanelWithSalesAiShortcut() {
+  return (
+    <>
+      <AdminPanel />
+      <a
+        href="/admin/sales-ai"
+        aria-label="Открыть AI-отдел продаж"
+        title="AI-отдел продаж"
+        style={{
+          position: 'fixed', right: 18, bottom: 18, zIndex: 10020,
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '11px 14px', borderRadius: 14,
+          background: '#171922', color: '#f7f4ea', textDecoration: 'none',
+          border: '1px solid rgba(216,183,93,.7)', boxShadow: '0 10px 30px rgba(0,0,0,.32)',
+          fontFamily: 'Inter, system-ui, sans-serif', fontSize: 13, fontWeight: 800,
+        }}
+      >
+        <span aria-hidden="true">🤖</span>
+        <span>AI-отдел продаж</span>
+      </a>
+    </>
+  );
+}
+
 export function App() {
   useEffect(() => {
     window.__APG_BOOT_MARK?.('app_mounted');
@@ -32,12 +56,12 @@ export function App() {
           } />
           <Route path="/admin" element={
             <Suspense fallback={<AppFallback label="Загрузка панели..." />}>
-              <AdminPanel />
+              <AdminPanelWithSalesAiShortcut />
             </Suspense>
           } />
           <Route path="/admin-app" element={
             <Suspense fallback={<AppFallback label="Загрузка админки АПГ..." />}>
-              <AdminPanel />
+              <AdminPanelWithSalesAiShortcut />
             </Suspense>
           } />
           <Route path="/admin/sales-ai" element={
