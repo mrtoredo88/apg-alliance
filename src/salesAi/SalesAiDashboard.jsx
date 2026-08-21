@@ -1,19 +1,30 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { API_BASE_URL } from '../constants.js';
+import { apgIdentity } from '../apg/index.js';
 import { enrichLead, nextBestAction, SALES_STAGE_LABELS, SALES_STAGES, summarizePipeline } from './salesAgentCore.js';
 
-const STORAGE_KEY = 'apg_ai_sales_leads_v1';
+const initialForm = {
+  name: '', category: 'food', website: '', vk: '', telegram: '', contact: '', city: 'Зеленоград', district: '', source: '', sourceUrl: '',
+  local: true, hasOfflinePoint: true, activeSocials: true, runsEvents: false,
+  hasRepeatCustomers: true, canBringAudience: true, decisionMakerFound: false,
+};
 
-function loadLeads() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+async function salesRequest(action, payload = {}) {
+  const token = await apgIdentity.getSessionToken?.().catch(() => '');
+  if (!token) throw new Error('Требуется административная авторизация.');
+  const response = await fetch(`${API_BASE_URL}/api/sales-ai`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-apg-auth': token },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) {
+    const error = new Error(data.error || 'Не удалось выполнить действие AI-отдела продаж.');
+    error.code = data.code;
+    error.duplicate = data.duplicate;
+    throw error;
   }
-}
-
-function saveLeads(leads) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(leads)); } catch {}
+  return data;
 }
 
 function normalizeForDuplicate(value) {
@@ -33,46 +44,73 @@ function duplicateOf(leads, candidate) {
   });
 }
 
-const initialForm = {
-  name: '', category: 'food', website: '', vk: '', telegram: '', contact: '', city: 'Зеленоград', district: '', source: '', sourceUrl: '',
-  local: true, hasOfflinePoint: true, activeSocials: true, runsEvents: false,
-  hasRepeatCustomers: true, canBringAudience: true, decisionMakerFound: false,
-};
-
 export function SalesAiDashboard() {
-  const [leads, setLeads] = useState(loadLeads);
+  const [leads, setLeads] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [selectedId, setSelectedId] = useState(null);
   const [notice, setNotice] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const stats = useMemo(() => summarizePipeline(leads), [leads]);
   const selected = leads.find(lead => lead.id === selectedId) || leads[0] || null;
 
-  const commit = updater => {
-    setLeads(current => {
-      const next = typeof updater === 'function' ? updater(current) : updater;
-      saveLeads(next);
-      return next;
-    });
+  const loadLeads = async () => {
+    setLoading(true);
+    try {
+      const data = await salesRequest('list');
+      const rows = Array.isArray(data.leads) ? data.leads : [];
+      setLeads(rows);
+      setSelectedId(current => current || rows[0]?.id || null);
+    } catch (error) {
+      setNotice(`Ошибка загрузки: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const addLead = event => {
+  useEffect(() => { loadLeads(); }, []);
+
+  const addLead = async event => {
     event.preventDefault();
-    if (!form.name.trim()) return;
+    if (!form.name.trim() || busy) return;
     const existing = duplicateOf(leads, form);
     if (existing) {
       setSelectedId(existing.id);
       setNotice(`Похожий лид уже есть: ${existing.name}. Открыл существующую карточку.`);
       return;
     }
-    const lead = enrichLead({ ...form, name: form.name.trim(), source: form.source.trim() || 'manual', sourceUrl: form.sourceUrl.trim() });
-    commit(current => [lead, ...current]);
-    setSelectedId(lead.id);
-    setForm(initialForm);
-    setNotice('Лид добавлен и передан Аналитику. Серверное хранение подключим следующим шагом.');
+    setBusy(true); setNotice('');
+    try {
+      const prepared = enrichLead({ ...form, name: form.name.trim(), source: form.source.trim() || 'manual', sourceUrl: form.sourceUrl.trim() });
+      const data = await salesRequest('create', { lead: prepared });
+      setLeads(current => [data.lead, ...current]);
+      setSelectedId(data.lead.id);
+      setForm(initialForm);
+      setNotice('Лид сохранён на сервере АПГ и передан Аналитику.');
+    } catch (error) {
+      if (error.code === 'sales-ai/duplicate' && error.duplicate?.id) {
+        setSelectedId(error.duplicate.id);
+        setNotice(`Сервер остановил дубль: ${error.duplicate.name || 'существующий лид'}.`);
+      } else {
+        setNotice(`Не удалось сохранить лид: ${error.message}`);
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const updateLead = (id, patch) => {
-    commit(current => current.map(lead => lead.id === id ? { ...lead, ...patch, updatedAt: new Date().toISOString() } : lead));
+  const updateLead = async (id, patch) => {
+    const before = leads.find(lead => lead.id === id);
+    if (!before) return;
+    const optimistic = { ...before, ...patch, updatedAt: new Date().toISOString() };
+    setLeads(current => current.map(lead => lead.id === id ? optimistic : lead));
+    try {
+      const data = await salesRequest('update', { id, patch });
+      setLeads(current => current.map(lead => lead.id === id ? data.lead : lead));
+    } catch (error) {
+      setLeads(current => current.map(lead => lead.id === id ? before : lead));
+      setNotice(`Изменение не сохранено: ${error.message}`);
+    }
   };
 
   return (
@@ -81,8 +119,9 @@ export function SalesAiDashboard() {
         <div>
           <div style={styles.eyebrow}>АПГ · AI-отдел продаж</div>
           <h1 style={styles.h1}>Разведка → анализ → оффер → контакт → результат</h1>
-          <p style={styles.muted}>MVP работает как безопасный конвейер: ИИ готовит решения, а отправка остаётся под контролем человека.</p>
+          <p style={styles.muted}>Лиды хранятся на backend АПГ. ИИ готовит решения, а отправка остаётся под контролем человека.</p>
         </div>
+        <button type="button" onClick={loadLeads} disabled={loading} style={styles.secondary}>{loading ? 'Загрузка…' : '↻ Обновить'}</button>
       </header>
 
       {notice && <div style={styles.noticeTop}>{notice}</div>}
@@ -125,14 +164,15 @@ export function SalesAiDashboard() {
               <Check label="Повторные клиенты" checked={form.hasRepeatCustomers} onChange={value => setForm({ ...form, hasRepeatCustomers: value })} />
               <Check label="Может привести аудиторию" checked={form.canBringAudience} onChange={value => setForm({ ...form, canBringAudience: value })} />
             </div>
-            <button style={styles.primary} type="submit">Добавить и проанализировать</button>
+            <button style={styles.primary} disabled={busy} type="submit">{busy ? 'Сохраняю…' : 'Добавить и проанализировать'}</button>
           </form>
         </div>
 
         <div style={styles.card}>
           <h2 style={styles.h2}>🧠 Очередь лидов</h2>
           <div style={{ display: 'grid', gap: 8 }}>
-            {leads.length === 0 && <div style={styles.empty}>Добавь первый бизнес. Здесь появится приоритет и следующий шаг.</div>}
+            {loading && <div style={styles.empty}>Загружаю серверную очередь…</div>}
+            {!loading && leads.length === 0 && <div style={styles.empty}>Добавь первый бизнес. Здесь появится приоритет и следующий шаг.</div>}
             {leads.map(lead => (
               <button key={lead.id} onClick={() => setSelectedId(lead.id)} style={{ ...styles.leadButton, borderColor: selected?.id === lead.id ? '#d8b75d' : '#303243' }}>
                 <span><strong>{lead.name}</strong><br /><small style={styles.muted}>{[lead.city, lead.district, SALES_STAGE_LABELS[lead.stage]].filter(Boolean).join(' · ')}</small></span>
@@ -175,7 +215,7 @@ function scoreStyle(priority) { return { minWidth: 46, height: 34, padding: '0 9
 
 const styles = {
   page: { minHeight: '100vh', background: '#0d0e16', color: '#f7f4ea', padding: 24, fontFamily: 'Inter, system-ui, sans-serif' },
-  header: { maxWidth: 1180, margin: '0 auto 18px' }, eyebrow: { color: '#d8b75d', fontWeight: 850, letterSpacing: '.08em', fontSize: 12 },
+  header: { maxWidth: 1180, margin: '0 auto 18px', display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'flex-start' }, eyebrow: { color: '#d8b75d', fontWeight: 850, letterSpacing: '.08em', fontSize: 12 },
   h1: { margin: '6px 0 8px', fontSize: 'clamp(25px,4vw,42px)' }, h2: { margin: '0 0 14px', fontSize: 17 }, muted: { color: '#aeb1bf' },
   noticeTop: { maxWidth: 1180, margin: '0 auto 12px', padding: '10px 12px', borderRadius: 12, background: '#181b28', border: '1px solid #343748', color: '#d8b75d', fontSize: 12 },
   stats: { maxWidth: 1180, margin: '0 auto 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 10 },
@@ -184,7 +224,7 @@ const styles = {
   card: { border: '1px solid #2d3040', background: '#151722', borderRadius: 20, padding: 18 },
   input: { width: '100%', boxSizing: 'border-box', height: 42, borderRadius: 12, border: '1px solid #343748', background: '#0f111a', color: '#fff', padding: '0 11px' }, twoCols: { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 },
   checks: { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 7 }, check: { color: '#c8cad3', fontSize: 13 },
-  primary: { height: 42, border: 0, borderRadius: 12, background: '#d8b75d', color: '#15120a', fontWeight: 900, cursor: 'pointer' },
+  primary: { height: 42, border: 0, borderRadius: 12, background: '#d8b75d', color: '#15120a', fontWeight: 900, cursor: 'pointer' }, secondary: { minHeight: 38, borderRadius: 11, border: '1px solid #343748', background: '#151722', color: '#d8b75d', padding: '0 12px', cursor: 'pointer' },
   leadButton: { width: '100%', border: '1px solid', background: '#10121b', color: '#fff', borderRadius: 14, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', cursor: 'pointer' },
   empty: { padding: 18, borderRadius: 14, background: '#10121b', color: '#858999' }, detailGrid: { display: 'grid', gridTemplateColumns: 'minmax(0,.8fr) minmax(0,1.2fr)', gap: 18 },
   scoreRow: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 20 }, label: { display: 'block', margin: '12px 0 6px', color: '#aeb1bf', fontSize: 12, fontWeight: 800 }, meta: { fontSize: 11, color: '#858999', wordBreak: 'break-word' },
