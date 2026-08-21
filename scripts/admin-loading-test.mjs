@@ -63,5 +63,7 @@ assert.ok(adminSecurity.includes('findUserByIdentityUid'), 'AdminGuard must reso
 assert.ok(adminPanel.includes('Назначить администратора из пользователей') && adminPanel.includes("onAction('admin:updateRole', { id: assignUserId }"), 'Access center must promote an existing user without creating a duplicate account.');
 assert.ok(adminPanel.includes('users={adminMetrics.users}'), 'Access center must receive the existing user directory.');
 assert.ok(adminSecurityRoute.includes('Нельзя снять роль у последнего активного Owner.') && adminSecurityRoute.includes("snap.id === actor.userId"), 'Owner demotion must protect the current and last active owner.');
+assert.ok(adminSecurity.includes('...(decoded.role ? { role: decoded.role } : {})'), 'AdminGuard must prefer the role from the verified native session over a stale legacy profile role.');
+assert.ok(adminSecurity.includes('getPrimaryRole(verifiedUser)'), 'AdminGuard permissions must be evaluated against the verified session-enriched identity.');
 
 console.log('Admin loading pipeline regression passed');
