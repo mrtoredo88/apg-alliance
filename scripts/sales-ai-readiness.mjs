@@ -64,6 +64,7 @@ check('five-agent-contract', () => {
   assert.ok(agents.includes('buildManagerSummary'));
   assert.ok(routes.includes('communication:record'));
   assert.ok(routes.includes('communication:send'));
+  assert.ok(routes.includes('contacts:enrich'));
   assert.ok(routes.includes('manager:summary'));
 });
 
@@ -73,6 +74,7 @@ check('human-in-the-loop-communication', () => {
   assert.ok(ui.includes('ничего не отправляет без человека') || ui.includes('AI готовит черновики'));
   assert.ok(dashboard.includes('Скопировать текст'));
   assert.ok(dashboard.includes('Отправить автоматически'));
+  assert.ok(dashboard.includes('Найти контакты у всех лидов'));
   for (const forbidden of ['sendEmail', 'sendTelegram', 'sendVk']) assert.equal(ui.includes(forbidden), false);
   for (const forbidden of ['sendEmail', 'sendTelegram', 'sendVk']) assert.equal(dashboard.includes(forbidden), false);
 });

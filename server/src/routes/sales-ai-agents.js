@@ -3,6 +3,7 @@ import { getDb } from '../lib/documentStore.js';
 import { adminReplyError, requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 import { analyzeLead, buildCommunicatorDraft, buildManagerSummary, buildSalesOffer, inferStageFromMessage } from '../lib/salesAgents.js';
 import { availableOutreachChannels, sendSalesOutreach } from '../lib/salesOutreach.js';
+import { enrichSalesLeadContacts } from '../lib/salesContactEnrichment.js';
 
 const LEADS = 'salesLeads';
 const MESSAGES = 'salesCommunications';
@@ -58,6 +59,14 @@ export default async function salesAiAgentRoutes(fastify) {
         await ref.set({ offerDraft, stage, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.userId || actor.uid }, { merge: true });
         await writeAuditLog(db, request, actor, 'sales-ai:salesperson-refresh', LEADS, lead.id, { label: `Продажник обновил оффер: ${lead.name}` });
         return reply.send({ ok: true, offerDraft, stage });
+      }
+
+      if (action === 'contacts:enrich') {
+        const { ref, lead } = await getLead(db, request.body?.leadId);
+        const result = await enrichSalesLeadContacts(lead);
+        await ref.set({ ...result.patch, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.userId || actor.uid }, { merge: true });
+        await writeAuditLog(db, request, actor, 'sales-ai:contacts-enrich', LEADS, lead.id, { label: `Контакты обновлены: ${lead.name}`, found: result.found, source: result.patch.contactEnrichmentSource });
+        return reply.send({ ok: true, lead: { ...lead, ...result.patch }, found: result.found });
       }
 
       if (action === 'communication:list') {
