@@ -5,6 +5,7 @@ import { SplashScreen } from './SplashScreen.jsx';
 import { markPerformanceStage } from './performance/index.js';
 
 const AdminPanel = lazy(() => import('./AdminPanel.jsx').then(m => ({ default: m.AdminPanel })));
+const SalesAiAdminPage = lazy(() => import('./salesAi/SalesAiAdminPage.jsx').then(m => ({ default: m.SalesAiAdminPage })));
 const AssistantMiniApp = lazy(() => import('./assistant/AssistantMiniApp.jsx').then(m => ({ default: m.AssistantMiniApp })));
 const NetworkDiagnosticsPage = lazy(() => import('./NetworkDiagnosticsPage.jsx').then(m => ({ default: m.NetworkDiagnosticsPage })));
 const UserApp = lazy(() => import('./UserApp.jsx').then(m => ({ default: m.UserApp })));
@@ -37,6 +38,11 @@ export function App() {
           <Route path="/admin-app" element={
             <Suspense fallback={<AppFallback label="Загрузка админки АПГ..." />}>
               <AdminPanel />
+            </Suspense>
+          } />
+          <Route path="/admin/sales-ai" element={
+            <Suspense fallback={<AppFallback label="Загрузка AI-отдела продаж..." />}>
+              <SalesAiAdminPage />
             </Suspense>
           } />
           <Route path="/news/:id" element={
