@@ -9,6 +9,8 @@ const initialForm = {
   hasRepeatCustomers: true, canBringAudience: true, decisionMakerFound: false,
 };
 
+const initialScoutTask = { city: 'Зеленоград', district: '', category: 'food', query: '', limit: 10 };
+
 async function salesRequest(action, payload = {}) {
   const token = await apgIdentity.getSessionToken?.().catch(() => '');
   if (!token) throw new Error('Требуется административная авторизация.');
@@ -51,6 +53,10 @@ export function SalesAiDashboard() {
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [scoutTask, setScoutTask] = useState(initialScoutTask);
+  const [scoutCandidates, setScoutCandidates] = useState([]);
+  const [scoutLoading, setScoutLoading] = useState(false);
+  const [scoutProvider, setScoutProvider] = useState('');
   const stats = useMemo(() => summarizePipeline(leads), [leads]);
   const selected = leads.find(lead => lead.id === selectedId) || leads[0] || null;
 
@@ -68,7 +74,82 @@ export function SalesAiDashboard() {
     }
   };
 
-  useEffect(() => { loadLeads(); }, []);
+  const loadScoutQueue = async () => {
+    try {
+      const data = await salesRequest('scout:list', { status: 'pending' });
+      setScoutCandidates(Array.isArray(data.candidates) ? data.candidates : []);
+    } catch (error) {
+      setNotice(`Очередь Scout не загрузилась: ${error.message}`);
+    }
+  };
+
+  useEffect(() => { loadLeads(); loadScoutQueue(); }, []);
+
+  const runScout = async event => {
+    event?.preventDefault?.();
+    if (scoutLoading) return;
+    setScoutLoading(true); setNotice('Scout ищет подходящие компании и проверяет дубли…');
+    try {
+      const data = await salesRequest('scout:search', { task: scoutTask });
+      setScoutProvider(data.provider || '');
+      await loadScoutQueue();
+      setNotice(`Scout завершил поиск: в очередь добавлено ${data.candidates?.length || 0}, дублей пропущено ${data.skippedDuplicates || 0}.`);
+    } catch (error) {
+      if (error.code === 'sales-ai/scout-provider-unconfigured') {
+        setNotice('Scout готов, но на сервере ещё не задан BRAVE_SEARCH_API_KEY. После добавления ключа поиск заработает без изменений интерфейса.');
+      } else {
+        setNotice(`Scout не смог выполнить поиск: ${error.message}`);
+      }
+    } finally {
+      setScoutLoading(false);
+    }
+  };
+
+  const approveScoutCandidate = async candidate => {
+    if (busy) return;
+    setBusy(true); setNotice('Передаю кандидата Аналитику…');
+    try {
+      const prepared = enrichLead({
+        ...candidate,
+        local: true,
+        hasOfflinePoint: true,
+        activeSocials: Boolean(candidate.vk || candidate.telegram || candidate.website),
+        runsEvents: false,
+        hasRepeatCustomers: true,
+        canBringAudience: true,
+        decisionMakerFound: false,
+      });
+      const data = await salesRequest('scout:approve', { id: candidate.id, lead: prepared });
+      setScoutCandidates(current => current.filter(item => item.id !== candidate.id));
+      setLeads(current => [data.lead, ...current]);
+      setSelectedId(data.lead.id);
+      setNotice(`${candidate.name} принят: Аналитик поставил ${data.lead.score}/100 и Продажник подготовил оффер.`);
+    } catch (error) {
+      if (error.code === 'sales-ai/duplicate' && error.duplicate?.id) {
+        setScoutCandidates(current => current.filter(item => item.id !== candidate.id));
+        setSelectedId(error.duplicate.id);
+        setNotice(`Scout-кандидат оказался дублем: ${error.duplicate.name || 'существующий лид'}.`);
+      } else {
+        setNotice(`Не удалось принять кандидата: ${error.message}`);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const dismissScoutCandidate = async candidate => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await salesRequest('scout:dismiss', { id: candidate.id });
+      setScoutCandidates(current => current.filter(item => item.id !== candidate.id));
+      setNotice(`${candidate.name} убран из очереди Scout.`);
+    } catch (error) {
+      setNotice(`Не удалось отклонить кандидата: ${error.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const addLead = async event => {
     event.preventDefault();
@@ -119,25 +200,71 @@ export function SalesAiDashboard() {
         <div>
           <div style={styles.eyebrow}>АПГ · AI-отдел продаж</div>
           <h1 style={styles.h1}>Разведка → анализ → оффер → контакт → результат</h1>
-          <p style={styles.muted}>Лиды хранятся на backend АПГ. ИИ готовит решения, а отправка остаётся под контролем человека.</p>
+          <p style={styles.muted}>Scout находит кандидатов, ты подтверждаешь, после чего Аналитик и Продажник подхватывают лид автоматически.</p>
         </div>
-        <button type="button" onClick={loadLeads} disabled={loading} style={styles.secondary}>{loading ? 'Загрузка…' : '↻ Обновить'}</button>
+        <button type="button" onClick={() => { loadLeads(); loadScoutQueue(); }} disabled={loading} style={styles.secondary}>{loading ? 'Загрузка…' : '↻ Обновить'}</button>
       </header>
 
       {notice && <div style={styles.noticeTop}>{notice}</div>}
 
       <section style={styles.stats}>
         <Stat label="Лидов" value={stats.total} />
+        <Stat label="Scout очередь" value={scoutCandidates.length} />
         <Stat label="Приоритетных" value={stats.highPriority} />
-        <Stat label="Контактов" value={stats.contacted} />
         <Stat label="Ответов" value={stats.replied} />
         <Stat label="Встреч" value={stats.meetings} />
         <Stat label="Партнёров" value={stats.won} />
       </section>
 
       <section style={styles.grid}>
+        <div style={styles.fullCard}>
+          <div style={styles.scoutHead}>
+            <div>
+              <h2 style={styles.h2}>🔎 Scout · автоматическая разведка</h2>
+              <div style={styles.muted}>Задай район и категорию. Scout ищет публичные источники, сохраняет доказательства и складывает кандидатов сюда, но сам никому не пишет.</div>
+            </div>
+            {scoutProvider && <span style={styles.providerBadge}>provider: {scoutProvider}</span>}
+          </div>
+          <form onSubmit={runScout} style={styles.scoutForm}>
+            <input style={styles.input} value={scoutTask.city} onChange={e => setScoutTask({ ...scoutTask, city: e.target.value })} placeholder="Город" />
+            <input style={styles.input} value={scoutTask.district} onChange={e => setScoutTask({ ...scoutTask, district: e.target.value })} placeholder="Район / локация" />
+            <select style={styles.input} value={scoutTask.category} onChange={e => setScoutTask({ ...scoutTask, category: e.target.value })}>
+              <option value="food">Еда</option><option value="beauty">Красота</option><option value="sport">Спорт</option>
+              <option value="education">Образование</option><option value="entertainment">Развлечения</option>
+              <option value="health">Здоровье</option><option value="pets">Животные</option><option value="services">Услуги</option><option value="other">Другое</option>
+            </select>
+            <input style={styles.input} value={scoutTask.query} onChange={e => setScoutTask({ ...scoutTask, query: e.target.value })} placeholder="Доп. условие, например: семейные, премиум…" />
+            <select style={styles.input} value={scoutTask.limit} onChange={e => setScoutTask({ ...scoutTask, limit: Number(e.target.value) })}>
+              {[5, 10, 20].map(value => <option key={value} value={value}>{value} кандидатов</option>)}
+            </select>
+            <button type="submit" style={styles.primary} disabled={scoutLoading}>{scoutLoading ? 'Scout ищет…' : 'Запустить разведку'}</button>
+          </form>
+
+          <div style={styles.candidateGrid}>
+            {scoutCandidates.length === 0 && <div style={styles.empty}>Очередь Scout пуста. После поиска найденные компании появятся здесь для проверки.</div>}
+            {scoutCandidates.map(candidate => (
+              <div key={candidate.id} style={styles.candidateCard}>
+                <div style={styles.candidateTop}>
+                  <div style={{ minWidth: 0 }}>
+                    <strong style={{ fontSize: 14 }}>{candidate.name}</strong>
+                    <div style={styles.meta}>{[candidate.city, candidate.district, candidate.category].filter(Boolean).join(' · ')}</div>
+                  </div>
+                  <span style={confidenceStyle(candidate.confidence)}>{Math.round(Number(candidate.confidence || 0) * 100)}%</span>
+                </div>
+                {candidate.snippet && <div style={styles.snippet}>{candidate.snippet}</div>}
+                <div style={styles.meta}>{candidate.sourceUrl || candidate.website || candidate.vk || candidate.telegram}</div>
+                {!!candidate.evidence?.length && <div style={styles.evidence}>Evidence: {candidate.evidence.slice(0, 3).map(item => item.field).join(' · ')}</div>}
+                <div style={styles.candidateActions}>
+                  <button type="button" style={styles.secondary} disabled={busy} onClick={() => dismissScoutCandidate(candidate)}>Не подходит</button>
+                  <button type="button" style={styles.primarySmall} disabled={busy} onClick={() => approveScoutCandidate(candidate)}>Принять → Аналитик</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div style={styles.card}>
-          <h2 style={styles.h2}>🔎 Агент-разведчик</h2>
+          <h2 style={styles.h2}>➕ Добавить лид вручную</h2>
           <form onSubmit={addLead} style={{ display: 'grid', gap: 10 }}>
             <input style={styles.input} placeholder="Название компании" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             <select style={styles.input} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
@@ -154,7 +281,7 @@ export function SalesAiDashboard() {
             <input style={styles.input} placeholder="Telegram" value={form.telegram} onChange={e => setForm({ ...form, telegram: e.target.value })} />
             <input style={styles.input} placeholder="Контакт / ЛПР" value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value, decisionMakerFound: Boolean(e.target.value.trim()) })} />
             <div style={styles.twoCols}>
-              <input style={styles.input} placeholder="Источник: поиск, рекомендация…" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })} />
+              <input style={styles.input} placeholder="Источник" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })} />
               <input style={styles.input} placeholder="Ссылка на источник" value={form.sourceUrl} onChange={e => setForm({ ...form, sourceUrl: e.target.value })} />
             </div>
             <div style={styles.checks}>
@@ -172,7 +299,7 @@ export function SalesAiDashboard() {
           <h2 style={styles.h2}>🧠 Очередь лидов</h2>
           <div style={{ display: 'grid', gap: 8 }}>
             {loading && <div style={styles.empty}>Загружаю серверную очередь…</div>}
-            {!loading && leads.length === 0 && <div style={styles.empty}>Добавь первый бизнес. Здесь появится приоритет и следующий шаг.</div>}
+            {!loading && leads.length === 0 && <div style={styles.empty}>Лидов пока нет.</div>}
             {leads.map(lead => (
               <button key={lead.id} onClick={() => setSelectedId(lead.id)} style={{ ...styles.leadButton, borderColor: selected?.id === lead.id ? '#d8b75d' : '#303243' }}>
                 <span><strong>{lead.name}</strong><br /><small style={styles.muted}>{[lead.city, lead.district, SALES_STAGE_LABELS[lead.stage]].filter(Boolean).join(' · ')}</small></span>
@@ -182,7 +309,7 @@ export function SalesAiDashboard() {
           </div>
         </div>
 
-        <div style={{ ...styles.card, gridColumn: 'span 2' }}>
+        <div style={styles.fullCard}>
           <h2 style={styles.h2}>✍️ Агент-продажник</h2>
           {!selected ? <div style={styles.empty}>Выбери лид, чтобы увидеть анализ и персональный оффер.</div> : (
             <div style={styles.detailGrid}>
@@ -190,6 +317,7 @@ export function SalesAiDashboard() {
                 <div style={styles.scoreRow}><span style={scoreStyle(selected.priority)}>{selected.score}/100</span><strong>{selected.name}</strong></div>
                 <p style={styles.muted}>{selected.reasons?.join(' · ') || 'Недостаточно сигналов для подробной оценки'}</p>
                 {(selected.source || selected.sourceUrl) && <div style={styles.meta}>Источник: {selected.source || 'не указан'}{selected.sourceUrl ? ` · ${selected.sourceUrl}` : ''}</div>}
+                {selected.confidence != null && <div style={styles.meta}>Scout confidence: {Math.round(Number(selected.confidence) * 100)}%</div>}
                 <label style={styles.label}>Статус</label>
                 <select style={styles.input} value={selected.stage} onChange={e => updateLead(selected.id, { stage: e.target.value })}>
                   {SALES_STAGES.map(stage => <option key={stage} value={stage}>{SALES_STAGE_LABELS[stage]}</option>)}
@@ -212,22 +340,38 @@ export function SalesAiDashboard() {
 function Stat({ label, value }) { return <div style={styles.stat}><strong style={{ fontSize: 26 }}>{value}</strong><span style={styles.muted}>{label}</span></div>; }
 function Check({ label, checked, onChange }) { return <label style={styles.check}><input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} /> {label}</label>; }
 function scoreStyle(priority) { return { minWidth: 46, height: 34, padding: '0 9px', borderRadius: 12, display: 'inline-grid', placeItems: 'center', fontWeight: 900, background: priority === 'high' ? '#294b32' : priority === 'medium' ? '#4b4229' : '#3c3446', color: '#fff' }; }
+function confidenceStyle(value) { const n = Number(value || 0); return { padding: '5px 8px', borderRadius: 999, fontSize: 11, fontWeight: 900, color: n >= 0.75 ? '#71d58b' : n >= 0.55 ? '#e8c76d' : '#d0a7ff', background: '#10121b', border: '1px solid #303243', flexShrink: 0 }; }
 
 const styles = {
   page: { minHeight: '100vh', background: '#0d0e16', color: '#f7f4ea', padding: 24, fontFamily: 'Inter, system-ui, sans-serif' },
-  header: { maxWidth: 1180, margin: '0 auto 18px', display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'flex-start' }, eyebrow: { color: '#d8b75d', fontWeight: 850, letterSpacing: '.08em', fontSize: 12 },
-  h1: { margin: '6px 0 8px', fontSize: 'clamp(25px,4vw,42px)' }, h2: { margin: '0 0 14px', fontSize: 17 }, muted: { color: '#aeb1bf' },
+  header: { maxWidth: 1180, margin: '0 auto 18px', display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' },
+  eyebrow: { color: '#d8b75d', fontWeight: 850, letterSpacing: '.08em', fontSize: 12 },
+  h1: { margin: '6px 0 8px', fontSize: 'clamp(25px,4vw,42px)' }, h2: { margin: '0 0 10px', fontSize: 17 }, muted: { color: '#aeb1bf' },
   noticeTop: { maxWidth: 1180, margin: '0 auto 12px', padding: '10px 12px', borderRadius: 12, background: '#181b28', border: '1px solid #343748', color: '#d8b75d', fontSize: 12 },
   stats: { maxWidth: 1180, margin: '0 auto 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 10 },
   stat: { border: '1px solid #2d3040', background: '#151722', borderRadius: 16, padding: 14, display: 'grid', gap: 3 },
-  grid: { maxWidth: 1180, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 14 },
-  card: { border: '1px solid #2d3040', background: '#151722', borderRadius: 20, padding: 18 },
-  input: { width: '100%', boxSizing: 'border-box', height: 42, borderRadius: 12, border: '1px solid #343748', background: '#0f111a', color: '#fff', padding: '0 11px' }, twoCols: { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 },
-  checks: { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 7 }, check: { color: '#c8cad3', fontSize: 13 },
-  primary: { height: 42, border: 0, borderRadius: 12, background: '#d8b75d', color: '#15120a', fontWeight: 900, cursor: 'pointer' }, secondary: { minHeight: 38, borderRadius: 11, border: '1px solid #343748', background: '#151722', color: '#d8b75d', padding: '0 12px', cursor: 'pointer' },
-  leadButton: { width: '100%', border: '1px solid', background: '#10121b', color: '#fff', borderRadius: 14, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', cursor: 'pointer' },
-  empty: { padding: 18, borderRadius: 14, background: '#10121b', color: '#858999' }, detailGrid: { display: 'grid', gridTemplateColumns: 'minmax(0,.8fr) minmax(0,1.2fr)', gap: 18 },
-  scoreRow: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 20 }, label: { display: 'block', margin: '12px 0 6px', color: '#aeb1bf', fontSize: 12, fontWeight: 800 }, meta: { fontSize: 11, color: '#858999', wordBreak: 'break-word' },
+  grid: { maxWidth: 1180, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,420px),1fr))', gap: 14 },
+  card: { border: '1px solid #2d3040', background: '#151722', borderRadius: 20, padding: 18, minWidth: 0 },
+  fullCard: { gridColumn: '1 / -1', border: '1px solid #2d3040', background: '#151722', borderRadius: 20, padding: 18, minWidth: 0 },
+  input: { width: '100%', boxSizing: 'border-box', height: 42, borderRadius: 12, border: '1px solid #343748', background: '#0f111a', color: '#fff', padding: '0 11px' },
+  twoCols: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 8 },
+  checks: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 7 }, check: { color: '#c8cad3', fontSize: 13 },
+  primary: { minHeight: 42, border: 0, borderRadius: 12, background: '#d8b75d', color: '#15120a', padding: '0 14px', fontWeight: 900, cursor: 'pointer' },
+  primarySmall: { minHeight: 36, border: 0, borderRadius: 10, background: '#d8b75d', color: '#15120a', padding: '0 11px', fontWeight: 900, cursor: 'pointer' },
+  secondary: { minHeight: 36, borderRadius: 10, border: '1px solid #343748', background: '#151722', color: '#d8b75d', padding: '0 11px', cursor: 'pointer' },
+  scoutHead: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
+  providerBadge: { padding: '5px 9px', borderRadius: 999, border: '1px solid #343748', background: '#10121b', color: '#858999', fontSize: 10 },
+  scoutForm: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8, marginTop: 14 },
+  candidateGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,280px),1fr))', gap: 10, marginTop: 14 },
+  candidateCard: { padding: 13, borderRadius: 15, background: '#10121b', border: '1px solid #303243', minWidth: 0 },
+  candidateTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
+  candidateActions: { display: 'flex', justifyContent: 'flex-end', gap: 7, marginTop: 11, flexWrap: 'wrap' },
+  snippet: { color: '#b9bcc8', fontSize: 12, lineHeight: '17px', margin: '9px 0' },
+  evidence: { marginTop: 7, color: '#d8b75d', fontSize: 10.5 },
+  leadButton: { width: '100%', border: '1px solid', background: '#10121b', color: '#fff', borderRadius: 14, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', cursor: 'pointer', gap: 10 },
+  empty: { padding: 18, borderRadius: 14, background: '#10121b', color: '#858999' },
+  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,330px),1fr))', gap: 18 },
+  scoreRow: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 20 }, label: { display: 'block', margin: '12px 0 6px', color: '#aeb1bf', fontSize: 12, fontWeight: 800 }, meta: { fontSize: 11, color: '#858999', wordBreak: 'break-word', marginTop: 5 },
   textarea: { width: '100%', minHeight: 220, resize: 'vertical', boxSizing: 'border-box', borderRadius: 14, border: '1px solid #343748', background: '#0f111a', color: '#fff', padding: 12, lineHeight: 1.45 },
   nextAction: { marginTop: 12, borderRadius: 12, padding: 11, background: '#10121b', color: '#d8b75d', fontWeight: 750 }, notice: { marginTop: 10, color: '#9ca0ae', fontSize: 12, lineHeight: 1.45 },
 };
