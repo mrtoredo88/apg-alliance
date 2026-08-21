@@ -12,7 +12,8 @@ const startedAt = Date.now();
 const scans = [];
 const commands = [
   ['unit', ['node', 'scripts/quality/quality-platform-test.mjs']],
-  ['sales-ai', ['node', 'scripts/sales-ai-scout-test.mjs']],
+  ['sales-ai-scout', ['node', 'scripts/sales-ai-scout-test.mjs']],
+  ['sales-ai-agents', ['node', 'scripts/sales-ai-agents-test.mjs']],
   ['sales-ai-readiness', ['node', 'scripts/sales-ai-readiness.mjs']],
   ['integration', ['npm', 'run', 'test:account-integration']],
   ['regression', ['npm', 'run', 'test:admin-interactions']],
