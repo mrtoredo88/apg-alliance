@@ -6,7 +6,7 @@ assert.match(food, /Зеленоград/);
 assert.match(food, /Крюково/);
 assert.match(food, /кафе ресторан/);
 assert.match(food, /семейные/);
-assert.match(food, /официальный сайт контакты/);
+assert.doesNotMatch(food, /официальный сайт контакты/);
 
 const sport = buildScoutQuery({ city: 'Зеленоград', category: 'sport' });
 assert.match(sport, /фитнес клуб спортивная школа/);
