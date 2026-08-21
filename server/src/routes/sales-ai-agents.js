@@ -2,6 +2,7 @@ import { FieldValue } from '../lib/documentValues.js';
 import { getDb } from '../lib/documentStore.js';
 import { adminReplyError, requireAdminPermission, writeAuditLog } from '../lib/adminSecurity.js';
 import { analyzeLead, buildCommunicatorDraft, buildManagerSummary, buildSalesOffer, inferStageFromMessage } from '../lib/salesAgents.js';
+import { availableOutreachChannels, sendSalesOutreach } from '../lib/salesOutreach.js';
 
 const LEADS = 'salesLeads';
 const MESSAGES = 'salesCommunications';
@@ -98,6 +99,36 @@ export default async function salesAiAgentRoutes(fastify) {
         await writeAuditLog(db, request, actor, 'sales-ai:communication-record', MESSAGES, messageRef.id, { label: `${direction === 'inbound' ? 'Входящее' : 'Исходящее'} сообщение: ${lead.name}`, channel, leadId: lead.id });
         const saved = await messageRef.get();
         return reply.send({ ok: true, message: { id: saved.id, ...serialize(saved.data() || {}) }, stage });
+      }
+
+      if (action === 'communication:channels') {
+        const { lead } = await getLead(db, request.body?.leadId);
+        return reply.send({ ok: true, channels: availableOutreachChannels(lead) });
+      }
+
+      if (action === 'communication:send') {
+        const { ref: leadRef, lead } = await getLead(db, request.body?.leadId);
+        if (['contacted', 'replied', 'meeting', 'won'].includes(lead.stage) && !request.body?.allowRepeat) {
+          return reply.code(409).send({ ok: false, code: 'sales-ai/already-contacted', error: 'Лид уже отмечен как связанный. Повторная отправка остановлена.' });
+        }
+        const text = clean(request.body?.text || lead.offerDraft, 8000);
+        const preferredChannel = ['auto', 'email', 'vk', 'telegram'].includes(request.body?.channel) ? request.body.channel : 'auto';
+        const delivery = await sendSalesOutreach(lead, text, preferredChannel);
+        const messageRef = db.collection(MESSAGES).doc();
+        await messageRef.set({
+          leadId: lead.id,
+          leadName: lead.name || '',
+          direction: 'outbound',
+          channel: delivery.channel,
+          text,
+          providerMessageId: delivery.providerMessageId || '',
+          deliveryStatus: 'sent',
+          createdAt: FieldValue.serverTimestamp(),
+          createdBy: actor.userId || actor.uid,
+        });
+        await leadRef.set({ stage: 'contacted', lastCommunicationAt: FieldValue.serverTimestamp(), lastOutreachChannel: delivery.channel, updatedAt: FieldValue.serverTimestamp(), updatedBy: actor.userId || actor.uid }, { merge: true });
+        await writeAuditLog(db, request, actor, 'sales-ai:communication-send', MESSAGES, messageRef.id, { label: `Сообщение отправлено: ${lead.name}`, channel: delivery.channel, leadId: lead.id });
+        return reply.send({ ok: true, delivery, stage: 'contacted' });
       }
 
       if (action === 'manager:summary') {

@@ -63,13 +63,18 @@ check('five-agent-contract', () => {
   assert.ok(agents.includes('buildCommunicatorDraft'));
   assert.ok(agents.includes('buildManagerSummary'));
   assert.ok(routes.includes('communication:record'));
+  assert.ok(routes.includes('communication:send'));
   assert.ok(routes.includes('manager:summary'));
 });
 
 check('human-in-the-loop-communication', () => {
   const ui = fs.readFileSync('src/salesAi/SalesAiAgentOps.jsx', 'utf8');
+  const dashboard = fs.readFileSync('src/salesAi/SalesAiDashboard.jsx', 'utf8');
   assert.ok(ui.includes('ничего не отправляет без человека') || ui.includes('AI готовит черновики'));
+  assert.ok(dashboard.includes('Скопировать текст'));
+  assert.ok(dashboard.includes('Отправить автоматически'));
   for (const forbidden of ['sendEmail', 'sendTelegram', 'sendVk']) assert.equal(ui.includes(forbidden), false);
+  for (const forbidden of ['sendEmail', 'sendTelegram', 'sendVk']) assert.equal(dashboard.includes(forbidden), false);
 });
 
 check('deploy-secret-passthrough', () => {
