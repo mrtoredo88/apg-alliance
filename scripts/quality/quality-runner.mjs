@@ -41,5 +41,14 @@ const report = createQualityReport({
   metadata: { criticalJourneys: CRITICAL_USER_JOURNEYS.length, browserScan: args.has('--browser') },
 });
 const output = writeQualityReport(report, process.env.QUALITY_REPORT_PATH || '.quality/latest.json');
-console.log(JSON.stringify({ status: report.status, summary: report.summary, report: output }, null, 2));
+const failures = scans
+  .flatMap(scan => (scan.findings || []).map(item => ({
+    scanner: scan.id,
+    severity: item.severity,
+    fingerprint: item.fingerprint,
+    message: item.message,
+    location: item.location,
+  })))
+  .filter(item => ['critical', 'error'].includes(String(item.severity || '').toLowerCase()));
+console.log(JSON.stringify({ status: report.status, summary: report.summary, failures, report: output }, null, 2));
 if (report.status !== 'PASS') process.exitCode = 1;
