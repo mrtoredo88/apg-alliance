@@ -13,6 +13,7 @@ const scans = [];
 const commands = [
   ['unit', ['node', 'scripts/quality/quality-platform-test.mjs']],
   ['sales-ai', ['node', 'scripts/sales-ai-scout-test.mjs']],
+  ['sales-ai-readiness', ['node', 'scripts/sales-ai-readiness.mjs']],
   ['integration', ['npm', 'run', 'test:account-integration']],
   ['regression', ['npm', 'run', 'test:admin-interactions']],
   ['smoke', ['npm', 'run', 'test:auth-lifecycle']],
