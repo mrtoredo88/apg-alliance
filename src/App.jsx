@@ -5,12 +5,37 @@ import { SplashScreen } from './SplashScreen.jsx';
 import { markPerformanceStage } from './performance/index.js';
 
 const AdminPanel = lazy(() => import('./AdminPanel.jsx').then(m => ({ default: m.AdminPanel })));
+const SalesAiAdminPage = lazy(() => import('./salesAi/SalesAiAdminPage.jsx').then(m => ({ default: m.SalesAiAdminPage })));
 const AssistantMiniApp = lazy(() => import('./assistant/AssistantMiniApp.jsx').then(m => ({ default: m.AssistantMiniApp })));
 const NetworkDiagnosticsPage = lazy(() => import('./NetworkDiagnosticsPage.jsx').then(m => ({ default: m.NetworkDiagnosticsPage })));
 const UserApp = lazy(() => import('./UserApp.jsx').then(m => ({ default: m.UserApp })));
 
 function AppFallback({ label = 'Загрузка...' }) {
   return <SplashScreen isReady={false} autoTimeout={false} status={label} />;
+}
+
+function AdminPanelWithSalesAiShortcut() {
+  return (
+    <>
+      <AdminPanel />
+      <a
+        href="/admin/sales-ai"
+        aria-label="Открыть AI-отдел продаж"
+        title="AI-отдел продаж"
+        style={{
+          position: 'fixed', right: 18, bottom: 18, zIndex: 10020,
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '11px 14px', borderRadius: 14,
+          background: '#171922', color: '#f7f4ea', textDecoration: 'none',
+          border: '1px solid rgba(216,183,93,.7)', boxShadow: '0 10px 30px rgba(0,0,0,.32)',
+          fontFamily: 'Inter, system-ui, sans-serif', fontSize: 13, fontWeight: 800,
+        }}
+      >
+        <span aria-hidden="true">🤖</span>
+        <span>AI-отдел продаж</span>
+      </a>
+    </>
+  );
 }
 
 export function App() {
@@ -31,12 +56,22 @@ export function App() {
           } />
           <Route path="/admin" element={
             <Suspense fallback={<AppFallback label="Загрузка панели..." />}>
-              <AdminPanel />
+              <AdminPanelWithSalesAiShortcut />
             </Suspense>
           } />
           <Route path="/admin-app" element={
             <Suspense fallback={<AppFallback label="Загрузка админки АПГ..." />}>
-              <AdminPanel />
+              <AdminPanelWithSalesAiShortcut />
+            </Suspense>
+          } />
+          <Route path="/admin/sales-ai" element={
+            <Suspense fallback={<AppFallback label="Загрузка AI-отдела продаж..." />}>
+              <SalesAiAdminPage />
+            </Suspense>
+          } />
+          <Route path="/admin/sales-ai/agents" element={
+            <Suspense fallback={<AppFallback label="Загрузка AI-агентов продаж..." />}>
+              <SalesAiAdminPage />
             </Suspense>
           } />
           <Route path="/news/:id" element={

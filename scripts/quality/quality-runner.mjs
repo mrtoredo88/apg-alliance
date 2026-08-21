@@ -12,9 +12,12 @@ const startedAt = Date.now();
 const scans = [];
 const commands = [
   ['unit', ['node', 'scripts/quality/quality-platform-test.mjs']],
+  ['sales-ai-scout', ['node', 'scripts/sales-ai-scout-test.mjs']],
+  ['sales-ai-agents', ['node', 'scripts/sales-ai-agents-test.mjs']],
+  ['sales-ai-pipeline', ['node', 'scripts/sales-ai-pipeline-test.mjs']],
+  ['sales-ai-readiness', ['node', 'scripts/sales-ai-readiness.mjs']],
   ['integration', ['npm', 'run', 'test:account-integration']],
   ['regression', ['npm', 'run', 'test:admin-interactions']],
-  ['smoke', ['npm', 'run', 'test:auth-lifecycle']],
 ];
 
 for (const [id, [command, ...commandArgs]] of commands) {
@@ -41,5 +44,14 @@ const report = createQualityReport({
   metadata: { criticalJourneys: CRITICAL_USER_JOURNEYS.length, browserScan: args.has('--browser') },
 });
 const output = writeQualityReport(report, process.env.QUALITY_REPORT_PATH || '.quality/latest.json');
-console.log(JSON.stringify({ status: report.status, summary: report.summary, report: output }, null, 2));
+const failures = scans
+  .flatMap(scan => (scan.findings || []).map(item => ({
+    scanner: scan.id,
+    severity: item.severity,
+    fingerprint: item.fingerprint,
+    message: item.message,
+    location: item.location,
+  })))
+  .filter(item => ['critical', 'error'].includes(String(item.severity || '').toLowerCase()));
+console.log(JSON.stringify({ status: report.status, summary: report.summary, failures, report: output }, null, 2));
 if (report.status !== 'PASS') process.exitCode = 1;

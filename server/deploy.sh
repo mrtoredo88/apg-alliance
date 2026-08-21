@@ -27,6 +27,12 @@ require_cmd docker
 require_cmd yc
 require_cmd node
 
+TWOGIS_API_KEY_VALUE="$(get_env TWOGIS_API_KEY)"
+if [[ -z "$TWOGIS_API_KEY_VALUE" ]]; then
+  echo "Missing required TWOGIS_API_KEY in $ENV_FILE" >&2
+  exit 1
+fi
+
 IMAGE_NAME="cr.yandex/crpvv13u8vr3qjftdvvg/apg-api"
 
 GIT_SHA="$(git -C "$ROOT_DIR" rev-parse HEAD)"
@@ -123,6 +129,7 @@ yc serverless container revision deploy \
   --environment POSTBOX_KEY_ID="$(get_env POSTBOX_KEY_ID)" \
   --environment POSTBOX_SECRET="$(get_env POSTBOX_SECRET)" \
   --environment APG_IDENTITY_DATABASE_URL="$(get_env APG_IDENTITY_DATABASE_URL)" \
+  --environment TWOGIS_API_KEY="$TWOGIS_API_KEY_VALUE" \
   --environment IDENTITY_PROVIDER=native-apg \
   --environment IDENTITY_STORAGE=postgres \
   --environment APP_VERSION="$GIT_SHA_SHORT" \
