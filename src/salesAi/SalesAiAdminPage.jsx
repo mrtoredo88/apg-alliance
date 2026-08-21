@@ -33,8 +33,27 @@ export function SalesAiAdminPage() {
 
   if (state.loading) return <Gate title="Проверяем доступ…" />;
   if (!state.allowed) return <Gate title="Доступ закрыт" text={state.error} />;
-  if (window.location.pathname.endsWith('/agents')) return <SalesAiAgentOps />;
-  return <SalesAiDashboard />;
+
+  const agentsView = window.location.pathname.endsWith('/agents');
+  return (
+    <div style={{ minHeight: '100vh', background: '#0d0e16' }}>
+      <nav style={{ position: 'sticky', top: 0, zIndex: 30, display: 'flex', gap: 8, alignItems: 'center', padding: '10px 18px', background: 'rgba(13,14,22,.96)', borderBottom: '1px solid #292c3a', backdropFilter: 'blur(12px)', fontFamily: 'Inter,system-ui,sans-serif' }}>
+        <a href="/admin" style={navLink(false)}>← Админка</a>
+        <a href="/admin/sales-ai" style={navLink(!agentsView)}>🔎 Разведчик · Аналитик · Продажник</a>
+        <a href="/admin/sales-ai/agents" style={navLink(agentsView)}>📬 Коммуникатор · 📊 Руководитель</a>
+      </nav>
+      {agentsView ? <SalesAiAgentOps /> : <SalesAiDashboard />}
+    </div>
+  );
+}
+
+function navLink(active) {
+  return {
+    display: 'inline-block', padding: '8px 11px', borderRadius: 10,
+    border: active ? '1px solid #8b753a' : '1px solid #343747',
+    background: active ? '#211d12' : '#151722', color: active ? '#e5c667' : '#d9dbe5',
+    textDecoration: 'none', fontSize: 12, fontWeight: 800,
+  };
 }
 
 function Gate({ title, text = '' }) {
