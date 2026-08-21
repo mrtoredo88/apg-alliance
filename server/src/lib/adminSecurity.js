@@ -61,14 +61,22 @@ export async function requireAdminPermission(request, permission) {
     throw error;
   }
 
-  const adminStatus = String(userRecord.data.adminStatus || userRecord.data.status || 'active').toLowerCase();
+  const verifiedUser = {
+    ...userRecord.data,
+    ...(decoded.role ? { role: decoded.role } : {}),
+    ...(Array.isArray(decoded.roles) && decoded.roles.length ? { roles: decoded.roles } : {}),
+  };
+  const adminStatus = String(verifiedUser.adminStatus || verifiedUser.status || 'active').toLowerCase();
   if (adminStatus && adminStatus !== 'active') {
     const error = new Error('Доступ администратора отключён.');
     error.statusCode = 403;
-    error.role = normalizeRole(userRecord.data.role || userRecord.data.userRole);
+    error.role = normalizeRole(verifiedUser.role || verifiedUser.userRole);
     throw error;
   }
-  const userRole = getPrimaryRole(userRecord?.data || {});
+  // The native bearer session joins apg_identity_roles and is the authoritative
+  // RBAC source. A legacy profile may still contain `user`; do not let that
+  // stale field downgrade a password-verified administrative session.
+  const userRole = getPrimaryRole(verifiedUser);
   if (!userRole) {
     const error = new Error('Роль администратора не определена в Identity.');
     error.statusCode = 403;
@@ -88,9 +96,9 @@ export async function requireAdminPermission(request, permission) {
   return {
     uid: decoded.uid,
     role,
-    mustChangePassword: Boolean(userRecord?.data?.mustChangePassword),
+    mustChangePassword: Boolean(verifiedUser.mustChangePassword),
     userId: userRecord?.id || decoded.uid,
-    name: userRecord?.data?.name || userRecord?.data?.firstName || userRecord?.data?.email || decoded.email || 'Администратор АПГ',
+    name: verifiedUser.name || verifiedUser.firstName || verifiedUser.email || decoded.email || 'Администратор АПГ',
     authSource: userRecord?.source || 'claims',
   };
 }
