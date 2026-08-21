@@ -40,6 +40,8 @@ assert.ok(adminLogin.includes('const combinedUser = { ...persistedUser, ...user,
 assert.ok(adminLogin.includes('const role = getPrimaryRole(combinedUser);'), 'Admin login must resolve the role from the complete canonical identity.');
 assert.ok(adminLogin.includes('const uid = String(userId || combinedUser.id'), 'Native APG admin sessions must use the canonical Identity user id.');
 assert.ok(adminLogin.includes('combinedUser.firebaseUid') && adminLogin.includes('combinedUser.authUid'), 'Legacy credential ids must remain available during the native Identity transition.');
+assert.ok(adminLogin.includes('identityV2.repository.roles.set'), 'Successful legacy admin login must reconcile the native Identity RBAC role before creating a session.');
+assert.ok(adminLogin.indexOf('verifyPasswordRecord(password, credential.password)') < adminLogin.indexOf('identityV2.repository.roles.set'), 'Identity RBAC reconciliation must happen only after the admin password is verified.');
 assert.ok(adminSecurity.includes('findUserByIdentityUid'), 'AdminGuard must resolve native APG session identities by canonical uid.');
 
 console.log('Admin loading pipeline regression passed');

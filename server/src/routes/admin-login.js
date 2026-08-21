@@ -76,10 +76,24 @@ export default async function adminLoginRoutes(fastify) {
         return reply.code(401).send({ ok: false, code: 'INVALID_CREDENTIALS', error: 'Неверный email или пароль администратора.' });
       }
       const owner = hasRole(combinedUser, ROLES.owner);
+      const roles = Array.from(new Set([
+        role,
+        ...(Array.isArray(combinedUser.roles) ? combinedUser.roles : []),
+      ].filter(Boolean)));
+      // Native APG sessions resolve RBAC from apg_identity_roles. Legacy admin
+      // profiles may already be authoritative while that table still contains
+      // the default `user` role, so reconcile it only after password and admin
+      // capability checks have both succeeded.
+      await serverFoundation.identityV2.repository.roles.set({
+        userId: uid,
+        primaryRole: role,
+        roles,
+        claims: { role, owner, admin: true },
+      });
       const customToken = await serverFoundation.identityV2.createCustomToken(uid, {
         ...combinedUser,
         role,
-        roles: combinedUser.roles || [role],
+        roles,
         claims: { role, owner, admin: true },
       });
       if (userDoc?.ref) await userDoc.ref.set({ lastLoginAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
