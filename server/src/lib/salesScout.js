@@ -1,5 +1,5 @@
 const CATEGORY_QUERIES = {
-  food: 'кафе ресторан гастрономический центр',
+  food: 'кафе ресторан',
   beauty: 'салон красоты студия косметология',
   sport: 'фитнес клуб спортивная школа студия спорта',
   education: 'школа курсы детский центр обучение',
@@ -120,36 +120,46 @@ async function twoGisSearch(query, count) {
     throw error;
   }
 
-  const pageSize = Math.max(1, Math.min(50, Number(count) || 20));
-  const url = new URL(TWOGIS_ENDPOINT);
-  url.searchParams.set('key', apiKey);
-  url.searchParams.set('q', query);
-  url.searchParams.set('type', 'branch');
-  url.searchParams.set('locale', 'ru_RU');
-  url.searchParams.set('page_size', String(pageSize));
-  url.searchParams.set('fields', [
-    'items.point',
-    'items.address',
-    'items.full_address_name',
-    'items.rubrics',
-    'items.schedule',
-    'items.contact_groups',
-    'items.description',
-  ].join(','));
+  const requested = Math.max(1, Math.min(50, Number(count) || 20));
+  const pageSize = Math.min(10, requested);
+  const pageCount = Math.min(5, Math.ceil(requested / pageSize));
+  const items = [];
 
-  const response = await fetch(url, {
-    headers: { Accept: 'application/json', 'User-Agent': 'APG-Sales-Scout/1.0' },
-    signal: AbortSignal.timeout(12000),
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const message = body?.meta?.error?.message || body?.message || body?.error || `2ГИС search failed (${response.status}).`;
-    const error = new Error(message);
-    error.code = 'sales-ai/scout-provider-error';
-    error.statusCode = 502;
-    throw error;
+  for (let page = 1; page <= pageCount && items.length < requested; page += 1) {
+    const url = new URL(TWOGIS_ENDPOINT);
+    url.searchParams.set('key', apiKey);
+    url.searchParams.set('q', query);
+    url.searchParams.set('type', 'branch');
+    url.searchParams.set('locale', 'ru_RU');
+    url.searchParams.set('page_size', String(pageSize));
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('fields', [
+      'items.point',
+      'items.address',
+      'items.full_address_name',
+      'items.rubrics',
+      'items.schedule',
+      'items.contact_groups',
+      'items.description',
+    ].join(','));
+
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json', 'User-Agent': 'APG-Sales-Scout/1.0' },
+      signal: AbortSignal.timeout(12000),
+    });
+    const body = await response.json().catch(() => ({}));
+    const providerError = body?.meta?.error?.message || body?.message || body?.error || '';
+    if (!response.ok || providerError) {
+      const error = new Error(providerError || `2ГИС search failed (${response.status}).`);
+      error.code = 'sales-ai/scout-provider-error';
+      error.statusCode = 502;
+      throw error;
+    }
+    const pageItems = Array.isArray(body?.result?.items) ? body.result.items : [];
+    items.push(...pageItems);
+    if (pageItems.length < pageSize) break;
   }
-  return Array.isArray(body?.result?.items) ? body.result.items : [];
+  return items.slice(0, requested);
 }
 
 export function buildScoutQuery(task = {}) {
