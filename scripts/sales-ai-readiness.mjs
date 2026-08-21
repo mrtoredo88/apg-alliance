@@ -14,9 +14,12 @@ const check = (id, fn) => {
 };
 
 check('server-route-file', () => assert.ok(fs.existsSync('server/src/routes/sales-ai.js')));
+check('agent-route-file', () => assert.ok(fs.existsSync('server/src/routes/sales-ai-agents.js')));
+check('agent-core-file', () => assert.ok(fs.existsSync('server/src/lib/salesAgents.js')));
 check('scout-provider-file', () => assert.ok(fs.existsSync('server/src/lib/salesScout.js')));
 check('admin-page-file', () => assert.ok(fs.existsSync('src/salesAi/SalesAiAdminPage.jsx')));
 check('dashboard-file', () => assert.ok(fs.existsSync('src/salesAi/SalesAiDashboard.jsx')));
+check('agent-ops-file', () => assert.ok(fs.existsSync('src/salesAi/SalesAiAgentOps.jsx')));
 check('safe-env-template', () => {
   const template = fs.readFileSync('server/.env.example', 'utf8');
   assert.match(template, /^TWOGIS_API_KEY=/m);
@@ -28,12 +31,31 @@ check('env-is-ignored', () => {
 });
 check('server-registration', () => {
   const source = fs.readFileSync('server/src/server.js', 'utf8');
-  assert.match(source, /sales-ai/);
+  assert.match(source, /salesAiRoutes/);
+  assert.match(source, /salesAiAgentRoutes/);
 });
 check('admin-route-registration', () => {
   const source = fs.readFileSync('src/App.jsx', 'utf8');
   assert.match(source, /\/admin\/sales-ai/);
+  assert.match(source, /\/admin\/sales-ai\/agents/);
   assert.match(source, /SalesAiAdminPage/);
+});
+check('five-agent-contract', () => {
+  const scout = fs.readFileSync('server/src/lib/salesScout.js', 'utf8');
+  const agents = fs.readFileSync('server/src/lib/salesAgents.js', 'utf8');
+  const routes = fs.readFileSync('server/src/routes/sales-ai-agents.js', 'utf8');
+  assert.match(scout, /runSalesScout/);
+  assert.match(agents, /analyzeLead/);
+  assert.match(agents, /buildSalesOffer/);
+  assert.match(agents, /buildCommunicatorDraft/);
+  assert.match(agents, /buildManagerSummary/);
+  assert.match(routes, /communication:record/);
+  assert.match(routes, /manager:summary/);
+});
+check('human-in-the-loop-communication', () => {
+  const ui = fs.readFileSync('src/salesAi/SalesAiAgentOps.jsx', 'utf8');
+  assert.match(ui, /ничего не отправляет без человека|AI готовит черновики/);
+  assert.doesNotMatch(ui, /sendEmail|sendTelegram|sendVk/);
 });
 check('deploy-secret-passthrough', () => {
   const source = fs.readFileSync('server/deploy.sh', 'utf8');
@@ -50,7 +72,10 @@ check('no-embedded-2gis-secret', () => {
   const files = [
     'server/src/lib/salesScout.js',
     'server/src/routes/sales-ai.js',
+    'server/src/routes/sales-ai-agents.js',
+    'server/src/lib/salesAgents.js',
     'src/salesAi/SalesAiDashboard.jsx',
+    'src/salesAi/SalesAiAgentOps.jsx',
     'server/deploy.sh',
     'server/.env.example',
   ];
