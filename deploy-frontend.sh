@@ -3,6 +3,15 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/server/.env"
+UI_RELEASE_BASELINE="6aa4d616617b9bd940799fb20e7633689b3bb44b"
+
+if [ "${ALLOW_UI_BASELINE_OVERRIDE:-0}" != "1" ]; then
+  if ! git -C "$SCRIPT_DIR" merge-base --is-ancestor "$UI_RELEASE_BASELINE" HEAD 2>/dev/null; then
+    echo "ОШИБКА: frontend-деплой остановлен — ветка не содержит утверждённую актуальную основу интерфейса $UI_RELEASE_BASELINE."
+    echo "Сначала объедините ветки. Обход ALLOW_UI_BASELINE_OVERRIDE=1 допустим только после явного согласования с владельцем продукта."
+    exit 1
+  fi
+fi
 
 get_env() {
   grep "^$1=" "$ENV_FILE" | head -1 | cut -d'=' -f2-
