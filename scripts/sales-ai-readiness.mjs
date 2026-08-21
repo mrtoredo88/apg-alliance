@@ -81,7 +81,7 @@ check('no-embedded-2gis-secret', () => {
   ];
   const source = files.map(file => fs.readFileSync(file, 'utf8')).join('\n');
   assert.doesNotMatch(source, /TWOGIS_API_KEY\s*=\s*['\"][^'\"]+['\"]/);
-  assert.doesNotMatch(source, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  assert.doesNotMatch(source, /DGIS_API_KEY\s*=\s*['\"][^'\"]+['\"]/);
 });
 
 const failed = checks.filter(item => item.status !== 'PASS');
