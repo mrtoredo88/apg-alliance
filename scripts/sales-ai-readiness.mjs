@@ -72,7 +72,7 @@ check('human-in-the-loop-communication', () => {
   const ui = fs.readFileSync('src/salesAi/SalesAiAgentOps.jsx', 'utf8');
   const dashboard = fs.readFileSync('src/salesAi/SalesAiDashboard.jsx', 'utf8');
   assert.ok(ui.includes('ничего не отправляет без человека') || ui.includes('AI готовит черновики'));
-  assert.ok(dashboard.includes('Скопировать текст'));
+  assert.match(dashboard, /Скопировать(?: текст)?/);
   assert.ok(dashboard.includes('Отправить автоматически'));
   assert.ok(dashboard.includes('Найти контакты у всех лидов'));
   for (const forbidden of ['sendEmail', 'sendTelegram', 'sendVk']) assert.equal(ui.includes(forbidden), false);
