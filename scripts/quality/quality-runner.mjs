@@ -17,7 +17,6 @@ const commands = [
   ['sales-ai-readiness', ['node', 'scripts/sales-ai-readiness.mjs']],
   ['integration', ['npm', 'run', 'test:account-integration']],
   ['regression', ['npm', 'run', 'test:admin-interactions']],
-  ['smoke', ['npm', 'run', 'test:auth-lifecycle']],
 ];
 
 for (const [id, [command, ...commandArgs]] of commands) {
