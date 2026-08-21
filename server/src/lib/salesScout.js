@@ -47,6 +47,25 @@ function extractPhone(item = {}) {
   return firstContact(item, 'phone') || clean(item.phone, 100);
 }
 
+function contactByKinds(item = {}, kinds = []) {
+  for (const kind of kinds) {
+    const value = firstContact(item, kind);
+    if (value) return value;
+  }
+  return '';
+}
+
+function extractDigitalContacts(item = {}) {
+  const email = contactByKinds(item, ['email', 'mail']);
+  const vkRaw = contactByKinds(item, ['vkontakte', 'vk']);
+  const telegramRaw = contactByKinds(item, ['telegram']);
+  return {
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : '',
+    vk: vkRaw ? normalizeUrl(/^https?:\/\//i.test(vkRaw) ? vkRaw : `https://vk.com/${vkRaw.replace(/^@/, '')}`) : '',
+    telegram: telegramRaw ? normalizeUrl(/^https?:\/\//i.test(telegramRaw) ? telegramRaw : `https://t.me/${telegramRaw.replace(/^@/, '')}`) : '',
+  };
+}
+
 function confidenceFor(item = {}, task = {}) {
   let score = 0.56;
   if (item.id) score += 0.08;
@@ -73,7 +92,9 @@ function buildEvidence(item, task, sourceUrl, confidence) {
   const website = extractWebsite(item);
   if (website) evidence.push({ field: 'website', value: website, sourceUrl, confidence: 0.9 });
   const phone = extractPhone(item);
+  const digital = extractDigitalContacts(item);
   if (phone) evidence.push({ field: 'phone', value: phone, sourceUrl, confidence: 0.9 });
+  for (const [field, value] of Object.entries(digital)) if (value) evidence.push({ field, value, sourceUrl, confidence: 0.9 });
   return evidence.filter(entry => entry.value);
 }
 
@@ -84,14 +105,14 @@ function buildCandidate(item, task, query) {
   const confidence = confidenceFor(item, task);
   const website = extractWebsite(item);
   const phone = extractPhone(item);
+  const digital = extractDigitalContacts(item);
   return {
     name,
     category: task.category || 'other',
     city: task.city || '',
     district: task.district || '',
     website,
-    vk: '',
-    telegram: '',
+    ...digital,
     contact: phone,
     source: `scout:${PROVIDER}`,
     sourceUrl,
@@ -109,6 +130,28 @@ function buildCandidate(item, task, query) {
       schedule: item?.schedule || null,
     },
   };
+}
+
+async function twoGisById(id) {
+  const apiKey = clean(process.env.TWOGIS_API_KEY || process.env.DGIS_API_KEY, 500);
+  if (!apiKey || !id) return null;
+  const url = new URL(`${TWOGIS_ENDPOINT}/byid`);
+  url.searchParams.set('key', apiKey);
+  url.searchParams.set('id', id);
+  url.searchParams.set('locale', 'ru_RU');
+  url.searchParams.set('fields', 'items.contact_groups,items.address,items.full_address_name,items.description');
+  const response = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'APG-Sales-Scout/1.0' }, signal: AbortSignal.timeout(12000) });
+  const body = await response.json().catch(() => ({}));
+  return response.ok && !body?.meta?.error ? body?.result?.items?.[0] || null : null;
+}
+
+export async function lookupSalesLead(lead = {}) {
+  const results = await twoGisSearch([lead.name, lead.city || 'Зеленоград'].filter(Boolean).join(' '), 5);
+  const target = clean(lead.name, 180).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const item = results.find(row => clean(row.name, 180).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim() === target) || results[0];
+  if (!item) return null;
+  const detailed = await twoGisById(item.id);
+  return buildCandidate({ ...item, ...(detailed || {}) }, { city: lead.city || 'Зеленоград', category: lead.category || 'other' }, [lead.name, lead.city].filter(Boolean).join(' '));
 }
 
 async function twoGisSearch(query, count) {

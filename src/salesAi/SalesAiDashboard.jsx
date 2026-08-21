@@ -246,6 +246,38 @@ export function SalesAiDashboard() {
     }
   };
 
+  const enrichAllContacts = async () => {
+    if (busy || !leads.length) return;
+    const targets = leads.filter(lead => !lead.email && !lead.vkPeerId && !lead.telegramChatId);
+    if (!targets.length) {
+      setNotice('У всех лидов уже есть цифровой адресат для автоотправки.');
+      return;
+    }
+    setBusy(true);
+    let cursor = 0;
+    let completed = 0;
+    let enriched = 0;
+    const updates = new Map();
+    const worker = async () => {
+      while (cursor < targets.length) {
+        const lead = targets[cursor++];
+        try {
+          const data = await salesAgentRequest('contacts:enrich', { leadId: lead.id });
+          updates.set(lead.id, data.lead);
+          if (data.found?.length) enriched += 1;
+        } catch (error) {
+          updates.set(lead.id, { ...lead, contactEnrichmentError: error.message });
+        }
+        completed += 1;
+        setNotice(`Собираю контакты: ${completed} из ${targets.length}…`);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, targets.length) }, () => worker()));
+    setLeads(current => current.map(lead => updates.get(lead.id) || lead));
+    setNotice(`Повторная разведка завершена: проверено ${targets.length}, контакты найдены или подтверждены у ${enriched}. Сообщения не отправлялись.`);
+    setBusy(false);
+  };
+
   return (
     <main style={styles.page}>
       <header style={styles.header}>
@@ -254,7 +286,10 @@ export function SalesAiDashboard() {
           <h1 style={styles.h1}>Разведка → анализ → оффер → контакт → результат</h1>
           <p style={styles.muted}>Scout находит кандидатов, ты подтверждаешь, после чего Аналитик и Продажник подхватывают лид автоматически.</p>
         </div>
-        <button type="button" onClick={() => { loadLeads(); loadScoutQueue(); }} disabled={loading} style={styles.secondary}>{loading ? 'Загрузка…' : '↻ Обновить'}</button>
+        <div style={styles.headerActions}>
+          <button type="button" onClick={enrichAllContacts} disabled={busy || loading} style={styles.primarySmall}>{busy ? 'Собираю контакты…' : 'Найти контакты у всех лидов'}</button>
+          <button type="button" onClick={() => { loadLeads(); loadScoutQueue(); }} disabled={loading} style={styles.secondary}>{loading ? 'Загрузка…' : '↻ Обновить'}</button>
+        </div>
       </header>
 
       {notice && <div style={styles.noticeTop}>{notice}</div>}
@@ -375,6 +410,8 @@ export function SalesAiDashboard() {
                 <p style={styles.muted}>{selected.reasons?.join(' · ') || 'Недостаточно сигналов для подробной оценки'}</p>
                 {(selected.source || selected.sourceUrl) && <div style={styles.meta}>Источник: {selected.source || 'не указан'}{selected.sourceUrl ? ` · ${selected.sourceUrl}` : ''}</div>}
                 {selected.confidence != null && <div style={styles.meta}>Scout confidence: {Math.round(Number(selected.confidence) * 100)}%</div>}
+                {(selected.email || selected.vk || selected.telegram || selected.contact) && <div style={styles.contactSummary}>Найдено: {[selected.email, selected.vk, selected.telegram, selected.contact].filter(Boolean).join(' · ')}</div>}
+                {selected.contactEnrichedAt && <div style={styles.meta}>Контакты проверены: {new Date(selected.contactEnrichedAt).toLocaleString('ru-RU')} · источник: {selected.contactEnrichmentSource || 'не найден'}</div>}
                 <label style={styles.label}>Каналы автоотправки</label>
                 <div style={styles.channelFields} key={selected.id}>
                   <input style={styles.input} type="email" defaultValue={selected.email || ''} placeholder="Email" onBlur={e => { if (e.target.value !== (selected.email || '')) updateLead(selected.id, { email: e.target.value }); }} />
@@ -417,6 +454,7 @@ function confidenceStyle(value) { const n = Number(value || 0); return { padding
 const styles = {
   page: { minHeight: '100vh', background: '#0d0e16', color: '#f7f4ea', padding: 24, fontFamily: 'Inter, system-ui, sans-serif' },
   header: { maxWidth: 1180, margin: '0 auto 18px', display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' },
+  headerActions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
   eyebrow: { color: '#d8b75d', fontWeight: 850, letterSpacing: '.08em', fontSize: 12 },
   h1: { margin: '6px 0 8px', fontSize: 'clamp(25px,4vw,42px)' }, h2: { margin: '0 0 10px', fontSize: 17 }, muted: { color: '#aeb1bf' },
   noticeTop: { maxWidth: 1180, margin: '0 auto 12px', padding: '10px 12px', borderRadius: 12, background: '#181b28', border: '1px solid #343748', color: '#d8b75d', fontSize: 12 },
@@ -444,6 +482,7 @@ const styles = {
   empty: { padding: 18, borderRadius: 14, background: '#10121b', color: '#858999' },
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,330px),1fr))', gap: 18 },
   channelFields: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 7 },
+  contactSummary: { marginTop: 8, padding: 9, borderRadius: 10, background: '#10121b', color: '#c8cad3', fontSize: 11, wordBreak: 'break-word' },
   scoreRow: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 20 }, label: { display: 'block', margin: '12px 0 6px', color: '#aeb1bf', fontSize: 12, fontWeight: 800 }, meta: { fontSize: 11, color: '#858999', wordBreak: 'break-word', marginTop: 5 },
   textarea: { width: '100%', minHeight: 220, resize: 'vertical', boxSizing: 'border-box', borderRadius: 14, border: '1px solid #343748', background: '#0f111a', color: '#fff', padding: 12, lineHeight: 1.45 },
   offerActions: { display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' },
