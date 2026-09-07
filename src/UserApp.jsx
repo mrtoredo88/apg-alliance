@@ -1238,6 +1238,7 @@ export function UserApp() {
   const [consentSaving, setConsentSaving]       = useState(false);
   const [consentError, setConsentError]         = useState('');
   const [consentReloginNeeded, setConsentReloginNeeded] = useState(false);
+  const consentSaveInFlightRef                    = useRef(false);
   const [pendingNotificationPrompt, setPendingNotificationPrompt] = useState(false);
   const [showOnboarding, setShowOnboarding]     = useState(false);
   const [showPwaInstallGuide, setShowPwaInstallGuide] = useState(false);
@@ -3999,7 +4000,8 @@ export function UserApp() {
 
   const handleConsentAccept = useCallback(async ({ termsAccepted, privacyAccepted, notificationsAccepted }) => {
     const targetUser = consentRequest?.user;
-    if (!targetUser?.id || !termsAccepted || !privacyAccepted || consentSaving) return;
+    if (!targetUser?.id || !termsAccepted || !privacyAccepted || consentSaving || consentSaveInFlightRef.current) return;
+    consentSaveInFlightRef.current = true;
     setConsentSaving(true);
     setConsentError('');
     traceAuthStage('CONSENTS_SAVE_STARTED', {
@@ -4097,6 +4099,7 @@ export function UserApp() {
         showToast('Ошибка входа: CONSENT_SAVE_FAILED', 'error');
       }
     } finally {
+      consentSaveInFlightRef.current = false;
       if (mountedRef.current) setConsentSaving(false);
     }
   }, [

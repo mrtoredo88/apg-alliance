@@ -100,6 +100,9 @@ export function ConsentScreen({
   const [notificationsAccepted, setNotificationsAccepted] = useState(notificationsDefault);
   const canContinue = termsAccepted && privacyAccepted && !loading;
   const firstName = user?.first_name || user?.firstName || user?.name?.split(' ')?.[0] || '';
+  const submitConsent = () => {
+    if (canContinue) onAccept?.({ termsAccepted, privacyAccepted, notificationsAccepted });
+  };
 
   return (
     <div
@@ -182,12 +185,19 @@ export function ConsentScreen({
         <form
           onSubmit={event => {
             event.preventDefault();
-            if (canContinue) onAccept?.({ termsAccepted, privacyAccepted, notificationsAccepted });
+            submitConsent();
           }}
           style={{ display: 'grid', gap: 10, marginTop: 18 }}
         >
           <GlassButton
             type="submit"
+            onClick={event => {
+              // Some embedded/desktop WebViews do not dispatch a reliable form
+              // submit for our styled button. Invoke the same guarded action
+              // directly and prevent the form from submitting it a second time.
+              event.preventDefault();
+              submitConsent();
+            }}
             disabled={!canContinue}
             tone="gold"
             style={{ width: '100%', minHeight: 54, color: '#17120a', fontSize: 15, fontWeight: 880 }}

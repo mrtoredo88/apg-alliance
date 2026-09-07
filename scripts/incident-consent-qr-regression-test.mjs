@@ -11,6 +11,8 @@ const emailAuthRoute = readFileSync(new URL('../server/src/routes/email-auth.js'
 assert.match(consentScreen, /type="checkbox"/);
 assert.match(consentScreen, /onSubmit=/);
 assert.match(consentScreen, /type="submit"/);
+assert.match(consentScreen, /onClick=\{event => \{[\s\S]*event\.preventDefault\(\);[\s\S]*submitConsent\(\);/, 'desktop consent button invokes its action directly');
+assert.match(userApp, /consentSaveInFlightRef\.current/, 'rapid repeated consent taps are blocked synchronously');
 assert.match(userApp, /timeoutMs: 10000/);
 assert.match(userApp, /retryOnTimeout: true/);
 assert.match(userActions, /writeAccountProfileRequired\(userId, accountProfileForSync/);
