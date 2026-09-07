@@ -179,6 +179,11 @@ export class AccountCoreService {
     return this.measure('postgres', () => this.cabinets.upsert(payload));
   }
 
+  async claimOwnedEntitiesByEmail(payload) {
+    this.metrics.increment('accountWrites');
+    return this.measure('postgres', () => this.cabinets.claimOwnedEntitiesByEmail(payload));
+  }
+
   async bootstrapWorkspace(userId) {
     this.metrics.increment('workspaceBootstrap');
     const [profile, roleState, cabinets] = await Promise.all([

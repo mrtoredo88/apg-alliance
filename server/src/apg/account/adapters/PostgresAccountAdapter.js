@@ -19,7 +19,7 @@ export class PostgresAccountAdapter extends PostgresIdentityAdapter {
     if (!this.accountSchemaPromise) {
       this.accountSchemaPromise = (async () => {
         const schemaPath = path.resolve(__dirname, '../schema/account-core.sql');
-        await this.client.query(fs.readFileSync(schemaPath, 'utf8'));
+        await this.runSchemaMigration('apg:account-core-schema', fs.readFileSync(schemaPath, 'utf8'));
         this.accountSchemaReady = true;
         return { ok: true };
       })().catch(error => {

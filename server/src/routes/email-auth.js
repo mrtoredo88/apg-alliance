@@ -581,6 +581,9 @@ function classifyEmailLoginError(error) {
   if (code === 'EMAIL_CODE_INVALID') return { code, statusCode: 400 };
   if (code === 'EMAIL_CODE_EXPIRED') return { code, statusCode: 400 };
   if (code === 'EMAIL_AUTH_TEMPORARILY_UNAVAILABLE') return { code, statusCode: 503 };
+  if (code === '40P01' || code === '40001' || /deadlock detected/i.test(message)) {
+    return { code: 'EMAIL_AUTH_TEMPORARILY_UNAVAILABLE', statusCode: 503 };
+  }
   if (code.includes('RESOURCE_EXHAUSTED') || message.includes('RESOURCE_EXHAUSTED') || message.includes('Quota exceeded')) {
     return { code: 'EMAIL_FIRESTORE_QUOTA', statusCode: 503 };
   }

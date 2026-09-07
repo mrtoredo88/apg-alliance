@@ -66,7 +66,7 @@ export class PostgresIdentityAdapter {
       this.schemaPromise = (async () => {
         const schemaPath = path.resolve(__dirname, '../../identity/schema/identity-v2.sql');
         const sql = fs.readFileSync(schemaPath, 'utf8');
-        await this.client.query(sql);
+        await this.runSchemaMigration('apg:identity-v2-schema', sql);
         this.schemaReady = true;
         return { ok: true };
       })().catch(error => {
@@ -75,6 +75,25 @@ export class PostgresIdentityAdapter {
       });
     }
     return this.schemaPromise;
+  }
+
+  async runSchemaMigration(lockName, sql) {
+    const client = await this.client.connect();
+    let locked = false;
+    try {
+      // Several serverless instances may cold-start at the same time. PostgreSQL
+      // DDL can otherwise deadlock while each instance runs the same idempotent
+      // schema file. A session advisory lock serializes schema initialization
+      // across processes without affecting ordinary application queries.
+      await client.query('SELECT pg_advisory_lock(hashtext($1))', [String(lockName)]);
+      locked = true;
+      await client.query(sql);
+    } finally {
+      if (locked) {
+        await client.query('SELECT pg_advisory_unlock(hashtext($1))', [String(lockName)]).catch(() => {});
+      }
+      client.release();
+    }
   }
 
   async query(sql, params = []) {

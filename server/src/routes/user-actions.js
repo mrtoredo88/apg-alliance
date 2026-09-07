@@ -978,6 +978,13 @@ async function actionProfileSync(db, req, actor) {
   }
   await writeAccountProfileRequired(userId, accountProfileForSync, { bootstrap: { profileSync: true, created } });
   if (accountCoreWriteEnabled()) {
+    const verifiedOwnerEmail = safeString(userDoc?.email || userDoc?.linkedEmail || profile?.email || profile?.linkedEmail, 220).toLowerCase();
+    if (verifiedOwnerEmail) {
+      await serverFoundation.account.claimOwnedEntitiesByEmail({ userId, email: verifiedOwnerEmail }).catch(error => {
+        serverFoundation.account.metrics.recordError(error);
+        return [];
+      });
+    }
     const cabinetLinks = [
       ...Array.from(new Set([
         userDoc?.partnerId,

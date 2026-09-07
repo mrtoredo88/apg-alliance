@@ -22,6 +22,15 @@ function normalizeTelegramId(value) {
   return raw.startsWith('tg_') ? raw.slice(3) : raw;
 }
 
+function isRetryablePostgresIdentityError(error) {
+  const code = String(error?.code || error?.error || '');
+  return code === '40P01' || code === '40001';
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export class ApgIdentityV2Service {
   constructor({ repository, sessionRepository, tokenProvider = null, flags = {}, metrics = null } = {}) {
     this.repository = repository;
@@ -60,26 +69,32 @@ export class ApgIdentityV2Service {
     const startedAt = Date.now();
     const normalized = normalizeEmail(email);
     if (!normalized) throw Object.assign(new Error('Некорректный email.'), { statusCode: 400, code: 'INVALID_EMAIL' });
-    try {
-      this.metrics.yandexReads += 1;
-      const identity = await this.repository.resolveByEmail(normalized);
-      if (!identity && createIfMissing) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        this.metrics.yandexReads += 1;
+        const identity = await this.repository.resolveByEmail(normalized);
+        if (!identity && createIfMissing) {
+          this.metrics.yandexWrites += 1;
+          const created = await this.repository.createEmailIdentity({ email: normalized, ref });
+          this.metrics.lastLoginTimeMs = Date.now() - startedAt;
+          this.metrics.lastSource = created.source || 'identity_v2_created';
+          return created;
+        }
+        if (!identity?.userId) throw Object.assign(new Error('Пользователь не найден.'), { statusCode: 404, code: 'USER_NOT_FOUND' });
         this.metrics.yandexWrites += 1;
-        const created = await this.repository.createEmailIdentity({ email: normalized, ref });
+        await this.repository.users.updateLastSeen(identity.userId).catch(() => {});
         this.metrics.lastLoginTimeMs = Date.now() - startedAt;
-        this.metrics.lastSource = created.source || 'identity_v2_created';
-        return created;
+        this.metrics.lastSource = identity.source || 'identity_v2';
+        return identity;
+      } catch (error) {
+        if (attempt < 2 && isRetryablePostgresIdentityError(error)) {
+          await wait(40 * (attempt + 1));
+          continue;
+        }
+        this.metrics.lastLoginTimeMs = Date.now() - startedAt;
+        this.metrics.lastError = classify(error);
+        throw error;
       }
-      if (!identity?.userId) throw Object.assign(new Error('Пользователь не найден.'), { statusCode: 404, code: 'USER_NOT_FOUND' });
-      this.metrics.yandexWrites += 1;
-      await this.repository.users.updateLastSeen(identity.userId).catch(() => {});
-      this.metrics.lastLoginTimeMs = Date.now() - startedAt;
-      this.metrics.lastSource = identity.source || 'identity_v2';
-      return identity;
-    } catch (error) {
-      this.metrics.lastLoginTimeMs = Date.now() - startedAt;
-      this.metrics.lastError = classify(error);
-      throw error;
     }
   }
 
