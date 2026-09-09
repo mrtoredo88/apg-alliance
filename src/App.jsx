@@ -49,6 +49,8 @@ export function App() {
               <UserApp />
             </Suspense>
           } />
+          <Route path="/offers" element={<Suspense fallback={<AppFallback />}><UserApp /></Suspense>} />
+          <Route path="/profile" element={<Suspense fallback={<AppFallback />}><UserApp /></Suspense>} />
           <Route path="/events" element={
             <Suspense fallback={<AppFallback label="Открываем афишу..." />}>
               <UserApp />

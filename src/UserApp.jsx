@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense, useRef, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { APP_URL, API_BASE_URL, WEB_PUSH_VAPID_PUBLIC_KEY } from './constants.js';
 import { createPortal } from 'react-dom';
 import { AdaptivityProvider, ConfigProvider, AppRoot, View, Panel } from '@vkontakte/vkui';
@@ -76,7 +77,7 @@ import {
 } from './firebase/resilience/index.js';
 import { BOOTSTRAP_PRIORITIES, scheduleBootstrapTask } from './bootstrap/index.js';
 import { clearPendingReferral, drainReferralEventQueue, getReferralContext, readPendingReferral, refLog } from './referralDiagnostics.js';
-import { getWorkspaceMode, getWorkspaceNavigation, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
+import { getWorkspaceMode, getWorkspaceNavigation, USER_MODE_NAV_ITEMS, WORKSPACE_MODES } from './workspace/WorkspaceCore.js';
 import { canUseDesktopWorkspace, getDesktopWorkspaceFlag, getWorkspaceUserRoles, isDesktopWorkspaceDevice, resolveDesktopWorkspaceMode } from './workspace/WorkspaceFeatureFlags.js';
 import { getRoleDiagnostics } from './roleEngine.js';
 import { requestPwaDiagnostics, subscribePwaUpdate } from './pwa/PwaUpdateManager.js';
@@ -259,6 +260,7 @@ function readAppDeepLink() {
     return { type: 'news-list', id: '' };
   }
   if (section === 'event' && id) return { type: 'event', id };
+  if (section === 'offers') return { type: 'offers', id: '' };
   if (section === 'events') return { type: 'events', id: '' };
   if (section === 'partner' && id) {
     qrLog('deep link', {
@@ -277,6 +279,7 @@ function readAppDeepLink() {
 }
 
 function getInitialPanelFromDeepLink(deepLink) {
+  if (deepLink.type === 'offers') return 'offers';
   if (deepLink.type === 'news') return 'news';
   if (deepLink.type === 'news-list') return 'news';
   if (deepLink.type === 'event' || deepLink.type === 'events') return 'events';
@@ -514,7 +517,7 @@ function PostVisitMoment({ booking, provider, user, userKeys, onClose, onSubmitR
 
 initErrorLogger();
 
-const SWIPE_TABS = ['home', 'offers', 'experts', 'profile'];
+const MAIN_PANEL_IDS = USER_MODE_NAV_ITEMS.map(item => item.panelId).filter(Boolean);
 const PULL_REFRESH_PANELS = new Set([
   'home', 'offers', 'experts', 'events', 'news', 'partners', 'nearby',
   'favorites', 'notifications', 'rewards', 'activity', 'profile', 'tasks', 'leaderboard',
@@ -1069,6 +1072,8 @@ function LokiLogoDialog() {
 
 export function UserApp() {
   countRender('UserApp');
+  const routeLocation = useLocation();
+  const navigateRoute = useNavigate();
   const userAppMountedAt = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
   const performanceReadyRef = useRef({ journey: false, loki: false, workspace: false, home: false });
   const initialDeepLink                         = useMemo(readAppDeepLink, []);
@@ -1437,6 +1442,16 @@ export function UserApp() {
     }).catch(() => {});
   }, [verifyEmailToken]);
 
+  useEffect(() => {
+    const deepLink = readAppDeepLink();
+    const panel = getInitialPanelFromDeepLink(deepLink);
+    if (!deepLink.id && (MAIN_PANEL_IDS.includes(panel) || panel === 'experts')) {
+      setActivePanel(panel);
+      setIsScannerOpen(false);
+      panelHistoryRef.current = [panel];
+    }
+  }, [routeLocation.key]);
+
   const navigatePanel = useCallback((id, { replace = false, direction = 'forward' } = {}) => {
     if (!id) return;
     setIsScannerOpen(false);
@@ -1450,6 +1465,9 @@ export function UserApp() {
       if (history.length > 24) history.shift();
     }
     setActivePanel(id);
+    if (MAIN_PANEL_IDS.includes(id)) {
+      navigateRoute({ pathname: id === 'home' ? '/' : `/${id}`, search: window.location.search }, { replace });
+    }
     trackAppEvent(`screen:${id}:open`, {
       type: id === 'home' ? APG_EVENT_TYPES.SCREEN_OPENED : id === 'loki' ? APG_EVENT_TYPES.LOKI_OPENED : APG_EVENT_TYPES.SCREEN_OPENED,
       user,
@@ -1458,7 +1476,7 @@ export function UserApp() {
       payload: { panel: id, direction, replace },
       source: platformSource,
     });
-  }, [platformSource, user]);
+  }, [navigateRoute, platformSource, user]);
 
   const getFallbackBackPanel = useCallback((panel) => {
     if (panel === 'activity' || panel === 'referral' || panel === 'partner-cabinet' || panel === 'expert-cabinet' || panel === 'partnership' || panel === 'dialogs') return 'profile';
@@ -1483,8 +1501,11 @@ export function UserApp() {
     setPanelTransition('back');
     setShowScannerHint(false);
     setActivePanel(target);
+    if (MAIN_PANEL_IDS.includes(target)) {
+      navigateRoute({ pathname: target === 'home' ? '/' : `/${target}`, search: window.location.search }, { replace: true });
+    }
     return true;
-  }, [activePanel, getFallbackBackPanel, isScannerOpen]);
+  }, [activePanel, getFallbackBackPanel, isScannerOpen, navigateRoute]);
 
   const goPanel = useCallback((id) => {
     navigatePanel(id);
@@ -4212,7 +4233,7 @@ export function UserApp() {
     }).catch(() => {});
   }, [user]);
 
-  // ─── Свайп-навигация между основными табами ─────────────────────────────────
+  // Main panels use button navigation; edge-back remains available on detail screens.
 
   const swipeTouchX  = useRef(null);
   const swipeTouchY  = useRef(null);
@@ -4227,7 +4248,7 @@ export function UserApp() {
     setPullDistance(0);
     swipeTouchX.current = gestureBoundary ? null : touch.clientX;
     swipeTouchY.current = gestureBoundary ? null : touch.clientY;
-    edgeSwipeRef.current = !gestureBoundary && touch.clientX <= 24 && (activePanel !== 'home' || panelHistoryRef.current.length > 1);
+    edgeSwipeRef.current = !gestureBoundary && touch.clientX <= 24 && !MAIN_PANEL_IDS.includes(activePanel);
     pullTouchRef.current = {
       active: pullState.active,
       startY: touch.clientY,
@@ -4298,13 +4319,7 @@ export function UserApp() {
     if (pull.active) logGestureDebug('pull_release_without_refresh', { started: pull.started, dx, dy, reason: pull.reason });
     setPullDistance(0);
 
-    // Только горизонтальные свайпы > 90px при вертикальном сдвиге < 60px
-    if (wasEdgeSwipe || Math.abs(dx) < 90 || Math.abs(dy) > 60) return;
-    const idx = SWIPE_TABS.indexOf(activePanel);
-    if (idx === -1) return;          // не на основном табе
-    if (dx < 0 && idx < SWIPE_TABS.length - 1) { goPanel(SWIPE_TABS[idx + 1]); }
-    if (dx > 0 && idx > 0)                      { goPanel(SWIPE_TABS[idx - 1]); }
-  }, [activePanel, goBackPanel, goPanel, triggerPullRefresh]);
+  }, [goBackPanel, triggerPullRefresh]);
 
   const handleSwipeCancel = useCallback(() => {
     swipeTouchX.current = null;
@@ -4878,6 +4893,7 @@ export function UserApp() {
           <button key={tab.id}
             ref={node => { tabSlotRefs.current[i] = node; }}
             data-apg-tab-slot={tab.id}
+            aria-current={isActive ? 'page' : undefined}
             aria-label={`Открыть раздел ${tab.label}`}
             onClick={() => { goPanel(tab.id); }}
             style={{ flex: 1, background: 'none', border: '1px solid transparent', borderRadius: 18, boxShadow: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 0, position: 'relative', zIndex: 1, minWidth: 0, transform: isActive ? 'translateY(-0.5px)' : 'translateY(0)', transition: motionTransition(['transform', 'background', 'border-color', 'box-shadow'], 'base') }}>

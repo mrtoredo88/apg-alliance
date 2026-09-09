@@ -602,3 +602,14 @@ remains available without becoming visible in the public directory.
 The Profile `Люди` sheet loads the canonical participant directory when the search
 field is empty. Text search switches to server-side filtering from two characters;
 a one-character query filters the already loaded directory locally.
+
+## 2026-09-09 — Mobile island navigation
+
+Removed the stale SWIPE_TABS route list. USER_MODE_NAV_ITEMS is the canonical
+source for main panel IDs; horizontal gestures and edge-back cannot switch the
+main panels. Edge-back on detail screens and vertical pull-to-refresh remain.
+The existing events button maps to events, while experts stays a separate entry.
+Main panel navigation now updates React Router; /offers and /profile are registered,
+and browser history restores the active panel. Buttons expose aria-current.
+Regression coverage: scripts/mobile-island-navigation-test.mjs and
+scripts/mobile-island-browser-test.mjs (APG_TEST_URL accepts a local server URL).

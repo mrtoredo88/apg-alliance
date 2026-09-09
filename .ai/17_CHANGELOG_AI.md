@@ -4855,3 +4855,14 @@
 - Добавлены серверные операции проверки, атомарной ротации и отзыва native APG-сессии.
 - Клиент заранее обновляет долгоживущий токен и объединяет параллельные refresh-запросы, исключая двойную ротацию.
 - В локальном хранилище фиксируются время выдачи и срок сессии; добавлен стресс-контракт на 100 параллельных обращений.
+
+## 2026-09-09 — Mobile island navigation
+
+Removed the stale SWIPE_TABS route list. USER_MODE_NAV_ITEMS is the canonical
+source for main panel IDs; horizontal gestures and edge-back cannot switch the
+main panels. Edge-back on detail screens and vertical pull-to-refresh remain.
+The existing events button maps to events, while experts stays a separate entry.
+Main panel navigation now updates React Router; /offers and /profile are registered,
+and browser history restores the active panel. Buttons expose aria-current.
+Regression coverage: scripts/mobile-island-navigation-test.mjs and
+scripts/mobile-island-browser-test.mjs (APG_TEST_URL accepts a local server URL).
