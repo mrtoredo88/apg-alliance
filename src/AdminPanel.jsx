@@ -4071,7 +4071,7 @@ function AIDraftsPanel() {
   const [data, setData] = useState({ sources: [], drafts: [], activity: [], runs: [], stats: {}, settings: {} });
   const [sourceName, setSourceName] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
-  const [sourceType, setSourceType] = useState('rss');
+  const [sourceType, setSourceType] = useState('website');
   const [intervalMinutes, setIntervalMinutes] = useState(10);
   const [confidenceThreshold, setConfidenceThreshold] = useState(70);
   const [maxItemsPerRun, setMaxItemsPerRun] = useState(20);
@@ -4112,13 +4112,24 @@ function AIDraftsPanel() {
   };
 
   const saveSource = async () => {
-    if (!sourceName.trim()) return;
+    if (!sourceName.trim()) {
+      setError('Укажите название источника.');
+      return;
+    }
+    let normalizedUrl;
+    try {
+      normalizedUrl = new URL(sourceUrl.trim());
+      if (!['http:', 'https:'].includes(normalizedUrl.protocol)) throw new Error();
+    } catch {
+      setError('Укажите корректный URL, например https://vedogon.ru/.');
+      return;
+    }
     setError('');
     try {
-      await lokiEditorRequest('source:save', { source: { name: sourceName.trim(), url: sourceUrl.trim(), type: sourceType, active: true, intervalMinutes: 10 } });
+      await lokiEditorRequest('source:save', { source: { name: sourceName.trim(), url: normalizedUrl.href, type: sourceType, active: true, intervalMinutes: 10 } });
       setSourceName('');
       setSourceUrl('');
-      setSourceType('rss');
+      setSourceType('website');
       await load();
     } catch (e) {
       setError(e.message || 'Источник не сохранён.');
@@ -4163,6 +4174,8 @@ function AIDraftsPanel() {
 
   const stats = data.stats || {};
   const readyDrafts = (data.drafts || []).filter(d => d.status !== 'rejected').sort((a, b) => Number(toJsDate(b.createdAt || b.fetchedAt) || 0) - Number(toJsDate(a.createdAt || a.fetchedAt) || 0));
+  const sourceTypeLabels = { website: 'Сайт', rss: 'RSS/XML', json: 'JSON' };
+  const sourceStatusLabels = { new: 'ещё не проверен', ok: 'проверен', error: 'ошибка' };
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
@@ -4236,18 +4249,21 @@ function AIDraftsPanel() {
           <div style={{ ...s.card, marginBottom: 0 }}>
             <h2 style={s.h2}>Источники</h2>
             <input style={s.input} value={sourceName} onChange={e => setSourceName(e.target.value)} placeholder="Название источника" />
-            <input style={s.input} value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="URL RSS / JSON" />
+            <input style={s.input} value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder={sourceType === 'website' ? 'URL сайта, например https://vedogon.ru/' : sourceType === 'json' ? 'URL JSON' : 'URL RSS / XML'} />
             <select style={s.input} value={sourceType} onChange={e => setSourceType(e.target.value)}>
+              <option value="website">Сайт</option>
               <option value="rss">RSS / XML</option>
-              <option value="json">JSON API</option>
-              <option value="manual">Ручной импорт</option>
+              <option value="json">JSON</option>
             </select>
+            {sourceType === 'website' && <div style={{ color: A.textSec, fontSize: 12, lineHeight: '18px', marginTop: -4 }}>Локи попробует найти публичные разделы с новостями и афишей или подключить RSS, если сайт её объявляет.</div>}
             <button style={{ ...s.btnGold, width: '100%' }} onClick={saveSource}>➕ Добавить источник</button>
             <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
               {(data.sources || []).slice(0, 12).map(source => (
                 <div key={source.id} style={{ padding: 11, borderRadius: 14, background: A.chip, border: `1px solid ${A.border}` }}>
                   <div style={{ color: A.text, fontWeight: 850, fontSize: 13 }}>{source.name}</div>
-                  <div style={{ color: A.textSec, fontSize: 11.5, marginTop: 3 }}>{source.type} · {source.status || 'new'}</div>
+                  <div style={{ color: source.status === 'error' ? '#fecdd3' : A.textSec, fontSize: 11.5, marginTop: 3 }}>{sourceTypeLabels[source.type] || source.type} · {sourceStatusLabels[source.status] || source.status || sourceStatusLabels.new}</div>
+                  {source.lastError && <div style={{ color: '#fecdd3', fontSize: 11.5, lineHeight: '17px', marginTop: 5 }}>{source.lastError}</div>}
+                  {source.status === 'ok' && Array.isArray(source.discoveredUrls) && source.discoveredUrls.length > 0 && <div style={{ color: A.textSec, fontSize: 11, lineHeight: '16px', marginTop: 5 }}>Обнаружено разделов: {source.discoveredUrls.length}</div>}
                 </div>
               ))}
             </div>

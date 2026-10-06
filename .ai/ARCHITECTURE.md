@@ -68,7 +68,7 @@
 
 - UI/персонаж живёт на frontend.
 - Настройки синхронизируются через `/api/user-actions` `loki:settings`.
-- V5.0 редакционный интеллект живёт в `/api/loki-editor`: Source Manager, Parser, Duplicate Checker, Draft Generator, Queue Manager, Activity Logger.
+- V5.0 редакционный интеллект живёт в `/api/loki-editor`: Source Manager для обычных сайтов, RSS/XML и JSON, обнаружение публичных разделов, Parser, Duplicate Checker, Draft Generator, Queue Manager, Activity Logger.
 - Локи не публикует новости сам. Он создаёт `aiDrafts`, объясняет важность и ждёт решения редактора.
 
 ## Backend API

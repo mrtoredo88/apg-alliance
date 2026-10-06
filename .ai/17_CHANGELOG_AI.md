@@ -4866,3 +4866,10 @@ Main panel navigation now updates React Router; /offers and /profile are registe
 and browser history restores the active panel. Buttons expose aria-current.
 Regression coverage: scripts/mobile-island-navigation-test.mjs and
 scripts/mobile-island-browser-test.mjs (APG_TEST_URL accepts a local server URL).
+
+## 2026-10-06 — Обычные сайты в «Локи · Редакция»
+
+- В источники редактора добавлен тип «Сайт» с обычным публичным URL; RSS/XML и JSON сохранены.
+- Сервер ищет объявленную RSS/Atom-ленту или доступные внутренние разделы новостей, афиши, событий и репертуара, а найденное по-прежнему сохраняет только как редакционные черновики.
+- Ошибки адреса, доступа и автоматического обнаружения сохраняются у конкретного источника и показываются в админке без остановки общего цикла.
+- Добавлена проверка публичности URL, ограничение размера ответа, таймауты и проверка каждого перенаправления.
